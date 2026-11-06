@@ -1,12 +1,19 @@
 #include "http.hpp"
 
+#include "log/log.hpp"
+#include "plugin/plugin.hpp"
+#include "store/store.hpp"
+
 #include <crow.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <cstdlib>
+#include <fstream>
 #include <memory>
+#include <sstream>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -14,9 +21,26 @@ namespace {
 
 constexpr int kPageSize = 12;
 
+const char* logo_mime(std::string_view path) {
+    const auto ext = path.substr(path.find_last_of('.') + 1);
+    if (ext == "png") {
+        return "image/png";
+}
+    if (ext == "svg") {
+        return "image/svg+xml";
+}
+    if (ext == "jpg" || ext == "jpeg") {
+        return "image/jpeg";
+}
+    if (ext == "avif") {
+        return "image/avif";
+}
+    return "application/octet-stream";
+}
+
 std::string param(const crow::request& req, const char* key) {
     const char* value = req.url_params.get(key);
-    return value ? value : "";
+    return (value != nullptr) ? value : "";
 }
 
 int page_of(const std::string& text) {
@@ -25,9 +49,10 @@ int page_of(const std::string& text) {
 }
 
 // Every database call runs on the single db worker, which owns the one connection.
-template <class Fn> auto on_db(BS::thread_pool<>& db, Fn fn) -> decltype(fn()) {
+// Same wrapper serves the plugin pool: one future hop, caller blocks.
+template <class Fn> auto on_pool(BS::thread_pool<>& pool, Fn fn) -> decltype(fn()) {
     auto done = std::make_shared<std::promise<decltype(fn())>>();
-    db.detach_task([done, fn = std::move(fn)] {
+    pool.detach_task([done, fn = std::move(fn)] {
         try {
             done->set_value(fn());
         } catch (...) {
@@ -37,7 +62,7 @@ template <class Fn> auto on_db(BS::thread_pool<>& db, Fn fn) -> decltype(fn()) {
     try {
         return done->get_future().get();
     } catch (const std::exception& e) {
-        spdlog::error("on_db failed: {}", e.what());
+        spdlog::error("on_pool failed: {}", e.what());
         throw;
     }
 }
@@ -53,11 +78,11 @@ crow::json::wvalue home_context(Store& store, BS::thread_pool<>& db, const crow:
     const std::string q = param(req, "q");
     const int page_no = page_of(param(req, "page"));
 
-    const auto plugins = on_db(db, [&] { return store.plugins(); });
-    const int total = on_db(db, [&] { return store.count(plugin, q); });
+    const auto plugins = on_pool(db, [&] { return store.plugins(); });
+    const int total = on_pool(db, [&] { return store.count(plugin, q); });
     const int pages = std::max(1, (total + kPageSize - 1) / kPageSize);
     const int shown = std::min(page_no, pages);
-    const auto titles = on_db(db, [&] { return store.search(plugin, q, kPageSize, (shown - 1) * kPageSize); });
+    const auto titles = on_pool(db, [&] { return store.search(plugin, q, kPageSize, (shown - 1) * kPageSize); });
 
     auto ctx = layout("library");
     ctx["q"] = q;
@@ -77,6 +102,8 @@ crow::json::wvalue home_context(Store& store, BS::thread_pool<>& db, const crow:
         row["name"] = item.name;
         row["titles"] = std::to_string(item.titles);
         row["current"] = item.name == plugin;
+        if (!item.plugin_id.empty())
+            row["logo"] = item.plugin_id; // absent key renders no <img> in the partial
         plugin_rows.push_back(std::move(row));
     }
     ctx["plugins"] = std::move(plugin_rows);
@@ -100,7 +127,8 @@ crow::response html(const std::string& file, crow::json::wvalue ctx) {
 
 } // namespace
 
-void serve(Store& store, BS::thread_pool<>& db, LogBuffer& logs, int port) {
+void serve(Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool, plugin::Host& plugins,
+           LogBuffer& logs, int port) {
     crow::SimpleApp app;
     crow::mustache::set_base("templates");
 
@@ -117,6 +145,43 @@ void serve(Store& store, BS::thread_pool<>& db, LogBuffer& logs, int port) {
     CROW_ROUTE(app, "/history")([] { return html("blank.mustache", layout("history")); });
     CROW_ROUTE(app, "/plugins")([] { return html("blank.mustache", layout("plugins")); });
     CROW_ROUTE(app, "/about")([] { return html("blank.mustache", layout("about")); });
+
+    // Dev endpoint: rescan the plugin dir, re-register, no restart.
+    CROW_ROUTE(app, "/plugins/reload").methods(crow::HTTPMethod::POST)([&] {
+        const int n = on_pool(db, [&] { return plugins.load_all(store); });
+        crow::json::wvalue out;
+        out["count"] = n;
+        crow::response r{out};
+        r.set_header("Content-Type", "application/json");
+        return r;
+    });
+
+    // /plugin/<id>/logo serves the logo file; any other <action> is an ABI
+    // envelope call with the query string as the params object (debug path).
+    CROW_ROUTE(app, "/plugin/<string>/<string>")
+    ([&](const crow::request& req, std::string id, std::string action) -> crow::response {
+        if (action == "logo") {
+            const std::string path = plugins.logo_path(id);
+            if (path.empty()) {
+                crow::response r;
+                r.code = 404;
+                r.body = "no logo\n";
+                return r;
+            }
+            std::ifstream f(path, std::ios::binary);
+            std::stringstream ss;
+            ss << f.rdbuf();
+            crow::response r{ss.str()};
+            r.set_header("Content-Type", logo_mime(path));
+            return r;
+        }
+        crow::json::wvalue p;
+        for (const auto& k : req.url_params.keys())
+            p[k] = req.url_params.get(k);
+        crow::response r{on_pool(plugin_pool, [&] { return plugins.call(id, action, p.dump()); })};
+        r.set_header("Content-Type", "application/json");
+        return r;
+    });
 
     CROW_ROUTE(app, "/logs")
     ([&] {

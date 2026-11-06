@@ -1,5 +1,6 @@
 #include "http/http.hpp"
 #include "log/log.hpp"
+#include "plugin/plugin.hpp"
 #include "store/store.hpp"
 
 #include <CLI/CLI.hpp> // system 2.7.2: flag parsing
@@ -32,9 +33,8 @@ int main(int argc, char** argv) {
     // ui pool is crow's own thread pool. db stays at 1: Store holds one connection.
     // ponytail: fetch pool exists so the layout matches the target, nothing calls it yet.
     BS::thread_pool<> db_pool(1);
-    BS::thread_pool<> fetch_pool(2);
+    BS::thread_pool<> plugin_pool(2); // blocking http.fetch and plugin calls live here
     BS::thread_pool<> log_pool(1);
-    (void)fetch_pool;
 
     std::atomic<bool> running{true};
     log_pool.detach_task([&] {
@@ -59,7 +59,20 @@ int main(int argc, char** argv) {
     if (port < 0)
         port = 8090;
 
+    // [plugin]: discovery dir and http.fetch defaults; resolved values logged for ops.
+    plugin::Config plugin_conf;
+    plugin_conf.dir = ini.GetValue("plugin", "plugins", "data/plugins");
+    plugin_conf.fetch_timeout_ms = ini.GetLongValue("plugin", "fetch_timeout_ms", 30000);
+    plugin_conf.fetch_profile = ini.GetValue("plugin", "fetch_profile", "chrome116");
+    plugin_conf.instruction_budget = ini.GetLongValue("plugin", "plugin_timeout_ops", 5000000);
+    spdlog::info("plugins dir={} fetch_timeout_ms={} fetch_profile={} ops={}", //
+                 plugin_conf.dir, plugin_conf.fetch_timeout_ms, plugin_conf.fetch_profile,
+                 plugin_conf.instruction_budget);
+
+    plugin::Host plugins{plugin_conf};
+    plugins.load_all(store);
+
     spdlog::info("cppIsekai listening on :{} (config: {})", port, conf);
-    serve(store, db_pool, logs, port);
+    serve(store, db_pool, plugin_pool, plugins, logs, port);
     running.store(false);
 }

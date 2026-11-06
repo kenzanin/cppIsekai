@@ -27,6 +27,7 @@ add_executable(cppIsekai
     src/main.cpp
     src/store/store.cpp
     src/http/http.cpp
+    src/plugin/plugin.cpp
 )
 target_include_directories(cppIsekai PRIVATE
     src
@@ -58,6 +59,27 @@ target_link_libraries(test_store PRIVATE sqlite3)
 target_compile_options(test_store PRIVATE -Wall -Wextra)
 enable_testing()
 add_test(NAME store COMMAND test_store)
+
+# plugin module: loader/sandbox/ABI/host tools; fixtures under tests/fixtures
+target_include_directories(cppIsekai PRIVATE ${TP}/glaze ${TP}/sol2/include)
+add_executable(test_plugin tests/test_plugin.cpp src/plugin/plugin.cpp src/store/store.cpp)
+target_include_directories(test_plugin PRIVATE
+    src
+    ${TP}/glaze
+    ${TP}/sol2/include
+    ${TP}/sqlite_orm/include
+    ${TP}/readerwriterqueue/include
+)
+target_link_libraries(test_plugin PRIVATE
+    sqlite3
+    PkgConfig::LUA
+    ${TP}/curl-impersonate/lib/libcurl-impersonate-chrome.so.4.8.0
+    spdlog::spdlog
+)
+target_compile_options(test_plugin PRIVATE -Wall -Wextra)
+target_compile_definitions(test_plugin PRIVATE TEST_PLUGIN_FIXTURES="${PROJECT_SOURCE_DIR}/tests/fixtures/plugins")
+set_target_properties(test_plugin PROPERTIES BUILD_RPATH "${TP}/curl-impersonate/lib")
+add_test(NAME plugin COMMAND test_plugin)
 
 # ponytail: no CPack/install yet -- add when packaging matters
 

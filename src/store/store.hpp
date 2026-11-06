@@ -11,6 +11,7 @@ struct Plugin {
     std::int64_t id{};
     std::string name;
     int titles{};
+    std::string plugin_id; // stable plugin key (folder id); empty for seed rows
 };
 
 struct Title {
@@ -30,6 +31,9 @@ public:
     Store& operator=(const Store&) = delete;
 
     std::vector<Plugin> plugins();
+    // Register/upsert a discovered plugin keyed by its stable id.
+    void upsert_plugin(const std::string& id, const std::string& name, const std::string& version,
+                       const std::string& capabilities);
     int count(const std::string& plugin, const std::string& query);
     std::vector<Title> search(const std::string& plugin, const std::string& query, int limit, int offset);
 

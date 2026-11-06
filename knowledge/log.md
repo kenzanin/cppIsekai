@@ -1,4 +1,24 @@
 ## 2026-11-06
+* **Update**: Linked `architecture/plugin-system.md` to `architecture/normalization-contract.md` (Wire-vs-storage clarification extends the unix-time + JSON policy (okf_update wipes relations)).
+* **Update**: Updated concept `architecture/plugin-system.md`.
+* **Update**: Linked `architecture/plugin-system.md` to `architecture/normalization-contract.md` (Plugins normalize to MangaDex canonical format and unix time per the contract).
+* **Update**: Linked `architecture/plugin-system.md` to `architecture/manga-viewer-core.md` (Plugin system realizes the host-tools orchestration of the core architecture).
+* **Creation**: Documented concept `architecture/plugin-system.md` (Plugin system: folder packaging, manifest, multi-runtime data-contract ABI).
+* **Update**: Linked `architecture/normalization-contract.md` to `architecture/fts5-search-dedup.md` (Policy normalisasi unix-time + JSON menajamkan kontrak yang dieksekusi plugin).
+* **Update**: Linked `architecture/normalization-contract.md` to `architecture/detail-page.md` (Unix-time + JSON policy refines the normalisation contract concept (okf_update wipes relations)).
+* **Update**: Updated concept `architecture/normalization-contract.md`.
+* **Update**: Linked `architecture/normalization-contract.md` to `architecture/manga-viewer-core.md` (Normalisation duty belongs to plugins orchestrated by the host).
+* **Update**: Linked `architecture/normalization-contract.md` to `architecture/detail-page.md` (Normalisation contract refines what the detail page displays and chapters record).
+* **Creation**: Documented concept `architecture/normalization-contract.md` (Normalisation contract: MangaDex canonical + chapter release_at).
+* **Update**: Linked `architecture/fts5-search-dedup.md` to `architecture/library-page.md` (FTS5 tables are part of the library data model).
+* **Update**: Linked `architecture/fts5-search-dedup.md` to `references/code-layers.md` (FTS5 search upgrades the Store search layer described in code-layers).
+* **Creation**: Documented concept `architecture/fts5-search-dedup.md` (Search & duplicate detection: FTS5 + BM25).
+* **Update**: Linked `architecture/detail-page.md` to `architecture/manga-viewer-core.md` (Enrichment plugins are a second capability family of the plugin system).
+* **Update**: Linked `architecture/detail-page.md` to `architecture/library-page.md` (Detail page extends the library title entity with metadata and enrichment).
+* **Creation**: Documented concept `architecture/detail-page.md` (Detail page design + enrichment plugin (alt cover/alt info)).
+* **Update**: Linked `architecture/library-page.md` to `architecture/manga-viewer-core.md` (Library page is a page of the core viewer architecture).
+* **Update**: Linked `architecture/library-page.md` to `architecture/home-demo.md` (Library page design extends the home demo grid).
+* **Creation**: Documented concept `architecture/library-page.md` (Library page design (status, progress, done/new badges)).
 * **Update**: Linked `references/code-layers.md` to `architecture/home-demo.md` (Layer map shows how the home-demo decision is realized in source (paths updated after restructure)).
 * **Update**: Updated concept `references/code-layers.md`.
 * **Update**: Linked `references/tooling.md` to `references/code-layers.md` (Test/lint tooling executes the code-layer rules for future modules).
