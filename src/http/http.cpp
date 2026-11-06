@@ -107,16 +107,16 @@ void serve(Store& store, BS::thread_pool<>& db, LogBuffer& logs, int port) {
     // Crow's built-in static handler already serves /static/<path> from ./static.
 
     CROW_ROUTE(app, "/")
-    ([&](const crow::request& req) { return html("home.html", home_context(store, db, req)); });
+    ([&](const crow::request& req) { return html("home.mustache", home_context(store, db, req)); });
 
     // htmx swaps only the grid; the sidebar and top bar stay put.
     CROW_ROUTE(app, "/library/grid")
-    ([&](const crow::request& req) { return html("grid.html", home_context(store, db, req)); });
+    ([&](const crow::request& req) { return html("grid.mustache", home_context(store, db, req)); });
 
-    CROW_ROUTE(app, "/search")([] { return html("blank.html", layout("search")); });
-    CROW_ROUTE(app, "/history")([] { return html("blank.html", layout("history")); });
-    CROW_ROUTE(app, "/plugins")([] { return html("blank.html", layout("plugins")); });
-    CROW_ROUTE(app, "/about")([] { return html("blank.html", layout("about")); });
+    CROW_ROUTE(app, "/search")([] { return html("blank.mustache", layout("search")); });
+    CROW_ROUTE(app, "/history")([] { return html("blank.mustache", layout("history")); });
+    CROW_ROUTE(app, "/plugins")([] { return html("blank.mustache", layout("plugins")); });
+    CROW_ROUTE(app, "/about")([] { return html("blank.mustache", layout("about")); });
 
     CROW_ROUTE(app, "/logs")
     ([&] {
@@ -125,7 +125,7 @@ void serve(Store& store, BS::thread_pool<>& db, LogBuffer& logs, int port) {
         for (const auto& line : logs.snapshot())
             lines.emplace_back(line);
         ctx["lines"] = std::move(lines);
-        return html("logs.html", std::move(ctx));
+        return html("logs.mustache", std::move(ctx));
     });
 
     CROW_WEBSOCKET_ROUTE(app, "/ws/log").onopen([&](crow::websocket::connection& conn) {

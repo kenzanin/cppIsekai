@@ -1,7 +1,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest/doctest.h>
 
-#include "store.hpp"
+#include "store/store.hpp"
 
 TEST_CASE("Store: seed, plugins, search, count") {
     Store store("test_store.db"); // fresh file -> seed path runs

@@ -1,5 +1,5 @@
-{{>top.html}}
+{{>top.mustache}}
   <pre id="log" class="bg-zinc-900 rounded p-3 text-xs leading-5 h-[70vh] overflow-auto"
        x-data x-init="const ws=new WebSocket(`ws://${location.host}/ws/log`); ws.onmessage=e=>{$el.textContent+=e.data; $el.scrollTop=$el.scrollHeight}">{{#lines}}{{.}}
 {{/lines}}</pre>
-{{>bottom.html}}
+{{>bottom.mustache}}

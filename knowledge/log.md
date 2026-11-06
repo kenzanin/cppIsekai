@@ -1,4 +1,8 @@
 ## 2026-11-06
+* **Update**: Linked `references/code-layers.md` to `architecture/home-demo.md` (Layer map shows how the home-demo decision is realized in source (paths updated after restructure)).
+* **Update**: Updated concept `references/code-layers.md`.
+* **Update**: Linked `references/tooling.md` to `references/code-layers.md` (Test/lint tooling executes the code-layer rules for future modules).
+* **Creation**: Documented concept `references/tooling.md` (Test and lint tooling (doctest, clang-tidy, clang-format)).
 * **Update**: Linked `references/dependency-api.md` to `decisions/third-party-dependencies.md` (Dependency decisions reference updated with the sqlite_orm entry).
 * **Update**: Linked `architecture/store-orm-migration.md` to `references/dependency-api.md` (sqlite_orm entry in the dependency API reference with the escape/limit/pragma caveats).
 * **Update**: Linked `architecture/store-orm-migration.md` to `references/code-layers.md` (ORM migration realizes the code-layer rules: Store remains the sole SQL gate, now via sqlite_orm).

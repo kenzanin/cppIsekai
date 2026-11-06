@@ -25,10 +25,11 @@ target_include_directories(sqlite3 PUBLIC ${TP}/libsql/sqlite)
 # --- app ---
 add_executable(cppIsekai
     src/main.cpp
-    src/store.cpp
-    src/http.cpp
+    src/store/store.cpp
+    src/http/http.cpp
 )
 target_include_directories(cppIsekai PRIVATE
+    src
     ${TP}/sol2/include
     ${TP}/thread_pool/include
     ${TP}/readerwriterqueue/include
@@ -51,7 +52,7 @@ set_target_properties(cppIsekai PROPERTIES
 
 # --- tests (doctest, system package) ---
 # ponytail: single test binary; split per-module when the suite outgrows one file
-add_executable(test_store tests/test_store.cpp src/store.cpp)
+add_executable(test_store tests/test_store.cpp src/store/store.cpp)
 target_include_directories(test_store PRIVATE src ${TP}/sqlite_orm/include)
 target_link_libraries(test_store PRIVATE sqlite3)
 target_compile_options(test_store PRIVATE -Wall -Wextra)
@@ -68,6 +69,6 @@ add_custom_target(tidy
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 add_custom_target(format
-    COMMAND ${CLANG_FORMAT} -i src/*.cpp src/*.hpp tests/*.cpp
+    COMMAND ${CLANG_FORMAT} -i src/*.cpp src/*/*.cpp src/main.cpp src/*/*.hpp tests/*.cpp
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )

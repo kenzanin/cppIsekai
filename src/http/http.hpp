@@ -1,6 +1,6 @@
 #pragma once
-#include "log.hpp"
-#include "store.hpp"
+#include "log/log.hpp"
+#include "store/store.hpp"
 
 #include <BS_thread_pool.hpp>
 

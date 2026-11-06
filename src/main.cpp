@@ -1,6 +1,6 @@
-#include "http.hpp"
-#include "log.hpp"
-#include "store.hpp"
+#include "http/http.hpp"
+#include "log/log.hpp"
+#include "store/store.hpp"
 
 #include <CLI/CLI.hpp> // system 2.7.2: flag parsing
 #include <BS_thread_pool.hpp>
