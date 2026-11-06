@@ -6,6 +6,7 @@ Welcome to the **cppIsekai** repository. Define domain-specific behavioral rules
 
 ## 0. Project & Domain Codex (Customize for your domain: Research, Enterprise, Engineering, Creative)
 - TONE: style == direct_concise, zero_pleasantries
+- LANGUAGE: lang == en_US UNLESS channel == user_chat
 - FORMAT: diagrams => ASSERT(syntax == mermaid, ELSE=STOP("All diagrams MUST use Mermaid syntax; ASCII/text art prohibited."))
 - GOAL: maintain(high_factual_integrity, domain_conventions)
 
