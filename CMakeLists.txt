@@ -9,6 +9,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(VIPS REQUIRED IMPORTED_TARGET vips)
 pkg_check_modules(LUA REQUIRED IMPORTED_TARGET lua5.4)
+find_package(spdlog REQUIRED)  # system shared 1.17.0; links fmt 12.2.0
 
 set(TP ${PROJECT_SOURCE_DIR}/third_party)
 
@@ -22,12 +23,18 @@ add_library(sqlite3 STATIC ${TP}/libsql/sqlite/sqlite3.c)
 target_include_directories(sqlite3 PUBLIC ${TP}/libsql/sqlite)
 
 # --- app ---
-add_executable(cppIsekai src/main.cpp)
+add_executable(cppIsekai
+    src/main.cpp
+    src/store.cpp
+    src/http.cpp
+)
 target_include_directories(cppIsekai PRIVATE
     ${TP}/sol2/include
     ${TP}/thread_pool/include
     ${TP}/readerwriterqueue/include
     ${TP}/glaze
+    ${TP}/simpleini
+    ${TP}/sqlite_orm/include
 )
 target_link_libraries(cppIsekai PRIVATE
     wasm3
@@ -35,6 +42,7 @@ target_link_libraries(cppIsekai PRIVATE
     PkgConfig::VIPS
     PkgConfig::LUA
     ${TP}/curl-impersonate/lib/libcurl-impersonate-chrome.so.4.8.0
+    spdlog::spdlog
 )
 target_compile_options(cppIsekai PRIVATE -Wall -Wextra)
 set_target_properties(cppIsekai PROPERTIES

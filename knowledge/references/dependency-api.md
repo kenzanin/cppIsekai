@@ -1,9 +1,9 @@
 ---
 type: reference
 title: cppIsekai dependency API surface
-description: "Per-dependency functions and entry points with include paths; header-verified, includes a curl_easy_impersonate prototype caveat"
+description: "Per-dependency functions and entry points with include paths; header-verified, includes curl_easy_impersonate, SimpleIni GetLongValue and sqlite_orm escape/limit/pragma caveats"
 tags: [api, dependencies, cpp]
-generated: { by: agent/mcp, at: "2026-11-06T08:11:58Z" }
+generated: { by: agent/mcp, at: "2026-11-06T13:50:44Z" }
 status: stable
 ---
 
@@ -19,6 +19,13 @@ Entry points per dependency; every name verified against vendored/system headers
 - `sqlite3_open_v2`, `sqlite3_prepare_v2`, `sqlite3_bind_*`, `sqlite3_step`, `sqlite3_column_*`, `sqlite3_exec`, `sqlite3_finalize`, `sqlite3_close`
 - `sqlite3_libversion()`
 - libsql fork MVCC: `BEGIN CONCURRENT` transactions
+
+## sqlite_orm - `#include <sqlite_orm/sqlite_orm.h>` (header-only, third_party/sqlite_orm, v1.9.1, AGPL-3.0)
+- `make_storage(path, make_table(...), make_column(..., primary_key().autoincrement(), unique()), foreign_key(&T::fk).references(&P::id))`
+- `storage.pragma.journal_mode(journal_mode::WAL)`; NO pragma.foreign_keys -- FK auto-enabled when schema declares foreign_key
+- `storage.sync_schema()`, `storage.transaction_guard()` (commit/rollback RAII), `storage.insert(entity)`, `storage.count<T>()`
+- queries: `select(columns(...), left_join<T>(on(c(a) == b)), group_by, order_by)`, `get_all<T>(where(...))`
+- caveats: aggregate is `count(&E::member)` not `count<T>(member)`; no `is_true` (use `like(col, "%")`); use `limit(lim, offset(off))` -- standalone `offset()` serializer is incomplete; `like(...).escape(...)` needs `std::string("\\")` -- char binds as its NUMERIC value via field_printer<char>
 
 ## libvips - `#include <vips/vips.h>` (system shared, pkg-config vips)
 - `vips_init(argv0)` / `vips_shutdown()`
@@ -51,5 +58,17 @@ Entry points per dependency; every name verified against vendored/system headers
 - libcurl ABI: `curl_global_init`, `curl_easy_init`, `curl_easy_setopt`, `curl_easy_perform`, `curl_easy_cleanup`, `curl_version`
 - fingerprinting: `curl_easy_impersonate(easy, "chrome116", 1)` -- NOTE: symbol exists in the .so (nm-verified) but NOT in system curl 8.23 headers; declare extern `CURL_EXTERN CURLcode curl_easy_impersonate(CURL*, const char*, unsigned);` or use include/ from the impersonate sources
 
+## CLI11 - `#include <CLI/CLI.hpp>` (system package cli11 2.7.2, /usr/include/CLI)
+- `CLI::App cli{"description"};`
+- `cli.add_option("--port", var, "help")->envname("PORT");`, `->capture_default_str()`
+- `CLI11_PARSE(cli, argc, argv);` -- macro prints parse errors and returns exit code
+
+## SimpleIni - `#include <SimpleIni.h>` (header-only, third_party/simpleini, v4.27)
+- `CSimpleIniA ini;` -- ctor(utf8, multiKey, multiLine), all default false
+- `ini.LoadFile(path)` -> SI_Error (<0 = missing/error); `ini.SaveFile(path)` writes UTF-8 BOM
+- getters are GetLongValue/GetValue -- NOT GetLong (build-error lesson); `ini.SetValue(section, key, value[, comment])`
+- round-trip keeps whole-line comments, normalizes to `key = value`; trailing same-line comments are dropped
+
 # Related Concepts
 - [Dependency vendoring: system-shared first, minimal vendoring](../decisions/third-party-dependencies.md): API reference for the dependencies decided in this concept
+- [Dependency vendoring: system-shared first, minimal vendoring](../decisions/third-party-dependencies.md): Dependency decisions reference updated with the sqlite_orm entry
