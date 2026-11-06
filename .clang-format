@@ -1,0 +1,18 @@
+# clang-format: project style (matches current code base: 4-space, 120 cols, braces attached)
+BasedOnStyle: LLVM
+IndentWidth: 4
+ColumnLimit: 120
+AccessModifierOffset: -4
+AllowShortFunctionsOnASingleLine: Inline
+PointerAlignment: Left
+SortIncludes: CaseSensitive
+IncludeCategories:
+  # project headers first
+  - Regex: '^"(store|http|log)\.hpp"$'
+    Priority: 1
+  # vendored/third-party
+  - Regex: '^<(BS_thread_pool|SimpleIni|sqlite_orm|glaze|sol|readerwriterqueue|doctest)'
+    Priority: 20
+  # everything else (std, system libs)
+  - Regex: '.*'
+    Priority: 10

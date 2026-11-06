@@ -3,7 +3,6 @@
 #include <crow.h>
 #include <spdlog/spdlog.h>
 
-#include <cstdlib>
 #include <algorithm>
 #include <cstdlib>
 #include <memory>
@@ -26,14 +25,13 @@ int page_of(const std::string& text) {
 }
 
 // Every database call runs on the single db worker, which owns the one connection.
-template <class Fn>
-auto on_db(BS::thread_pool<>& db, Fn fn) -> decltype(fn()) {
+template <class Fn> auto on_db(BS::thread_pool<>& db, Fn fn) -> decltype(fn()) {
     auto done = std::make_shared<std::promise<decltype(fn())>>();
     db.detach_task([done, fn = std::move(fn)] {
         try {
             done->set_value(fn());
         } catch (...) {
-            done->set_exception(std::current_exception());  // release the waiting future either way
+            done->set_exception(std::current_exception()); // release the waiting future either way
         }
     });
     try {
@@ -100,7 +98,7 @@ crow::response html(const std::string& file, crow::json::wvalue ctx) {
     return crow::response(crow::mustache::load(file).render(ctx));
 }
 
-}  // namespace
+} // namespace
 
 void serve(Store& store, BS::thread_pool<>& db, LogBuffer& logs, int port) {
     crow::SimpleApp app;
@@ -124,15 +122,17 @@ void serve(Store& store, BS::thread_pool<>& db, LogBuffer& logs, int port) {
     ([&] {
         auto ctx = layout("logs");
         std::vector<crow::json::wvalue> lines;
-        for (const auto& line : logs.snapshot()) lines.emplace_back(line);
+        for (const auto& line : logs.snapshot())
+            lines.emplace_back(line);
         ctx["lines"] = std::move(lines);
         return html("logs.html", std::move(ctx));
     });
 
-    CROW_WEBSOCKET_ROUTE(app, "/ws/log")
-        .onopen([&](crow::websocket::connection& conn) {
-            for (const auto& line : logs.snapshot()) conn.send_text(line);
-            spdlog::info("log socket opened");
-        });
+    CROW_WEBSOCKET_ROUTE(app, "/ws/log").onopen([&](crow::websocket::connection& conn) {
+        for (const auto& line : logs.snapshot())
+            conn.send_text(line);
+        spdlog::info("log socket opened");
+    });
 
-    app.port(port).concurrency(4).run();}
+    app.port(port).concurrency(4).run();
+}

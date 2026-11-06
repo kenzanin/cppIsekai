@@ -1,3 +1,7 @@
 tmp/
 build/
 .cache/
+
+data/
+test_store.db
+build/

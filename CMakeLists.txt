@@ -49,4 +49,25 @@ set_target_properties(cppIsekai PROPERTIES
     BUILD_RPATH "${TP}/curl-impersonate/lib"
 )
 
-# ponytail: no tests/CPack/install yet -- add when the first module needs them
+# --- tests (doctest, system package) ---
+# ponytail: single test binary; split per-module when the suite outgrows one file
+add_executable(test_store tests/test_store.cpp src/store.cpp)
+target_include_directories(test_store PRIVATE src ${TP}/sqlite_orm/include)
+target_link_libraries(test_store PRIVATE sqlite3)
+target_compile_options(test_store PRIVATE -Wall -Wextra)
+enable_testing()
+add_test(NAME store COMMAND test_store)
+
+# ponytail: no CPack/install yet -- add when packaging matters
+
+find_program(CLANG_TIDY clang-tidy)
+find_program(CLANG_FORMAT clang-format)
+# optional targets: cmake --build build --target tidy / format
+add_custom_target(tidy
+    COMMAND ${CLANG_TIDY} -p ${CMAKE_BINARY_DIR} src/main.cpp src/store.cpp src/http.cpp
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+add_custom_target(format
+    COMMAND ${CLANG_FORMAT} -i src/*.cpp src/*.hpp tests/*.cpp
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)

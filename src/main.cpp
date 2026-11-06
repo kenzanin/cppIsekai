@@ -2,9 +2,9 @@
 #include "log.hpp"
 #include "store.hpp"
 
+#include <CLI/CLI.hpp> // system 2.7.2: flag parsing
 #include <BS_thread_pool.hpp>
-#include <CLI/CLI.hpp>  // system 2.7.2: flag parsing
-#include <SimpleIni.h>  // vendored 4.27: ini, comments kept on rewrite
+#include <SimpleIni.h> // vendored 4.27: ini, comments kept on rewrite
 
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
@@ -47,16 +47,17 @@ int main(int argc, char** argv) {
 
     // Precedence: --port > $PORT > [server] port in ini > 8090 (8080 = goisekai's on this host)
     CLI::App cli{"cppIsekai - local manga viewer daemon"};
-    int port = -1;  // -1 = unset
+    int port = -1; // -1 = unset
     cli.add_option("--port", port, "TCP port")->envname("PORT");
     std::string conf = "data/cppisekai.ini";
     cli.add_option("--config", conf, "INI config; comments survive rewrites (SimpleIni)")->capture_default_str();
     CLI11_PARSE(cli, argc, argv);
 
-    CSimpleIniA ini;  // load error (missing file) just leaves port unset
+    CSimpleIniA ini; // load error (missing file) just leaves port unset
     if (ini.LoadFile(conf.c_str()) >= 0 && port < 0)
         port = static_cast<int>(ini.GetLongValue("server", "port", -1));
-    if (port < 0) port = 8090;
+    if (port < 0)
+        port = 8090;
 
     spdlog::info("cppIsekai listening on :{} (config: {})", port, conf);
     serve(store, db_pool, logs, port);

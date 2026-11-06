@@ -22,7 +22,7 @@ struct Title {
 struct StoreImpl;
 
 class Store {
-  public:
+public:
     explicit Store(const std::string& path);
     ~Store();
 
@@ -33,6 +33,6 @@ class Store {
     int count(const std::string& plugin, const std::string& query);
     std::vector<Title> search(const std::string& plugin, const std::string& query, int limit, int offset);
 
-  private:
+private:
     std::unique_ptr<StoreImpl> impl_;
 };
