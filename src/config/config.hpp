@@ -132,7 +132,8 @@ inline std::string dump() {
     std::string section;
     for (const Entry& e : kEntries) {
         if (e.section != section) { // content compare, const char* vs string
-            if (!out.empty()) out += '\n'; // blank line between groups
+            if (!out.empty())
+                out += '\n'; // blank line between groups
             section = e.section;
             out += '[';
             out += section;
@@ -159,7 +160,8 @@ inline std::string dump() {
 inline int save(const std::map<std::string, std::string>& updates, const std::string& ini_path,
                 std::string* err = nullptr) {
     auto reject = [&](std::string why, int rc) {
-        if (err != nullptr) *err = std::move(why);
+        if (err != nullptr)
+            *err = std::move(why);
         return rc;
     };
 
@@ -174,32 +176,33 @@ inline int save(const std::map<std::string, std::string>& updates, const std::st
                 e = &c;
                 break;
             }
-        if (e == nullptr) return reject("unknown config key: " + full, -1);
+        if (e == nullptr)
+            return reject("unknown config key: " + full, -1);
         if (e->type != Type::Str) {
             try {
                 std::size_t used = 0;
                 std::stoll(value, &used);
                 if (used != value.size())
                     return reject("value of " + full + " is not an integer", -1);
-            }
-            catch (...) { // empty / non-numeric: same 400-class reject
+            } catch (...) { // empty / non-numeric: same 400-class reject
                 return reject("value of " + full + " is not an integer", -1);
             }
         }
         plan.push_back({e, &value});
     }
-    if (plan.empty()) return 0; // nothing to merge: no load, no rewrite
+    if (plan.empty())
+        return 0; // nothing to merge: no load, no rewrite
 
     CSimpleIniA ini;
     if (std::filesystem::exists(ini_path)) {
         if (ini.LoadFile(ini_path.c_str()) < 0)
             return reject("cannot parse " + ini_path, -1); // corrupt: never clobber
-    }
-    else {
+    } else {
         ini.LoadData(dump()); // D5: absent file starts from the documented template
     }
 
-    for (const auto& [e, value] : plan) ini.SetValue(e->section, e->key, value->c_str());
+    for (const auto& [e, value] : plan)
+        ini.SetValue(e->section, e->key, value->c_str());
 
     if (ini.SaveFile(ini_path.c_str(), false) < 0) // no BOM: plain template shape
         return reject("cannot write " + ini_path, -2);

@@ -19,9 +19,9 @@ namespace {
 int tmp_seq = 0;
 
 std::string tmp_ini(const std::string& body) {
-    std::string path = (std::filesystem::temp_directory_path() /
-                        ("cppisekai_cfg_test_" + std::to_string(++tmp_seq) + ".ini"))
-                           .string();
+    std::string path =
+        (std::filesystem::temp_directory_path() / ("cppisekai_cfg_test_" + std::to_string(++tmp_seq) + ".ini"))
+            .string();
     std::ofstream{path} << body;
     return path;
 }
@@ -43,10 +43,10 @@ Overrides parse_args(std::initializer_list<const char*> args) {
     return o;
 }
 
-}  // namespace
+} // namespace
 
 TEST_CASE("config: layered resolve default < ini < env < flag") {
-    Overrides none;  // no CLI parse: flag layer inert, opt[] all null
+    Overrides none; // no CLI parse: flag layer inert, opt[] all null
 
     SUBCASE("defaults when no ini and no env") {
         Config c = resolve(none, "no-such-cfg.ini", fake_env({}));
@@ -67,12 +67,11 @@ TEST_CASE("config: layered resolve default < ini < env < flag") {
         Config a = resolve(none, ini, fake_env({}));
         CHECK(a.port == 1234);
         CHECK(a.cache_max_mb == 64);
-        CHECK(a.fetch_profile == "chrome116");  // untouched knob keeps default
+        CHECK(a.fetch_profile == "chrome116"); // untouched knob keeps default
 
         CHECK(resolve(none, ini, fake_env({{"CPPISEKAI_PORT", "2222"}})).port == 2222);
-        CHECK(resolve(none, "no-such-cfg.ini",
-                      fake_env({{"CPPISEKAI_FETCH_PROFILE", "chrome120"}}))
-                      .fetch_profile == "chrome120");
+        CHECK(resolve(none, "no-such-cfg.ini", fake_env({{"CPPISEKAI_FETCH_PROFILE", "chrome120"}})).fetch_profile ==
+              "chrome120");
         CHECK(resolve(none, ini, fake_env({{"CPPISEKAI_PORT", "2222"}})).cache_max_mb == 64);
     }
 
@@ -81,13 +80,11 @@ TEST_CASE("config: layered resolve default < ini < env < flag") {
         Overrides flagged = parse_args({"prog", "--port", "9000"});
         Config c = resolve(flagged, ini, fake_env({{"CPPISEKAI_PORT", "2222"}}));
         CHECK(c.port == 9000);
-        CHECK(c.cache_max_mb == 64);  // --cache-max-mb not passed: ini value survives
+        CHECK(c.cache_max_mb == 64); // --cache-max-mb not passed: ini value survives
     }
 
     SUBCASE("alias --server-port binds the same knob") {
-        CHECK(resolve(parse_args({"prog", "--server-port", "7777"}), "no-such-cfg.ini",
-                      fake_env({}))
-                      .port == 7777);
+        CHECK(resolve(parse_args({"prog", "--server-port", "7777"}), "no-such-cfg.ini", fake_env({})).port == 7777);
     }
 
     SUBCASE("port <= 0 falls back to default (validation ceiling)") {
@@ -137,8 +134,7 @@ TEST_CASE("config: dump projects registry as commented ini template (D4)") {
     CSimpleIniA ini;
     REQUIRE(ini.LoadData(text) >= 0);
     for (const Entry& e : kEntries)
-        CHECK(std::string(ini.GetValue(e.section, e.key, "\x01missing")) ==
-              std::string(e.def));
+        CHECK(std::string(ini.GetValue(e.section, e.key, "\x01missing")) == std::string(e.def));
 }
 
 // D5: comment-safe merge-save. `read` is the byte-honest view the asserts
@@ -151,8 +147,7 @@ TEST_CASE("config: save merges comment-safe (D5)") {
     };
 
     SUBCASE("round trip: comments, ordering and untouched keys survive") {
-        const auto path =
-            tmp_ini("[server]\n; TCP listen port\nport = 1234\n; keep me\nproxy = http://p:1\n");
+        const auto path = tmp_ini("[server]\n; TCP listen port\nport = 1234\n; keep me\nproxy = http://p:1\n");
         REQUIRE(save({{"server.port", "8091"}}, path, &err) == 1);
         CHECK(err.empty());
         const auto text = read(path);
@@ -189,9 +184,9 @@ TEST_CASE("config: save merges comment-safe (D5)") {
     }
 
     SUBCASE("missing file: created from the dump template, resolve() reads it back") {
-        const auto path = (std::filesystem::temp_directory_path() /
-                           ("cppisekai_cfg_fresh_" + std::to_string(++tmp_seq) + ".ini"))
-                              .string();
+        const auto path =
+            (std::filesystem::temp_directory_path() / ("cppisekai_cfg_fresh_" + std::to_string(++tmp_seq) + ".ini"))
+                .string();
         std::filesystem::remove(path); // seq restarts per run: clear prior leftovers
         REQUIRE(save({{"server.port", "1"}}, path, &err) == 1);
         CHECK(err.empty());

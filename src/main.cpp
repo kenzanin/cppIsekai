@@ -34,8 +34,7 @@ int main(int argc, char** argv) {
     std::string ini_path = "data/cppisekai.ini"; // help-text default; boot itself requires --config (D3)
     auto* cfg_opt = cli.add_option("--config", ini_path, "INI config; comments survive rewrites (SimpleIni)")
                         ->capture_default_str();
-    auto* dump_opt =
-        cli.add_flag("--dump-config", "print ini template (doc comment + default per knob), then exit");
+    auto* dump_opt = cli.add_flag("--dump-config", "print ini template (doc comment + default per knob), then exit");
     std::string dump_path; // positional next to --dump-config: target file, created/truncated
     cli.add_option("path", dump_path, "with --dump-config: write the template here instead of stdout");
     config::build_cli(cli, overrides);
