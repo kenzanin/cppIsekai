@@ -1,4 +1,6 @@
 ## 2026-11-07
+* **Update**: Linked `architecture/manga-viewer-core.md` to `architecture/image-cache-offline.md`.
+* **Creation**: Documented concept `architecture/image-cache-offline.md` (cppIsekai image-cache + offline-first pathway).
 * **Update**: Linked `references/mangadex-search-ranking.md` to `references/mangadex-auth-quirks.md` (Same verified-behaviors family: ranking quirk completes the auth quirks reference.).
 * **Creation**: Documented concept `references/mangadex-search-ranking.md` (MangaDex search ranking = followedCount desc).
 * **Update**: Linked `references/mangadex-auth-quirks.md` to `architecture/plugin-system.md` (MangaDex quirks constrained the mangadex plugin auth design and the storage host tools.).
