@@ -150,3 +150,24 @@ TEST_CASE("http.fetch via curl-impersonate") {
         CHECK(res.find("\"status\":200") != std::string::npos);
     }
 }
+
+TEST_CASE("health: last call outcome per plugin") {
+    LogSetup ls;
+    Store store("test_health.db");
+    plugin::Host host(test_conf());
+    host.load_all(store);
+
+    SUBCASE("ok call -> active, failing call -> error with message") {
+        (void)host.call("good", "ping", "{}");
+        CHECK(host.health("good").ok);
+        (void)host.call("good", "fail", "{}"); // fixture returns ok=false boom
+        const auto h = host.health("good");
+        CHECK_FALSE(h.ok);
+        CHECK(h.error == "boom");
+        CHECK(h.at > 0);
+    }
+
+    SUBCASE("unknown plugin defaults to ok") {
+        CHECK(host.health("ghost").ok);
+    }
+}

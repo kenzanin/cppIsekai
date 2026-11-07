@@ -13,6 +13,10 @@ struct Plugin {
     std::string name;
     int titles{};
     std::string plugin_id; // stable plugin key (folder id); empty for seed rows
+    std::string version;
+    bool enabled{true};
+    std::string runtime; // lua/js/wasm; empty for legacy rows
+    std::string caps;    // comma-separated capability list
 };
 
 struct Title {
@@ -34,7 +38,10 @@ public:
     std::vector<Plugin> plugins();
     // Register/upsert a discovered plugin keyed by its stable id.
     void upsert_plugin(const std::string& id, const std::string& name, const std::string& version,
-                       const std::string& capabilities);
+                       const std::string& capabilities, const std::string& runtime);
+    void set_plugin_enabled(std::int64_t id, bool on);
+    // Gate for call paths; absent row (unregistered id) counts as enabled.
+    bool plugin_enabled(const std::string& plugin_id);
     int count(const std::string& plugin, const std::string& query);
     std::vector<Title> search(const std::string& plugin, const std::string& query, int limit, int offset);
 

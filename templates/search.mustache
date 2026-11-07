@@ -1,0 +1,154 @@
+{{>top.mustache}}
+<div x-data="searchPage" x-init="boot()">
+  <!-- plugin + query row -->
+  <div class="flex items-center gap-3 mb-4">
+    <select x-model="plugin" @change="pick()" class="bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-sm">
+      <option value="" disabled>pilih plugin</option>
+      <template x-for="p in plugins" :key="p.key">
+        <option :value="p.key" x-text="p.name"></option>
+      </template>
+    </select>
+    <template x-if="plugin && !logoBroken">
+      <span class="w-6 h-6 rounded bg-zinc-800 flex items-center justify-center text-xs font-bold">
+        <img :src="'/plugin/'+plugin+'/logo'" class="w-6 h-6 rounded object-cover" @error="logoBroken=true" alt="">
+      </span>
+    </template>
+    <input x-model="q" @keydown.enter="search()"
+           placeholder="Cari manga…" class="flex-1 bg-zinc-900 border border-zinc-700 rounded px-3 py-1.5">
+    <button @click="search()" :disabled="!plugin || loading"
+            class="px-4 py-1.5 text-sm bg-zinc-800 rounded hover:bg-zinc-700 disabled:opacity-40">Search</button>
+  </div>
+  <p class="text-xs text-yellow-500 mb-3" x-show="notice" x-text="notice" x-cloak></p>
+
+  <!-- genre chips -->
+  <div class="flex flex-wrap gap-1.5 mb-3" x-show="genres.length" x-cloak>
+    <template x-for="g in genres" :key="g">
+      <button @click="toggleTag(g)"
+              class="text-xs px-2 py-0.5 rounded-full border"
+              :class="tags.includes(g) ? 'bg-zinc-100 text-zinc-900 border-zinc-100' : 'bg-zinc-900 border-zinc-700 text-zinc-400'"
+              x-text="g"></button>
+    </template>
+  </div>
+
+  <!-- count + top pager -->
+  <div class="flex items-center gap-4 mb-2 text-sm text-zinc-400">
+    <span x-text="total===null ? '' : total+' results'"></span>
+    <span class="flex-1"></span>
+    <template x-if="pages()>1">
+      <nav class="flex gap-2 items-center">
+        <button @click="go(page-1)" :disabled="page<=1" class="px-2 py-0.5 rounded bg-zinc-800 disabled:opacity-30">‹</button>
+        <span x-text="page+' / '+pages()"></span>
+        <button @click="go(page+1)" :disabled="page>=pages()" class="px-2 py-0.5 rounded bg-zinc-800 disabled:opacity-30">›</button>
+      </nav>
+    </template>
+  </div>
+
+  <!-- error -->
+  <div class="text-sm text-red-400 mb-2" x-show="err" x-cloak>
+    <span x-text="err"></span>
+    <button @click="run()" class="underline ml-2">Retry</button>
+  </div>
+
+  <!-- skeleton -->
+  <div x-show="loading" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4" x-cloak>
+    <template x-for="i in 12" :key="'sk'+i">
+      <div>
+        <div class="aspect-[3/4] rounded bg-zinc-800 animate-pulse"></div>
+        <div class="h-3 mt-1 rounded bg-zinc-800 animate-pulse"></div>
+      </div>
+    </template>
+  </div>
+
+  <!-- grid -->
+  <div x-show="!loading && items.length" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4" x-cloak>
+    <template x-for="(it,idx) in items" :key="it.id">
+      <li class="list-none">
+        <div class="aspect-[3/4] rounded overflow-hidden"
+             :style="'background:hsl('+(idx*47%360)+' 40% 28%)'">
+          <img :src="it.cover" class="w-full h-full object-cover" loading="lazy"
+               @error="$el.style.display='none'" alt="">
+        </div>
+        <p class="mt-1 text-sm truncate" x-text="it.name"></p>
+        <p class="text-xs text-zinc-500" x-text="it.status"></p>
+      </li>
+    </template>
+  </div>
+
+  <!-- empty -->
+  <div x-show="!loading && total===0" class="text-zinc-500 text-sm py-8 text-center" x-cloak>
+    No results for this search — coba kata kunci lain atau kurangi filter.
+  </div>
+
+  <!-- bottom pager -->
+  <div class="flex justify-center mt-4 mb-8" x-show="pages()>1" x-cloak>
+    <nav class="flex gap-2 items-center text-sm">
+      <button @click="go(page-1)" :disabled="page<=1" class="px-3 py-1 rounded bg-zinc-800 disabled:opacity-30">‹ Prev</button>
+      <span x-text="page+' / '+pages()"></span>
+      <button @click="go(page+1)" :disabled="page>=pages()" class="px-3 py-1 rounded bg-zinc-800 disabled:opacity-30">Next ›</button>
+    </nav>
+  </div>
+</div>
+<script>
+function searchPage() {
+  const PAGE = 12
+  return {
+    plugins: [], plugin: '', q: '', tags: [], genres: [],
+    items: [], total: null, page: 1, loading: false, err: '', notice: '',
+    logoBroken: false,
+    logoFor(k) { return k && !this.logoBroken },
+    async boot() {
+      const j = await (await fetch('/api/plugins')).json()
+      this.plugins = (j.plugins || []).filter(p => p.enabled && p.key)
+      const u = new URL(location)
+      this.plugin = u.searchParams.get('plugin') || ''
+      this.q = u.searchParams.get('q') || ''
+      this.page = parseInt(u.searchParams.get('page')) || 1
+      this.tags = (u.searchParams.get('tags') || '').split(',').filter(Boolean)
+      if (this.plugin) { await this.loadGenres(); await this.run(false) }
+      else if (!this.plugins.length) this.notice = 'No enabled plugin — aktifkan satu di halaman Plugins.'
+    },
+    async pick() { this.tags = []; this.items = []; this.total = null; this.page = 1; this.sync()
+      await this.loadGenres() },
+    async loadGenres() {
+      this.genres = []
+      if (!this.plugin) return
+      try {
+        const j = await (await fetch(`/plugin/${this.plugin}/genres`)).json()
+        if (j.ok) this.genres = j.data
+      } catch (e) { /* no row */ }
+    },
+    toggleTag(g) {
+      const i = this.tags.indexOf(g)
+      i >= 0 ? this.tags.splice(i, 1) : this.tags.push(g)
+      this.page = 1; this.run()
+    },
+    search() { this.page = 1; this.run() },
+    go(p) { if (p >= 1 && p <= this.pages()) { this.page = p; this.run() } },
+    pages() { return this.total === null ? 1 : Math.max(1, Math.ceil(this.total / PAGE)) },
+    async run(push = true) {
+      if (!this.plugin) return
+      this.loading = true; this.err = ''
+      const u = new URL(`/plugin/${this.plugin}/search`, location.origin)
+      u.searchParams.set('title', this.q); u.searchParams.set('page', this.page); u.searchParams.set('limit', PAGE)
+      if (this.tags.length) u.searchParams.set('tags', this.tags.join(','))
+      try {
+        const j = await (await fetch(u)).json()
+        if (!j.ok) { this.err = j.error || 'search failed' }
+        else { this.items = j.data.items; this.total = j.data.total }
+      } catch (e) { this.err = String(e) }
+      this.loading = false
+      if (push) this.sync()
+    },
+    sync() {
+      const u = new URL(location); u.search = ''
+      if (this.plugin) u.searchParams.set('plugin', this.plugin)
+      if (this.q) u.searchParams.set('q', this.q)
+      if (this.tags.length) u.searchParams.set('tags', this.tags.join(','))
+      if (this.page > 1) u.searchParams.set('page', this.page)
+      history.pushState({}, '', u)
+    },
+  }
+}
+window.addEventListener('popstate', () => location.reload())
+</script>
+{{>bottom.mustache}}

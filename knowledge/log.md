@@ -1,4 +1,9 @@
 ## 2026-11-07
+* **Update**: Linked `decisions/third-party-dependencies.md` to `decisions/deps-and-plugins.md` (Extension of vendoring policy: tambah libzippp+libzip (CBZ), stbrumme/hash-library, quickjs-ng; base64 reuse glaze; no hand-rolled crypto.).
+* **Update**: Linked `architecture/plugin-system.md` to `decisions/deps-and-plugins.md` (Runtime parity: quickjs-ng menjadi runtime kedua dengan feature set & signature sama (data-contract ABI tetap; wasm3 tidak diprioritaskan).).
+* **Creation**: Documented concept `decisions/deps-and-plugins.md` (Dependencies & plugins: curl-first APIs, runtime parity, no hand-rolled crypto).
+* **Update**: Linked `architecture/manga-viewer-core.md` to `architecture/image-cache-offline.md`.
+* **Creation**: Documented concept `architecture/image-cache-offline.md` (cppIsekai image-cache + offline-first pathway).
 * **Update**: Linked `references/mangadex-search-ranking.md` to `references/mangadex-auth-quirks.md` (Same verified-behaviors family: ranking quirk completes the auth quirks reference.).
 * **Creation**: Documented concept `references/mangadex-search-ranking.md` (MangaDex search ranking = followedCount desc).
 * **Update**: Linked `references/mangadex-auth-quirks.md` to `architecture/plugin-system.md` (MangaDex quirks constrained the mangadex plugin auth design and the storage host tools.).

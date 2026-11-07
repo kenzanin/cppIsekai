@@ -3,7 +3,7 @@ type: decision
 title: "Plugin system: folder packaging, manifest, multi-runtime data-contract ABI"
 description: "Plugin packaging: one folder per plugin under data/plugins (entry + manifest json + logo), declared via ini; ABI = JSON-text-in/out data contract + per-runtime host-tool bindings; jsonb is DB-side storage only, never the wire format; lua first, wasm/js/micropython later"
 tags: [plugin, abi, packaging, jsonb]
-generated: { by: agent/mcp, at: "2026-11-06T15:06:06Z" }
+generated: { by: agent/mcp, at: "2026-11-07T11:37:17Z" }
 status: stable
 ---
 
@@ -36,3 +36,4 @@ Relations: implements the plugin orchestration in manga-viewer-core; consumes no
 # Related Concepts
 - [Normalisation contract: MangaDex canonical + chapter release_at](normalization-contract.md): Wire-vs-storage clarification extends the unix-time + JSON policy (okf_update wipes relations)
 - [cppIsekai core architecture: plugin-per-site manga viewer](manga-viewer-core.md): Plugin system realizes the host-tools orchestration of the core architecture
+- [Dependencies & plugins: curl-first APIs, runtime parity, no hand-rolled crypto](../decisions/deps-and-plugins.md): Runtime parity: quickjs-ng menjadi runtime kedua dengan feature set & signature sama (data-contract ABI tetap; wasm3 tidak diprioritaskan).
