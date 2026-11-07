@@ -18,6 +18,7 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(VIPS REQUIRED IMPORTED_TARGET vips)
 pkg_check_modules(LUA REQUIRED IMPORTED_TARGET lua5.4)
 find_package(spdlog REQUIRED) # system shared 1.17.0; links fmt 12.2.0
+pkg_check_modules(LIBZIP REQUIRED IMPORTED_TARGET libzip) # system shared (pacman libzip); CBZ export
 
 set(TP ${PROJECT_SOURCE_DIR}/third_party)
 
@@ -33,7 +34,8 @@ target_include_directories(sqlite3 PUBLIC ${TP}/libsql/sqlite)
 
 # --- app ---
 add_executable(cppIsekai src/main.cpp src/store/store.cpp src/http/http.cpp
-                         src/plugin/plugin.cpp src/cache/cache.cpp src/reader/window.cpp)
+                         src/plugin/plugin.cpp src/cache/cache.cpp src/reader/window.cpp
+                         ${TP}/libzippp/libzippp.cpp)
 target_include_directories(
   cppIsekai
   PRIVATE src
@@ -42,12 +44,13 @@ target_include_directories(
           ${TP}/readerwriterqueue/include
           ${TP}/glaze
           ${TP}/simpleini
-          ${TP}/sqlite_orm/include)
+          ${TP}/sqlite_orm/include
+          ${TP}/libzippp)
 target_link_libraries(
   cppIsekai
   PRIVATE wasm3 sqlite3 PkgConfig::VIPS PkgConfig::LUA
           ${TP}/curl-impersonate/lib/libcurl-impersonate-chrome.so.4.8.0
-          spdlog::spdlog)
+          spdlog::spdlog PkgConfig::LIBZIP)
 target_compile_options(cppIsekai PRIVATE -Wall -Wextra)
 set_target_properties(cppIsekai PROPERTIES BUILD_RPATH
                                            "${TP}/curl-impersonate/lib")
