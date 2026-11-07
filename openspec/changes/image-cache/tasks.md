@@ -6,7 +6,7 @@
 
 ## 2. Offline path
 - [x] 2.1 `proxy=` ini -> CURLOPT_PROXY on every outbound (plugin fetch + image getter)
-- [ ] 2.2 stale layer: persist ok responses per `plugin|method|q` on opted read routes; on failure serve last-good + `cached:true`; unit test with failing fetcher
+- [x] 2.2 stale layer: persist ok responses per `plugin|method|q` on opted read routes; on failure serve last-good + `cached:true`; unit test with failing fetcher
 
 ## 3. Mangadex pages + prefetch
 - [ ] 3.1 `pages` method via `/at-home/server/{id}` (dataSaver off), luac + live probe
