@@ -103,6 +103,12 @@ target_include_directories(test_window PRIVATE src)
 target_compile_options(test_window PRIVATE -Wall -Wextra)
 add_test(NAME window COMMAND test_window)
 
+# worker (3.3): delta prefetch on an injected cache; no server, no crow
+add_executable(test_worker tests/test_worker.cpp src/cache/cache.cpp)
+target_include_directories(test_worker PRIVATE src)
+target_compile_options(test_worker PRIVATE -Wall -Wextra)
+add_test(NAME worker COMMAND test_worker)
+
 # ponytail: no CPack/install yet -- add when packaging matters
 
 find_program(CLANG_TIDY clang-tidy)

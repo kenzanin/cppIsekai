@@ -5,6 +5,7 @@
 #include "log/log.hpp"
 #include "plugin/plugin.hpp"
 #include "reader/window.hpp"
+#include "reader/worker.hpp"
 #include "store/store.hpp"
 
 #include <crow.h>
@@ -265,6 +266,10 @@ void serve(Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool, 
     crow::SimpleApp app;
     crow::mustache::set_base("templates");
 
+    // Image-cache 3.3: one background prefetcher over the shared img cache;
+    // woken only by the two reader endpoints below, stopped at scope exit.
+    reader::Worker prefetch{images};
+
     // Crow's built-in static handler already serves /static/<path> from ./static.
 
     CROW_ROUTE(app, "/")
@@ -413,10 +418,11 @@ void serve(Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool, 
                 return 0;
             });
 
+            const std::vector<std::string> found =
+                reader_window(store, db, plugin_pool, plugins, images, plugin, manga, pos);
             std::vector<crow::json::wvalue> window;
-            for (const auto& url :
-                 reader_window(store, db, plugin_pool, plugins, images, plugin, manga, pos))
-                window.emplace_back(url);
+            for (const auto& url : found) window.emplace_back(url);
+            if (!found.empty()) prefetch.nudge(found); // background delta fetch (3.3)
 
             crow::json::wvalue out;
             out["window"] = std::move(window);
@@ -452,9 +458,11 @@ void serve(Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool, 
                     if (!plugin.empty() && !manga.empty() && !chapter.empty()) {
                         const reader::Position where{
                             chapter, static_cast<int>(std::max(1L, num_field(pos, "page", 1)))};
-                        for (const auto& url : reader_window(store, db, plugin_pool, plugins, images,
-                                                             plugin, manga, where))
-                            window.emplace_back(url);
+                        const std::vector<std::string> found = reader_window(store, db, plugin_pool,
+                                                                             plugins, images, plugin,
+                                                                             manga, where);
+                        for (const auto& url : found) window.emplace_back(url);
+                        if (!found.empty()) prefetch.nudge(found); // rerun delta (3.3)
                     }
                 }
             }
