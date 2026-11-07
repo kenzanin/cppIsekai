@@ -4,6 +4,8 @@
 // the entry script (main.lua) and an optional logo file.
 // Contract: host calls handle({api, method, params}); the plugin answers
 // {ok=true, data=...} or {ok=false, error=...}.
+#include <BS_thread_pool.hpp>
+
 #include <memory>
 #include <string>
 #include <vector>
@@ -46,6 +48,11 @@ public:
     // Returns the number of plugins kept. A broken plugin logs a warning and
     // never aborts the scan.
     int load_all(Store& store);
+
+    // Optional db-worker gate: when set, plugin `storage.*` calls are run on
+    // this pool (Store is single-connection, db-worker only). Without it the
+    // calls run inline — fine for single-threaded tests.
+    void use_db(BS::thread_pool<>* db);
 
     // ABI call. Returns the response as JSON text:
     // {"ok":true,"data":...} or {"ok":false,"error":"..."}.

@@ -2,12 +2,13 @@
 
 #include "store/store.hpp"
 
+#include <algorithm>
 #include <glaze/glaze.hpp>
 #include <sol/sol.hpp>
 
 #include <curl/curl.h>
-#include <lua.h>
 #include <lauxlib.h>
+#include <lua.h>
 #include <lualib.h>
 
 #include <spdlog/spdlog.h>
@@ -17,6 +18,7 @@
 #include <ctime>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -24,6 +26,7 @@
 #include <sstream>
 #include <string>
 #include <utility>
+#include <vector>
 #include <variant>
 #include <vector>
 
@@ -42,13 +45,16 @@ namespace {
 // ---------------------------------------------------------------------------
 
 std::string dump_json(const glz::generic& g) {
-    if (auto s = glz::write_json(g))
+    if (auto s = glz::write_json(g)) {
         return std::move(*s);
+    }
     return "null";
 }
 
 std::string err_json(std::string msg) {
-    glz::generic ok, err, root;
+    glz::generic ok;
+    glz::generic err;
+    glz::generic root;
     ok.data = false;
     err.data = std::move(msg);
     auto& obj = root.data.emplace<glz::generic::object_t>();
@@ -66,13 +72,15 @@ sol::object json_to_sol(lua_State* L, const glz::generic& g) {
                 return sol::make_object(L, sol::nil);
             } else if constexpr (std::is_same_v<T, glz::generic::array_t>) {
                 sol::table t = sol::table(L, sol::new_table());
-                for (size_t i = 0; i < v.size(); ++i)
+                for (size_t i = 0; i < v.size(); ++i) {
                     t[i + 1] = json_to_sol(L, v[i]);
+                }
                 return sol::make_object(L, t);
             } else if constexpr (std::is_same_v<T, glz::generic::object_t>) {
                 sol::table t = sol::table(L, sol::new_table());
-                for (const auto& [k, val] : v)
+                for (const auto& [k, val] : v) {
                     t[k] = json_to_sol(L, val);
+                }
                 return sol::make_object(L, t);
             } else {
                 return sol::make_object(L, v); // double / string / bool
@@ -109,22 +117,24 @@ glz::generic sol_to_json(const sol::object& o, int depth = 0) {
         for (const auto& kv : t) {
             ++n;
             array = array && kv.first.get_type() == sol::type::number &&
-                     static_cast<long long>(kv.first.as<double>()) == static_cast<long long>(n);
+                    static_cast<long long>(kv.first.as<double>()) == static_cast<long long>(n);
         }
         if (n > 0 && array) {
             auto& arr = g.data.emplace<generic::array_t>();
-            for (size_t i = 1; i <= n; ++i)
+            for (size_t i = 1; i <= n; ++i) {
                 arr.push_back(sol_to_json(t[i], depth + 1));
+            }
         } else {
             auto& obj = g.data.emplace<generic::object_t>();
             for (const auto& kv : t) {
                 std::string key;
-                if (kv.first.get_type() == sol::type::number)
+                if (kv.first.get_type() == sol::type::number) {
                     key = std::to_string(static_cast<long long>(kv.first.as<double>()));
-                else if (kv.first.get_type() == sol::type::string)
+                } else if (kv.first.get_type() == sol::type::string) {
                     key = kv.first.as<std::string>();
-                else
+                } else {
                     continue; // non-scalar key is not representable in JSON
+                }
                 obj.insert({key, sol_to_json(kv.second, depth + 1)});
             }
         }
@@ -153,25 +163,30 @@ size_t on_body(char* ptr, size_t size, size_t nmemb, void* ud) {
 size_t on_header(char* ptr, size_t size, size_t nmemb, void* ud) {
     auto* headers = static_cast<std::map<std::string, std::string>*>(ud);
     std::string_view line(ptr, size * nmemb);
-    while (!line.empty() && (line.back() == '\n' || line.back() == '\r'))
+    while (!line.empty() && (line.back() == '\n' || line.back() == '\r')) {
         line.remove_suffix(1);
+    }
     const auto colon = line.find(':');
-    if (colon == std::string_view::npos)
+    if (colon == std::string_view::npos) {
         return size * nmemb; // status line or obs-fold continuation
+    }
     std::string key(line.substr(0, colon));
     std::string value(line.substr(colon + 1));
     auto trim = [](std::string& s) {
         const auto issp = [](unsigned char c) { return c == ' ' || c == '	'; };
-        while (!s.empty() && issp(s.front()))
+        while (!s.empty() && issp(s.front())) {
             s.erase(s.begin());
-        while (!s.empty() && issp(s.back()))
+        }
+        while (!s.empty() && issp(s.back())) {
             s.pop_back();
+        }
     };
-    std::transform(key.begin(), key.end(), key.begin(), [](unsigned char c) { return char(std::tolower(c)); });
+    std::ranges::transform(key, key.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     trim(key);
     trim(value);
-    if (!key.empty())
+    if (!key.empty()) {
         (*headers)[key] = std::move(value);
+    }
     return size * nmemb;
 }
 
@@ -183,9 +198,10 @@ using CurlPtr = std::unique_ptr<CURL, decltype(&curl_easy_cleanup)>;
 
 thread_local long long t_budget_left = 0;
 
-void count_hook(lua_State* L, lua_Debug*) {
-    if ((t_budget_left -= 1000) <= 0)
+void count_hook(lua_State* L, lua_Debug* /*unused*/) {
+    if ((t_budget_left -= 1000) <= 0) {
         luaL_error(L, "plugin instruction budget exhausted");
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -205,7 +221,13 @@ void open_sandbox(lua_State* L) {
     lua_pop(L, 1);
 }
 
-void install_host_tools(lua_State* L, const std::string& id, const Config& conf) {
+// Plugin state accessors: (plugin_id, key) -> value. Routed to the db worker
+// when one is attached; inline otherwise (tests).
+using StateGet = std::function<std::optional<std::string>(const std::string&, const std::string&)>;
+using StateSet = std::function<void(const std::string&, const std::string&, const std::string&)>;
+
+void install_host_tools(lua_State* L, const std::string& id, const Config& conf, const glz::generic& cfg, bool has_cfg,
+                        const StateGet& sget, const StateSet& sset) {
     sol::state_view sv(L);
 
     // Routed through the default logger, whose sinks include the queue sink
@@ -219,21 +241,24 @@ void install_host_tools(lua_State* L, const std::string& id, const Config& conf)
     // ponytail: io shim is read-only via istream; widen only when a plugin
     // needs incremental reads (io.lines multi-arg / formats).
     sol::table io = sv.create_named_table("io");
-    io["read"] = []() -> std::optional<std::string> {
+    io["read"] = [] -> std::optional<std::string> {
         std::string line;
-        if (std::getline(std::cin, line))
+        if (std::getline(std::cin, line)) {
             return line;
+        }
         return std::nullopt;
     };
     io["lines"] = [](const std::string& path, sol::this_state ts) -> sol::object {
         auto f = std::make_shared<std::ifstream>(path);
-        if (!*f)
+        if (!*f) {
             throw std::runtime_error("io.lines: cannot open " + path);
+        }
         lua_State* L = ts;
-        return sol::make_object(L, [f]() -> std::optional<std::string> {
+        return sol::make_object(L, [f] -> std::optional<std::string> {
             std::string line;
-            if (std::getline(*f, line))
+            if (std::getline(*f, line)) {
                 return line;
+            }
             return std::nullopt; // iterator ends; the file closes with the closure
         });
     };
@@ -242,19 +267,43 @@ void install_host_tools(lua_State* L, const std::string& id, const Config& conf)
     json["encode"] = [](const sol::object& o) { return dump_json(sol_to_json(o)); };
     json["decode"] = [](const std::string& s, sol::this_state ts) -> sol::object {
         glz::generic g;
-        if (auto ec = glz::read_json(g, s))
+        if (auto ec = glz::read_json(g, s)) {
             throw std::runtime_error("json.decode: invalid JSON");
-        lua_State* L = ts;
-        return json_to_sol(L, g);
+        }
+        lua_State* lstate = ts;
+        return json_to_sol(lstate, g);
     };
+
+    // config.get: values from the plugin's own config.json, parsed once at load.
+    // Absent file or key -> nil; the sandbox itself stays file-read-free.
+    sol::table config = sv.create_named_table("config");
+    config["get"] = [&cfg, has_cfg](const std::string& key, sol::this_state ts) -> sol::object {
+        const auto* obj = std::get_if<glz::generic::object_t>(&cfg.data);
+        if (!has_cfg || obj == nullptr) {
+            return sol::make_object(ts, sol::lua_nil);
+        }
+        if (auto it = obj->find(key); it != obj->end()) {
+            return json_to_sol(ts, it->second);
+        }
+        return sol::make_object(ts, sol::lua_nil);
+    };
+
+    // storage.get/set: host-owned per-plugin state (tokens), db-backed, survives restarts.
+    sol::table storage = sv.create_named_table("storage");
+    storage["get"] = [id, sget](const std::string& key, sol::this_state ts) -> sol::object {
+        if (auto v = sget(id, key)) {
+            return sol::make_object(ts, *v);
+        }
+        return sol::make_object(ts, sol::lua_nil);
+    };
+    storage["set"] = [id, sset](const std::string& key, const std::string& val) { sset(id, key, val); };
 
     // Blocking fetch on the calling (plugin-pool) worker; curl's own timeout
     // guards the network half, the instruction hook the CPU half.
     sol::table http = sv.create_named_table("http");
-    http["fetch"] =
-        [id, timeout_ms = conf.fetch_timeout_ms, profile = conf.fetch_profile](
-            const std::string& url, const sol::optional<sol::table>& opts,
-            sol::this_state ts) -> std::pair<sol::object, std::optional<std::string>> {
+    http["fetch"] = [id, timeout_ms = conf.fetch_timeout_ms, profile = conf.fetch_profile](
+                        const std::string& url, const sol::optional<sol::table>& opts,
+                        sol::this_state ts) -> std::pair<sol::object, std::optional<std::string>> {
         const auto fail = [&](std::string why) {
             spdlog::warn("[plugin:{}] fetch {} failed: {}", id, url, why);
             return std::make_pair(sol::make_object(ts, sol::lua_nil), std::optional(std::move(why)));
@@ -262,63 +311,96 @@ void install_host_tools(lua_State* L, const std::string& id, const Config& conf)
 
         long ms = timeout_ms;
         std::string profile_name = profile;
+        std::string method = "GET";
+        std::string body;
         std::string accept_header; // optional per-call Accept override
         std::string ua_header;     // optional per-call User-Agent override
+        std::vector<std::pair<std::string, std::string>> extra_headers;
         if (opts) {
-            if (sol::object v = (*opts)["timeout_ms"]; v.get_type() == sol::type::number)
+            if (sol::object v = (*opts)["timeout_ms"]; v.get_type() == sol::type::number) {
                 ms = static_cast<long>(v.as<double>());
-            if (sol::object v = (*opts)["profile"]; v.get_type() == sol::type::string)
+            }
+            if (sol::object v = (*opts)["profile"]; v.get_type() == sol::type::string) {
                 profile_name = v.as<std::string>();
-            if (sol::object v = (*opts)["accept"]; v.get_type() == sol::type::string)
+            }
+            if (sol::object v = (*opts)["method"]; v.get_type() == sol::type::string) {
+                method = v.as<std::string>();
+            }
+            if (sol::object v = (*opts)["body"]; v.get_type() == sol::type::string) {
+                body = v.as<std::string>();
+            }
+            if (sol::object v = (*opts)["accept"]; v.get_type() == sol::type::string) {
                 accept_header = v.as<std::string>();
-            if (sol::object v = (*opts)["user_agent"]; v.get_type() == sol::type::string)
+            }
+            if (sol::object v = (*opts)["user_agent"]; v.get_type() == sol::type::string) {
                 ua_header = v.as<std::string>();
+            }
+            if (sol::object v = (*opts)["headers"]; v.get_type() == sol::type::table) {
+                v.as<sol::table>().for_each([&](sol::object k, sol::object val) {
+                    if (k.get_type() == sol::type::string && val.get_type() == sol::type::string) {
+                        extra_headers.emplace_back(k.as<std::string>(), val.as<std::string>());
+                    }
+                });
+            }
         }
 
         CurlPtr easy(curl_easy_init(), &curl_easy_cleanup);
-        if (!easy)
+        if (!easy) {
             return fail("curl init failed");
+        }
 
         FetchSink sink;
-        curl_slist* hdrs = nullptr;
-        if (!accept_header.empty())
-            hdrs = curl_slist_append(hdrs, ("Accept: " + accept_header).c_str());
-        if (!ua_header.empty())
-            hdrs = curl_slist_append(hdrs, ("User-Agent: " + ua_header).c_str());
-        curl_easy_setopt(easy.get(), CURLOPT_URL, url.c_str());
-        curl_easy_setopt(easy.get(), CURLOPT_FOLLOWLOCATION, 1L);
-        curl_easy_setopt(easy.get(), CURLOPT_WRITEFUNCTION, on_body);
-        curl_easy_setopt(easy.get(), CURLOPT_WRITEDATA, &sink.body);
-        curl_easy_setopt(easy.get(), CURLOPT_HEADERFUNCTION, on_header);
-        curl_easy_setopt(easy.get(), CURLOPT_HEADERDATA, &sink.headers);
-        curl_easy_setopt(easy.get(), CURLOPT_TIMEOUT_MS, std::max(1L, ms));
-        curl_easy_setopt(easy.get(), CURLOPT_CAINFO, "/etc/ssl/certs/ca-certificates.crt");
-        if (hdrs)
-            curl_easy_setopt(easy.get(), CURLOPT_HTTPHEADER, hdrs);
-        if (curl_easy_impersonate(easy.get(), profile_name.c_str(), 1) != CURLE_OK)
-            return fail("impersonate profile '" + profile_name + "' unsupported");
+        // One option block for both attempts: the retry path re-creates the
+        // handle, and headers/method/body must survive it (they did not before).
+        const auto setup = [&](const CurlPtr& e) {
+            curl_slist* hdrs = nullptr;
+            if (!accept_header.empty()) {
+                hdrs = curl_slist_append(hdrs, ("Accept: " + accept_header).c_str());
+            }
+            if (!ua_header.empty()) {
+                hdrs = curl_slist_append(hdrs, ("User-Agent: " + ua_header).c_str());
+            }
+            for (const auto& [k, v] : extra_headers) {
+                hdrs = curl_slist_append(hdrs, (k + ": " + v).c_str());
+            }
+            curl_easy_setopt(e.get(), CURLOPT_URL, url.c_str());
+            curl_easy_setopt(e.get(), CURLOPT_FOLLOWLOCATION, 1L);
+            curl_easy_setopt(e.get(), CURLOPT_WRITEFUNCTION, on_body);
+            curl_easy_setopt(e.get(), CURLOPT_WRITEDATA, &sink.body);
+            curl_easy_setopt(e.get(), CURLOPT_HEADERFUNCTION, on_header);
+            curl_easy_setopt(e.get(), CURLOPT_HEADERDATA, &sink.headers);
+            curl_easy_setopt(e.get(), CURLOPT_TIMEOUT_MS, std::max(1L, ms));
+            curl_easy_setopt(e.get(), CURLOPT_CAINFO, "/etc/ssl/certs/ca-certificates.crt");
+            if (method != "GET") {
+                curl_easy_setopt(e.get(), CURLOPT_CUSTOMREQUEST, method.c_str());
+            }
+            if (!body.empty()) {
+                curl_easy_setopt(e.get(), CURLOPT_POSTFIELDS, body.c_str()); // lives as long as this call
+                curl_easy_setopt(e.get(), CURLOPT_POSTFIELDSIZE, static_cast<long>(body.size()));
+            }
+            if (hdrs) {
+                curl_easy_setopt(e.get(), CURLOPT_HTTPHEADER, hdrs); // freed with the handle's cache; lives this call
+            }
+            curl_easy_impersonate(e.get(), profile_name.c_str(), 1);
+        };
+        setup(easy);
         // ponytail: this impersonate build intermittently fails TLS handshake
         // (ECONNRESET) against MangaDex's LB; one fresh-handle retry removes it.
         CURLcode rc = CURLE_OK;
         for (int attempt = 0; attempt < 2; ++attempt) {
             rc = curl_easy_perform(easy.get());
-            if (rc == CURLE_OK || rc != CURLE_SSL_CONNECT_ERROR)
+            if (rc == CURLE_OK || rc != CURLE_SSL_CONNECT_ERROR) {
                 break;
+            }
             easy.reset(curl_easy_init());
-            if (!easy)
+            if (!easy) {
                 return fail("curl re-init failed");
-            curl_easy_setopt(easy.get(), CURLOPT_URL, url.c_str());
-            curl_easy_setopt(easy.get(), CURLOPT_FOLLOWLOCATION, 1L);
-            curl_easy_setopt(easy.get(), CURLOPT_WRITEFUNCTION, on_body);
-            curl_easy_setopt(easy.get(), CURLOPT_WRITEDATA, &sink.body);
-            curl_easy_setopt(easy.get(), CURLOPT_HEADERFUNCTION, on_header);
-            curl_easy_setopt(easy.get(), CURLOPT_HEADERDATA, &sink.headers);
-            curl_easy_setopt(easy.get(), CURLOPT_TIMEOUT_MS, std::max(1L, ms));
-            curl_easy_setopt(easy.get(), CURLOPT_CAINFO, "/etc/ssl/certs/ca-certificates.crt");
-            curl_easy_impersonate(easy.get(), profile_name.c_str(), 1);
+            }
+            setup(easy);
         }
-        if (rc != CURLE_OK)
+        if (rc != CURLE_OK) {
             return fail(curl_easy_strerror(rc));
+        }
 
         long code = 0;
         curl_easy_getinfo(easy.get(), CURLINFO_RESPONSE_CODE, &code);
@@ -327,8 +409,9 @@ void install_host_tools(lua_State* L, const std::string& id, const Config& conf)
         out["status"] = static_cast<long long>(code);
         out["body"] = sink.body;
         sol::table hh = sol::table(ts.lua_state(), sol::new_table());
-        for (const auto& [k, v] : sink.headers)
+        for (const auto& [k, v] : sink.headers) {
             hh[k] = v;
+        }
         out["headers"] = sol::make_object(ts, hh);
         return {sol::make_object(ts, out), std::nullopt};
     };
@@ -338,6 +421,8 @@ struct Runtime {
     PluginInfo info;
     std::unique_ptr<lua_State, decltype(&lua_close)> L{nullptr, &lua_close};
     std::mutex mu; // one call at a time per state
+    glz::generic cfg;  // parsed config.json; meaningful only when has_cfg
+    bool has_cfg = false;
 };
 
 // Manifest; optional members may be absent, the rest are required by glaze.
@@ -347,12 +432,13 @@ struct Manifest {
     std::optional<std::vector<std::string>> capabilities;
     int api{};
 };
-} // namespace plugin
+} // namespace
 
 struct plugin::Host::Impl {
     Config conf;
     std::mutex mu;
     std::map<std::string, std::shared_ptr<Runtime>> plugins;
+    BS::thread_pool<>* db = nullptr; // db-worker gate for storage.*, set via use_db
 };
 
 Host::Host(Config conf) : conf_(conf), impl_(std::make_unique<Host::Impl>()) {
@@ -361,20 +447,42 @@ Host::Host(Config conf) : conf_(conf), impl_(std::make_unique<Host::Impl>()) {
 
 Host::~Host() = default;
 
+void Host::use_db(BS::thread_pool<>* db) {
+    impl_->db = db;
+}
+
 int Host::load_all(Store& store) {
     std::map<std::string, std::shared_ptr<Runtime>> fresh;
+
+    // Storage closures: same gate for every runtime this scan produces.
+    Store* sp = &store;
+    BS::thread_pool<>* dbp = impl_->db;
+    StateGet sget = [sp, dbp](const std::string& pid, const std::string& key) -> std::optional<std::string> {
+        if (dbp != nullptr) {
+            return dbp->submit_task([&] { return sp->state_get(pid, key); }).get();
+        }
+        return sp->state_get(pid, key); // single-threaded tests
+    };
+    StateSet sset = [sp, dbp](const std::string& pid, const std::string& key, const std::string& val) {
+        if (dbp != nullptr) {
+            dbp->submit_task([&] { sp->state_set(pid, key, val); }).get();
+            return;
+        }
+        sp->state_set(pid, key, val);
+    };
 
     std::error_code ec;
     if (!fs::exists(fs::path(conf_.dir), ec)) {
         spdlog::warn("plugin dir '{}' missing; no plugins loaded", conf_.dir);
-        const std::lock_guard lock(impl_->mu);
+        const std::scoped_lock lock(impl_->mu);
         impl_->plugins.clear();
         return 0;
     }
 
     for (const auto& item : fs::directory_iterator(fs::path(conf_.dir))) {
-        if (!item.is_directory())
+        if (!item.is_directory()) {
             continue;
+        }
         const std::string folder = item.path().filename().string();
 
         std::ifstream in(item.path() / "main.json");
@@ -404,9 +512,23 @@ int Host::load_all(Store& store) {
         rt.info.runtime = m.runtime;
         rt.info.api = m.api;
         rt.info.entry = m.entry.value_or("main.lua");
-        if (m.capabilities)
+        if (m.capabilities) {
             rt.info.capabilities = *m.capabilities;
+        }
         rt.info.dir = item.path().string();
+
+        // User config lives beside the manifest, is never read by anyone else,
+        // and is optional: absent/invalid -> plugin runs with no config.
+        if (std::ifstream cf(fs::path(rt.info.dir) / "config.json"); cf) {
+            std::stringstream ss;
+            ss << cf.rdbuf();
+            if (auto ec = glz::read_json(rt.cfg, std::move(ss).str())) {
+                spdlog::warn("plugin {}: config.json invalid ({})", rt.info.id, glz::format_error(ec));
+            }
+            else {
+                rt.has_cfg = true;
+            }
+        }
 
         if (m.runtime != "lua") {
             spdlog::warn("plugin {}: runtime '{}' not loadable (host loads: lua)", rt.info.id, m.runtime);
@@ -422,13 +544,13 @@ int Host::load_all(Store& store) {
         }
 
         lua_State* L = luaL_newstate();
-        if (!L) {
+        if (L == nullptr) {
             spdlog::warn("plugin {}: lua state allocation failed", rt.info.id);
             continue;
         }
         rt.L = {L, &lua_close};
         open_sandbox(L);
-        install_host_tools(L, rt.info.id, conf_);
+        install_host_tools(L, rt.info.id, conf_, rt.cfg, rt.has_cfg, sget, sset);
         // Entry scripts return nothing; run them, check validity explicitly.
         const sol::protected_function_result script =
             sol::state_view(L).safe_script_file((fs::path(rt.info.dir) / rt.info.entry).string());
@@ -442,8 +564,9 @@ int Host::load_all(Store& store) {
         lua_pop(L, lua_gettop(L));
 
         std::string caps;
-        for (size_t i = 0; i < rt.info.capabilities.size(); ++i)
-            caps += (i ? "," : "") + rt.info.capabilities[i];
+        for (size_t i = 0; i < rt.info.capabilities.size(); ++i) {
+            caps += ((i != 0u) ? "," : "") + rt.info.capabilities[i];
+        }
         store.upsert_plugin(rt.info.id, rt.info.name, rt.info.version, caps);
         spdlog::info("plugin loaded: {} v{} (api {}, caps: {})", rt.info.id, rt.info.version, rt.info.api,
                      caps.empty() ? std::string("none") : caps);
@@ -455,7 +578,7 @@ int Host::load_all(Store& store) {
     }
 
     const int kept = static_cast<int>(fresh.size());
-    const std::lock_guard lock(impl_->mu);
+    const std::scoped_lock lock(impl_->mu);
     impl_->plugins = std::move(fresh);
     return kept;
 }
@@ -463,14 +586,16 @@ int Host::load_all(Store& store) {
 std::string Host::call(const std::string& id, const std::string& method, const std::string& params_json) {
     std::shared_ptr<Runtime> rt;
     {
-        const std::lock_guard lock(impl_->mu);
-        if (const auto it = impl_->plugins.find(id); it != impl_->plugins.end())
+        const std::scoped_lock lock(impl_->mu);
+        if (const auto it = impl_->plugins.find(id); it != impl_->plugins.end()) {
             rt = it->second;
+        }
     }
-    if (!rt)
+    if (!rt) {
         return err_json("no plugin '" + id + "'");
+    }
 
-    const std::lock_guard call_lock(rt->mu);
+    const std::scoped_lock call_lock(rt->mu);
     lua_State* L = rt->L.get();
     sol::state_view sv(L);
 
@@ -479,14 +604,16 @@ std::string Host::call(const std::string& id, const std::string& method, const s
         params_obj = sol::make_object(L, sol::table(L, sol::new_table()));
     } else {
         glz::generic g;
-        if (auto ec = glz::read_json(g, params_json))
+        if (auto ec = glz::read_json(g, params_json)) {
             return err_json("bad params json");
+        }
         params_obj = json_to_sol(L, g);
     }
 
     const sol::object h = sv["handle"];
-    if (h.get_type() != sol::type::function)
+    if (h.get_type() != sol::type::function) {
         return err_json("no handle() defined");
+    }
 
     sol::table env = sol::table(L, sol::new_table()); // constructed directly on L
     env["api"] = kHostApi;
@@ -522,27 +649,29 @@ std::string Host::call(const std::string& id, const std::string& method, const s
     }
     if (!okv.as<bool>()) {
         const sol::object ev = t["error"];
-        const std::string msg =
-            ev.get_type() == sol::type::string ? ev.as<std::string>() : std::string("plugin error");
+        const std::string msg = ev.get_type() == sol::type::string ? ev.as<std::string>() : std::string("plugin error");
         spdlog::warn("[plugin:{}] {} returned error: {}", id, method, msg);
         return err_json(msg);
     }
-    return "{\"ok\":true,\"data\":" + dump_json(sol_to_json(t["data"])) + "}";
+    return R"({"ok":true,"data":)" + dump_json(sol_to_json(t["data"])) + "}";
 }
 
 std::string Host::logo_path(const std::string& id) const {
     std::shared_ptr<Runtime> rt;
     {
-        const std::lock_guard lock(impl_->mu);
-        if (const auto it = impl_->plugins.find(id); it != impl_->plugins.end())
+        const std::scoped_lock lock(impl_->mu);
+        if (const auto it = impl_->plugins.find(id); it != impl_->plugins.end()) {
             rt = it->second;
+        }
     }
-    if (!rt)
+    if (!rt) {
         return "";
+    }
     for (const char* name : {"logo.png", "logo.svg", "logo.jpg", "logo.jpeg", "logo.avif"}) {
         const fs::path p = fs::path(rt->info.dir) / name;
-        if (fs::exists(p))
+        if (fs::exists(p)) {
             return p.string();
+        }
     }
     return "";
 }

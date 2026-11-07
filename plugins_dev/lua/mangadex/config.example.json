@@ -1,0 +1,6 @@
+{
+  "client_id": "personal-client-xxxxxxxx",
+  "client_secret": "get-from-mangadex.org-settings-api-clients",
+  "username": "your-mangadex-username",
+  "password": "your-mangadex-password"
+}

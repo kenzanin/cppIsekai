@@ -1,74 +1,56 @@
 ---
 type: reference
-title: cppIsekai dependency API surface
+title: cppIsekai dependency API surface + MangaDex auth resolution
 description: "Per-dependency functions and entry points with include paths; header-verified, includes curl_easy_impersonate, SimpleIni GetLongValue and sqlite_orm escape/limit/pragma caveats"
-tags: [api, dependencies, cpp]
-generated: { by: agent/mcp, at: "2026-11-06T13:50:44Z" }
+tags: [api, dependencies, cpp, mangadex-auth]
+generated: { by: agent/mcp, at: "2026-11-07T00:50:27Z" }
 status: stable
 ---
 
-Entry points per dependency; every name verified against vendored/system headers (not from memory).
+cppIsekai dependency API surface (header-verified; curl-impersonate calls go through this layer).
 
-## Crow - `#include <crow.h>` (system package crow 1.3.4, /usr/include)
-- `crow::SimpleApp app;`
-- `CROW_ROUTE(app, "/path").methods("POST"_method)([](const crow::request& req){ ... return crow::response{...}; })`
-- `app.port(8080).multithreaded().run();`
-- WebSocket: `#include <crow/websocket.h>`
+== curl-impersonate (third_party/curl-impersonate/lib/libcurl-impersonate-chrome.so.4.8.0; headers: system curl/8.23)
+- Extern declare: `extern "C" CURLcode curl_easy_impersonate(CURL* c, const char* target, unsigned int options);` (NOT in system headers; present in the .so, symbol verified). Call AFTER easy init / before perform; target like `chrome131` (`curl --impersonate list` from the chrome binary).
+- Standard libcurl: curl_easy_init/setopt/perform/cleanup, CURLOPT_URL, CURLOPT_WRITEFUNCTION/WRITEDATA, CURLOPT_TIMEOUT_MS, CURLOPT_USERAGENT, CURLOPT_HTTPHEADER (slist), CURLOPT_POSTFIELDS (form body), CURLOPT_FOLLOWLOCATION.
 
-## libsql / sqlite amalgamation - `#include <sqlite3.h>` (static, third_party/libsql, 3.47.0)
-- `sqlite3_open_v2`, `sqlite3_prepare_v2`, `sqlite3_bind_*`, `sqlite3_step`, `sqlite3_column_*`, `sqlite3_exec`, `sqlite3_finalize`, `sqlite3_close`
-- `sqlite3_libversion()`
-- libsql fork MVCC: `BEGIN CONCURRENT` transactions
+== libvips (system 8.18.7; pkg-config vips)
+- Init once in main(): `if (VIPS_INIT("cppisekai")) return 1;`
+- Entry: `vips_thumbnail(...)` family (thumbnail_* ops), `vips_image_new_from_file` (any format incl. webp/avif with delegates), `vips_image_write_to_file`, `vips_image_write_to_buffer` (to memory), option strings like `[access=sequential]`.
+- Link: `pkg-config --libs vips`; glib/pango/rsvg come transitively.
 
-## sqlite_orm - `#include <sqlite_orm/sqlite_orm.h>` (header-only, third_party/sqlite_orm, v1.9.1, AGPL-3.0)
-- `make_storage(path, make_table(...), make_column(..., primary_key().autoincrement(), unique()), foreign_key(&T::fk).references(&P::id))`
-- `storage.pragma.journal_mode(journal_mode::WAL)`; NO pragma.foreign_keys -- FK auto-enabled when schema declares foreign_key
-- `storage.sync_schema()`, `storage.transaction_guard()` (commit/rollback RAII), `storage.insert(entity)`, `storage.count<T>()`
-- queries: `select(columns(...), left_join<T>(on(c(a) == b)), group_by, order_by)`, `get_all<T>(where(...))`
-- caveats: aggregate is `count(&E::member)` not `count<T>(member)`; no `is_true` (use `like(col, "%")`); use `limit(lim, offset(off))` -- standalone `offset()` serializer is incomplete; `like(...).escape(...)` needs `std::string("\\")` -- char binds as its NUMERIC value via field_printer<char>
+== wasm3 (vendored source third_party/wasm3/src -> build as static lib)
+- C API from wasm3.h: m3_NewEnvironment, m3_NewRuntime(runtime, stackBytes, userData), m3_ParseModule(env, buf, size), m3_LoadModule(rt, mod), m3_LinkLibC(module) / m3_LinkLibWasmSyslib(module), m3_FindFunction(&f, rt, "name"), m3_CallV/Call/CallArity, m3_GetResults/GetArgv, m3_FreeRuntime, m3_FreeEnvironment. WASM binaries must be compiled with stack-bytes headroom (default runtime stack ~64KB).
 
-## libvips - `#include <vips/vips.h>` (system shared, pkg-config vips)
-- `vips_init(argv0)` / `vips_shutdown()`
-- `vips_image_new_from_file`, `vips_image_write_to_file`
-- `vips_thumbnail`, `vips_webpsave`, `vips_webpsave_buffer`, `vips_heifsave` (AVIF), `vips_jpegsave`
+== sol2 + Lua 5.4 (sol2 vendored v3.5.0-1-g9190880; system lua54 5.4.9, include /usr/include/lua5.4)
+- sol::state (owns lua_State), state.open_libraries(sol::lib::base, string, table, math, ...); state.script / state.safe_script; state[name]=..., state[name](args) call; sol::table t = state.create_table(); usertype<T>: state.new_usertype<T>("T", "member", &T::m). Lua 5.4 integer/float split supported. Sandbox pattern: fresh lua_State + open only whitelisted libs + lua_sethook(L, hook, LUA_MASKCOUNT, N) instruction budget + pcall all entries.
 
-## sol2 - `#include <sol/sol.hpp>` (header-only; links lua5.4)
-- `sol::state lua; lua.open_libraries(sol::lib::base);`
-- `lua.safe_script("...")`, `lua["var"]`, `sol::function`
-- binding: `lua.new_usertype<T>("T", "field", &T::field)`
+== sqlite_orm (vendored v1.9.1, third_party/sqlite_orm/include) over libsql amalgamation (third_party/libsql/sqlite/sqlite3.c built as object into target)
+- make_storage(path, make_table(...)), sync_schema(), pragma.journal_mode(WAL); pragma.foreign_keys NOT settable (FK enforced via schema decl).
+- Queries: select(columns(...), where(...), order_by(...), limit(n), offset(o)); count(member) not count<T>(); multi-arg like: like(col, pattern).escape(std::string("\\")) - a bare char prints as number -> `ESCAPE 92` bug; limit(lim, offset(off)) combined overload when both present; ternary needs same branch types (c(&X::a)==v both sides); count aggregate needs sqlite_orm::count qualifier inside columns().
 
-## wasm3 - `#include <wasm3.h>` (static, third_party/wasm3)
-- flow: `m3_NewEnvironment` -> `m3_NewRuntime` -> `m3_ParseModule` -> `m3_LoadModule` -> `m3_FindFunction` -> `m3_CallV` / `m3_Call`
-- optional import linking: `m3_LinkLibC`
-- cleanup: `m3_FreeRuntime`, `m3_FreeEnvironment`
+== glaze (vendored, third_party/glaze/glaze.hpp)
+- glz::read<glz::opts{}>(obj, json_string) / glz::write<glz::opts{}>(obj) -> std::string; reflect on aggregates by default; glz::json_t for dynamic JSON (accessor: j["key"].get<std::string>(); array iteration).
 
-## BS::thread_pool - `#include <BS_thread_pool.hpp>` (header-only)
-- `BS::thread_pool pool(n);`
-- `pool.submit(f, args...)` -> `std::future`, `pool.wait()`, `pool.wait_for(ms)`
+== spdlog (system 1.17.0 shared, SPDLOG_FMT_EXTERNAL)
+- spdlog::default_logger_raw / basic_logger_mt(name, path); sinks: stdout_sink_mt, rotating_file_sink_mt, ringbuffer_sink_mt (retrieves formatted log msgs via last_formatted()); custom sink: subclass base_sink<std::mutex>, override sink_it_(view) + flush_(); queue via spdlog::details::async_msg + own thread, or spdlog::async_factory with queue size.
 
-## moodycamel::ReaderWriterQueue - `#include <readerwriterqueue.h>` (header-only, SPSC)
-- `moodycamel::ReaderWriterQueue<T> q(capacity);`
-- `q.enqueue(x)`, `q.try_dequeue(x)`, `q.size_approx()`
+== crow (system 1.3.4+; single header /usr/include/crow.h)
+- SimpleApp app; CROW_ROUTE(app, "/path/<param>"), CROW_WEBSOCKET_ROUTE(app, "/ws/<room>") with .onopen/.onmessage/.onclose; app.port(n).multithreaded().run(); app.stop() for graceful shutdown. Response helpers: crow::response{body}, .set_header, crow::json::wvalue / mustache::context for templating. Mustache: crow::mustache::load_text(name, string) then tmpl.render(ctx) - partials via `{{> partialname}}` resolve through the SAME loader.
 
-## Glaze - `#include <glaze/glaze.hpp>` (header-only, C++23)
-- `glz::write_json(obj, buf)`, `glz::read_json(obj, buf)`
-- automatic reflection from aggregate structs
+== SimpleIni (vendored v4.27+9190880-equivalent tag fd6db69, third_party/simpleini/SimpleIni.h)
+- CSimpleIniA ini; ini.SetUnicode(); ini.LoadFile(path)/LoadData(mem, size); GetBoolValue(section, key, default), GetLongValue, GetValue(section, key, default); SetLongValue/SetValue/Delete(section, key, clear_comment); SaveFile(path). Comment preservation verified in practice; optional MultiKey true for repeated keys.
 
-## curl-impersonate - `#include <curl/curl.h>` (shared, third_party/curl-impersonate/lib, 8.1.1 BoringSSL)
-- libcurl ABI: `curl_global_init`, `curl_easy_init`, `curl_easy_setopt`, `curl_easy_perform`, `curl_easy_cleanup`, `curl_version`
-- fingerprinting: `curl_easy_impersonate(easy, "chrome116", 1)` -- NOTE: symbol exists in the .so (nm-verified) but NOT in system curl 8.23 headers; declare extern `CURL_EXTERN CURLcode curl_easy_impersonate(CURL*, const char*, unsigned);` or use include/ from the impersonate sources
+== CLI11 (system 2.7.2; #include <CLI/CLI.hpp>)
+- CLI::App app{desc}; app.add_option("-p,--port", port, "")->check(CLI::Range(1,65535)); app.add_option("-c,--config", path)->envname("CPPSEKAI_CONFIG")->check(CLI::ExistingFile); CLI11_PARSE(app, argc, argv) or app.parse/exit.
 
-## CLI11 - `#include <CLI/CLI.hpp>` (system package cli11 2.7.2, /usr/include/CLI)
-- `CLI::App cli{"description"};`
-- `cli.add_option("--port", var, "help")->envname("PORT");`, `->capture_default_str()`
-- `CLI11_PARSE(cli, argc, argv);` -- macro prints parse errors and returns exit code
+== BS::thread_pool (vendored) / readerwriterqueue (vendored)
+- BS::thread_pool<TP::opt::none> pool(n); pool.detach_task([]{...}), pool.submit_task(f) -> future; moodycamel::ReaderWriterQueue<T> q(cap); q.enqueue/emplace, q.try_dequeue(item) - single producer/consumer fast path.
 
-## SimpleIni - `#include <SimpleIni.h>` (header-only, third_party/simpleini, v4.27)
-- `CSimpleIniA ini;` -- ctor(utf8, multiKey, multiLine), all default false
-- `ini.LoadFile(path)` -> SI_Error (<0 = missing/error); `ini.SaveFile(path)` writes UTF-8 BOM
-- getters are GetLongValue/GetValue -- NOT GetLong (build-error lesson); `ini.SetValue(section, key, value[, comment])`
-- round-trip keeps whole-line comments, normalizes to `key = value`; trailing same-line comments are dropped
+== MangaDex auth (resolved 2026-11-06; docs source tmp/mdapi = mangadex-pub/mangadex-api-docs official GitLab mirror)
+- Token endpoint https://auth.mangadex.org/realms/mangadex/protocol/openid-connect/token (Keycloak).
+- `client_credentials` is for SERVICE clients only: our personal client returns 401 {"error":"unauthorized_client","error_description":"Client not enabled to retrieve service account"} - verified live. This is expected, not a config error.
+- Personal client auth: password grant (username+password+client_id+client_secret -> access_token + refresh_token) for bootstrap, then refresh_token grant thereafter. No browser/authorization-code dance needed.
+- Plugin design: config section [plugin.mangadex] in ini -> Lua global config; ensure_token(): cache -> refresh_token grant -> password grant -> nil (anon fallback, never fail the call over auth). 401 -> clear cache, re-auth once, retry once. `curl --data-urlencode` form POST; Content-Type application/x-www-form-urlencoded.
 
 # Related Concepts
-- [Dependency vendoring: system-shared first, minimal vendoring](../decisions/third-party-dependencies.md): API reference for the dependencies decided in this concept
-- [Dependency vendoring: system-shared first, minimal vendoring](../decisions/third-party-dependencies.md): Dependency decisions reference updated with the sqlite_orm entry
+- Related to [Dependency vendoring: system-shared first, minimal vendoring](../decisions/third-party-dependencies.md)

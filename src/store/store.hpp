@@ -4,6 +4,7 @@
 // ponytail: sqlite_orm is not thread-safe; all calls must come from the db worker.
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -36,6 +37,10 @@ public:
                        const std::string& capabilities);
     int count(const std::string& plugin, const std::string& query);
     std::vector<Title> search(const std::string& plugin, const std::string& query, int limit, int offset);
+
+    // Per-plugin key-value state (tokens etc.); survives restart. nullopt when absent.
+    std::optional<std::string> state_get(const std::string& plugin_id, const std::string& key);
+    void state_set(const std::string& plugin_id, const std::string& key, const std::string& value);
 
 private:
     std::unique_ptr<StoreImpl> impl_;

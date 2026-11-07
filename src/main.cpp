@@ -54,10 +54,12 @@ int main(int argc, char** argv) {
     CLI11_PARSE(cli, argc, argv);
 
     CSimpleIniA ini; // load error (missing file) just leaves port unset
-    if (ini.LoadFile(conf.c_str()) >= 0 && port < 0)
+    if (ini.LoadFile(conf.c_str()) >= 0 && port < 0) {
         port = static_cast<int>(ini.GetLongValue("server", "port", -1));
-    if (port < 0)
+    }
+    if (port < 0) {
         port = 8090;
+    }
 
     // [plugin]: discovery dir and http.fetch defaults; resolved values logged for ops.
     plugin::Config plugin_conf;
@@ -70,6 +72,7 @@ int main(int argc, char** argv) {
                  plugin_conf.instruction_budget);
 
     plugin::Host plugins{plugin_conf};
+    plugins.use_db(&db_pool); // storage.* gate: plugin threads never touch sqlite directly
     plugins.load_all(store);
 
     spdlog::info("cppIsekai listening on :{} (config: {})", port, conf);

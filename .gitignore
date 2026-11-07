@@ -3,5 +3,6 @@ build/
 .cache/
 
 data/
+plugins_dev/**/config.json
 test_store.db
 build/

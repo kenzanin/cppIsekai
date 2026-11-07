@@ -67,6 +67,7 @@ target_include_directories(test_plugin PRIVATE
     src
     ${TP}/glaze
     ${TP}/sol2/include
+    ${TP}/thread_pool/include
     ${TP}/sqlite_orm/include
     ${TP}/readerwriterqueue/include
 )
@@ -87,7 +88,8 @@ find_program(CLANG_TIDY clang-tidy)
 find_program(CLANG_FORMAT clang-format)
 # optional targets: cmake --build build --target tidy / format
 add_custom_target(tidy
-    COMMAND ${CLANG_TIDY} -p ${CMAKE_BINARY_DIR} src/main.cpp src/store.cpp src/http.cpp
+    COMMAND ${CLANG_TIDY} -p ${CMAKE_BINARY_DIR}
+    src/main.cpp src/store/store.cpp src/http/http.cpp src/plugin/plugin.cpp
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 add_custom_target(format

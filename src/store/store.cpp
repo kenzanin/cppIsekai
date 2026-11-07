@@ -23,17 +23,25 @@ struct TitleEntity {
     std::string name;
 };
 
+struct StateEntity {
+    std::string plugin_id; // plugin folder id, not plugin.id FK
+    std::string key;
+    std::string value;
+};
+
 inline auto create_storage(const std::string& path) {
-    return make_storage(path,
-                        make_table("plugin", make_column("id", &PluginEntity::id, primary_key().autoincrement()),
+    return make_storage(
+        path,
+        make_table("plugin", make_column("id", &PluginEntity::id, primary_key().autoincrement()),
                    make_column("name", &PluginEntity::name, unique()),
-                   make_column("plugin_id", &PluginEntity::plugin_id),
-                   make_column("version", &PluginEntity::version),
+                   make_column("plugin_id", &PluginEntity::plugin_id), make_column("version", &PluginEntity::version),
                    make_column("capabilities", &PluginEntity::capabilities)),
-                        make_table("title", make_column("id", &TitleEntity::id, primary_key().autoincrement()),
-                                   make_column("plugin_id", &TitleEntity::plugin_id),
-                                   make_column("name", &TitleEntity::name),
-                                   foreign_key(&TitleEntity::plugin_id).references(&PluginEntity::id)));
+        make_table("title", make_column("id", &TitleEntity::id, primary_key().autoincrement()),
+                   make_column("plugin_id", &TitleEntity::plugin_id), make_column("name", &TitleEntity::name),
+                   foreign_key(&TitleEntity::plugin_id).references(&PluginEntity::id)),
+        make_table("plugin_state", make_column("plugin_id", &StateEntity::plugin_id),
+                   make_column("key", &StateEntity::key), make_column("value", &StateEntity::value),
+                   primary_key(&StateEntity::plugin_id, &StateEntity::key)));
 }
 
 using StorageType = decltype(create_storage(""));
@@ -67,11 +75,10 @@ Store::Store(const std::string& path) : impl_(std::make_unique<StoreImpl>(path))
 Store::~Store() = default;
 
 std::vector<Plugin> Store::plugins() {
-    auto rows =
-        impl_->storage.select(columns(&PluginEntity::id, &PluginEntity::name, sqlite_orm::count(&TitleEntity::id),
-                                      &PluginEntity::plugin_id),
-                              left_join<TitleEntity>(on(c(&TitleEntity::plugin_id) == &PluginEntity::id)),
-                              group_by(&PluginEntity::id), order_by(&PluginEntity::name));
+    auto rows = impl_->storage.select(
+        columns(&PluginEntity::id, &PluginEntity::name, sqlite_orm::count(&TitleEntity::id), &PluginEntity::plugin_id),
+        left_join<TitleEntity>(on(c(&TitleEntity::plugin_id) == &PluginEntity::id)), group_by(&PluginEntity::id),
+        order_by(&PluginEntity::name));
     std::vector<Plugin> out;
     out.reserve(rows.size());
     for (const auto& row : rows) {
@@ -145,4 +152,16 @@ std::vector<Title> Store::search(const std::string& plugin, const std::string& q
         out.push_back(std::move(t));
     }
     return out;
+}
+
+std::optional<std::string> Store::state_get(const std::string& plugin_id, const std::string& key) {
+    auto rows = impl_->storage.get_all<StateEntity>(
+        where(c(&StateEntity::plugin_id) == plugin_id && c(&StateEntity::key) == key));
+    if (rows.empty())
+        return std::nullopt;
+    return rows[0].value;
+}
+
+void Store::state_set(const std::string& plugin_id, const std::string& key, const std::string& value) {
+    impl_->storage.replace(StateEntity{plugin_id, key, value}); // INSERT OR REPLACE on the composite pk: upsert
 }

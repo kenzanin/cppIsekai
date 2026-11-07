@@ -1,3 +1,13 @@
+## 2026-11-07
+* **Update**: Linked `references/mangadex-auth-quirks.md` to `architecture/plugin-system.md` (MangaDex quirks constrained the mangadex plugin auth design and the storage host tools.).
+* **Update**: Linked `decisions/plugin-dev-layout.md` to `decisions/plugin-data-segregation.md` (Dev layout realizes the data-segregation rule at the workflow level.).
+* **Creation**: Documented concept `references/mangadex-auth-quirks.md` (MangaDex auth and API quirks (verified)).
+* **Creation**: Documented concept `decisions/plugin-dev-layout.md` (Plugin dev layout: plugins_dev/<lang>/<site> + symlink deploy).
+* **Update**: Linked `decisions/plugin-data-segregation.md` to `architecture/plugin-system.md` (MangaDex auth (config.json credentials + storage-backed tokens) is realized through plugin host tools defined here.).
+* **Creation**: Documented concept `decisions/plugin-data-segregation.md` (Plugin data segregation: host .ini is host-only).
+* **Update**: Linked `references/dependency-api.md` to `decisions/third-party-dependencies.md`.
+* **Update**: Updated concept `references/dependency-api.md`.
+
 ## 2026-11-06
 * **Update**: Linked `architecture/plugin-system.md` to `architecture/normalization-contract.md` (Wire-vs-storage clarification extends the unix-time + JSON policy (okf_update wipes relations)).
 * **Update**: Updated concept `architecture/plugin-system.md`.

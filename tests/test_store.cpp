@@ -1,6 +1,8 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest/doctest.h>
 
+#include <chrono>
+
 #include "store/store.hpp"
 
 TEST_CASE("Store: seed, plugins, search, count") {
@@ -48,5 +50,22 @@ TEST_CASE("Store: seed, plugins, search, count") {
             CHECK(r.plugin == "Flame");
         auto exact = store.search("Flame", "Scans #1", 10, 0);
         CHECK(exact[0].name == "Flame Scans #1"); // order_by name puts #1 first
+    }
+
+    SUBCASE("plugin state round-trip and overwrite") {
+        // hermetic: probe key unique per run, the db file persists between runs
+        const auto probe = "probe_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+        CHECK_FALSE(store.state_get("mangadex", probe).has_value());
+        store.state_set("mangadex", probe, "r1");
+        CHECK(store.state_get("mangadex", probe) == "r1");
+        store.state_set("mangadex", probe, "r2"); // same PK -> update
+        CHECK(store.state_get("mangadex", probe) == "r2");
+        store.state_set("other", probe, "x"); // scoped per plugin
+        CHECK(store.state_get("other", probe) == "x");
+        CHECK(store.state_get("mangadex", probe) == "r2");
+        { // fresh connection = what a host restart observes on disk
+            Store reopened("test_store.db");
+            CHECK(reopened.state_get("mangadex", probe) == "r2");
+        }
     }
 }

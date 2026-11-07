@@ -1,0 +1,8 @@
+{
+  "name": "MangaDex",
+  "id": "mangadex",
+  "version": "1.0.0",
+  "runtime": "lua",
+  "capabilities": ["search", "detail", "chapters"],
+  "api": 1
+}

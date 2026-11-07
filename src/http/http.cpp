@@ -25,16 +25,16 @@ const char* logo_mime(std::string_view path) {
     const auto ext = path.substr(path.find_last_of('.') + 1);
     if (ext == "png") {
         return "image/png";
-}
+    }
     if (ext == "svg") {
         return "image/svg+xml";
-}
+    }
     if (ext == "jpg" || ext == "jpeg") {
         return "image/jpeg";
-}
+    }
     if (ext == "avif") {
         return "image/avif";
-}
+    }
     return "application/octet-stream";
 }
 
@@ -102,8 +102,9 @@ crow::json::wvalue home_context(Store& store, BS::thread_pool<>& db, const crow:
         row["name"] = item.name;
         row["titles"] = std::to_string(item.titles);
         row["current"] = item.name == plugin;
-        if (!item.plugin_id.empty())
+        if (!item.plugin_id.empty()) {
             row["logo"] = item.plugin_id; // absent key renders no <img> in the partial
+        }
         plugin_rows.push_back(std::move(row));
     }
     ctx["plugins"] = std::move(plugin_rows);
@@ -121,14 +122,14 @@ crow::json::wvalue home_context(Store& store, BS::thread_pool<>& db, const crow:
     return ctx;
 }
 
-crow::response html(const std::string& file, crow::json::wvalue ctx) {
-    return crow::response(crow::mustache::load(file).render(ctx));
+crow::response html(const std::string& file, const crow::json::wvalue& ctx) {
+    return {crow::mustache::load(file).render(ctx)};
 }
 
 } // namespace
 
-void serve(Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool, plugin::Host& plugins,
-           LogBuffer& logs, int port) {
+void serve(Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool, plugin::Host& plugins, LogBuffer& logs,
+           int port) {
     crow::SimpleApp app;
     crow::mustache::set_base("templates");
 
@@ -176,8 +177,9 @@ void serve(Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool, 
             return r;
         }
         crow::json::wvalue p;
-        for (const auto& k : req.url_params.keys())
+        for (const auto& k : req.url_params.keys()) {
             p[k] = req.url_params.get(k);
+        }
         crow::response r{on_pool(plugin_pool, [&] { return plugins.call(id, action, p.dump()); })};
         r.set_header("Content-Type", "application/json");
         return r;
@@ -187,15 +189,17 @@ void serve(Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool, 
     ([&] {
         auto ctx = layout("logs");
         std::vector<crow::json::wvalue> lines;
-        for (const auto& line : logs.snapshot())
+        for (const auto& line : logs.snapshot()) {
             lines.emplace_back(line);
+        }
         ctx["lines"] = std::move(lines);
         return html("logs.mustache", std::move(ctx));
     });
 
     CROW_WEBSOCKET_ROUTE(app, "/ws/log").onopen([&](crow::websocket::connection& conn) {
-        for (const auto& line : logs.snapshot())
+        for (const auto& line : logs.snapshot()) {
             conn.send_text(line);
+        }
         spdlog::info("log socket opened");
     });
 
