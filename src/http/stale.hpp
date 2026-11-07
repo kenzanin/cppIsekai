@@ -10,6 +10,7 @@
 
 #include <glaze/glaze.hpp>
 
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -27,6 +28,17 @@ inline bool envelope_ok(const glz::generic& g) {
     const auto ok = obj->find("ok");
     const auto* b = ok == obj->end() ? nullptr : std::get_if<bool>(&ok->second.data);
     return b && *b;
+}
+
+// `data` of an ok ABI envelope, copied; nullopt on any malformed shape.
+// Consumers: the reader window composition and, later, the prefetch worker.
+inline std::optional<glz::generic::array_t> envelope_data(const std::string& envelope) {
+    glz::generic parsed;
+    if (glz::read_json(parsed, envelope) || !envelope_ok(parsed) || !parsed.is_object())
+        return std::nullopt;
+    const auto data = parsed.get_object().find("data");
+    if (data == parsed.get_object().end() || !data->second.is_array()) return std::nullopt;
+    return data->second.get_array();
 }
 
 // sha1(plugin|method|sorted-query): params re-serialized with keys sorted

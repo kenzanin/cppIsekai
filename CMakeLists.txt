@@ -28,7 +28,7 @@ target_include_directories(sqlite3 PUBLIC ${TP}/libsql/sqlite)
 
 # --- app ---
 add_executable(cppIsekai src/main.cpp src/store/store.cpp src/http/http.cpp
-                         src/plugin/plugin.cpp src/cache/cache.cpp)
+                         src/plugin/plugin.cpp src/cache/cache.cpp src/reader/window.cpp)
 target_include_directories(
   cppIsekai
   PRIVATE src
@@ -97,6 +97,12 @@ target_include_directories(test_stale PRIVATE src ${TP}/glaze)
 target_compile_options(test_stale PRIVATE -Wall -Wextra)
 add_test(NAME stale COMMAND test_stale)
 
+# reader window math: pure fn, fakes injected; no server, store or network
+add_executable(test_window tests/test_window.cpp src/reader/window.cpp)
+target_include_directories(test_window PRIVATE src)
+target_compile_options(test_window PRIVATE -Wall -Wextra)
+add_test(NAME window COMMAND test_window)
+
 # ponytail: no CPack/install yet -- add when packaging matters
 
 find_program(CLANG_TIDY clang-tidy)
@@ -105,7 +111,7 @@ find_program(CLANG_FORMAT clang-format)
 add_custom_target(
   tidy
   COMMAND ${CLANG_TIDY} -p ${CMAKE_BINARY_DIR} src/main.cpp src/store/store.cpp
-          src/http/http.cpp src/plugin/plugin.cpp src/cache/cache.cpp
+          src/http/http.cpp src/plugin/plugin.cpp src/cache/cache.cpp src/reader/window.cpp
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 add_custom_target(
   format
