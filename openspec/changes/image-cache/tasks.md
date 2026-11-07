@@ -11,7 +11,7 @@
 ## 3. Mangadex pages + prefetch
 - [x] 3.1 `pages` method via `/at-home/server/{id}` (dataSaver off), luac + live probe
 - [x] 3.2 `POST /reader/position`, `POST /chapter/<id>/skip` (state `host/skip/<id>`); window pure fn + unit test (boundary spill, skip reroute, no refetch)
-- [ ] 3.3 worker thread: sequential delta fetch, re-run on position/skip
+- [x] 3.3 worker thread: sequential delta fetch, re-run on position/skip
 
 ## 4. Verification
 - [ ] 4.1 ctest green; openspec valid
