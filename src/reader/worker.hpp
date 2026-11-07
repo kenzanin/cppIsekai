@@ -36,16 +36,23 @@ struct WindowCtx {
 inline std::string rel_path(const WindowCtx& ctx, int page, const std::string& url) {
     if (ctx.plugin.empty() || ctx.slug.empty() || ctx.chapter < 1 || page < 1)
         return {};
-    // Ext rule mirrors the sha fallback's ext_of: trailing dot-suffix of the
-    // url path, 1-5 alnum chars, lowercased; absent -> "bin".
+    // Ext rule mirrors the sha fallback's ext_of (cache.cpp): trailing
+    // dot-suffix of the url path, 1-5 alnum chars, lowercased; absent -> ""
+    // which falls back to the exact sha path.
     const std::string path = url.substr(0, url.find('?'));
     const std::string name = path.substr(path.find_last_of('/') + 1);
     const auto dot = name.find_last_of('.');
     if (dot == std::string::npos || dot + 1 == name.size() || name.size() - dot > 6)
         return {};
+    std::string ext = name.substr(dot + 1);
+    for (char& c : ext) {
+        if (!std::isalnum(static_cast<unsigned char>(c)))
+            return {};
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
     const auto pad = [](int n) { return "000" + std::to_string(n); };
     return ctx.plugin + "/" + ctx.slug + "/ch" + pad(ctx.chapter).substr(1) + "/p" + pad(page).substr(1) +
-           "." + name.substr(dot + 1);
+           "." + ext;
 }
 
 class Worker {
