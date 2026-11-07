@@ -40,8 +40,9 @@ inline void build_cli(CLI::App& app, Overrides& o) {
     for (std::size_t i = 0; i < kEntryCount; ++i) {
         const Entry& e = kEntries[i];
         std::string names = std::string("--") + e.flag;
-        if (e.alias && *e.alias)
+        if ((e.alias != nullptr) && ((*e.alias) != 0)) {
             names += std::string(",--") + e.alias;
+        }
         o.opt[i] = app.add_option(names, o.value[i], e.doc);
     }
 }
@@ -72,8 +73,9 @@ inline Config to_config(const std::array<std::string, kEntryCount>& v) {
     c.db = v[7];
     c.log_file = v[8];
     c.data_dir = v[9];
-    if (c.port <= 0)
+    if (c.port <= 0) {
         c.port = num_or<int>(kEntries[0].def, kEntries[0].def); // design ceiling: port > 0
+    }
     return c;
 }
 
