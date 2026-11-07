@@ -3,7 +3,7 @@ type: decision
 title: "Dependencies & plugins: curl-first APIs, runtime parity, no hand-rolled crypto"
 description: "User-confirmed 2026-11-07: curl-first REST routes (CBZ export = host route), plugin runtime parity same signature (quickjs-ng second runtime), no hand-rolled crypto (stbrumme/hash-library md5/sha1), base64 dari glaze, libzippp + pacman libzip, quickjs-ng vendored static."
 tags: [dependencies, cbz, quickjs, plugins, hashing, api-design]
-generated: { by: agent/mcp, at: "2026-11-07T10:20:00Z" }
+generated: { by: agent/mcp, at: "2026-11-07T14:04:38Z" }
 status: stable
 ---
 
@@ -27,3 +27,6 @@ Apache-2.0, tanpa dependency eksternal. Menggantikan rencana "wasm3 second" deng
 ## Impact scope
 
 Change openspec baru `deps-and-plugins`, di-stack di branch image-cache (file yang sama: cache keys, plugin host, routes).
+
+# Related Concepts
+- [cli-config: registry-backed config surface (CLI/env/ini/dump/save)](../architecture/cli-config.md): POST /config is a REST route per curl-first ruling; registry wraps CLI11/SimpleIni/glaze APIs.

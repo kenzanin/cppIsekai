@@ -3,7 +3,7 @@ type: decision
 title: "cppIsekai core architecture: plugin-per-site manga viewer"
 description: "Plugin-per-site manga viewer: plugins parse HTML themselves, host = crow+mustache + libsql + impersonate proxy w/ disk cache; light sandbox; zero new deps"
 tags: [architecture, plugin, manga]
-generated: { by: agent/mcp, at: "2026-11-07T10:45:25Z" }
+generated: { by: agent/mcp, at: "2026-11-07T14:04:38Z" }
 status: stable
 ---
 
@@ -27,3 +27,4 @@ Deferred (ponytail): test framework at first plugin regression suite; WAMR swap 
 - [Dependency vendoring: system-shared first, minimal vendoring](../decisions/third-party-dependencies.md): Core architecture consumes the vendored dependency set decided here
 - [cppIsekai dependency API surface](../references/dependency-api.md): Plugin ABI function names come from the verified dependency API reference
 - Related to [cppIsekai image-cache + offline-first pathway](image-cache-offline.md)
+- [cli-config: registry-backed config surface (CLI/env/ini/dump/save)](cli-config.md): Config layer feeds the host core (paths/port wiring to store, plugin, cache); registry is consumer of its dependency APIs.

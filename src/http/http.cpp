@@ -2,6 +2,7 @@
 #include "img.hpp"
 #include "stale.hpp"
 
+#include "config/config.hpp"
 #include "log/log.hpp"
 #include "plugin/plugin.hpp"
 #include "reader/window.hpp"
@@ -13,8 +14,10 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <fstream>
+#include <map>
 #include <memory>
 #include <optional>
 #include <sstream>
@@ -65,8 +68,7 @@ constexpr const char* kPositionKey = "host/pos";
 // Typed readers for request/state JSON: absent or wrong-typed -> default.
 // House crow accessors throw on a type mismatch; bodies are a trust boundary.
 std::string str_field(const crow::json::rvalue& j, const char* key) {
-    return j.has(key) && j[key].t() == crow::json::type::String ? std::string(j[key].s())
-                                                                : std::string{};
+    return j.has(key) && j[key].t() == crow::json::type::String ? std::string(j[key].s()) : std::string{};
 }
 long num_field(const crow::json::rvalue& j, const char* key, long def) {
     return j.has(key) && j[key].t() == crow::json::type::Number ? j[key].i() : def;
@@ -77,9 +79,8 @@ long num_field(const crow::json::rvalue& j, const char* key, long def) {
 // math in reader::next_window. Empty result on any plugin failure -- the
 // reader merely loses its prefetch. The worker (task 3.3) mirrors this shape.
 std::vector<std::string> reader_window(Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool,
-                                       plugin::Host& plugins, cache::Cache& images,
-                                       const std::string& plugin_id, const std::string& manga_id,
-                                       const reader::Position& pos) {
+                                       plugin::Host& plugins, cache::Cache& images, const std::string& plugin_id,
+                                       const std::string& manga_id, const reader::Position& pos) {
     crow::json::wvalue query;
     query["id"] = manga_id;
     const std::string chapters_query = query.dump();
@@ -92,14 +93,17 @@ std::vector<std::string> reader_window(Store& store, BS::thread_pool<>& db, BS::
     std::vector<reader::Chapter> chapters;
     if (const auto data = envelope_data(envelope)) {
         for (const auto& item : *data) {
-            if (!item.is_object()) continue;
+            if (!item.is_object())
+                continue;
             const auto& entry = item.get_object();
             const auto id = entry.find("id");
             const auto* id_s = id == entry.end() ? nullptr : std::get_if<std::string>(&id->second.data);
-            if (!id_s) continue;
-            double number = 0;  // fractional chapter numbers are a thing
+            if (!id_s)
+                continue;
+            double number = 0; // fractional chapter numbers are a thing
             if (const auto num = entry.find("number"); num != entry.end())
-                if (const auto* d = std::get_if<double>(&num->second.data)) number = *d;
+                if (const auto* d = std::get_if<double>(&num->second.data))
+                    number = *d;
             chapters.push_back(reader::Chapter{*id_s, number});
         }
     }
@@ -111,10 +115,9 @@ std::vector<std::string> reader_window(Store& store, BS::thread_pool<>& db, BS::
     reader::Skipped skip;
     on_pool(db, [&] {
         for (const auto& ch : chapters)
-            if (const std::optional<std::string> v =
-                    store.state_get(kStateHost, std::string(kSkipPrefix) + ch.id))
+            if (const std::optional<std::string> v = store.state_get(kStateHost, std::string(kSkipPrefix) + ch.id))
                 skip[ch.id] = *v == "1";
-        return 0;  // on_pool is value-based
+        return 0; // on_pool is value-based
     });
 
     const auto pages_of = [&](const std::string& chapter_id) {
@@ -128,7 +131,8 @@ std::vector<std::string> reader_window(Store& store, BS::thread_pool<>& db, BS::
         std::vector<std::string> urls;
         if (const auto data = envelope_data(env))
             for (const auto& el : *data)
-                if (const auto* s = std::get_if<std::string>(&el.data)) urls.emplace_back(*s);
+                if (const auto* s = std::get_if<std::string>(&el.data))
+                    urls.emplace_back(*s);
         return urls;
     };
 
@@ -208,8 +212,7 @@ extern "C" CURLcode curl_easy_impersonate(CURL* easy, const char* client, unsign
 // The one production curl call for the image cache: plain GET, body on 2xx.
 cache::Fetcher makeCurlFetcher(std::string proxy) {
     return [proxy = std::move(proxy)](const std::string& url) -> std::optional<std::string> {
-        std::unique_ptr<CURL, decltype(&curl_easy_cleanup)> easy(curl_easy_init(),
-                                                                 &curl_easy_cleanup);
+        std::unique_ptr<CURL, decltype(&curl_easy_cleanup)> easy(curl_easy_init(), &curl_easy_cleanup);
         if (!easy) {
             return std::nullopt;
         }
@@ -219,8 +222,7 @@ cache::Fetcher makeCurlFetcher(std::string proxy) {
             curl_easy_setopt(e, CURLOPT_URL, url.c_str());
             curl_easy_setopt(e, CURLOPT_FOLLOWLOCATION, 1L);
             curl_easy_setopt(
-                e, CURLOPT_WRITEFUNCTION,
-                +[](char* p, size_t n, size_t l, void* ud) {
+                e, CURLOPT_WRITEFUNCTION, +[](char* p, size_t n, size_t l, void* ud) {
                     static_cast<std::string*>(ud)->append(p, n * l);
                     return n * l;
                 });
@@ -261,8 +263,8 @@ cache::Fetcher makeCurlFetcher(std::string proxy) {
     };
 }
 
-void serve(Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool, plugin::Host& plugins,
-           LogBuffer& logs, cache::Cache& images, int port) {
+void serve(Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool, plugin::Host& plugins, LogBuffer& logs,
+           cache::Cache& images, int port, const std::string& ini_path) {
     crow::SimpleApp app;
     crow::mustache::set_base("templates");
 
@@ -296,7 +298,7 @@ void serve(Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool, 
 
     // Page data for /plugins: registry rows + live health.
     CROW_ROUTE(app, "/api/plugins")
-   ([&] {
+    ([&] {
         const auto rows = on_pool(db, [&] { return store.plugins(); });
         crow::json::wvalue list(crow::json::type::List);
         int idx = 0;
@@ -378,8 +380,7 @@ void serve(Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool, 
         const std::string params = p.dump();
         // Stale-serve wrap (design D3): the one call site, opt-in methods only.
         crow::response r{on_pool(plugin_pool, [&] {
-            return call_cached(images, id, action, params,
-                               [&] { return plugins.call(id, action, params); });
+            return call_cached(images, id, action, params, [&] { return plugins.call(id, action, params); });
         })};
         r.set_header("Content-Type", "application/json");
         return r;
@@ -403,8 +404,7 @@ void serve(Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool, 
                 r.set_header("Content-Type", "application/json");
                 return r;
             }
-            const reader::Position pos{chapter,
-                                       static_cast<int>(std::max(1L, num_field(body, "page", 1)))};
+            const reader::Position pos{chapter, static_cast<int>(std::max(1L, num_field(body, "page", 1)))};
 
             // last spot wins: single-user reader, one live anchor
             crow::json::wvalue pos_json;
@@ -421,8 +421,10 @@ void serve(Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool, 
             const std::vector<std::string> found =
                 reader_window(store, db, plugin_pool, plugins, images, plugin, manga, pos);
             std::vector<crow::json::wvalue> window;
-            for (const auto& url : found) window.emplace_back(url);
-            if (!found.empty()) prefetch.nudge(found); // background delta fetch (3.3)
+            for (const auto& url : found)
+                window.emplace_back(url);
+            if (!found.empty())
+                prefetch.nudge(found); // background delta fetch (3.3)
 
             crow::json::wvalue out;
             out["window"] = std::move(window);
@@ -456,13 +458,14 @@ void serve(Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool, 
                     const std::string manga = str_field(pos, "manga");
                     const std::string chapter = str_field(pos, "chapter");
                     if (!plugin.empty() && !manga.empty() && !chapter.empty()) {
-                        const reader::Position where{
-                            chapter, static_cast<int>(std::max(1L, num_field(pos, "page", 1)))};
-                        const std::vector<std::string> found = reader_window(store, db, plugin_pool,
-                                                                             plugins, images, plugin,
-                                                                             manga, where);
-                        for (const auto& url : found) window.emplace_back(url);
-                        if (!found.empty()) prefetch.nudge(found); // rerun delta (3.3)
+                        const reader::Position where{chapter,
+                                                     static_cast<int>(std::max(1L, num_field(pos, "page", 1)))};
+                        const std::vector<std::string> found =
+                            reader_window(store, db, plugin_pool, plugins, images, plugin, manga, where);
+                        for (const auto& url : found)
+                            window.emplace_back(url);
+                        if (!found.empty())
+                            prefetch.nudge(found); // rerun delta (3.3)
                     }
                 }
             }
@@ -475,6 +478,37 @@ void serve(Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool, 
             r.set_header("Content-Type", "application/json");
             return r;
         });
+
+    // Config save (D5): validation-first merge, comments/ordering survive.
+    // Body {"section.key": string|number} in resolved full-key form.
+    CROW_ROUTE(app, "/config").methods(crow::HTTPMethod::POST)([&](const crow::request& req) -> crow::response {
+        auto fail = [](int code, std::string msg) {
+            crow::json::wvalue e;
+            e["ok"] = false;
+            e["error"] = std::move(msg);
+            crow::response r{std::move(e)};
+            r.code = code;
+            r.set_header("Content-Type", "application/json");
+            return r;
+        };
+
+        std::map<std::string, std::string> updates;
+        std::string parse_err;
+        if (!config::parse_updates(req.body, updates, parse_err))
+            return fail(400, std::move(parse_err));
+
+        std::string err;
+        const int written = config::save(updates, ini_path, &err);
+        if (written < 0)
+            return fail(written == -2 ? 500 : 400, std::move(err));
+
+        crow::json::wvalue out;
+        out["ok"] = true;
+        out["written"] = written;
+        crow::response r{std::move(out)};
+        r.set_header("Content-Type", "application/json");
+        return r;
+    });
 
     // Serve-through image cache: hit = disk, miss+online = fetch+store+serve,
     // miss+offline = 404. Mime from the stored file's extension.
