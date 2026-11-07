@@ -227,8 +227,24 @@ methods.chapters = function(params)
   return { ok = true, data = out }
 end
 
+-- Page images for a chapter: /at-home/server/{id} -> {baseUrl, chapter{hash,data[]}}.
+-- data[] is the quality pass; dataSaver[] deliberately unused (dataSaver off).
+-- baseUrl already carries the scheme (live: "https://<host>.mangadex.network").
+methods.pages = function(params)
+  local body, err = get("/at-home/server/" .. (params.id or ""))
+  if err ~= nil then return { ok = false, error = err } end
+  local data = type(body.chapter) == "table" and body.chapter.data
+  if type(body.baseUrl) ~= "string" or type(data) ~= "table" or #data == 0 then
+    return { ok = false, error = "at-home: malformed response" }
+  end
+  local prefix = body.baseUrl .. "/data/" .. body.chapter.hash .. "/"
+  local out = {}
+  for _, f in ipairs(data) do out[#out + 1] = prefix .. f end
+  return { ok = true, data = out }
+end
+
 function handle(req)
   local fn = methods[req.method]
   if fn == nil then return { ok = false, error = "unknown method " .. tostring(req.method) } end
-  return fn(req.params)
+  return fn(req.params or {})
 end
