@@ -12,6 +12,7 @@
 // routes or state: the queue is the only worker state, newest list wins.
 #include "cache/cache.hpp"
 
+#include <cctype>
 #include <condition_variable>
 #include <mutex>
 #include <optional>
