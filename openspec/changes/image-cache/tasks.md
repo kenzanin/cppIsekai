@@ -14,5 +14,5 @@
 - [x] 3.3 worker thread: sequential delta fetch, re-run on position/skip
 
 ## 4. Verification
-- [ ] 4.1 ctest green; openspec valid
-- [ ] 4.2 live: bogus proxy -> viewed manga detail/chapters/pages `cached:true`, images 200 from disk; unviewed 404; window log shows ch1->ch2 spill and skip reroute
+- [x] 4.1 ctest green; openspec valid
+- [x] 4.2 live: bogus proxy -> viewed manga detail/chapters/pages `cached:true`, images 200 from disk; unviewed 404; window log shows ch1->ch2 spill and skip reroute
