@@ -1,4 +1,6 @@
 ## 2026-11-07
+* **Update**: Linked `references/mangadex-search-ranking.md` to `references/mangadex-auth-quirks.md` (Same verified-behaviors family: ranking quirk completes the auth quirks reference.).
+* **Creation**: Documented concept `references/mangadex-search-ranking.md` (MangaDex search ranking = followedCount desc).
 * **Update**: Linked `references/mangadex-auth-quirks.md` to `architecture/plugin-system.md` (MangaDex quirks constrained the mangadex plugin auth design and the storage host tools.).
 * **Update**: Linked `decisions/plugin-dev-layout.md` to `decisions/plugin-data-segregation.md` (Dev layout realizes the data-segregation rule at the workflow level.).
 * **Creation**: Documented concept `references/mangadex-auth-quirks.md` (MangaDex auth and API quirks (verified)).
