@@ -5,17 +5,48 @@
 // the resulting urls over and the worker walks them in order through
 // cache::ensure, which IS the delta filter (hit: on disk, no fetch; miss: one
 // fetch) -- sequential, on the shared img pool with /cache/img, concurrent-
-// miss dedup included. Nothing here touches routes or state: the queue is the
-// only worker state, newest list wins.
+// miss dedup included. Layout v2 (D5): each batch also carries the window
+// context {plugin, slug, chapter}; when complete (and the url has an
+// extension) the file lands at <plugin>/<slug>/chNNN/pNNN.<ext> via
+// rel_path, otherwise the exact old sha fallback. Nothing here touches
+// routes or state: the queue is the only worker state, newest list wins.
 #include "cache/cache.hpp"
 
 #include <condition_variable>
 #include <mutex>
 #include <optional>
+#include <string>
 #include <thread>
 #include <vector>
 
 namespace reader {
+
+// Placement context for one window batch: the reader knows plugin, slug (D5)
+// and the chapter number the window belongs to; the page number is the
+// 1-based position of the url within the batch. Empty fields force the sha
+// fallback, so http.cpp (no ctx today) writes byte-identical v1 paths.
+struct WindowCtx {
+    std::string plugin;
+    std::string slug;
+    int chapter{}; // 1-based chapter number; 0 = unknown
+};
+
+// <plugin>/<slug>/chNNN/pNNN.<ext> from the ctx + the url's 1-based window
+// position; empty when any piece is missing -> the exact old sha path.
+inline std::string rel_path(const WindowCtx& ctx, int page, const std::string& url) {
+    if (ctx.plugin.empty() || ctx.slug.empty() || ctx.chapter < 1 || page < 1)
+        return {};
+    // Ext rule mirrors the sha fallback's ext_of: trailing dot-suffix of the
+    // url path, 1-5 alnum chars, lowercased; absent -> "bin".
+    const std::string path = url.substr(0, url.find('?'));
+    const std::string name = path.substr(path.find_last_of('/') + 1);
+    const auto dot = name.find_last_of('.');
+    if (dot == std::string::npos || dot + 1 == name.size() || name.size() - dot > 6)
+        return {};
+    const auto pad = [](int n) { return "000" + std::to_string(n); };
+    return ctx.plugin + "/" + ctx.slug + "/ch" + pad(ctx.chapter).substr(1) + "/p" + pad(page).substr(1) +
+           "." + name.substr(dot + 1);
+}
 
 class Worker {
 public:
@@ -27,10 +58,13 @@ public:
 
     // Event: queue the freshest window. Coalesces -- a pending list is
     // replaced, re-run semantics (only the latest position/skip matters).
-    void nudge(std::vector<std::string> urls) {
+    // ctx optional: structured placement when plugin/slug/chapter are known
+    // (2.1), otherwise the exact old sha fallback.
+    void nudge(std::vector<std::string> urls, WindowCtx ctx = {}) {
         {
             const std::lock_guard lock(mu_);
             pending_ = std::move(urls);
+            ctx_ = std::move(ctx);
         }
         cv_.notify_one();
     }
@@ -54,9 +88,12 @@ private:
             if (!pending_)
                 return; // stop_ and nothing left to drain
             const std::vector<std::string> batch = std::move(*pending_);
+            const WindowCtx ctx = std::move(ctx_);
+            ctx_ = {};
             pending_.reset();
             lock.unlock();
-            for (const auto& url : batch) images_.ensure(url, "img");
+            for (std::size_t i = 0; i < batch.size(); ++i)
+                images_.ensure(batch[i], "img", rel_path(ctx, int(i) + 1, batch[i]));
             lock.lock();
         }
     }
@@ -65,6 +102,7 @@ private:
     std::mutex mu_;
     std::condition_variable cv_;
     std::optional<std::vector<std::string>> pending_;
+    WindowCtx ctx_;
     bool stop_ = false;
     std::thread thread_; // last: touches every member above once running
 };
