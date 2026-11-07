@@ -1,4 +1,7 @@
 ## 2026-11-07
+* **Update**: Linked `decisions/deps-and-plugins.md` to `architecture/cli-config.md` (POST /config is a REST route per curl-first ruling; registry wraps CLI11/SimpleIni/glaze APIs.).
+* **Update**: Linked `architecture/manga-viewer-core.md` to `architecture/cli-config.md` (Config layer feeds the host core (paths/port wiring to store, plugin, cache); registry is consumer of its dependency APIs.).
+* **Creation**: Documented concept `architecture/cli-config.md` (cli-config: registry-backed config surface (CLI/env/ini/dump/save)).
 * **Update**: Updated concept `architecture/image-cache-offline.md`.
 * **Update**: Linked `decisions/third-party-dependencies.md` to `decisions/deps-and-plugins.md` (Extension of vendoring policy: tambah libzippp+libzip (CBZ), stbrumme/hash-library, quickjs-ng; base64 reuse glaze; no hand-rolled crypto.).
 * **Update**: Linked `architecture/plugin-system.md` to `decisions/deps-and-plugins.md` (Runtime parity: quickjs-ng menjadi runtime kedua dengan feature set & signature sama (data-contract ABI tetap; wasm3 tidak diprioritaskan).).
