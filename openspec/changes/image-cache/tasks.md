@@ -9,8 +9,8 @@
 - [x] 2.2 stale layer: persist ok responses per `plugin|method|q` on opted read routes; on failure serve last-good + `cached:true`; unit test with failing fetcher
 
 ## 3. Mangadex pages + prefetch
-- [ ] 3.1 `pages` method via `/at-home/server/{id}` (dataSaver off), luac + live probe
-- [ ] 3.2 `POST /reader/position`, `POST /chapter/<id>/skip` (state `host/skip/<id>`); window pure fn + unit test (boundary spill, skip reroute, no refetch)
+- [x] 3.1 `pages` method via `/at-home/server/{id}` (dataSaver off), luac + live probe
+- [x] 3.2 `POST /reader/position`, `POST /chapter/<id>/skip` (state `host/skip/<id>`); window pure fn + unit test (boundary spill, skip reroute, no refetch)
 - [ ] 3.3 worker thread: sequential delta fetch, re-run on position/skip
 
 ## 4. Verification
