@@ -2,7 +2,7 @@
 type: decision
 title: "Dependency vendoring: system-shared first, minimal vendoring"
 description: "Dependencies: crow/asio/libvips/lua54/curl-headers/cli11 from pacman; sol2, BS::thread_pool, readerwriterqueue, glaze, wasm3, libsql amalgamation, curl-impersonate and simpleini vendored minimal; pin hashes in README"
-generated: { by: agent/mcp, at: "2026-11-06T13:17:46Z" }
+generated: { by: agent/mcp, at: "2026-11-07T11:37:17Z" }
 status: stable
 ---
 
@@ -10,3 +10,4 @@ Source: tmp/konsep_awal.md. System packages (pacman / pkg-config): libvips 8.18.
 
 # Related Concepts
 - [Build system: CMake + C++23, exe-only](build-toolchain-cpp23.md): Dependency choices (system cli11, vendored simpleini, dst) implement the toolchain/build decision
+- [Dependencies & plugins: curl-first APIs, runtime parity, no hand-rolled crypto](deps-and-plugins.md): Extension of vendoring policy: tambah libzippp+libzip (CBZ), stbrumme/hash-library, quickjs-ng; base64 reuse glaze; no hand-rolled crypto.
