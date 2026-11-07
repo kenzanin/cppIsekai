@@ -89,6 +89,12 @@ target_include_directories(test_cache PRIVATE src)
 target_compile_options(test_cache PRIVATE -Wall -Wextra)
 add_test(NAME cache COMMAND test_cache)
 
+# slug pragma (1.1): header-only title->folder rule + collision suffix; no src sources
+add_executable(test_slug tests/test_slug.cpp)
+target_include_directories(test_slug PRIVATE src)
+target_compile_options(test_slug PRIVATE -Wall -Wextra)
+add_test(NAME slug COMMAND test_slug)
+
 # config core (1.1): header-only registry + layered resolve; CLI11 parse, no env leakage
 add_executable(test_config tests/test_config.cpp)
 target_include_directories(test_config PRIVATE src ${TP}/simpleini ${TP}/glaze)
