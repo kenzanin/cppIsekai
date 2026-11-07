@@ -1,9 +1,9 @@
 # Tasks: cache-layout
 
 ## 1. Storage layout v2
-- [ ] 1.1 `src/cache/slug.hpp`: fs-safe slug (lowercase, <=64 chars), collision suffix = last 8 chars of manga id, no DB; unit tests (empty title, unicode, collision, length cap)
-- [ ] 1.2 `Cache` API gains optional `rel_path` on `ensure/store/peek` (shard key stays sha-of-URL; on-disk path switches); boot walk of root/ recursive + purge `.legacy-img-*`/`-api-*` after one boot; ctest green (`-R cache`), full suite green
-- [ ] 1.3 Fixtures in `tests/test_cache.cpp` exercising: eviction across tree depth, purge-once path with legacy `.legacy-img-*` detection
+- [x] 1.1 `src/cache/slug.hpp`: fs-safe slug (lowercase, <=64 chars), collision suffix = last 8 chars of manga id, no DB; unit tests (empty title, unicode, collision, length cap)  <!-- bc8eaea -->
+- [x] 1.2 `Cache` API gains optional `rel_path` on `ensure/store/peek` (shard key stays sha-of-URL; on-disk path switches); boot walk of root/ recursive + purge `.legacy-img-*`/`-api-*` after one boot; ctest green (`-R cache`), full suite green  <!-- 840a3a6 -->
+- [x] 1.3 Fixtures in `tests/test_cache.cpp` exercising: eviction across tree depth, purge-once path with legacy `.legacy-img-*` detection  <!-- included in 840a3a6 -->
 
 ## 2. Reader worker placement
 - [ ] 2.1 `src/reader/worker.hpp`: page image writes use `<plugin>/<slug>/chNNN/pNNN.<ext>` when rel_path known; sha fallback untouched; ctest green; live smoke optional flag in task 4
