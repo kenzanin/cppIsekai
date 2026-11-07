@@ -301,7 +301,8 @@ void install_host_tools(lua_State* L, const std::string& id, const Config& conf,
     // Blocking fetch on the calling (plugin-pool) worker; curl's own timeout
     // guards the network half, the instruction hook the CPU half.
     sol::table http = sv.create_named_table("http");
-    http["fetch"] = [id, timeout_ms = conf.fetch_timeout_ms, profile = conf.fetch_profile](
+    http["fetch"] = [id, timeout_ms = conf.fetch_timeout_ms, profile = conf.fetch_profile,
+                     proxy = conf.proxy](
                         const std::string& url, const sol::optional<sol::table>& opts,
                         sol::this_state ts) -> std::pair<sol::object, std::optional<std::string>> {
         const auto fail = [&](std::string why) {
@@ -371,6 +372,7 @@ void install_host_tools(lua_State* L, const std::string& id, const Config& conf,
             curl_easy_setopt(e.get(), CURLOPT_HEADERDATA, &sink.headers);
             curl_easy_setopt(e.get(), CURLOPT_TIMEOUT_MS, std::max(1L, ms));
             curl_easy_setopt(e.get(), CURLOPT_CAINFO, "/etc/ssl/certs/ca-certificates.crt");
+            applyProxy(e.get(), proxy); // host-wide; empty = direct
             if (method != "GET") {
                 curl_easy_setopt(e.get(), CURLOPT_CUSTOMREQUEST, method.c_str());
             }

@@ -5,6 +5,7 @@
 // Contract: host calls handle({api, method, params}); the plugin answers
 // {ok=true, data=...} or {ok=false, error=...}.
 #include <BS_thread_pool.hpp>
+#include <curl/curl.h>
 
 #include <memory>
 #include <string>
@@ -25,7 +26,19 @@ struct Config {
     // Instruction budget for the Lua count hook, in ~instructions (hook fires
     // per 1000 vm instructions).
     long instruction_budget = 5000000;
+
+    // Host-wide outbound proxy (ini [server] proxy), applied to every handle
+    // via applyProxy; empty = direct.
+    std::string proxy;
 };
+
+// One proxy rule for every outbound curl handle (plugin fetch + image
+// getter): empty string means direct, no CURLOPT_PROXY set.
+inline void applyProxy(CURL* e, const std::string& proxy) {
+    if (!proxy.empty()) {
+        curl_easy_setopt(e, CURLOPT_PROXY, proxy.c_str());
+    }
+}
 
 struct PluginInfo {
     std::string id, name, version, runtime, entry;

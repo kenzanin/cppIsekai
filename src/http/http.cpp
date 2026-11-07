@@ -122,8 +122,8 @@ crow::response html(const std::string& file, const crow::json::wvalue& ctx) {
 extern "C" CURLcode curl_easy_impersonate(CURL* easy, const char* client, unsigned clientscope);
 
 // The one production curl call for the image cache: plain GET, body on 2xx.
-cache::Fetcher makeCurlFetcher() {
-    return [](const std::string& url) -> std::optional<std::string> {
+cache::Fetcher makeCurlFetcher(std::string proxy) {
+    return [proxy = std::move(proxy)](const std::string& url) -> std::optional<std::string> {
         std::unique_ptr<CURL, decltype(&curl_easy_cleanup)> easy(curl_easy_init(),
                                                                  &curl_easy_cleanup);
         if (!easy) {
@@ -141,8 +141,9 @@ cache::Fetcher makeCurlFetcher() {
                     return n * l;
                 });
             curl_easy_setopt(e, CURLOPT_WRITEDATA, &body);
-            // ponytail: plugin-parity 30s / chrome116, no per-pool knobs until
-            // a real need shows up; proxy lands here in task 2.1.
+            plugin::applyProxy(e, proxy); // host-wide; empty = direct
+            // ponytail: plugin-parity 30s / chrome116, no per-pool knobs
+            // until a real need shows up.
             curl_easy_setopt(e, CURLOPT_TIMEOUT_MS, 30000L);
             curl_easy_setopt(e, CURLOPT_CAINFO, "/etc/ssl/certs/ca-certificates.crt");
             curl_easy_impersonate(e, "chrome116", 1);
