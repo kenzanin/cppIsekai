@@ -6,7 +6,12 @@ project(
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_C_STANDARD 23)
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_CXX_COMPILER_LAUNCHER ccache)
+set(CMAKE_C_COMPILER_LAUNCHER ccache)
+
 
 # --- system shared libs ---
 find_package(PkgConfig REQUIRED)
@@ -83,6 +88,12 @@ add_executable(test_cache tests/test_cache.cpp src/cache/cache.cpp)
 target_include_directories(test_cache PRIVATE src)
 target_compile_options(test_cache PRIVATE -Wall -Wextra)
 add_test(NAME cache COMMAND test_cache)
+
+# config core (1.1): header-only registry + layered resolve; CLI11 parse, no env leakage
+add_executable(test_config tests/test_config.cpp)
+target_include_directories(test_config PRIVATE src ${TP}/simpleini)
+target_compile_options(test_config PRIVATE -Wall -Wextra)
+add_test(NAME config COMMAND test_config)
 
 # /cache/img serve-through: pure route core, crow-free; fetcher injected via the
 # cache ctor, so no server, curl or store linkage is needed here.
