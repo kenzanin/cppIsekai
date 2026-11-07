@@ -1,7 +1,7 @@
 # Tasks: image-cache
 
 ## 1. Cache core
-- [ ] 1.1 `src/cache/`: disk store `data/cache/{img,api}`, sha1 keys, LRU index (mem map, rebuild on boot), `cache_max_mb` ini (default 2048), evict-on-insert; unit test evict order with tiny cap
+- [x] 1.1 `src/cache/`: disk store `data/cache/{img,api}`, sha1 keys, LRU index (mem map, rebuild on boot), `cache_max_mb` ini (default 2048), evict-on-insert; unit test evict order with tiny cap
 - [ ] 1.2 `GET /cache/img?url=` serve-through (content-type by ext; fetch+store on miss online; 404 offline)
 
 ## 2. Offline path
