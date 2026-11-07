@@ -78,6 +78,12 @@ set_target_properties(test_plugin PROPERTIES BUILD_RPATH
                                              "${TP}/curl-impersonate/lib")
 add_test(NAME plugin COMMAND test_plugin)
 
+# cache core: disk LRU store; fetcher injected -> network-free tests
+add_executable(test_cache tests/test_cache.cpp src/cache/cache.cpp)
+target_include_directories(test_cache PRIVATE src)
+target_compile_options(test_cache PRIVATE -Wall -Wextra)
+add_test(NAME cache COMMAND test_cache)
+
 # ponytail: no CPack/install yet -- add when packaging matters
 
 find_program(CLANG_TIDY clang-tidy)
@@ -86,7 +92,7 @@ find_program(CLANG_FORMAT clang-format)
 add_custom_target(
   tidy
   COMMAND ${CLANG_TIDY} -p ${CMAKE_BINARY_DIR} src/main.cpp src/store/store.cpp
-          src/http/http.cpp src/plugin/plugin.cpp
+          src/http/http.cpp src/plugin/plugin.cpp src/cache/cache.cpp
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 add_custom_target(
   format
