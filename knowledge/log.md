@@ -1,4 +1,5 @@
 ## 2026-11-07
+* **Update**: Updated concept `architecture/image-cache-offline.md`.
 * **Update**: Linked `decisions/third-party-dependencies.md` to `decisions/deps-and-plugins.md` (Extension of vendoring policy: tambah libzippp+libzip (CBZ), stbrumme/hash-library, quickjs-ng; base64 reuse glaze; no hand-rolled crypto.).
 * **Update**: Linked `architecture/plugin-system.md` to `decisions/deps-and-plugins.md` (Runtime parity: quickjs-ng menjadi runtime kedua dengan feature set & signature sama (data-contract ABI tetap; wasm3 tidak diprioritaskan).).
 * **Creation**: Documented concept `decisions/deps-and-plugins.md` (Dependencies & plugins: curl-first APIs, runtime parity, no hand-rolled crypto).
