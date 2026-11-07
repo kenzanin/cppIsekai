@@ -34,6 +34,13 @@ struct PluginInfo {
     std::string dir;
 };
 
+// Last finished call per plugin; in-memory, resets on restart.
+struct CallHealth {
+    bool ok{true};
+    std::string error; // empty when ok
+    std::int64_t at{}; // unix seconds
+};
+
 struct Host; // fwd: Impl defined in plugin.cpp as plugin::Host::Impl
 // Registry + runtime holder. One instance for the process; safe to call from
 // pool threads.
@@ -57,6 +64,9 @@ public:
     // ABI call. Returns the response as JSON text:
     // {"ok":true,"data":...} or {"ok":false,"error":"..."}.
     std::string call(const std::string& id, const std::string& method, const std::string& params_json);
+
+    // Last-call outcome for id; ok-when-unknown when never called.
+    [[nodiscard]] CallHealth health(const std::string& id) const;
 
     // Logo file path for id; empty when the plugin (or its logo) is absent.
     [[nodiscard]] std::string logo_path(const std::string& id) const;

@@ -439,6 +439,7 @@ struct plugin::Host::Impl {
     std::mutex mu;
     std::map<std::string, std::shared_ptr<Runtime>> plugins;
     BS::thread_pool<>* db = nullptr; // db-worker gate for storage.*, set via use_db
+    std::map<std::string, CallHealth> health; // last call outcome per plugin id
 };
 
 Host::Host(Config conf) : conf_(conf), impl_(std::make_unique<Host::Impl>()) {
@@ -567,7 +568,7 @@ int Host::load_all(Store& store) {
         for (size_t i = 0; i < rt.info.capabilities.size(); ++i) {
             caps += ((i != 0u) ? "," : "") + rt.info.capabilities[i];
         }
-        store.upsert_plugin(rt.info.id, rt.info.name, rt.info.version, caps);
+        store.upsert_plugin(rt.info.id, rt.info.name, rt.info.version, caps, rt.info.runtime);
         spdlog::info("plugin loaded: {} v{} (api {}, caps: {})", rt.info.id, rt.info.version, rt.info.api,
                      caps.empty() ? std::string("none") : caps);
 
@@ -595,6 +596,19 @@ std::string Host::call(const std::string& id, const std::string& method, const s
         return err_json("no plugin '" + id + "'");
     }
 
+    // Health bookkeeping: one entry per finished call (design: in-memory).
+    const auto record = [&](bool ok, std::string err) {
+        const std::scoped_lock lock(impl_->mu);
+        auto& h = impl_->health[id];
+        h.ok = ok;
+        h.error = std::move(err);
+        h.at = std::time(nullptr);
+    };
+    const auto fail = [&](std::string msg) {
+        record(false, msg);
+        return err_json(std::move(msg));
+    };
+
     const std::scoped_lock call_lock(rt->mu);
     lua_State* L = rt->L.get();
     sol::state_view sv(L);
@@ -605,14 +619,14 @@ std::string Host::call(const std::string& id, const std::string& method, const s
     } else {
         glz::generic g;
         if (auto ec = glz::read_json(g, params_json)) {
-            return err_json("bad params json");
+            return fail("bad params json");
         }
         params_obj = json_to_sol(L, g);
     }
 
     const sol::object h = sv["handle"];
     if (h.get_type() != sol::type::function) {
-        return err_json("no handle() defined");
+        return fail("no handle() defined");
     }
 
     sol::table env = sol::table(L, sol::new_table()); // constructed directly on L
@@ -630,30 +644,37 @@ std::string Host::call(const std::string& id, const std::string& method, const s
         const sol::error e = res;
         if (timed_out) {
             spdlog::warn("[plugin:{}] {} timed out", id, method);
-            return err_json("timeout: instruction budget exhausted");
+            return fail("timeout: instruction budget exhausted");
         }
         spdlog::warn("[plugin:{}] {} failed: {}", id, method, e.what());
-        return err_json(e.what());
+        return fail(e.what());
     }
 
     const sol::object r = res;
     if (r.get_type() != sol::type::table) {
         spdlog::warn("[plugin:{}] {}: malformed response (non-table)", id, method);
-        return err_json("malformed response: not a table");
+        return fail("malformed response: not a table");
     }
     const sol::table t = r;
     const sol::object okv = t["ok"];
     if (okv.get_type() != sol::type::boolean) {
         spdlog::warn("[plugin:{}] {}: malformed response (missing ok)", id, method);
-        return err_json("malformed response: missing ok");
+        return fail("malformed response: missing ok");
     }
     if (!okv.as<bool>()) {
         const sol::object ev = t["error"];
         const std::string msg = ev.get_type() == sol::type::string ? ev.as<std::string>() : std::string("plugin error");
         spdlog::warn("[plugin:{}] {} returned error: {}", id, method, msg);
-        return err_json(msg);
+        return fail(msg);
     }
+    record(true, "");
     return R"({"ok":true,"data":)" + dump_json(sol_to_json(t["data"])) + "}";
+}
+
+CallHealth Host::health(const std::string& id) const {
+    const std::scoped_lock lock(impl_->mu);
+    const auto it = impl_->health.find(id);
+    return it != impl_->health.end() ? it->second : CallHealth{};
 }
 
 std::string Host::logo_path(const std::string& id) const {

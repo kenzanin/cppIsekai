@@ -15,6 +15,8 @@ struct PluginEntity {
     std::string plugin_id; // stable plugin key; '' for the seed rows
     std::string version;
     std::string capabilities;
+    int enabled = 1;
+    std::string runtime;
 };
 
 struct TitleEntity {
@@ -35,7 +37,9 @@ inline auto create_storage(const std::string& path) {
         make_table("plugin", make_column("id", &PluginEntity::id, primary_key().autoincrement()),
                    make_column("name", &PluginEntity::name, unique()),
                    make_column("plugin_id", &PluginEntity::plugin_id), make_column("version", &PluginEntity::version),
-                   make_column("capabilities", &PluginEntity::capabilities)),
+                   make_column("capabilities", &PluginEntity::capabilities),
+                   make_column("enabled", &PluginEntity::enabled, default_value(1)),
+                   make_column("runtime", &PluginEntity::runtime)),
         make_table("title", make_column("id", &TitleEntity::id, primary_key().autoincrement()),
                    make_column("plugin_id", &TitleEntity::plugin_id), make_column("name", &TitleEntity::name),
                    foreign_key(&TitleEntity::plugin_id).references(&PluginEntity::id)),
@@ -76,7 +80,9 @@ Store::~Store() = default;
 
 std::vector<Plugin> Store::plugins() {
     auto rows = impl_->storage.select(
-        columns(&PluginEntity::id, &PluginEntity::name, sqlite_orm::count(&TitleEntity::id), &PluginEntity::plugin_id),
+        columns(&PluginEntity::id, &PluginEntity::name, sqlite_orm::count(&TitleEntity::id), &PluginEntity::plugin_id,
+                &PluginEntity::version, &PluginEntity::enabled, &PluginEntity::runtime,
+                &PluginEntity::capabilities),
         left_join<TitleEntity>(on(c(&TitleEntity::plugin_id) == &PluginEntity::id)), group_by(&PluginEntity::id),
         order_by(&PluginEntity::name));
     std::vector<Plugin> out;
@@ -87,22 +93,39 @@ std::vector<Plugin> Store::plugins() {
         p.name = std::get<1>(row);
         p.titles = std::get<2>(row);
         p.plugin_id = std::get<3>(row);
+        p.version = std::get<4>(row);
+        p.enabled = std::get<5>(row) != 0;
+        p.runtime = std::get<6>(row);
+        p.caps = std::get<7>(row);
         out.push_back(std::move(p));
     }
     return out;
 }
 
 void Store::upsert_plugin(const std::string& id, const std::string& name, const std::string& version,
-                          const std::string& capabilities) {
+                          const std::string& capabilities, const std::string& runtime) {
     auto rows = impl_->storage.get_all<PluginEntity>(where(c(&PluginEntity::plugin_id) == id));
     if (!rows.empty()) {
         rows[0].name = name;
         rows[0].version = version;
         rows[0].capabilities = capabilities;
+        rows[0].runtime = runtime;
         impl_->storage.update(rows[0]);
         return;
     }
-    impl_->storage.insert(PluginEntity{0, name, id, version, capabilities});
+    impl_->storage.insert(PluginEntity{0, name, id, version, capabilities, 1, runtime});
+}
+
+void Store::set_plugin_enabled(std::int64_t id, bool on) {
+    impl_->storage.update_all(set(c(&PluginEntity::enabled) = on ? 1 : 0), where(c(&PluginEntity::id) == id));
+}
+
+bool Store::plugin_enabled(const std::string& plugin_id) {
+    auto rows = impl_->storage.get_all<PluginEntity>(where(c(&PluginEntity::plugin_id) == plugin_id));
+    if (rows.empty()) {
+        return true; // unregistered id: nothing to gate
+    }
+    return rows[0].enabled != 0;
 }
 
 namespace {

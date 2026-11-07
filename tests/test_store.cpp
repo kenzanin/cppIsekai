@@ -68,4 +68,23 @@ TEST_CASE("Store: seed, plugins, search, count") {
             CHECK(reopened.state_get("mangadex", probe) == "r2");
         }
     }
+
+    SUBCASE("plugin enabled flag persists") {
+        auto rows = store.plugins();
+        REQUIRE(!rows.empty());
+        auto& first = rows[0];
+        CHECK(first.enabled); // default on, also for pre-migration rows
+        store.set_plugin_enabled(first.id, false);
+        for (const auto& p : store.plugins()) {
+            if (p.id == first.id) {
+                CHECK_FALSE(p.enabled);
+            }
+        }
+        store.set_plugin_enabled(first.id, true); // restore for other subcases/runs
+        for (const auto& p : store.plugins()) {
+            if (p.id == first.id) {
+                CHECK(p.enabled);
+            }
+        }
+    }
 }

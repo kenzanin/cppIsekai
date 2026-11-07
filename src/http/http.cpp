@@ -98,6 +98,9 @@ crow::json::wvalue home_context(Store& store, BS::thread_pool<>& db, const crow:
 
     std::vector<crow::json::wvalue> plugin_rows;
     for (const auto& item : plugins) {
+        if (!item.enabled) {
+            continue; // disabled: no sidebar entry, not searchable (user ruling)
+        }
         crow::json::wvalue row;
         row["name"] = item.name;
         row["titles"] = std::to_string(item.titles);
@@ -142,9 +145,9 @@ void serve(Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool, 
     CROW_ROUTE(app, "/library/grid")
     ([&](const crow::request& req) { return html("grid.mustache", home_context(store, db, req)); });
 
-    CROW_ROUTE(app, "/search")([] { return html("blank.mustache", layout("search")); });
+    CROW_ROUTE(app, "/search")([&] { return html("search.mustache", layout("search")); });
     CROW_ROUTE(app, "/history")([] { return html("blank.mustache", layout("history")); });
-    CROW_ROUTE(app, "/plugins")([] { return html("blank.mustache", layout("plugins")); });
+    CROW_ROUTE(app, "/plugins")([&] { return html("plugins.mustache", layout("plugins")); });
     CROW_ROUTE(app, "/about")([] { return html("blank.mustache", layout("about")); });
 
     // Dev endpoint: rescan the plugin dir, re-register, no restart.
@@ -152,6 +155,57 @@ void serve(Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool, 
         const int n = on_pool(db, [&] { return plugins.load_all(store); });
         crow::json::wvalue out;
         out["count"] = n;
+        crow::response r{out};
+        r.set_header("Content-Type", "application/json");
+        return r;
+    });
+
+    // Page data for /plugins: registry rows + live health.
+    CROW_ROUTE(app, "/api/plugins")
+   ([&] {
+        const auto rows = on_pool(db, [&] { return store.plugins(); });
+        crow::json::wvalue list(crow::json::type::List);
+        int idx = 0;
+        for (const auto& p : rows) {
+            crow::json::wvalue row;
+            row["id"] = p.id;
+            row["key"] = p.plugin_id;
+            row["name"] = p.name;
+            row["version"] = p.version;
+            row["runtime"] = p.runtime;
+            row["enabled"] = p.enabled;
+            row["titles"] = p.titles;
+            row["caps"] = p.caps;
+            if (!p.enabled) {
+                row["state"] = "disabled";
+            } else {
+                const plugin::CallHealth h = plugins.health(p.plugin_id);
+                row["state"] = h.ok ? "active" : "error";
+                row["error"] = h.error;
+                row["checked_at"] = h.at;
+            }
+            list[idx++] = std::move(row);
+        }
+        crow::json::wvalue out;
+        out["plugins"] = std::move(list);
+        crow::response r{out};
+        r.set_header("Content-Type", "application/json");
+        return r;
+    });
+
+    // Toggle registry flag; page + gates react on next request.
+    CROW_ROUTE(app, "/plugin/<int>/enabled").methods(crow::HTTPMethod::POST)([&](const crow::request& req, int id) {
+        bool on = false;
+        if (const auto body = crow::json::load(req.body); body && body.has("enabled")) {
+            on = body["enabled"].b();
+        }
+        on_pool(db, [&] {
+            store.set_plugin_enabled(id, on);
+            return true; // on_pool is value-based; void lambdas need a token
+        });
+        crow::json::wvalue out;
+        out["id"] = id;
+        out["enabled"] = on;
         crow::response r{out};
         r.set_header("Content-Type", "application/json");
         return r;
@@ -179,6 +233,13 @@ void serve(Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool, 
         crow::json::wvalue p;
         for (const auto& k : req.url_params.keys()) {
             p[k] = req.url_params.get(k);
+        }
+        // Disabled gate on the db thread: no plugin-pool dispatch, error shape.
+        const bool enabled = on_pool(db, [&] { return store.plugin_enabled(id); });
+        if (!enabled) {
+            crow::response r{R"({"ok":false,"error":"plugin disabled"})"};
+            r.set_header("Content-Type", "application/json");
+            return r;
         }
         crow::response r{on_pool(plugin_pool, [&] { return plugins.call(id, action, p.dump()); })};
         r.set_header("Content-Type", "application/json");

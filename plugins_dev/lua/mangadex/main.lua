@@ -67,7 +67,13 @@ local function get(path, query)
   if query and next(query) ~= nil then
     local parts = {}
     for k, v in pairs(query) do
-      parts[#parts + 1] = k .. "=" .. tostring(v):gsub(" ", "+"):gsub("%[", "%%5B"):gsub("%]", "%%5D")
+      if type(v) == "table" then -- repeated key: includedTags[]=a&includedTags[]=b
+        for _, vv in ipairs(v) do
+          parts[#parts + 1] = k .. "=" .. tostring(vv):gsub(" ", "+"):gsub("%[", "%%5B"):gsub("%]", "%%5D")
+        end
+      else
+        parts[#parts + 1] = k .. "=" .. tostring(v):gsub(" ", "+"):gsub("%[", "%%5B"):gsub("%]", "%%5D")
+      end
     end
     url = url .. "?" .. table.concat(parts, "&")
   end
@@ -148,19 +154,57 @@ end
 
 local methods = {}
 
+-- Tag name -> uuid map (genres source too); fetched once per plugin load.
+local tag_map
+local function tag_ids()
+  if tag_map then return tag_map end
+  local body, err = get("/manga/tag", { limit = 100 })
+  if err ~= nil then return nil, err end
+  local map = {}
+  for _, t in ipairs(body.data or {}) do
+    local name = t.attributes and t.attributes.name and t.attributes.name.en
+    if name then map[name] = t.id end
+  end
+  tag_map = map
+  return map
+end
+
 methods.search = function(params)
+  local q = params.title or params.query or params.q or ""
+  local page = math.max(1, tonumber(params.page) or 1)
+  local limit = tonumber(params.limit) or 12
   -- followCount desc = the site's ranking (one piece -> One Piece first);
   -- bare title order is server-default and buried the obvious match.
-  local body, err = get("/manga", { title = params.title or params.query or params.q or "", limit = params.limit or 12,
-    ["order[followedCount]"] = "desc" })
+  local query = { title = q, limit = limit, ["order[followedCount]"] = "desc", offset = (page - 1) * limit,
+    ["includes[]"] = "cover_art" }
+  if params.tags and #params.tags > 0 then -- "Isekai,Fantasy" -> includedTags[] uuid, AND
+    local map, err = tag_ids()
+    if err ~= nil then return { ok = false, error = err } end
+    local uuids = {}
+    for name in params.tags:gmatch("[^,]+") do
+      local id = map[name:gsub("^%s+", ""):gsub("%s+$", "")]
+      if id then uuids[#uuids + 1] = id end
+    end
+    if #uuids > 0 then query["includedTags[]"] = uuids end
+  end
+  local body, err = get("/manga", query)
   if err ~= nil then return { ok = false, error = err } end
   local items = {}
   for _, m in ipairs(body.data or {}) do items[#items + 1] = canonical_manga(m) end
-  return { ok = true, data = items }
+  return { ok = true, data = { items = items, total = tonumber(body.total) or #items } }
+end
+
+methods.genres = function()
+  local map, err = tag_ids()
+  if err ~= nil then return { ok = false, error = err } end
+  local names = {}
+  for name in pairs(map) do names[#names + 1] = name end
+  table.sort(names)
+  return { ok = true, data = names }
 end
 
 methods.detail = function(params)
-  local body, err = get("/manga/" .. (params.id or ""), nil)
+  local body, err = get("/manga/" .. (params.id or ""), { ["includes[]"] = "cover_art" })
   if err ~= nil then return { ok = false, error = err } end
   return { ok = true, data = canonical_manga(body.data) }
 end

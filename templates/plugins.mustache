@@ -1,0 +1,102 @@
+{{>top.mustache}}
+<div x-data="pluginsPage" x-init="load()">
+  <div class="flex items-center gap-3 mb-4">
+    <input x-model="q" placeholder="Filter name / capability"
+           class="bg-zinc-900 border border-zinc-700 rounded px-3 py-1.5 text-sm w-72">
+    <button @click="reload()" class="px-3 py-1.5 text-sm bg-zinc-800 rounded hover:bg-zinc-700">Reload all</button>
+    <span class="text-sm text-zinc-500" x-show="busy">…</span>
+  </div>
+
+  <!-- empty state -->
+  <div x-show="view.length===0 && !busy" class="text-zinc-500 text-sm space-y-1 border border-dashed border-zinc-800 rounded p-6">
+    <p>No plugins installed.</p>
+    <p class="text-zinc-600">Drop a plugin folder into <code>data/plugins/&lt;id&gt;/</code>
+      (needs <code>main.json</code> + entry script) and press Reload all. Dev copies live in
+      <code>plugins_dev/&lt;lang&gt;/&lt;site&gt;/</code>, symlinked into data/plugins.</p>
+  </div>
+
+  <ul class="space-y-2">
+    <template x-for="r in view" :key="r.id">
+      <li class="flex items-center gap-3 border border-zinc-800 rounded p-3"
+          :class="r.enabled ? '' : 'opacity-50'">
+        <!-- logo or initial -->
+        <span class="w-9 h-9 rounded bg-zinc-800 flex items-center justify-center font-bold shrink-0"
+              x-show="!broken[r.id] && r.key" >
+          <img :src="'/plugin/'+r.key+'/logo'" class="w-9 h-9 rounded object-cover" @error="broken[r.id]=true" alt="">
+        </span>
+        <span class="w-9 h-9 rounded bg-zinc-800 flex items-center justify-center font-bold shrink-0"
+              x-show="broken[r.id] || !r.key" x-text="r.name.charAt(0)"></span>
+
+        <!-- name version runtime caps -->
+        <div class="min-w-0">
+          <div class="flex items-center gap-2">
+            <span class="font-medium truncate" x-text="r.name"></span>
+            <span class="text-xs text-zinc-500" x-text="r.version"></span>
+            <span class="text-[10px] uppercase tracking-wide bg-zinc-800 rounded px-1.5 py-0.5"
+                  x-show="r.runtime" x-text="r.runtime"></span>
+          </div>
+          <div class="flex gap-1 mt-1">
+            <template x-for="c in caps(r)" :key="c">
+              <span class="text-[10px] bg-zinc-900 border border-zinc-800 rounded px-1.5 py-0.5 text-zinc-400"
+                    x-text="c"></span>
+            </template>
+          </div>
+          <p class="text-xs text-red-400 mt-1" x-show="r.state==='error'"
+             x-text="'last error: '+r.error"></p>
+        </div>
+
+        <span class="flex-1"></span>
+
+        <!-- status -->
+        <span class="text-xs shrink-0"
+              :class="stateClass(r)" x-text="stateText(r)"></span>
+
+        <!-- actions -->
+        <button @click="toggle(r)"
+                class="px-3 py-1 text-xs rounded bg-zinc-800 hover:bg-zinc-700"
+                x-text="r.enabled ? 'Disable' : 'Enable'"></button>
+        <button @click="reload()" title="Rescan plugin dir"
+                class="px-2 py-1 text-xs rounded bg-zinc-800 hover:bg-zinc-700">⟳</button>
+      </li>
+    </template>
+  </ul>
+</div>
+<script>
+function pluginsPage() {
+  return {
+    rows: [], q: '', busy: false,
+    broken: {},
+    async load() {
+      this.busy = true
+      const j = await (await fetch('/api/plugins')).json()
+      this.rows = j.plugins || []
+      this.busy = false
+    },
+    get view() {
+      const q = this.q.trim().toLowerCase()
+      if (!q) return this.rows
+      return this.rows.filter(r =>
+        r.name.toLowerCase().includes(q) || (r.caps || '').toLowerCase().includes(q))
+    },
+    caps(r) { return (r.caps || '').split(',').filter(Boolean) },
+    stateText(r) { return !r.enabled ? '○ disabled' : (r.state === 'error' ? '⚠ error' : '● active') },
+    stateClass(r) {
+      if (!r.enabled) return 'text-zinc-500'
+      return r.state === 'error' ? 'text-yellow-400' : 'text-green-400'
+    },
+    async toggle(r) {
+      await fetch('/plugin/' + r.id + '/enabled', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: !r.enabled })
+      })
+      await this.load()
+    },
+    async reload() {
+      this.busy = true
+      await fetch('/plugins/reload', { method: 'POST' })
+      await this.load()
+    },
+  }
+}
+</script>
+{{>bottom.mustache}}
