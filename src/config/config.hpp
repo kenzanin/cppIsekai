@@ -12,6 +12,7 @@
 #include <cstdlib>
 #include <functional>
 #include <string>
+#include <string_view>
 
 namespace config {
 
@@ -108,6 +109,41 @@ inline Config resolve(
         }
     }
     return detail::to_config(v);
+}
+
+// Minimal value escaping per SimpleIni load rules: a bare value gets trimmed,
+// so only quote when surrounding whitespace must survive. Registry defaults
+// are single-line; nothing else needs escaping (D4).
+inline std::string ini_literal(std::string_view v) {
+    if (!v.empty() && (v.front() == ' ' || v.back() == ' '))
+        return '"' + std::string(v) + '"';
+    return std::string(v);
+}
+
+// D4: ini template rendered straight from the registry -- one [section] header
+// per group, `; doc` above every key, `key = default`. Pure string on purpose:
+// file governance lives in the caller, so dumping never touches an existing
+// config and runs with no --config at all.
+inline std::string dump() {
+    std::string out;
+    std::string section;
+    for (const Entry& e : kEntries) {
+        if (e.section != section) { // content compare, const char* vs string
+            if (!out.empty()) out += '\n'; // blank line between groups
+            section = e.section;
+            out += '[';
+            out += section;
+            out += "]\n";
+        }
+        out += "; ";
+        out += e.doc;
+        out += '\n';
+        out += e.key;
+        out += " = ";
+        out += ini_literal(e.def);
+        out += '\n';
+    }
+    return out;
 }
 
 } // namespace config

@@ -13,6 +13,7 @@
 #include <atomic>
 #include <chrono>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <thread>
 
@@ -33,8 +34,27 @@ int main(int argc, char** argv) {
     std::string ini_path = "data/cppisekai.ini"; // help-text default; boot itself requires --config (D3)
     auto* cfg_opt = cli.add_option("--config", ini_path, "INI config; comments survive rewrites (SimpleIni)")
                         ->capture_default_str();
+    auto* dump_opt =
+        cli.add_flag("--dump-config", "print ini template (doc comment + default per knob), then exit");
+    std::string dump_path; // positional next to --dump-config: target file, created/truncated
+    cli.add_option("path", dump_path, "with --dump-config: write the template here instead of stdout");
     config::build_cli(cli, overrides);
     CLI11_PARSE(cli, argc, argv); // --help / bad flags print and exit here
+
+    if (dump_opt->count() > 0) { // D3/D4: exempt from required --config, never boots
+        const std::string text = config::dump();
+        if (dump_path.empty()) {
+            std::cout << text;
+        } else {
+            std::ofstream out{dump_path, std::ios::trunc}; // existing configs untouched
+            if (!out) {
+                std::cerr << "cppisekai: cannot write " << dump_path << '\n';
+                return 1;
+            }
+            out << text;
+        }
+        return 0;
+    }
 
     if (cfg_opt->count() == 0) { // D3: manual required-check, not CLI11 required()
         std::cout << "usage: cppisekai --config <file.ini> [options]\n"

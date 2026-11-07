@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <fstream>
 #include <map>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -98,4 +99,44 @@ TEST_CASE("config: layered resolve default < ini < env < flag") {
         auto ini = tmp_ini("[cache]\ncache_max_mb = lots\n");
         CHECK(resolve(none, ini, fake_env({})).cache_max_mb == 2048);
     }
+}
+
+TEST_CASE("config: dump projects registry as commented ini template (D4)") {
+    const std::string text = dump();
+    REQUIRE(!text.empty());
+
+    // key -> {section header, doc comment, rendered key = value}
+    std::map<std::string, std::array<std::string, 3>> row;
+    std::string section;
+    std::string prev;
+    std::istringstream in(text);
+    int headers = 0;
+    for (std::string line; std::getline(in, line); prev = line) {
+        if (line.starts_with('[')) {
+            section = line;
+            ++headers;
+        } else if (!line.empty() && !line.starts_with("; ")) {
+            const auto eq = line.find(" = ");
+            REQUIRE(eq != std::string::npos);
+            row[line.substr(0, eq)] = {section, prev, line};
+        }
+    }
+
+    // Every registry knob present exactly once: right section, doc above,
+    // default as value -- generated, so new knobs are covered for free.
+    for (const Entry& e : kEntries) {
+        const std::string key = e.key;
+        REQUIRE(row.count(key) == 1);
+        CHECK(row[key][0] == "[" + std::string(e.section) + "]");
+        CHECK(row[key][1] == "; " + std::string(e.doc));
+        CHECK(row[key][2] == key + " = " + std::string(e.def));
+    }
+    CHECK(headers == 4); // one header per group: server plugin cache paths
+
+    // And the template is honest ini: SimpleIni reads every default back.
+    CSimpleIniA ini;
+    REQUIRE(ini.LoadData(text) >= 0);
+    for (const Entry& e : kEntries)
+        CHECK(std::string(ini.GetValue(e.section, e.key, "\x01missing")) ==
+              std::string(e.def));
 }
