@@ -149,7 +149,10 @@ end
 local methods = {}
 
 methods.search = function(params)
-  local body, err = get("/manga", { title = params.query or params.q or "", limit = params.limit or 12 })
+  -- followCount desc = the site's ranking (one piece -> One Piece first);
+  -- bare title order is server-default and buried the obvious match.
+  local body, err = get("/manga", { title = params.title or params.query or params.q or "", limit = params.limit or 12,
+    ["order[followedCount]"] = "desc" })
   if err ~= nil then return { ok = false, error = err } end
   local items = {}
   for _, m in ipairs(body.data or {}) do items[#items + 1] = canonical_manga(m) end
