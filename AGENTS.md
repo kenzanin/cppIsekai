@@ -16,6 +16,8 @@ Welcome to the **cppIsekai** repository. Define domain-specific behavioral rules
 - NEVER scan `knowledge/` via `list_dir`, `grep_search`, `find`, or raw file readers.
 - NEVER forge human verification (`verified:` is human-only; declare `generated: { by: "<actor>", at: "<iso-time>" }`).
 - PREFER native `okf_*` MCP tools OVER CLI fallback commands.
+- CODEGRAPH: MUST keep the index fresh -- run `codebase-memory-mcp/index_repository` after structural code changes; MUST explore unfamiliar code via `codebase-memory-mcp/search_code` BEFORE editing it.
+- OKF PERSISTENCE: MUST persist durable decisions/facts via `okf_create`/`okf_update` in the same session they are made -- session-only knowledge is lost knowledge.
 
 ## 2. Guard Clauses & Scope Governance
 - ON edit(@path/):
