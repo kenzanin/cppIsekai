@@ -7,7 +7,7 @@
 
 ## 2. Reader worker placement
 - [ ] 2.1 `src/reader/worker.hpp`: page image writes use `<plugin>/<slug>/chNNN/pNNN.<ext>` when rel_path known; sha fallback untouched; ctest green; live smoke optional flag in task 4
-- [ ] 2.2 `/reader/window` unchanged inline — verify worker probe test writes to structured dir when slug present
+- [x] 2.2 `/reader/window` unchanged inline — verify worker probe test writes to structured dir when slug present  <!-- covered in 65730d7 (probe cases window-placement/fallback/reuse); no new code -->
 
 ## 3. CBZ export
 - [ ] 3.1 vendor libzippp header pair under `third_party/`; CMake target find_package libzip + libzippp include; fallback to vendored minizip if linkage stalls (ponytail note in design D6)
