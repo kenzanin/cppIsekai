@@ -4,6 +4,7 @@
 #include <cctype>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <utility>
 #include <vector>
 
@@ -63,13 +64,42 @@ Cache::Cache(Config conf, Fetcher fetch) : conf_(std::move(conf)), fetch_(std::m
     }
 }
 
+std::string Cache::path_for(const std::string& key, const std::string& kind) const {
+    return (fs::path(conf_.root) / kind / (sha1_hex(key) + "." + ext_of(key))).string();
+}
+
+std::optional<std::string> Cache::persist_locked(const std::string& path, const std::string& body) {
+    // temp + rename: a crash mid-write never leaves a truncated cache entry
+    const std::string tmp = path + ".tmp";
+    {
+        std::ofstream out(tmp, std::ios::binary | std::ios::trunc);
+        out.write(body.data(), static_cast<std::streamsize>(body.size()));
+        out.close();
+        std::error_code ec;
+        if (out.fail() || (fs::rename(tmp, path, ec), ec)) {
+            fs::remove(tmp, ec);
+            return std::nullopt;
+        }
+    }
+
+    const auto bytes = static_cast<std::int64_t>(body.size());
+    if (const auto known = entries_.find(path); known != entries_.end()) {
+        bytes_ += bytes - known->second.bytes; // refresh of a live entry
+        known->second = Entry{bytes, ++tick_};
+    } else {
+        bytes_ += bytes;
+        entries_.emplace(path, Entry{bytes, ++tick_});
+    }
+    trim(path);
+    return path;
+}
+
 std::optional<std::string> Cache::ensure(const std::string& key, const std::string& kind) {
     // ponytail: one lock across the (blocking) fetch serializes concurrent
     // misses; per-key inflight dedup when parallel workers actually starve.
     std::lock_guard lock(mu_);
 
-    const std::string path =
-        (fs::path(conf_.root) / kind / (sha1_hex(key) + "." + ext_of(key))).string();
+    const std::string path = path_for(key, kind);
 
     if (const auto hit = entries_.find(path); hit != entries_.end()) {
         hit->second.tick = ++tick_; // recency bump on serve
@@ -79,24 +109,31 @@ std::optional<std::string> Cache::ensure(const std::string& key, const std::stri
     const std::optional<std::string> body = fetch_ ? fetch_(key) : std::nullopt;
     if (!body) return std::nullopt;
 
-    // temp + rename: a crash mid-write never leaves a truncated cache entry
-    const std::string tmp = path + ".tmp";
-    {
-        std::ofstream out(tmp, std::ios::binary | std::ios::trunc);
-        out.write(body->data(), static_cast<std::streamsize>(body->size()));
-        out.close();
-        std::error_code ec;
-        if (out.fail() || (fs::rename(tmp, path, ec), ec)) {
-            fs::remove(tmp, ec);
-            return std::nullopt;
-        }
-    }
+    return persist_locked(path, *body);
+}
 
-    const auto bytes = static_cast<std::int64_t>(body->size());
-    bytes_ += bytes;
-    entries_.emplace(path, Entry{bytes, ++tick_});
-    trim(path);
-    return path;
+std::optional<std::string> Cache::store(const std::string& key, const std::string& kind,
+                                        const std::string& body) {
+    const std::lock_guard lock(mu_);
+    return persist_locked(path_for(key, kind), body);
+}
+
+std::optional<std::string> Cache::peek(const std::string& key, const std::string& kind) {
+    const std::lock_guard lock(mu_);
+
+    const auto it = entries_.find(path_for(key, kind));
+    if (it == entries_.end()) return std::nullopt;
+
+    std::ifstream in(it->first, std::ios::binary);
+    if (!in) {
+        // File gone under a live index (external wipe): drop the phantom.
+        bytes_ -= it->second.bytes;
+        entries_.erase(it);
+        return std::nullopt;
+    }
+    std::string body{std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
+    it->second.tick = ++tick_; // same recency bump as an ensure() hit
+    return body;
 }
 
 void Cache::trim(const std::string& keep) {

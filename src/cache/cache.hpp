@@ -39,7 +39,21 @@ public:
     // nullopt when the fetch fails; the caller decides (404, stale, ...).
     std::optional<std::string> ensure(const std::string& key, const std::string& kind);
 
+    // --- stale layer (task 2.2, additive; ensure/Fetcher untouched) ---
+    // Persist body for key under kind -- the write half of ensure(), no fetch.
+    // A repeat store refreshes the entry and bumps recency like a hit.
+    // Returns the entry path; nullopt on write failure.
+    std::optional<std::string> store(const std::string& key, const std::string& kind,
+                                     const std::string& body);
+
+    // Cached body for key; recency bumps exactly like an ensure() hit.
+    // nullopt on miss, or when the file vanished (index self-heals).
+    std::optional<std::string> peek(const std::string& key, const std::string& kind);
+
 private:
+    std::string path_for(const std::string& key, const std::string& kind) const;
+    // tmp+rename write + index bookkeeping + trim; mu_ held by callers.
+    std::optional<std::string> persist_locked(const std::string& path, const std::string& body);
     struct Entry {
         std::int64_t bytes{};
         std::uint64_t tick{};

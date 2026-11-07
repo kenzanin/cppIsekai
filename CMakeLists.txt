@@ -91,6 +91,12 @@ target_include_directories(test_http_img PRIVATE src)
 target_compile_options(test_http_img PRIVATE -Wall -Wextra)
 add_test(NAME http_img COMMAND test_http_img)
 
+# stale layer (2.2): wrapper around the ABI call; cache + glaze, no server
+add_executable(test_stale tests/test_stale.cpp src/cache/cache.cpp)
+target_include_directories(test_stale PRIVATE src ${TP}/glaze)
+target_compile_options(test_stale PRIVATE -Wall -Wextra)
+add_test(NAME stale COMMAND test_stale)
+
 # ponytail: no CPack/install yet -- add when packaging matters
 
 find_program(CLANG_TIDY clang-tidy)

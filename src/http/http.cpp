@@ -1,5 +1,6 @@
 #include "http.hpp"
 #include "img.hpp"
+#include "stale.hpp"
 
 #include "log/log.hpp"
 #include "plugin/plugin.hpp"
@@ -287,7 +288,12 @@ void serve(Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool, 
             r.set_header("Content-Type", "application/json");
             return r;
         }
-        crow::response r{on_pool(plugin_pool, [&] { return plugins.call(id, action, p.dump()); })};
+        const std::string params = p.dump();
+        // Stale-serve wrap (design D3): the one call site, opt-in methods only.
+        crow::response r{on_pool(plugin_pool, [&] {
+            return call_cached(images, id, action, params,
+                               [&] { return plugins.call(id, action, params); });
+        })};
         r.set_header("Content-Type", "application/json");
         return r;
     });
