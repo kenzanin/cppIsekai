@@ -91,7 +91,7 @@ add_test(NAME cache COMMAND test_cache)
 
 # config core (1.1): header-only registry + layered resolve; CLI11 parse, no env leakage
 add_executable(test_config tests/test_config.cpp)
-target_include_directories(test_config PRIVATE src ${TP}/simpleini)
+target_include_directories(test_config PRIVATE src ${TP}/simpleini ${TP}/glaze)
 target_compile_options(test_config PRIVATE -Wall -Wextra)
 add_test(NAME config COMMAND test_config)
 

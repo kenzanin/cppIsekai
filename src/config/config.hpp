@@ -5,6 +5,7 @@
 #include "registry.hpp"
 
 #include <CLI/CLI.hpp>
+#include <glaze/glaze.hpp>
 
 #include <SimpleIni.h> // vendored 4.27; load is read-only, save() below is the comment-safe merge
 
@@ -85,7 +86,32 @@ inline Config to_config(const std::array<std::string, kEntryCount>& v) {
 
 } // namespace detail
 
-// Layered resolve. Missing/corrupt ini skips that layer (same as main.cpp today);
+// POST /config body coercion: JSON object -> updates map in string form.
+// Integers up to 1e18 keep exact integer text; fractional doubles go through
+// to_string(double); any other value type is an error. Crow-free so the
+// branchy part is unit-testable (review I1).
+inline bool parse_updates(const std::string& body, std::map<std::string, std::string>& out,
+                          std::string& err) {
+    glz::generic root;
+    if (glz::read_json(root, body) || !root.is_object()) {
+        err = "body must be a JSON object";
+        return false;
+    }
+    for (const auto& [key, val] : root.get_object()) {
+        if (const auto* s = std::get_if<std::string>(&val.data))
+            out[key] = *s;
+        else if (const auto* n = std::get_if<double>(&val.data)) // glz::generic: f64 numbers
+            out[key] = (*n == std::floor(*n) && std::fabs(*n) < 1e18)
+                           ? std::to_string(static_cast<long long>(*n))
+                           : std::to_string(*n);
+        else {
+            err = "value of '" + key + "' must be a string or number";
+            return false;
+        }
+    }
+    return true;
+}
+
 // env lookup injectable for tests; pass {} to run with no env at all.
 inline Config resolve(
     const Overrides& flags, const std::string& ini_path,

@@ -139,6 +139,65 @@ TEST_CASE("config: dump projects registry as commented ini template (D4)") {
 
 // D5: comment-safe merge-save. `read` is the byte-honest view the asserts
 // below reason about -- SimpleIni re-emits `key = value` with spaces.
+TEST_CASE("config: parse_updates coerces POST /config body (review I1)") {
+    std::map<std::string, std::string> out;
+    std::string err;
+
+    auto ok = [&](const char* body) {
+        out.clear();
+        err.clear();
+        return parse_updates(body, out, err);
+    };
+
+    SUBCASE("object with string and fractional-free number") {
+        REQUIRE(ok(R"({"server.port": 8091, "server.proxy": "http://p:1"})"));
+        CHECK(out.count("server.port") == 1);
+        CHECK(out.at("server.port") == "8091");
+        CHECK(out.at("server.proxy") == "http://p:1");
+        CHECK(err.empty());
+    }
+
+    SUBCASE("integer below 2^53 stays exact (no float rounding)") {
+        REQUIRE(ok(R"({"plugin.plugin_timeout_ops": 1234567890123456})"));
+        // glz::generic holds numbers as f64, so only values <= 2^53 round-trip
+        // exactly; the integer branch still renders them without decimals.
+        CHECK(out.at("plugin.plugin_timeout_ops") == "1234567890123456");
+    }
+
+    SUBCASE("integer above 2^53 keeps the f64 rounding glz gives us (ponytail)") {
+        // Known ceiling: glz::generic is f64-only, values past 2^53 lose the
+        // exact-int guarantee in the coerced string. Upgrade when glaze grows
+        // an int64 variant path.
+        REQUIRE(ok(R"({"plugin.plugin_timeout_ops": 12345678901234567})"));
+        CHECK(out.at("plugin.plugin_timeout_ops") == "12345678901234568");
+    }
+
+    SUBCASE("fractional double goes through to_string(double)") {
+        REQUIRE(ok(R"({"server.proxy": 1.5})"));
+        CHECK(out.at("server.proxy") == "1.500000");
+    }
+
+    SUBCASE("huge beyond 1e18 falls back to double text") {
+        REQUIRE(ok(R"({"plugin.plugin_timeout_ops": 1e19})"));
+        CHECK(out.at("plugin.plugin_timeout_ops") == "10000000000000000000.000000");
+    }
+
+    SUBCASE("non-scalar value rejected with key named") {
+        CHECK_FALSE(ok(R"({"server.port": {"a":1}})"));
+        CHECK(err == "value of 'server.port' must be a string or number");
+    }
+
+    SUBCASE("non-object body rejected") {
+        CHECK_FALSE(ok("[1,2,3]"));
+        CHECK(err == "body must be a JSON object");
+    }
+
+    SUBCASE("malformed JSON rejected") {
+        CHECK_FALSE(ok("{not json"));
+        CHECK(err == "body must be a JSON object");
+    }
+}
+
 TEST_CASE("config: save merges comment-safe (D5)") {
     std::string err;
     auto read = [](const std::string& p) {

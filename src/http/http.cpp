@@ -493,19 +493,9 @@ void serve(Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool, 
         };
 
         std::map<std::string, std::string> updates;
-        glz::generic body;
-        if (glz::read_json(body, req.body) || !body.is_object())
-            return fail(400, "body must be a JSON object");
-        for (const auto& [key, val] : body.get_object()) {
-            if (const auto* s = std::get_if<std::string>(&val.data))
-                updates[key] = *s;
-            else if (const auto* n = std::get_if<double>(&val.data)) // glz::generic: f64 numbers
-                updates[key] = (*n == std::floor(*n) && std::fabs(*n) < 1e18)
-                                   ? std::to_string(static_cast<long long>(*n))
-                                   : std::to_string(*n);
-            else
-                return fail(400, "value of '" + key + "' must be a string or number");
-        }
+        std::string parse_err;
+        if (!config::parse_updates(req.body, updates, parse_err))
+            return fail(400, std::move(parse_err));
 
         std::string err;
         const int written = config::save(updates, ini_path, &err);
