@@ -4,3 +4,4 @@
 * [Test and lint tooling (doctest, clang-tidy, clang-format)](tooling.md) - doctest + ctest + clang-tidy/format targets wired; system packages only; LIKE-% lesson recorded
 * [MangaDex auth and API quirks (verified)](mangadex-auth-quirks.md) - Verified MangaDex auth/API behaviors: password-grant-only personal clients, public endpoints tolerating any bearer, no auth headers on CDN, impersonate TLS flakiness, token state in plugin_state.
 * [MangaDex search ranking = followedCount desc](mangadex-search-ranking.md) - Search mangadex.org = order[followedCount]=desc di API; relevance enum ada tapi tidak menjamin exact-match first; plugin mengirim followedCount dan menerima title/query/q.
+* [image-cache deferred polish backlog](image-cache-backlog.md) - Fix-later items dari final review image-cache (cache.cpp ec handling, main.lua guard, envelope_data test, ponytail accepts) + catatan MangaDex@Home emergency mode probe 2026-11-07.
