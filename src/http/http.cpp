@@ -2,6 +2,7 @@
 #include "img.hpp"
 #include "stale.hpp"
 
+#include "config/config.hpp"
 #include "log/log.hpp"
 #include "plugin/plugin.hpp"
 #include "reader/window.hpp"
@@ -13,8 +14,10 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <fstream>
+#include <map>
 #include <memory>
 #include <optional>
 #include <sstream>
@@ -262,7 +265,7 @@ cache::Fetcher makeCurlFetcher(std::string proxy) {
 }
 
 void serve(Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool, plugin::Host& plugins,
-           LogBuffer& logs, cache::Cache& images, int port) {
+           LogBuffer& logs, cache::Cache& images, int port, const std::string& ini_path) {
     crow::SimpleApp app;
     crow::mustache::set_base("templates");
 
@@ -472,6 +475,47 @@ void serve(Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool, 
             out["skipped"] = skipped;
             out["window"] = std::move(window);
             crow::response r{out};
+            r.set_header("Content-Type", "application/json");
+            return r;
+        });
+
+    // Config save (D5): validation-first merge, comments/ordering survive.
+    // Body {"section.key": string|number} in resolved full-key form.
+    CROW_ROUTE(app, "/config")
+        .methods(crow::HTTPMethod::POST)([&](const crow::request& req) -> crow::response {
+            auto fail = [](int code, std::string msg) {
+                crow::json::wvalue e;
+                e["ok"] = false;
+                e["error"] = std::move(msg);
+                crow::response r{std::move(e)};
+                r.code = code;
+                r.set_header("Content-Type", "application/json");
+                return r;
+            };
+
+            std::map<std::string, std::string> updates;
+            glz::generic body;
+            if (glz::read_json(body, req.body) || !body.is_object())
+                return fail(400, "body must be a JSON object");
+            for (const auto& [key, val] : body.get_object()) {
+                if (const auto* s = std::get_if<std::string>(&val.data))
+                    updates[key] = *s;
+                else if (const auto* n = std::get_if<double>(&val.data)) // glz::generic: f64 numbers
+                    updates[key] = (*n == std::floor(*n) && std::fabs(*n) < 1e18)
+                                       ? std::to_string(static_cast<long long>(*n))
+                                       : std::to_string(*n);
+                else
+                    return fail(400, "value of '" + key + "' must be a string or number");
+            }
+
+            std::string err;
+            const int written = config::save(updates, ini_path, &err);
+            if (written < 0) return fail(written == -2 ? 500 : 400, std::move(err));
+
+            crow::json::wvalue out;
+            out["ok"] = true;
+            out["written"] = written;
+            crow::response r{std::move(out)};
             r.set_header("Content-Type", "application/json");
             return r;
         });

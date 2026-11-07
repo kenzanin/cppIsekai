@@ -12,4 +12,4 @@
 cache::Fetcher makeCurlFetcher(std::string proxy);
 
 void serve(Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool, plugin::Host& plugins,
-           LogBuffer& logs, cache::Cache& images, int port);
+           LogBuffer& logs, cache::Cache& images, int port, const std::string& ini_path);

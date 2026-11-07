@@ -140,3 +140,65 @@ TEST_CASE("config: dump projects registry as commented ini template (D4)") {
         CHECK(std::string(ini.GetValue(e.section, e.key, "\x01missing")) ==
               std::string(e.def));
 }
+
+// D5: comment-safe merge-save. `read` is the byte-honest view the asserts
+// below reason about -- SimpleIni re-emits `key = value` with spaces.
+TEST_CASE("config: save merges comment-safe (D5)") {
+    std::string err;
+    auto read = [](const std::string& p) {
+        std::ifstream f{p};
+        return std::string{std::istreambuf_iterator<char>{f}, std::istreambuf_iterator<char>{}};
+    };
+
+    SUBCASE("round trip: comments, ordering and untouched keys survive") {
+        const auto path =
+            tmp_ini("[server]\n; TCP listen port\nport = 1234\n; keep me\nproxy = http://p:1\n");
+        REQUIRE(save({{"server.port", "8091"}}, path, &err) == 1);
+        CHECK(err.empty());
+        const auto text = read(path);
+        CHECK(text.find("; TCP listen port") != std::string::npos);
+        CHECK(text.find("; keep me") != std::string::npos);
+        const auto port_at = text.find("port = 8091");
+        const auto proxy_at = text.find("proxy = http://p:1");
+        REQUIRE(port_at != std::string::npos);
+        REQUIRE(proxy_at != std::string::npos);
+        CHECK(port_at < proxy_at); // load order preserved
+    }
+
+    SUBCASE("unknown key rejected before any write") {
+        const auto path = tmp_ini("[server]\nport = 1\n");
+        const auto before = read(path);
+        CHECK(save({{"nope.side", "x"}}, path, &err) == -1);
+        CHECK(err == "unknown config key: nope.side");
+        CHECK(read(path) == before); // validation-first: file untouched
+    }
+
+    SUBCASE("type mismatch rejected: numeric knob takes an integer string") {
+        const auto path = tmp_ini("[server]\n; c\nport = 1\n");
+        const auto before = read(path);
+        CHECK(save({{"server.port", "eighty"}}, path, &err) == -1);
+        CHECK(err == "value of server.port is not an integer");
+        CHECK(read(path) == before);
+    }
+
+    SUBCASE("unregistered key beside a valid one is still a no-op write") {
+        const auto path = tmp_ini("[paths]\nlog_file = a.log\n");
+        const auto before = read(path);
+        CHECK(save({{"paths.data_dir", "d"}, {"made.up", "1"}}, path, &err) == -1);
+        CHECK(read(path) == before);
+    }
+
+    SUBCASE("missing file: created from the dump template, resolve() reads it back") {
+        const auto path = (std::filesystem::temp_directory_path() /
+                           ("cppisekai_cfg_fresh_" + std::to_string(++tmp_seq) + ".ini"))
+                              .string();
+        std::filesystem::remove(path); // seq restarts per run: clear prior leftovers
+        REQUIRE(save({{"server.port", "1"}}, path, &err) == 1);
+        CHECK(err.empty());
+        const auto text = read(path);
+        for (const Entry& e : kEntries) // every knob, doc comment attached
+            CHECK_MESSAGE(text.find(e.key) != std::string::npos, e.key);
+        CHECK(text.find("; TCP listen port") != std::string::npos);
+        CHECK(resolve(Overrides{}, path, fake_env({})).port == 1);
+    }
+}
