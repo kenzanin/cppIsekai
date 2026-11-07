@@ -28,7 +28,7 @@ target_include_directories(sqlite3 PUBLIC ${TP}/libsql/sqlite)
 
 # --- app ---
 add_executable(cppIsekai src/main.cpp src/store/store.cpp src/http/http.cpp
-                         src/plugin/plugin.cpp)
+                         src/plugin/plugin.cpp src/cache/cache.cpp)
 target_include_directories(
   cppIsekai
   PRIVATE src
@@ -83,6 +83,13 @@ add_executable(test_cache tests/test_cache.cpp src/cache/cache.cpp)
 target_include_directories(test_cache PRIVATE src)
 target_compile_options(test_cache PRIVATE -Wall -Wextra)
 add_test(NAME cache COMMAND test_cache)
+
+# /cache/img serve-through: pure route core, crow-free; fetcher injected via the
+# cache ctor, so no server, curl or store linkage is needed here.
+add_executable(test_http_img tests/test_http_img.cpp src/cache/cache.cpp)
+target_include_directories(test_http_img PRIVATE src)
+target_compile_options(test_http_img PRIVATE -Wall -Wextra)
+add_test(NAME http_img COMMAND test_http_img)
 
 # ponytail: no CPack/install yet -- add when packaging matters
 

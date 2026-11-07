@@ -75,7 +75,12 @@ int main(int argc, char** argv) {
     plugins.use_db(&db_pool); // storage.* gate: plugin threads never touch sqlite directly
     plugins.load_all(store);
 
+    // [cache]: the one shared disk-LRU (img now, api in 3.3); cap ini -> bytes.
+    const std::int64_t cache_max_bytes =
+        static_cast<std::int64_t>(ini.GetLongValue("cache", "cache_max_mb", 2048)) << 20;
+    cache::Cache images{cache::Config{"data/cache", cache_max_bytes}, makeCurlFetcher()};
+
     spdlog::info("cppIsekai listening on :{} (config: {})", port, conf);
-    serve(store, db_pool, plugin_pool, plugins, logs, port);
+    serve(store, db_pool, plugin_pool, plugins, logs, images, port);
     running.store(false);
 }
