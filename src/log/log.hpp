@@ -11,8 +11,9 @@
 #include <fstream>
 #include <mutex>
 #include <string>
-
+namespace {
 inline moodycamel::ReaderWriterQueue<std::string> g_log_queue{1024};
+}
 
 class QueueSink : public spdlog::sinks::base_sink<std::mutex> {
 protected:
@@ -35,14 +36,14 @@ public:
     }
 
     std::vector<std::string> snapshot() const {
-        std::lock_guard lock(mu_);
+        std::scoped_lock lock(mu_);
         return {lines_.begin(), lines_.end()};
     }
 
 private:
     void push(std::string line) {
         file_ << line << std::flush;
-        std::lock_guard lock(mu_);
+        std::scoped_lock lock(mu_);
         lines_.push_back(std::move(line));
         if (lines_.size() > 200)
             lines_.pop_front();
