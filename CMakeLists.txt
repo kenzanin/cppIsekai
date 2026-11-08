@@ -40,7 +40,7 @@ add_library(sqlite3 STATIC ${TP}/libsql/sqlite/sqlite3.c)
 target_include_directories(sqlite3 PUBLIC ${TP}/libsql/sqlite)
 
 # --- app ---
-add_executable(cppIsekai src/main.cpp src/store/store.cpp src/http/http.cpp
+add_executable(cppIsekai src/main.cpp src/store/store.cpp src/http/http.cpp src/http/http_pages.cpp src/http/http_api.cpp
                          src/plugin/plugin.cpp src/plugin/lua/bridge.cpp src/plugin/lua/lua_runtime.cpp src/plugin/http_client.cpp src/plugin/wasm_rt.cpp src/plugin/js_rt.cpp src/cache/cache.cpp src/reader/window.cpp
                          ${TP}/libzippp/libzippp.cpp src/http/export_cbz.cpp)
 target_include_directories(

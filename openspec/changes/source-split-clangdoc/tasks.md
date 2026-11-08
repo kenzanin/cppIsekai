@@ -10,7 +10,7 @@
 
 ## 2. http module split
 
-- [ ] 2.1 Registration-helper extraction per design D3: `http_pages.cpp` + `http_api.cpp` + internal `http_routes.hpp`; `serve()` slims to layout/helpers + registration calls; full ctest green
+- [x] 2.1 Registration-helper extraction per design D3: `http_pages.cpp` + `http_api.cpp` + internal `http_routes.hpp`; `serve()` slims to layout/helpers + registration calls; full ctest green
 
 ## 3. runtime seams
 
