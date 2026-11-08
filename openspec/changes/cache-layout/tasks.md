@@ -6,7 +6,7 @@
 - [x] 1.3 Fixtures in `tests/test_cache.cpp` exercising: eviction across tree depth, purge-once path with legacy `.legacy-img-*` detection  <!-- included in 840a3a6 -->
 
 ## 2. Reader worker placement
-- [ ] 2.1 `src/reader/worker.hpp`: page image writes use `<plugin>/<slug>/chNNN/pNNN.<ext>` when rel_path known; sha fallback untouched; ctest green; live smoke optional flag in task 4
+- [x] 2.1 `src/reader/worker.hpp`: page image writes use `<plugin>/<slug>/chNNN/pNNN.<ext>` when rel_path known; sha fallback untouched; ctest green; live smoke optional flag in task 4
 - [x] 2.2 `/reader/window` unchanged inline — verify worker probe test writes to structured dir when slug present  <!-- covered in 65730d7 (probe cases window-placement/fallback/reuse); no new code -->
 
 ## 3. CBZ export
@@ -14,5 +14,5 @@
 - [x] 3.2 `GET /export/cbz?plugin=<id>&slug=<slug>` stream entries (cover.<ext> + chNNN/pNNN.<ext>) in lexicographic order from disk, empty slug = empty zip; unit + live smoke route probing via binary + curl in next task
 
 ## 4. Verification
-- [ ] 4.1 ctest full suite green; `openspec validate`
+- [x] 4.1 ctest full suite green; `openspec validate`
 - [ ] 4.2 smoke: boot with pre-populated legacy `img/` folder → purge message in log + fresh structured writes; export slug whose pages exist → downloadable zip; window probe writes land structured
