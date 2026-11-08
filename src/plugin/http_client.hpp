@@ -7,6 +7,7 @@
 
 #include "fetch/fetch.hpp"
 
+#include <spdlog/spdlog.h>
 #include <string>
 #include <utility>
 #include <vector>
@@ -22,5 +23,24 @@ FetchResult fetch_sync(const std::string& url, long timeout_ms, const std::strin
                        const std::string& body, const std::string& accept_header, const std::string& ua_header,
                        const std::vector<std::pair<std::string, std::string>>& extra_headers,
                        const std::string& proxy);
+
+/** \brief Unknown-target guard (task 1.2): empty => live default; a target
+ *  the linked libs do not know => warn and fall back (the request runs). */
+inline std::string checked_profile(std::string want, const std::string& live_default) {
+    if (want.empty()) {
+        want = live_default;
+    }
+    if (want.empty()) {
+        want = "chrome116";
+    }
+    if (!fetch::is_known_target(want)) {
+        spdlog::warn("[fetch] unknown profile '{}' -> using '{}'", want, live_default);
+        want = live_default.empty() ? "chrome116" : live_default;
+    }
+    return want;
+}
+
+/** \brief The live default-profile cell type itself is plugin::LiveProfile
+ *  (plugin.hpp); the runtimes receive it from the Host. */
 
 } // namespace plugin

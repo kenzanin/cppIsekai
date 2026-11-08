@@ -14,6 +14,7 @@
 
 #include <map>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -47,6 +48,19 @@ inline void applyProxy(CURL* e, const std::string& proxy) {
     if (!proxy.empty()) {
         curl_easy_setopt(e, CURLOPT_PROXY, proxy.c_str());
     }
+}
+
+/** \brief Targets the linked curl-impersonate libs accept (OKF probe
+ *  2026-11-08); the firefox family extends this in task 1.3. */
+inline bool is_known_target(std::string_view t) {
+    for (std::string_view k :
+         {"chrome99", "chrome100", "chrome101", "chrome104", "chrome107", "chrome110", "chrome116", "edge99",
+          "edge101", "safari15"}) {
+        if (t == k) {
+            return true;
+        }
+    }
+    return false;
 }
 
 /** \brief Execute \p req; on SSL_CONNECT_ERROR retry once on a fresh handle

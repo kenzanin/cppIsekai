@@ -26,7 +26,8 @@ void open_sandbox(lua_State* L) {
 }
 
 void install_host_tools(lua_State* L, const std::string& id, const Config& conf, const glz::generic& cfg, bool has_cfg,
-                        const StateGet& sget, const StateSet& sset, const std::string& dir) {
+                        const StateGet& sget, const StateSet& sset, const std::string& dir,
+                        const LiveProfile& live_profile) {
     sol::state_view sv(L);
 
     // Routed through the default logger, whose sinks include the queue sink
@@ -106,7 +107,7 @@ void install_host_tools(lua_State* L, const std::string& id, const Config& conf,
     // Blocking fetch on the calling (plugin-pool) worker; curl's own timeout
     // guards the network half, the instruction hook the CPU half.
     sol::table http = sv.create_named_table("http");
-    http["fetch"] = [id, timeout_ms = conf.fetch_timeout_ms, profile = conf.fetch_profile,
+    http["fetch"] = [id, timeout_ms = conf.fetch_timeout_ms, live = &live_profile,
                      proxy = conf.proxy](
                         const std::string& url, const sol::optional<sol::table>& opts,
                         sol::this_state ts) -> std::pair<sol::object, std::optional<std::string>> {
@@ -116,7 +117,11 @@ void install_host_tools(lua_State* L, const std::string& id, const Config& conf,
         };
 
         long ms = timeout_ms;
-        std::string profile_name = profile;
+        std::string live_default;
+        if (auto p = live->load()) {
+            live_default = *p;
+        }
+        std::string profile_name = live_default;
         std::string method = "GET";
         std::string body;
         std::string accept_header; // optional per-call Accept override
@@ -150,6 +155,7 @@ void install_host_tools(lua_State* L, const std::string& id, const Config& conf,
             }
         }
 
+        profile_name = checked_profile(std::move(profile_name), live_default);
         // The shared sync path (http_client): one option block, retry, impersonation.
         const FetchResult fr =
             fetch_sync(url, ms, profile_name, method, body, accept_header, ua_header, extra_headers, proxy);

@@ -36,7 +36,8 @@ void open_sandbox(lua_State* L);
  *  http) into the plugin state. \p cfg is the parsed config.json when
  *  \p has_cfg; storage closures route through \p sget / \p sset. */
 void install_host_tools(lua_State* L, const std::string& id, const Config& conf, const glz::generic& cfg, bool has_cfg,
-                        const StateGet& sget, const StateSet& sset, const std::string& dir);
+                        const StateGet& sget, const StateSet& sset, const std::string& dir,
+                        const LiveProfile& live_profile);
 
 } // namespace plugin::lua
 } // namespace plugin

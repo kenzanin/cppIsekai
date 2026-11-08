@@ -12,6 +12,7 @@
 #include <BS_thread_pool.hpp>
 #include <curl/curl.h>
 
+#include <atomic>
 #include <memory>
 #include <string>
 #include <vector>
@@ -23,6 +24,11 @@ namespace plugin {
 /** \brief Bump when the envelope/param contract changes; plugins with a newer
  *  api are skipped at load (older ones run best-effort). */
 constexpr int kHostApi = 1;
+
+/** \brief Live default-profile cell (task 1.2): POST /config swaps the value
+ *  through Host::set_default_profile; the runtimes read it per call. Points
+ *  into Host::Impl -- stable for the Host's lifetime. */
+using LiveProfile = std::atomic<std::shared_ptr<const std::string>>;
 
 struct Config {
     std::string dir = "data/plugins";
@@ -80,6 +86,13 @@ public:
 
     /** \brief Last-call outcome for id; ok-when-unknown when never called. */
     [[nodiscard]] CallHealth health(const std::string& id) const;
+
+    /** \brief Swap the live default profile (task 1.2); the config route
+     *  calls this after a successful save. */
+    void set_default_profile(std::string profile);
+
+    /** \brief Current live default profile (plugin.fetch_profile). */
+    [[nodiscard]] std::string default_profile() const;
 
     /** \brief Logo file path for id; empty when the plugin (or its logo) is
      *  absent. */
