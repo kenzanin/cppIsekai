@@ -1,4 +1,7 @@
 ## 2026-11-08
+* **Update**: Linked `references/uploads-cdn-tls-constraint.md` to `architecture/image-cache-offline.md`.
+* **Update**: Linked `references/uploads-cdn-tls-constraint.md` to `decisions/fetch-profile-gate.md`.
+* **Creation**: Documented concept `references/uploads-cdn-tls-constraint.md` (uploads CDN TLS constraint: system curl CLI is the only working engine).
 * **Update**: Linked `decisions/source-layout-policy.md` to `architecture/manga-viewer-core.md` (layout policy for the host codebase this core serves).
 * **Update**: Linked `decisions/source-layout-policy.md` to `references/code-layers.md` (supersedes the single-file crown descriptions in the layer map).
 * **Update**: Updated concept `architecture/image-cache-offline.md`.
@@ -83,6 +86,8 @@
 * **Creation**: Documented concept `decisions/search-read-model-cache.md` (JSONB search read-model via opt-in call_cached; fresh=SELECT no HTTP; per-method TTL; file cache stays as fallback).
 * **Update**: Linked `decisions/plugin-cookie-jars.md` to `decisions/plugin-data-segregation.md`, `decisions/fetch-profile-gate.md`, `architecture/plugin-system.md` (State-location policy, mounting gate, and the opts ABI).
 * **Update**: Linked `decisions/search-read-model-cache.md` to `architecture/normalization-contract.md`, `architecture/plugin-system.md`, `references/code-layers.md` (jsonb decision source, wire-format principle, and the SQL layering).
+* **Creation**: Documented concept `references/uploads-cdn-tls-constraint.md` (uploads.mangadex.org rejects both impersonate TLS stacks and a second in-process libcurl segfaults; image fetching shells out to the system curl CLI; covers load via /cache/img).
+* **Update**: Linked `references/uploads-cdn-tls-constraint.md` to `decisions/fetch-profile-gate.md` and `architecture/image-cache-offline.md` (The constraint justifies the gate's plain/system path and the image fetcher's subprocess engine).
 * **Creation**: Documented concept `decisions/source-layout-policy.md` (Post-split layout policy: crown facades, ~200-loc units, per-runtime seams, clang-doc doc-comments; sub-200 prune; audits in source-split-clangdoc/codeloc-final.txt).
 * **Update**: Updated concept `decisions/fetch-profile-gate.md` (firefox pulled into phase 1: dual-.so dlopen vtable, family routing; user steer 2026-11-08).
 * **Update**: Updated concept `decisions/fetch-profile-gate.md` (shipped state: real ff soname v0.6.1 pair vendored, probed safari15_3/_5 + ff target list, chrome-degrade path; change fetch-gate 6/6).
