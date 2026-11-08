@@ -73,7 +73,7 @@ openspec validate --specs             # validate main specs
 ## Conventions
 
 - C++23, `-Wall -Wextra` clean — no new warnings on build; doctest for tests; one test target per module (`tests/test_<module>.cpp`); fixtures under `tests/fixtures/`.
-- Header-only modules preferred (config core, slug, reader worker, stale layer); crown files are `main.cpp` / `http.cpp` / `plugin.cpp` / `store.cpp` / `cache.cpp`.
+- Header-only modules preferred (config core, slug, reader worker, stale layer); crown facades after source-split-clangdoc: `src/http/{http,http_pages,http_api}.cpp`, `src/plugin/{plugin.cpp,http_client.cpp,lua/,wasm/,js/}`, `src/store/store.cpp`, `src/cache/cache.cpp` -- split units stay <=~200 code-loc (plugin core + http_api documented exceptions, large functions whole); doc-comments are clang-doc (`/** \brief */`) on public decls, why-notes stay `//`.
 - All internationalizable content is en_US in code/identifiers; user_chat language = Indonesian (casual).
 - Generated files (docs, knowledge, openspec artifacts, reports, briefs): English only — Indonesian appears in user chat, never in committed files.
 - Commit subjects: short, lowercase imperative (e.g., `cache: slug pragma header-only (title->folder, collision id suffix) + tests`).

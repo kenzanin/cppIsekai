@@ -1,10 +1,15 @@
 #pragma once
-// sha1_hex — minimal SHA-1 (FIPS 180-4) for cache keys. ~40 lines, no deps.
-// ponytail: swap for a real hash if keys ever need more than identity.
+
+/** \file sha1.hpp
+ *  \brief sha1_hex -- minimal SHA-1 (FIPS 180-4) for cache keys, ~40 lines,
+ *  no deps.
+ *
+ *  ponytail: swap for a real hash if keys ever need more than identity. */
 #include <cstdint>
 #include <cstdio>
 #include <string>
 
+/** \brief Lowercase-hex SHA-1 digest of \p msg. */
 inline std::string sha1_hex(const std::string& msg) {
     std::uint32_t h[5] = {0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476, 0xC3D2E1F0};
     std::string data = msg;

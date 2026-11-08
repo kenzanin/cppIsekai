@@ -1,11 +1,14 @@
 #pragma once
 
+/** \file plugin.hpp
+ *  \brief Plugin discovery, sandboxing, host tools, ABI envelope dispatch.
+ *
+ * Layout: one folder per plugin under Config::dir with main.json (manifest),
+ * the entry script (main.lua) and an optional logo file. Contract: host calls
+ * handle({api, method, params}); the plugin answers {ok=true, data=...} or
+ * {ok=false, error=...}. */
+
 #include "fs.hpp" // plugin::fs_read -- confined read-only file helper (also drags <filesystem>/<fstream> for embedders)
-// Plugin discovery, Lua sandbox, host tools, ABI envelope dispatch.
-// Layout: one folder per plugin under Config::dir with main.json (manifest),
-// the entry script (main.lua) and an optional logo file.
-// Contract: host calls handle({api, method, params}); the plugin answers
-// {ok=true, data=...} or {ok=false, error=...}.
 #include <BS_thread_pool.hpp>
 #include <curl/curl.h>
 
@@ -17,8 +20,8 @@ struct Store;
 
 namespace plugin {
 
-// Bump when the envelope/param contract changes; plugins with a newer api are
-// skipped at load (older ones run best-effort).
+/** \brief Bump when the envelope/param contract changes; plugins with a newer
+ *  api are skipped at load (older ones run best-effort). */
 constexpr int kHostApi = 1;
 
 struct Config {
@@ -34,8 +37,8 @@ struct Config {
     std::string proxy;
 };
 
-// One proxy rule for every outbound curl handle (plugin fetch + image
-// getter): empty string means direct, no CURLOPT_PROXY set.
+/** \brief One proxy rule for every outbound curl handle (plugin fetch + image
+ *  getter): empty string means direct, no CURLOPT_PROXY set. */
 inline void applyProxy(CURL* e, const std::string& proxy) {
     if (!proxy.empty()) {
         curl_easy_setopt(e, CURLOPT_PROXY, proxy.c_str());
@@ -49,7 +52,7 @@ struct PluginInfo {
     std::string dir;
 };
 
-// Last finished call per plugin; in-memory, resets on restart.
+/** \brief Last finished call per plugin; in-memory, resets on restart. */
 struct CallHealth {
     bool ok{true};
     std::string error; // empty when ok
@@ -57,8 +60,9 @@ struct CallHealth {
 };
 
 struct Host; // fwd: Impl defined in plugin.cpp as plugin::Host::Impl
-// Registry + runtime holder. One instance for the process; safe to call from
-// pool threads.
+
+/** \brief Registry + runtime holder. One instance for the process; safe to
+ *  call from pool threads. */
 class Host {
 public:
     explicit Host(Config conf);
@@ -66,26 +70,27 @@ public:
     Host(const Host&) = delete;
     Host& operator=(const Host&) = delete;
 
-    // Rescan dir, rebuild every runtime, upsert survivors into Store.
-    // Returns the number of plugins kept. A broken plugin logs a warning and
-    // never aborts the scan.
+    /** \brief Rescan dir, rebuild every runtime, upsert survivors into Store.
+     *  Returns the number of plugins kept. A broken plugin logs a warning and
+     *  never aborts the scan. */
     int load_all(Store& store);
 
-    // Optional db-worker gate: when set, plugin `storage.*` calls are run on
-    // this pool (Store is single-connection, db-worker only). Without it the
-    // calls run inline — fine for single-threaded tests.
+    /** \brief Optional db-worker gate: when set, plugin `storage.*` calls run
+     *  on this pool (Store is single-connection, db-worker only). Without it
+     *  the calls run inline -- fine for single-threaded tests. */
     void use_db(BS::thread_pool<>* db);
 
-    // ABI call. Dispatches on the manifest runtime; envelope, health
-    // bookkeeping and response shape are the runtime-agnostic core. Returns
-    // the response as JSON text:
-    // {"ok":true,"data":...} or {"ok":false,"error":"..."}.
+    /** \brief ABI call. Dispatches on the manifest runtime; envelope, health
+     *  bookkeeping and response shape are the runtime-agnostic core. Returns
+     *  the response as JSON text:
+     *  {"ok":true,"data":...} or {"ok":false,"error":"..."}. */
     std::string call(const std::string& id, const std::string& method, const std::string& params_json);
 
-    // Last-call outcome for id; ok-when-unknown when never called.
+    /** \brief Last-call outcome for id; ok-when-unknown when never called. */
     [[nodiscard]] CallHealth health(const std::string& id) const;
 
-    // Logo file path for id; empty when the plugin (or its logo) is absent.
+    /** \brief Logo file path for id; empty when the plugin (or its logo) is
+     *  absent. */
     [[nodiscard]] std::string logo_path(const std::string& id) const;
 
 private:

@@ -1,6 +1,9 @@
-// The single source of config truth: every knob, its layers, its default.
-// Registry table is normative: openspec/changes/cli-config/design.md (D1, D7).
 #pragma once
+
+/** \file registry.hpp
+ *  \brief The single source of config truth: every knob, its layers, its
+ *  default. Registry table is normative:
+ *  openspec/changes/cli-config/design.md (D1, D7). */
 
 #include <array>
 #include <cstddef>

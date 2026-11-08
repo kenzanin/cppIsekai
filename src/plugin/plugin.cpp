@@ -1,7 +1,9 @@
 #include "plugin.hpp"
 #include "fs.hpp"
-#include "wasm_rt.hpp"
-#include "js_rt.hpp"
+#include "lua/bridge.hpp"
+#include "http_client.hpp"
+#include "plugin/wasm/wasm_rt.hpp"
+#include "plugin/js/js_rt.hpp"
 
 #include "store/store.hpp"
 
@@ -35,24 +37,19 @@
 
 namespace fs = std::filesystem;
 
-// curl-impersonate ships the symbol but no header on this host (system curl
-// headers predate it; see knowledge/references/dependency-api.md).
-extern "C" CURLcode curl_easy_impersonate(CURL* easy, const char* client, unsigned clientscope);
-
 namespace plugin {
+
+// The lua seam lives in plugin/lua; the shared sync curl client in http_client.
+using lua::json_to_sol;
+using lua::sol_to_json;
+using lua::open_sandbox;
+using lua::install_host_tools;
 
 namespace {
 
 // ---------------------------------------------------------------------------
 // json <-> lua bridges. glz::generic = variant<null,double,string,bool,vec,map>
 // ---------------------------------------------------------------------------
-
-std::string dump_json(const glz::generic& g) {
-    if (auto s = glz::write_json(g)) {
-        return std::move(*s);
-    }
-    return "null";
-}
 
 std::string err_json(std::string msg) {
     glz::generic ok;
@@ -64,227 +61,6 @@ std::string err_json(std::string msg) {
     obj.insert({"ok", std::move(ok)});
     obj.insert({"error", std::move(err)});
     return dump_json(root);
-}
-
-// Object member view: nullptr when there is no object or the key is absent.
-const glz::generic* member(const glz::generic::object_t* obj, const char* key) {
-    if (obj == nullptr) {
-        return nullptr;
-    }
-    const auto it = obj->find(std::string(key));
-    return it != obj->end() ? &it->second : nullptr;
-}
-
-sol::object json_to_sol(lua_State* L, const glz::generic& g) {
-    sol::state_view sv(L);
-    return std::visit(
-        [&](auto&& v) -> sol::object {
-            using T = std::decay_t<decltype(v)>;
-            if constexpr (std::is_null_pointer_v<T>) {
-                return sol::make_object(L, sol::nil);
-            } else if constexpr (std::is_same_v<T, glz::generic::array_t>) {
-                sol::table t = sol::table(L, sol::new_table());
-                for (size_t i = 0; i < v.size(); ++i) {
-                    t[i + 1] = json_to_sol(L, v[i]);
-                }
-                return sol::make_object(L, t);
-            } else if constexpr (std::is_same_v<T, glz::generic::object_t>) {
-                sol::table t = sol::table(L, sol::new_table());
-                for (const auto& [k, val] : v) {
-                    t[k] = json_to_sol(L, val);
-                }
-                return sol::make_object(L, t);
-            } else {
-                return sol::make_object(L, v); // double / string / bool
-            }
-        },
-        g.data);
-}
-
-glz::generic sol_to_json(const sol::object& o, int depth = 0) {
-    using glz::generic;
-    generic g;
-    if (depth > 64) { // ponytail: cyclic tables would recurse forever; cap and degrade
-        g.data = std::string("<too deep>");
-        return g;
-    }
-    switch (o.get_type()) {
-    case sol::type::lua_nil:
-        g.data = nullptr;
-        break;
-    case sol::type::boolean:
-        g.data = o.as<bool>();
-        break;
-    case sol::type::number:
-        g.data = o.as<double>();
-        break;
-    case sol::type::string:
-        g.data = o.as<std::string>();
-        break;
-    case sol::type::table: {
-        // array iff the keys are exactly 1..n
-        const sol::table t = o;
-        size_t n = 0;
-        bool array = true;
-        for (const auto& kv : t) {
-            ++n;
-            array = array && kv.first.get_type() == sol::type::number &&
-                    static_cast<long long>(kv.first.as<double>()) == static_cast<long long>(n);
-        }
-        if (n > 0 && array) {
-            auto& arr = g.data.emplace<generic::array_t>();
-            for (size_t i = 1; i <= n; ++i) {
-                arr.push_back(sol_to_json(t[i], depth + 1));
-            }
-        } else {
-            auto& obj = g.data.emplace<generic::object_t>();
-            for (const auto& kv : t) {
-                std::string key;
-                if (kv.first.get_type() == sol::type::number) {
-                    key = std::to_string(static_cast<long long>(kv.first.as<double>()));
-                } else if (kv.first.get_type() == sol::type::string) {
-                    key = kv.first.as<std::string>();
-                } else {
-                    continue; // non-scalar key is not representable in JSON
-                }
-                obj.insert({key, sol_to_json(kv.second, depth + 1)});
-            }
-        }
-        break;
-    }
-    default:
-        g.data = std::string("<unserializable>"); // functions/userdata: keep the envelope valid
-    }
-    return g;
-}
-
-// ---------------------------------------------------------------------------
-// curl
-// ---------------------------------------------------------------------------
-
-struct FetchSink {
-    std::string body;
-    std::map<std::string, std::string> headers; // keys lowercased, last wins
-};
-
-size_t on_body(char* ptr, size_t size, size_t nmemb, void* ud) {
-    static_cast<std::string*>(ud)->append(ptr, size * nmemb);
-    return size * nmemb;
-}
-
-size_t on_header(char* ptr, size_t size, size_t nmemb, void* ud) {
-    auto* headers = static_cast<std::map<std::string, std::string>*>(ud);
-    std::string_view line(ptr, size * nmemb);
-    while (!line.empty() && (line.back() == '\n' || line.back() == '\r')) {
-        line.remove_suffix(1);
-    }
-    const auto colon = line.find(':');
-    if (colon == std::string_view::npos) {
-        return size * nmemb; // status line or obs-fold continuation
-    }
-    std::string key(line.substr(0, colon));
-    std::string value(line.substr(colon + 1));
-    auto trim = [](std::string& s) {
-        const auto issp = [](unsigned char c) { return c == ' ' || c == '	'; };
-        while (!s.empty() && issp(s.front())) {
-            s.erase(s.begin());
-        }
-        while (!s.empty() && issp(s.back())) {
-            s.pop_back();
-        }
-    };
-    std::ranges::transform(key, key.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    trim(key);
-    trim(value);
-    if (!key.empty()) {
-        (*headers)[key] = std::move(value);
-    }
-    return size * nmemb;
-}
-
-using CurlPtr = std::unique_ptr<CURL, decltype(&curl_easy_cleanup)>;
-
-// The one synchronous fetch path: lua http.fetch and the wasm env.http_fetch
-// import both land here. Options pre-extracted by the caller; `error` empty on
-// success.
-struct FetchResult {
-    long status = 0;
-    std::string body;
-    std::map<std::string, std::string> headers;
-    std::string error;
-};
-
-FetchResult fetch_sync(const std::string& url, long timeout_ms, const std::string& profile, const std::string& method,
-                       const std::string& body, const std::string& accept_header, const std::string& ua_header,
-                       const std::vector<std::pair<std::string, std::string>>& extra_headers,
-                       const std::string& proxy) {
-    FetchResult out;
-    CurlPtr easy(curl_easy_init(), &curl_easy_cleanup);
-    if (!easy) {
-        out.error = "curl init failed";
-        return out;
-    }
-
-    FetchSink sink;
-    // One option block for both attempts: the retry path re-creates the
-    // handle, and headers/method/body must survive it (they did not before).
-    const auto setup = [&](const CurlPtr& e) {
-        curl_slist* hdrs = nullptr;
-        if (!accept_header.empty()) {
-            hdrs = curl_slist_append(hdrs, ("Accept: " + accept_header).c_str());
-        }
-        if (!ua_header.empty()) {
-            hdrs = curl_slist_append(hdrs, ("User-Agent: " + ua_header).c_str());
-        }
-        for (const auto& [k, v] : extra_headers) {
-            hdrs = curl_slist_append(hdrs, (k + ": " + v).c_str());
-        }
-        curl_easy_setopt(e.get(), CURLOPT_URL, url.c_str());
-        curl_easy_setopt(e.get(), CURLOPT_FOLLOWLOCATION, 1L);
-        curl_easy_setopt(e.get(), CURLOPT_WRITEFUNCTION, on_body);
-        curl_easy_setopt(e.get(), CURLOPT_WRITEDATA, &sink.body);
-        curl_easy_setopt(e.get(), CURLOPT_HEADERFUNCTION, on_header);
-        curl_easy_setopt(e.get(), CURLOPT_HEADERDATA, &sink.headers);
-        curl_easy_setopt(e.get(), CURLOPT_TIMEOUT_MS, std::max(1L, timeout_ms));
-        curl_easy_setopt(e.get(), CURLOPT_CAINFO, "/etc/ssl/certs/ca-certificates.crt");
-        applyProxy(e.get(), proxy); // host-wide; empty = direct
-        if (method != "GET") {
-            curl_easy_setopt(e.get(), CURLOPT_CUSTOMREQUEST, method.c_str());
-        }
-        if (!body.empty()) {
-            curl_easy_setopt(e.get(), CURLOPT_POSTFIELDS, body.c_str()); // lives as long as this call
-            curl_easy_setopt(e.get(), CURLOPT_POSTFIELDSIZE, static_cast<long>(body.size()));
-        }
-        if (hdrs) {
-            curl_easy_setopt(e.get(), CURLOPT_HTTPHEADER, hdrs); // freed with the handle's cache; lives this call
-        }
-        curl_easy_impersonate(e.get(), profile.c_str(), 1);
-    };
-    setup(easy);
-    // ponytail: this impersonate build intermittently fails TLS handshake
-    // (ECONNRESET) against MangaDex's LB; one fresh-handle retry removes it.
-    CURLcode rc = CURLE_OK;
-    for (int attempt = 0; attempt < 2; ++attempt) {
-        rc = curl_easy_perform(easy.get());
-        if (rc == CURLE_OK || rc != CURLE_SSL_CONNECT_ERROR) {
-            break;
-        }
-        easy.reset(curl_easy_init());
-        if (!easy) {
-            out.error = "curl re-init failed";
-            return out;
-        }
-        setup(easy);
-    }
-    if (rc != CURLE_OK) {
-        out.error = curl_easy_strerror(rc);
-        return out;
-    }
-
-    curl_easy_getinfo(easy.get(), CURLINFO_RESPONSE_CODE, &out.status);
-    out.body = std::move(sink.body);
-    out.headers = std::move(sink.headers);
-    return out;
 }
 
 // The wasm env.http_fetch service: the same option names the lua front takes,
@@ -362,238 +138,8 @@ wasm::HttpFetch make_wasm_fetch(const std::string& id, const Config& conf) {
     };
 }
 
-// ---------------------------------------------------------------------------
 // per-call instruction budget; the hook is process-global per calling thread
-// ---------------------------------------------------------------------------
-
-thread_local long long t_budget_left = 0;
-
-void count_hook(lua_State* L, lua_Debug* /*unused*/) {
-    if ((t_budget_left -= 1000) <= 0) {
-        luaL_error(L, "plugin instruction budget exhausted");
-    }
-}
-
-// ---------------------------------------------------------------------------
-// sandbox + host tools. Only base/string/table/math are opened; json is
-// host-provided (glaze) and io a read-only two-function shim. os, debug and
-// package are never opened.
-// ---------------------------------------------------------------------------
-
-void open_sandbox(lua_State* L) {
-    luaL_requiref(L, "_G", luaopen_base, 1);
-    lua_pop(L, 1);
-    luaL_requiref(L, LUA_STRLIBNAME, luaopen_string, 1);
-    lua_pop(L, 1);
-    luaL_requiref(L, LUA_TABLIBNAME, luaopen_table, 1);
-    lua_pop(L, 1);
-    luaL_requiref(L, LUA_MATHLIBNAME, luaopen_math, 1);
-    lua_pop(L, 1);
-}
-
-// Plugin state accessors: (plugin_id, key) -> value. Routed to the db worker
-// when one is attached; inline otherwise (tests).
-using StateGet = std::function<std::optional<std::string>(const std::string&, const std::string&)>;
-using StateSet = std::function<void(const std::string&, const std::string&, const std::string&)>;
-
-void install_host_tools(lua_State* L, const std::string& id, const Config& conf, const glz::generic& cfg, bool has_cfg,
-                        const StateGet& sget, const StateSet& sset, const std::string& dir) {
-    sol::state_view sv(L);
-
-    // Routed through the default logger, whose sinks include the queue sink
-    // feeding the log page (wired in main).
-    // fs.read: confined read-only access into this plugin's own folder (D5).
-    sol::table fs_tab = sv.create_named_table("fs");
-    fs_tab["read"] = [dir](const std::string& rel) -> std::optional<std::string> {
-        return fs_read(dir, rel);
-    };
-
-    sol::table log = sv.create_named_table("log");
-    log["info"] = [id](const std::string& msg) { spdlog::info("[plugin:{}] {}", id, msg); };
-    log["error"] = [id](const std::string& msg) { spdlog::error("[plugin:{}] {}", id, msg); };
-
-    sv.set_function("now", [] { return static_cast<long long>(std::time(nullptr)); });
-
-    // ponytail: io shim is read-only via istream; widen only when a plugin
-    // needs incremental reads (io.lines multi-arg / formats).
-    sol::table io = sv.create_named_table("io");
-    io["read"] = [] -> std::optional<std::string> {
-        std::string line;
-        if (std::getline(std::cin, line)) {
-            return line;
-        }
-        return std::nullopt;
-    };
-    io["lines"] = [](const std::string& path, sol::this_state ts) -> sol::object {
-        auto f = std::make_shared<std::ifstream>(path);
-        if (!*f) {
-            throw std::runtime_error("io.lines: cannot open " + path);
-        }
-        lua_State* L = ts;
-        return sol::make_object(L, [f] -> std::optional<std::string> {
-            std::string line;
-            if (std::getline(*f, line)) {
-                return line;
-            }
-            return std::nullopt; // iterator ends; the file closes with the closure
-        });
-    };
-
-    sol::table json = sv.create_named_table("json");
-    json["encode"] = [](const sol::object& o) { return dump_json(sol_to_json(o)); };
-    json["decode"] = [](const std::string& s, sol::this_state ts) -> sol::object {
-        glz::generic g;
-        if (auto ec = glz::read_json(g, s)) {
-            throw std::runtime_error("json.decode: invalid JSON");
-        }
-        lua_State* lstate = ts;
-        return json_to_sol(lstate, g);
-    };
-
-    // config.get: values from the plugin's own config.json, parsed once at load.
-    // Absent file or key -> nil; the sandbox itself stays file-read-free.
-    sol::table config = sv.create_named_table("config");
-    config["get"] = [&cfg, has_cfg](const std::string& key, sol::this_state ts) -> sol::object {
-        const auto* obj = std::get_if<glz::generic::object_t>(&cfg.data);
-        if (!has_cfg || obj == nullptr) {
-            return sol::make_object(ts, sol::lua_nil);
-        }
-        if (auto it = obj->find(key); it != obj->end()) {
-            return json_to_sol(ts, it->second);
-        }
-        return sol::make_object(ts, sol::lua_nil);
-    };
-
-    // storage.get/set: host-owned per-plugin state (tokens), db-backed, survives restarts.
-    sol::table storage = sv.create_named_table("storage");
-    storage["get"] = [id, sget](const std::string& key, sol::this_state ts) -> sol::object {
-        if (auto v = sget(id, key)) {
-            return sol::make_object(ts, *v);
-        }
-        return sol::make_object(ts, sol::lua_nil);
-    };
-    storage["set"] = [id, sset](const std::string& key, const std::string& val) { sset(id, key, val); };
-
-    // Blocking fetch on the calling (plugin-pool) worker; curl's own timeout
-    // guards the network half, the instruction hook the CPU half.
-    sol::table http = sv.create_named_table("http");
-    http["fetch"] = [id, timeout_ms = conf.fetch_timeout_ms, profile = conf.fetch_profile,
-                     proxy = conf.proxy](
-                        const std::string& url, const sol::optional<sol::table>& opts,
-                        sol::this_state ts) -> std::pair<sol::object, std::optional<std::string>> {
-        const auto fail = [&](std::string why) {
-            spdlog::warn("[plugin:{}] fetch {} failed: {}", id, url, why);
-            return std::make_pair(sol::make_object(ts, sol::lua_nil), std::optional(std::move(why)));
-        };
-
-        long ms = timeout_ms;
-        std::string profile_name = profile;
-        std::string method = "GET";
-        std::string body;
-        std::string accept_header; // optional per-call Accept override
-        std::string ua_header;     // optional per-call User-Agent override
-        std::vector<std::pair<std::string, std::string>> extra_headers;
-        if (opts) {
-            if (sol::object v = (*opts)["timeout_ms"]; v.get_type() == sol::type::number) {
-                ms = static_cast<long>(v.as<double>());
-            }
-            if (sol::object v = (*opts)["profile"]; v.get_type() == sol::type::string) {
-                profile_name = v.as<std::string>();
-            }
-            if (sol::object v = (*opts)["method"]; v.get_type() == sol::type::string) {
-                method = v.as<std::string>();
-            }
-            if (sol::object v = (*opts)["body"]; v.get_type() == sol::type::string) {
-                body = v.as<std::string>();
-            }
-            if (sol::object v = (*opts)["accept"]; v.get_type() == sol::type::string) {
-                accept_header = v.as<std::string>();
-            }
-            if (sol::object v = (*opts)["user_agent"]; v.get_type() == sol::type::string) {
-                ua_header = v.as<std::string>();
-            }
-            if (sol::object v = (*opts)["headers"]; v.get_type() == sol::type::table) {
-                v.as<sol::table>().for_each([&](sol::object k, sol::object val) {
-                    if (k.get_type() == sol::type::string && val.get_type() == sol::type::string) {
-                        extra_headers.emplace_back(k.as<std::string>(), val.as<std::string>());
-                    }
-                });
-            }
-        }
-
-        CurlPtr easy(curl_easy_init(), &curl_easy_cleanup);
-        if (!easy) {
-            return fail("curl init failed");
-        }
-
-        FetchSink sink;
-        // One option block for both attempts: the retry path re-creates the
-        // handle, and headers/method/body must survive it (they did not before).
-        const auto setup = [&](const CurlPtr& e) {
-            curl_slist* hdrs = nullptr;
-            if (!accept_header.empty()) {
-                hdrs = curl_slist_append(hdrs, ("Accept: " + accept_header).c_str());
-            }
-            if (!ua_header.empty()) {
-                hdrs = curl_slist_append(hdrs, ("User-Agent: " + ua_header).c_str());
-            }
-            for (const auto& [k, v] : extra_headers) {
-                hdrs = curl_slist_append(hdrs, (k + ": " + v).c_str());
-            }
-            curl_easy_setopt(e.get(), CURLOPT_URL, url.c_str());
-            curl_easy_setopt(e.get(), CURLOPT_FOLLOWLOCATION, 1L);
-            curl_easy_setopt(e.get(), CURLOPT_WRITEFUNCTION, on_body);
-            curl_easy_setopt(e.get(), CURLOPT_WRITEDATA, &sink.body);
-            curl_easy_setopt(e.get(), CURLOPT_HEADERFUNCTION, on_header);
-            curl_easy_setopt(e.get(), CURLOPT_HEADERDATA, &sink.headers);
-            curl_easy_setopt(e.get(), CURLOPT_TIMEOUT_MS, std::max(1L, ms));
-            curl_easy_setopt(e.get(), CURLOPT_CAINFO, "/etc/ssl/certs/ca-certificates.crt");
-            applyProxy(e.get(), proxy); // host-wide; empty = direct
-            if (method != "GET") {
-                curl_easy_setopt(e.get(), CURLOPT_CUSTOMREQUEST, method.c_str());
-            }
-            if (!body.empty()) {
-                curl_easy_setopt(e.get(), CURLOPT_POSTFIELDS, body.c_str()); // lives as long as this call
-                curl_easy_setopt(e.get(), CURLOPT_POSTFIELDSIZE, static_cast<long>(body.size()));
-            }
-            if (hdrs) {
-                curl_easy_setopt(e.get(), CURLOPT_HTTPHEADER, hdrs); // freed with the handle's cache; lives this call
-            }
-            curl_easy_impersonate(e.get(), profile_name.c_str(), 1);
-        };
-        setup(easy);
-        // ponytail: this impersonate build intermittently fails TLS handshake
-        // (ECONNRESET) against MangaDex's LB; one fresh-handle retry removes it.
-        CURLcode rc = CURLE_OK;
-        for (int attempt = 0; attempt < 2; ++attempt) {
-            rc = curl_easy_perform(easy.get());
-            if (rc == CURLE_OK || rc != CURLE_SSL_CONNECT_ERROR) {
-                break;
-            }
-            easy.reset(curl_easy_init());
-            if (!easy) {
-                return fail("curl re-init failed");
-            }
-            setup(easy);
-        }
-        if (rc != CURLE_OK) {
-            return fail(curl_easy_strerror(rc));
-        }
-
-        long code = 0;
-        curl_easy_getinfo(easy.get(), CURLINFO_RESPONSE_CODE, &code);
-
-        sol::table out = sol::table(ts.lua_state(), sol::new_table());
-        out["status"] = static_cast<long long>(code);
-        out["body"] = sink.body;
-        sol::table hh = sol::table(ts.lua_state(), sol::new_table());
-        for (const auto& [k, v] : sink.headers) {
-            hh[k] = v;
-        }
-        out["headers"] = sol::make_object(ts, hh);
-        return {sol::make_object(ts, out), std::nullopt};
-    };
-} // anonymous namespace
+// --------------------------------------------------------------------------- // anonymous namespace
 
 // Per-plugin runtime holder, variant-ready: the loader engages the member
 // matching info.runtime ("lua" today; wasm/js add their state beside it and a
@@ -631,15 +177,21 @@ struct Manifest {
 // ---------------------------------------------------------------------------
 
 // Raw reply handed back to the core: the plugin's return value marshaled
-// as-is, shape-checked later. When the entry never produced one, invoked is
-// false and error carries the host-side diagnostic (already logged).
-// The struct itself lives in wasm_rt.hpp (plugin::wasm::RawReply) so the wasm
-// seam can fill it too; this alias keeps the lua path's spelling.
-using RawReply = wasm::RawReply;
+// as-is, shape-checked later (plugin::RawReply, runtime_common.hpp). When the
+// entry never produced one, invoked is false and error carries the
+// host-side diagnostic (already logged).
 
 // lua seam: materialize the envelope as lua values, invoke handle, marshal
 // the reply back to JSON. Lua-level failures (exception, budget) are logged
 // here; the reply value itself always reaches the core's shape check.
+thread_local long long t_budget_left = 0;
+
+void count_hook(lua_State* L, lua_Debug* /*unused*/) {
+    if ((t_budget_left -= 1000) <= 0) {
+        luaL_error(L, "plugin instruction budget exhausted");
+    }
+}
+
 RawReply lua_call_entry(const Runtime& rt, const std::string& method, long instruction_budget,
                         const glz::generic& envelope) {
     RawReply out;

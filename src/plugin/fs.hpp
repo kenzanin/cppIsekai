@@ -1,8 +1,12 @@
 #pragma once
-// plugin::fs_read -- confined, read-only file access for plugin runtimes.
-// Resolves `rel` under `dir` lexically; paths escaping the root (.. beyond it,
-// absolute paths) and non-regular files yield nullopt. Symlink escape is
-// tolerated in v1 (ponytail: realpath audit if a plugin ever needs it).
+
+/** \file fs.hpp
+ *  \brief Confined, read-only file access for plugin runtimes.
+ *
+ *  Resolves `rel` under `dir` lexically; paths escaping the root (.. beyond
+ *  it, absolute paths) and non-regular files yield nullopt. Symlink escape is
+ *  tolerated in v1 (ponytail: realpath audit if a plugin ever needs it). */
+
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -11,6 +15,8 @@
 
 namespace plugin {
 
+/** \brief Read \p rel under \p dir; nullopt when outside the root or
+ *  non-regular. */
 inline std::optional<std::string> fs_read(const std::filesystem::path& dir, const std::string& rel) {
     namespace fs = std::filesystem;
     if (rel.empty()) {

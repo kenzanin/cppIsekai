@@ -1,15 +1,20 @@
 #pragma once
-// Background prefetch worker (image-cache 3.3): ONE thread, no timer -- it
-// only ever wakes on a nudge from POST /reader/position or /chapter/<id>/skip.
-// The endpoint has already re-run the window against the new state; it hands
-// the resulting urls over and the worker walks them in order through
-// cache::ensure, which IS the delta filter (hit: on disk, no fetch; miss: one
-// fetch) -- sequential, on the shared img pool with /cache/img, concurrent-
-// miss dedup included. Layout v2 (D5): each batch also carries the window
-// context {plugin, slug, chapter}; when complete (and the url has an
-// extension) the file lands at <plugin>/<slug>/chNNN/pNNN.<ext> via
-// rel_path, otherwise the exact old sha fallback. Nothing here touches
-// routes or state: the queue is the only worker state, newest list wins.
+
+/** \file worker.hpp
+ *  \brief Background prefetch worker (image-cache 3.3): ONE thread, no
+ *  timer -- it only ever wakes on a nudge from POST /reader/position or
+ *  /chapter/<id>/skip.
+ *
+ *  The endpoint has already re-run the window against the new state; it hands
+ *  the resulting urls over and the worker walks them in order through
+ *  cache::ensure, which IS the delta filter (hit: on disk, no fetch; miss:
+ *  one fetch) -- sequential, on the shared img pool with /cache/img,
+ *  concurrent-miss dedup included. Layout v2 (D5): each batch also carries
+ *  the window context {plugin, slug, chapter}; when complete (and the url has
+ *  an extension) the file lands at <plugin>/<slug>/chNNN/pNNN.<ext> via
+ *  rel_path, otherwise the exact old sha fallback. Nothing here touches
+ *  routes or state: the queue is the only worker state, newest list wins. */
+
 #include "cache/cache.hpp"
 
 #include <cctype>
@@ -22,18 +27,19 @@
 
 namespace reader {
 
-// Placement context for one window batch: the reader knows plugin, slug (D5)
-// and the chapter number the window belongs to; the page number is the
-// 1-based position of the url within the batch. Empty fields force the sha
-// fallback, so http.cpp (no ctx today) writes byte-identical v1 paths.
+/** \brief Placement context for one window batch: the reader knows plugin,
+ *  slug (D5) and the chapter number the window belongs to; the page number is
+ *  the 1-based position of the url within the batch. Empty fields force the
+ *  sha fallback, so http.cpp (no ctx today) writes byte-identical v1 paths. */
 struct WindowCtx {
     std::string plugin;
     std::string slug;
     int chapter{}; // 1-based chapter number; 0 = unknown
 };
 
-// <plugin>/<slug>/chNNN/pNNN.<ext> from the ctx + the url's 1-based window
-// position; empty when any piece is missing -> the exact old sha path.
+/** \brief <plugin>/<slug>/chNNN/pNNN.<ext> from \p ctx + the url's 1-based
+ *  window position; empty when any piece is missing -> the exact old sha
+ *  path. */
 inline std::string rel_path(const WindowCtx& ctx, int page, const std::string& url) {
     if (ctx.plugin.empty() || ctx.slug.empty() || ctx.chapter < 1 || page < 1)
         return {};
@@ -64,10 +70,11 @@ public:
     Worker(const Worker&) = delete;
     Worker& operator=(const Worker&) = delete;
 
-    // Event: queue the freshest window. Coalesces -- a pending list is
-    // replaced, re-run semantics (only the latest position/skip matters).
-    // ctx optional: structured placement when plugin/slug/chapter are known
-    // (2.1), otherwise the exact old sha fallback.
+    /** \brief Event: queue the freshest window. Coalesces -- a pending list
+     *  is replaced, re-run semantics (only the latest position/skip matters).
+     *
+     *  ctx optional: structured placement when plugin/slug/chapter are known
+     *  (2.1), otherwise the exact old sha fallback. */
     void nudge(std::vector<std::string> urls, WindowCtx ctx = {}) {
         {
             const std::lock_guard lock(mu_);
@@ -77,8 +84,8 @@ public:
         cv_.notify_one();
     }
 
-    // Graceful stop: drain whatever is queued, finish the running batch, join.
-    // Idempotent; the destructor calls it.
+    /** \brief Graceful stop: drain whatever is queued, finish the running
+     *  batch, join. Idempotent; the destructor calls it. */
     void stop() {
         {
             const std::lock_guard lock(mu_);

@@ -1,0 +1,25 @@
+# code-loc audit, post-split -- D1b metric (comments/blank stripped), same
+# pipeline as baseline-codeloc.txt.
+#
+# baseline (pre-split): plugin.cpp 835, http.cpp 467, wasm_rt.cpp 280,
+#   js_rt.cpp 225, config.hpp 185*, cache.cpp 177*
+#   (* = already sub-200; 4.x umbrella-splits pruned per task 1.0)
+#
+# measured after the 5.x doc pass (comments never count):
+src/plugin/plugin.cpp                  555 raw / 453 code  (Host core: envelope/health/dispatch/load_all; documented >200 exception, large fns whole)
+src/plugin/http_client.cpp             118 raw / 105 code
+src/plugin/lua/bridge.cpp               88 raw /  83 code
+src/plugin/lua/lua_runtime.cpp         173 raw / 144 code
+src/plugin/wasm/wasm_rt.cpp             90 raw /  73 code
+src/plugin/wasm/wasm_load.cpp          272 raw / 211 code
+src/plugin/js/js_rt.cpp                113 raw /  97 code
+src/plugin/js/js_bindings.cpp          161 raw / 137 code
+src/http/http.cpp                       85 raw /  62 code
+src/http/http_pages.cpp                110 raw /  91 code
+src/http/http_api.cpp                 365 raw / 305 code
+src/config/config.hpp                 238 raw / 185 code  (<200: 4.1 no-split per prune)
+src/cache/cache.cpp                   220 raw / 177 code  (<200: 4.2 no-split per prune)
+
+Every split unit lands <= 211 code-loc except the two documented cores:
+plugin.cpp (entry/health/load_all stay whole) and http_api.cpp (route
+handlers stay whole per design D3).
