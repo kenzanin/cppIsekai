@@ -1,4 +1,5 @@
 #include "plugin.hpp"
+#include "fs.hpp"
 
 #include "store/store.hpp"
 
@@ -236,11 +237,17 @@ using StateGet = std::function<std::optional<std::string>(const std::string&, co
 using StateSet = std::function<void(const std::string&, const std::string&, const std::string&)>;
 
 void install_host_tools(lua_State* L, const std::string& id, const Config& conf, const glz::generic& cfg, bool has_cfg,
-                        const StateGet& sget, const StateSet& sset) {
+                        const StateGet& sget, const StateSet& sset, const std::string& dir) {
     sol::state_view sv(L);
 
     // Routed through the default logger, whose sinks include the queue sink
     // feeding the log page (wired in main).
+    // fs.read: confined read-only access into this plugin's own folder (D5).
+    sol::table fs_tab = sv.create_named_table("fs");
+    fs_tab["read"] = [dir](const std::string& rel) -> std::optional<std::string> {
+        return fs_read(dir, rel);
+    };
+
     sol::table log = sv.create_named_table("log");
     log["info"] = [id](const std::string& msg) { spdlog::info("[plugin:{}] {}", id, msg); };
     log["error"] = [id](const std::string& msg) { spdlog::error("[plugin:{}] {}", id, msg); };
@@ -626,7 +633,7 @@ int Host::load_all(Store& store) {
         }
         rt.lua = {L, &lua_close};
         open_sandbox(L);
-        install_host_tools(L, rt.info.id, conf_, rt.cfg, rt.has_cfg, sget, sset);
+        install_host_tools(L, rt.info.id, conf_, rt.cfg, rt.has_cfg, sget, sset, rt.info.dir);
         // Entry scripts return nothing; run them, check validity explicitly.
         const sol::protected_function_result script =
             sol::state_view(L).safe_script_file((fs::path(rt.info.dir) / rt.info.entry).string());

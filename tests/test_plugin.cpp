@@ -171,3 +171,42 @@ TEST_CASE("health: last call outcome per plugin") {
         CHECK(host.health("ghost").ok);
     }
 }
+
+TEST_CASE("fs.read: confined read-only plugin file access") {
+    namespace fs = std::filesystem;
+    const auto base = fs::temp_directory_path() / "cppisekai_fsread_test";
+    fs::remove_all(base);
+    fs::create_directories(base / "sub");
+    {
+        std::ofstream o(base / "config.json");
+        o << "{\"k\":1}";
+    }
+    {
+        std::ofstream o(base / "sub" / "nested.txt");
+        o << "nested";
+    }
+
+    CHECK(plugin::fs_read(base, "config.json").value_or("!") == "{\"k\":1}");
+    CHECK(plugin::fs_read(base, "sub/nested.txt").value_or("!") == "nested");
+    CHECK(plugin::fs_read(base, "./sub/../config.json").value_or("!") == "{\"k\":1}");
+    CHECK(plugin::fs_read(base, "missing.txt") == std::nullopt);
+    CHECK(plugin::fs_read(base, "../outside") == std::nullopt);
+    CHECK(plugin::fs_read(base, "/etc/hostname") == std::nullopt);
+    CHECK(plugin::fs_read(base, "") == std::nullopt);
+    CHECK(plugin::fs_read(base, "sub") == std::nullopt);  // directory, not a regular file
+
+    // Lua binding end-to-end: fixture plugin reads its own entry file.
+    LogSetup ls;
+    Store store("test_fsread.db");
+    plugin::Host host(test_conf());
+    host.load_all(store);
+    const std::string res = host.call("fsread", "ping", "{}");
+    CHECK(res.find("\"ok\":true") != std::string::npos);
+    CHECK(res.find("\"len\"") != std::string::npos);
+    const std::string esc = host.call("fsread", "escape", "{}");
+    CHECK(esc.find("\"gone\":true") != std::string::npos);
+
+    fs::remove_all(base);
+    std::error_code ec;
+    fs::remove("test_fsread.db", ec);
+}

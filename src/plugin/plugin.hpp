@@ -1,4 +1,6 @@
 #pragma once
+
+#include "fs.hpp" // plugin::fs_read -- confined read-only file helper (also drags <filesystem>/<fstream> for embedders)
 // Plugin discovery, Lua sandbox, host tools, ABI envelope dispatch.
 // Layout: one folder per plugin under Config::dir with main.json (manifest),
 // the entry script (main.lua) and an optional logo file.
