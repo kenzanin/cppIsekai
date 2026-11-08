@@ -15,4 +15,4 @@
 
 ## 4. Verification
 - [x] 4.1 ctest full suite green; `openspec validate`
-- [ ] 4.2 smoke: boot with pre-populated legacy `img/` folder → purge message in log + fresh structured writes; export slug whose pages exist → downloadable zip; window probe writes land structured
+- [x] 4.2 smoke: boot with pre-populated legacy `img/` folder → purge message in log + fresh structured writes; export slug whose pages exist → downloadable zip; window probe writes land structured
