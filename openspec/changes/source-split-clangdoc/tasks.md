@@ -2,9 +2,10 @@
 
 ## 1. plugin module split
 
-- [ ] 1.1 Extract the lua layer: `plugin_lua.cpp` + internal `lua_bridge.hpp` (bridges, sandbox, host tools, budget hook, `lua_call_entry`); split `lua_bridge.cpp` out too if the unit lands >300 (pre-approved, design D2)
-- [ ] 1.2 Extract the sync http client: `http_client.cpp` + internal `http_client.hpp` (`FetchResult`, sinks, `fetch_sync`, `applyProxy`, `make_wasm_fetch`); interim home until `fetch-gate`
-- [ ] 1.3 Slim `plugin.cpp` to the Host core; wire CMake source lists; full ctest green
+- [ ] 1.1 Hoist shared runtime types: `RawReply` + `Services` from `wasm_rt.hpp` -> new `src/plugin/runtime_common.hpp`; `plugin.cpp`, wasm, js include it
+- [ ] 1.2 Extract the lua layer under `src/plugin/lua/`: `lua_runtime.cpp` + internal `bridge.{hpp,cpp}` (bridges, sandbox, host tools, budget hook, `lua_call_entry`); split `bridge.cpp` further if the unit lands >300 (pre-approved, design D2)
+- [ ] 1.3 Extract the sync http client: `src/plugin/http_client.{hpp,cpp}` (`FetchResult`, sinks, `fetch_sync`, `applyProxy`, `make_wasm_fetch`); root-level, interim home until `fetch-gate`
+- [ ] 1.4 Slim `plugin.cpp` to the Host core (stays at `src/plugin/` root); wire CMake source lists; full ctest green
 
 ## 2. http module split
 
@@ -12,8 +13,8 @@
 
 ## 3. runtime seams
 
-- [ ] 3.1 `wasm_rt.cpp` -> `wasm_rt.cpp` (invoke/guest_mem) + `wasm_load.cpp` (dtor/load/imports); ctest green
-- [ ] 3.2 `js_rt.cpp` -> `js_rt.cpp` (load/invoke/lifecycle) + `js_bindings.cpp` (C callbacks + bind helper); ctest green
+- [ ] 3.1 wasm -> `src/plugin/wasm/`: `wasm_rt.{hpp,cpp}` (invoke/guest_mem) + `wasm_load.cpp` (dtor/load/imports); ctest green
+- [ ] 3.2 js -> `src/plugin/js/`: `js_rt.{hpp,cpp}` (load/invoke/lifecycle) + `js_bindings.cpp` (C callbacks + bind helper); ctest green
 
 ## 4. config & cache
 
