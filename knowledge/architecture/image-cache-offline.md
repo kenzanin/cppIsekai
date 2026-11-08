@@ -1,9 +1,9 @@
 ---
 type: decision
 title: cppIsekai image-cache + offline-first pathway
-description: "CHANGE cache-layout mid-flight 2026-11-08: 4/9 landed (slug.hpp, Cache rel_path v2 + tree-walk evict + purge-once, worker structured <plugin>/<slug>/chNNN/pNNN with sha fallback), git rectified (cli-config merged to main ff80746; cache-layout rebased onto main). Pending 2.2/3.1/3.2/review/4.x."
-tags: [rewrite, cache, offline, proxy, stale, reader, mangadex, cache-layout, wip]
-generated: { by: agent/mcp, at: "2026-11-07T20:28:51Z" }
+description: "cppIsekai image-cache + offline-first pathway -- cache-layout sub-change COMPLETE 2026-11-08 (9/9 tasks, openspec all_done, ctest 10/10 green, live smoke verified legacy purge + CBZ export)."
+tags: [rewrite, cache, offline, proxy, stale, reader, mangadex, cache-layout, cbz-export]
+generated: { by: agent/mcp, at: "2026-11-08T00:41:36Z" }
 status: stable
 ---
 
