@@ -210,3 +210,37 @@ TEST_CASE("fs.read: confined read-only plugin file access") {
     std::error_code ec;
     fs::remove("test_fsread.db", ec);
 }
+
+TEST_CASE("wasm runtime: ABI call over wasm3") {
+    LogSetup ls;
+    Store store("test_wasm.db");
+    plugin::Host host(test_conf());
+    host.load_all(store);
+
+    const std::string res = host.call("wasmfix", "ping", "{}");
+    CHECK(res.find("\"ok\":true") != std::string::npos);
+    CHECK(res.find("\"wasm\":\"pong\"") != std::string::npos);
+    CHECK(host.health("wasmfix").ok);
+}
+
+TEST_CASE("wasm runtime: broken module loads as absent") {
+    LogSetup ls;
+    Store store("test_wasmbad.db");
+    plugin::Host host(test_conf());
+    host.load_all(store);
+
+    // wasmbad fails wasm parse => not registered; wasmfix in the same scan is.
+    CHECK(host.call("wasmbad", "x", "{}").find("no plugin 'wasmbad'") != std::string::npos);
+    CHECK(host.call("wasmfix", "ping", "{}").find("\"ok\":true") != std::string::npos);
+}
+
+TEST_CASE("wasm runtime: gas trap maps to ok:false") {
+    LogSetup ls;
+    Store store("test_wasmspin.db");
+    plugin::Host host(test_conf());
+    host.load_all(store);
+
+    const std::string res = host.call("wasmspin", "x", "{}");
+    CHECK(res.find("\"ok\":false") != std::string::npos);
+    CHECK_FALSE(host.health("wasmspin").ok);
+}

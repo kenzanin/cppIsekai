@@ -1,5 +1,6 @@
 #include "plugin.hpp"
 #include "fs.hpp"
+#include "wasm_rt.hpp"
 
 #include "store/store.hpp"
 
@@ -201,6 +202,164 @@ size_t on_header(char* ptr, size_t size, size_t nmemb, void* ud) {
 }
 
 using CurlPtr = std::unique_ptr<CURL, decltype(&curl_easy_cleanup)>;
+
+// The one synchronous fetch path: lua http.fetch and the wasm env.http_fetch
+// import both land here. Options pre-extracted by the caller; `error` empty on
+// success.
+struct FetchResult {
+    long status = 0;
+    std::string body;
+    std::map<std::string, std::string> headers;
+    std::string error;
+};
+
+FetchResult fetch_sync(const std::string& url, long timeout_ms, const std::string& profile, const std::string& method,
+                       const std::string& body, const std::string& accept_header, const std::string& ua_header,
+                       const std::vector<std::pair<std::string, std::string>>& extra_headers,
+                       const std::string& proxy) {
+    FetchResult out;
+    CurlPtr easy(curl_easy_init(), &curl_easy_cleanup);
+    if (!easy) {
+        out.error = "curl init failed";
+        return out;
+    }
+
+    FetchSink sink;
+    // One option block for both attempts: the retry path re-creates the
+    // handle, and headers/method/body must survive it (they did not before).
+    const auto setup = [&](const CurlPtr& e) {
+        curl_slist* hdrs = nullptr;
+        if (!accept_header.empty()) {
+            hdrs = curl_slist_append(hdrs, ("Accept: " + accept_header).c_str());
+        }
+        if (!ua_header.empty()) {
+            hdrs = curl_slist_append(hdrs, ("User-Agent: " + ua_header).c_str());
+        }
+        for (const auto& [k, v] : extra_headers) {
+            hdrs = curl_slist_append(hdrs, (k + ": " + v).c_str());
+        }
+        curl_easy_setopt(e.get(), CURLOPT_URL, url.c_str());
+        curl_easy_setopt(e.get(), CURLOPT_FOLLOWLOCATION, 1L);
+        curl_easy_setopt(e.get(), CURLOPT_WRITEFUNCTION, on_body);
+        curl_easy_setopt(e.get(), CURLOPT_WRITEDATA, &sink.body);
+        curl_easy_setopt(e.get(), CURLOPT_HEADERFUNCTION, on_header);
+        curl_easy_setopt(e.get(), CURLOPT_HEADERDATA, &sink.headers);
+        curl_easy_setopt(e.get(), CURLOPT_TIMEOUT_MS, std::max(1L, timeout_ms));
+        curl_easy_setopt(e.get(), CURLOPT_CAINFO, "/etc/ssl/certs/ca-certificates.crt");
+        applyProxy(e.get(), proxy); // host-wide; empty = direct
+        if (method != "GET") {
+            curl_easy_setopt(e.get(), CURLOPT_CUSTOMREQUEST, method.c_str());
+        }
+        if (!body.empty()) {
+            curl_easy_setopt(e.get(), CURLOPT_POSTFIELDS, body.c_str()); // lives as long as this call
+            curl_easy_setopt(e.get(), CURLOPT_POSTFIELDSIZE, static_cast<long>(body.size()));
+        }
+        if (hdrs) {
+            curl_easy_setopt(e.get(), CURLOPT_HTTPHEADER, hdrs); // freed with the handle's cache; lives this call
+        }
+        curl_easy_impersonate(e.get(), profile.c_str(), 1);
+    };
+    setup(easy);
+    // ponytail: this impersonate build intermittently fails TLS handshake
+    // (ECONNRESET) against MangaDex's LB; one fresh-handle retry removes it.
+    CURLcode rc = CURLE_OK;
+    for (int attempt = 0; attempt < 2; ++attempt) {
+        rc = curl_easy_perform(easy.get());
+        if (rc == CURLE_OK || rc != CURLE_SSL_CONNECT_ERROR) {
+            break;
+        }
+        easy.reset(curl_easy_init());
+        if (!easy) {
+            out.error = "curl re-init failed";
+            return out;
+        }
+        setup(easy);
+    }
+    if (rc != CURLE_OK) {
+        out.error = curl_easy_strerror(rc);
+        return out;
+    }
+
+    curl_easy_getinfo(easy.get(), CURLINFO_RESPONSE_CODE, &out.status);
+    out.body = std::move(sink.body);
+    out.headers = std::move(sink.headers);
+    return out;
+}
+
+// The wasm env.http_fetch service: the same option names the lua front takes,
+// JSON-encoded; the lua-shaped result ({status, body, headers}) as JSON back.
+// nullopt = fetch failure (the import reports -1).
+wasm::HttpFetch make_wasm_fetch(const std::string& id, const Config& conf) {
+    return [id, timeout_ms = conf.fetch_timeout_ms, profile = conf.fetch_profile, proxy = conf.proxy](
+               const std::string& url, const std::string& opts_json) -> std::optional<std::string> {
+        long ms = timeout_ms;
+        std::string profile_name = profile;
+        std::string method = "GET";
+        std::string body;
+        std::string accept_header;
+        std::string ua_header;
+        std::vector<std::pair<std::string, std::string>> extra_headers;
+
+        glz::generic o;
+        if (auto ec = glz::read_json(o, opts_json); !ec) {
+            if (const auto* obj = std::get_if<glz::generic::object_t>(&o.data)) {
+                const auto num = [&](const char* key, long& dst) {
+                    if (const auto* v = member(obj, key)) {
+                        if (const auto* d = std::get_if<double>(&v->data)) {
+                            dst = static_cast<long>(*d);
+                        }
+                    }
+                };
+                const auto str = [&](const char* key, std::string& dst) {
+                    if (const auto* v = member(obj, key)) {
+                        if (const auto* s = std::get_if<std::string>(&v->data)) {
+                            dst = *s;
+                        }
+                    }
+                };
+                num("timeout_ms", ms);
+                str("profile", profile_name);
+                str("method", method);
+                str("body", body);
+                str("accept", accept_header);
+                str("user_agent", ua_header);
+                if (const auto* h = member(obj, "headers")) {
+                    if (const auto* ho = std::get_if<glz::generic::object_t>(&h->data)) {
+                        for (const auto& [k, v] : *ho) {
+                            if (const auto* s = std::get_if<std::string>(&v.data)) {
+                                extra_headers.emplace_back(k, *s);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        const FetchResult fr = fetch_sync(url, ms, profile_name, method, body, accept_header, ua_header,
+                                          extra_headers, proxy);
+        if (!fr.error.empty()) {
+            spdlog::warn("[plugin:{}] fetch {} failed: {}", id, url, fr.error);
+            return std::nullopt;
+        }
+        glz::generic out;
+        auto& obj = out.data.emplace<glz::generic::object_t>();
+        glz::generic status;
+        status.data = static_cast<double>(fr.status);
+        obj.insert({"status", std::move(status)});
+        glz::generic body_v;
+        body_v.data = std::move(fr.body);
+        obj.insert({"body", std::move(body_v)});
+        glz::generic headers;
+        auto& hh = headers.data.emplace<glz::generic::object_t>();
+        for (auto&& [k, v] : fr.headers) {
+            glz::generic val;
+            val.data = v;
+            hh.insert({k, std::move(val)});
+        }
+        obj.insert({"headers", std::move(headers)});
+        return dump_json(out);
+    };
+}
 
 // ---------------------------------------------------------------------------
 // per-call instruction budget; the hook is process-global per calling thread
@@ -448,6 +607,9 @@ struct Runtime {
 
     // lua backend (info.runtime == "lua")
     std::unique_ptr<lua_State, decltype(&lua_close)> lua{nullptr, &lua_close};
+
+    // wasm backend (info.runtime == "wasm"): loaded module + host services.
+    std::unique_ptr<wasm::Instance> wasm;
 };
 
 // Manifest; optional members may be absent, the rest are required by glaze.
@@ -467,11 +629,9 @@ struct Manifest {
 // Raw reply handed back to the core: the plugin's return value marshaled
 // as-is, shape-checked later. When the entry never produced one, invoked is
 // false and error carries the host-side diagnostic (already logged).
-struct RawReply {
-    bool invoked = false;
-    std::string error;
-    glz::generic reply;
-};
+// The struct itself lives in wasm_rt.hpp (plugin::wasm::RawReply) so the wasm
+// seam can fill it too; this alias keeps the lua path's spelling.
+using RawReply = wasm::RawReply;
 
 // lua seam: materialize the envelope as lua values, invoke handle, marshal
 // the reply back to JSON. Lua-level failures (exception, budget) are logged
@@ -513,6 +673,37 @@ RawReply lua_call_entry(const Runtime& rt, const std::string& method, long instr
     // wrapper level does not eat one rung of the cyclic-table depth budget.
     out.reply = sol_to_json(r, -1);
     return out;
+}
+
+// The response-shape gate, shared by every backend: {"ok":bool} plus the
+// ok=true "data" contract, exactly as the core pinned it. Returns the wire
+// response; nullopt with `error` set when the shape is rejected (the warning
+// carries plugin/method context).
+std::optional<std::string> checked_reply(const glz::generic& reply, const std::string& id, const std::string& method,
+                                         std::string& error) {
+    const auto* obj = std::get_if<glz::generic::object_t>(&reply.data);
+    if (obj == nullptr) {
+        spdlog::warn("[plugin:{}] {}: malformed response (non-table)", id, method);
+        error = "malformed response: not a table";
+        return std::nullopt;
+    }
+    const glz::generic* okv = member(obj, "ok");
+    if (okv == nullptr || std::get_if<bool>(&okv->data) == nullptr) {
+        spdlog::warn("[plugin:{}] {}: malformed response (missing ok)", id, method);
+        error = "malformed response: missing ok";
+        return std::nullopt;
+    }
+    if (!*std::get_if<bool>(&okv->data)) {
+        const glz::generic* ev = member(obj, "error");
+        const bool is_str = ev != nullptr && std::get_if<std::string>(&ev->data) != nullptr;
+        const std::string msg = is_str ? std::get<std::string>(ev->data) : std::string("plugin error");
+        spdlog::warn("[plugin:{}] {} returned error: {}", id, method, msg);
+        error = msg;
+        return std::nullopt;
+    }
+    static const glz::generic null_v;
+    const glz::generic* data = member(obj, "data");
+    return R"({"ok":true,"data":)" + dump_json(data ? *data : null_v) + "}";
 }
 } // namespace
 
@@ -594,7 +785,13 @@ int Host::load_all(Store& store) {
         rt.info.version = m.version;
         rt.info.runtime = m.runtime;
         rt.info.api = m.api;
-        rt.info.entry = m.entry.value_or("main.lua");
+        const char* default_ext = "lua";
+        if (m.runtime == "wasm") {
+            default_ext = "wasm";
+        } else if (m.runtime == "js") {
+            default_ext = "js";
+        }
+        rt.info.entry = m.entry.value_or(std::string("main.") + default_ext);
         if (m.capabilities) {
             rt.info.capabilities = *m.capabilities;
         }
@@ -613,8 +810,10 @@ int Host::load_all(Store& store) {
             }
         }
 
-        if (m.runtime != "lua") {
-            spdlog::warn("plugin {}: runtime '{}' not loadable (host loads: lua)", rt.info.id, m.runtime);
+        const bool is_lua = m.runtime == "lua";
+        const bool is_wasm = m.runtime == "wasm";
+        if (!is_lua && !is_wasm) {
+            spdlog::warn("plugin {}: runtime '{}' not loadable (host loads: lua, wasm)", rt.info.id, m.runtime);
             continue;
         }
         if (m.api > kHostApi) {
@@ -626,25 +825,42 @@ int Host::load_all(Store& store) {
             continue;
         }
 
-        lua_State* L = luaL_newstate();
-        if (L == nullptr) {
-            spdlog::warn("plugin {}: lua state allocation failed", rt.info.id);
-            continue;
+        if (is_lua) {
+            lua_State* L = luaL_newstate();
+            if (L == nullptr) {
+                spdlog::warn("plugin {}: lua state allocation failed", rt.info.id);
+                continue;
+            }
+            rt.lua = {L, &lua_close};
+            open_sandbox(L);
+            install_host_tools(L, rt.info.id, conf_, rt.cfg, rt.has_cfg, sget, sset, rt.info.dir);
+            // Entry scripts return nothing; run them, check validity explicitly.
+            const sol::protected_function_result script =
+                sol::state_view(L).safe_script_file((fs::path(rt.info.dir) / rt.info.entry).string());
+            if (!script.valid()) {
+                const sol::error e = script;
+                spdlog::warn("plugin {}: entry script failed: {}", rt.info.id, e.what());
+                continue;
+            }
+            // The chunk may leave a nil result on the stack; balance it so the
+            // protected-call path below never sees a stray value.
+            lua_pop(L, lua_gettop(L));
+        } else {
+            // wasm: entry is a prebuilt .wasm image; the seam owns load/link.
+            std::ifstream wf(fs::path(rt.info.dir) / rt.info.entry, std::ios::binary);
+            if (!wf) {
+                spdlog::warn("plugin {}: wasm entry {} unreadable", rt.info.id, rt.info.entry);
+                continue;
+            }
+            std::vector<std::uint8_t> bytes{std::istreambuf_iterator<char>(wf), {}};
+            wasm::Services services{sget, sset, make_wasm_fetch(rt.info.id, conf_)};
+            wasm::Loaded loaded = wasm::load(rt.info.id, rt.info.dir, std::move(bytes), std::move(services));
+            if (!loaded.instance) {
+                spdlog::warn("plugin {}: wasm load failed: {}", rt.info.id, loaded.error);
+                continue;
+            }
+            rt.wasm = std::move(loaded.instance);
         }
-        rt.lua = {L, &lua_close};
-        open_sandbox(L);
-        install_host_tools(L, rt.info.id, conf_, rt.cfg, rt.has_cfg, sget, sset, rt.info.dir);
-        // Entry scripts return nothing; run them, check validity explicitly.
-        const sol::protected_function_result script =
-            sol::state_view(L).safe_script_file((fs::path(rt.info.dir) / rt.info.entry).string());
-        if (!script.valid()) {
-            const sol::error e = script;
-            spdlog::warn("plugin {}: entry script failed: {}", rt.info.id, e.what());
-            continue;
-        }
-        // The chunk may leave a nil result on the stack; balance it so the
-        // protected-call path below never sees a stray value.
-        lua_pop(L, lua_gettop(L));
 
         std::string caps;
         for (size_t i = 0; i < rt.info.capabilities.size(); ++i) {
@@ -657,6 +873,7 @@ int Host::load_all(Store& store) {
         auto shared = std::make_shared<Runtime>();
         shared->info = std::move(rt.info);
         shared->lua = std::move(rt.lua);
+        shared->wasm = std::move(rt.wasm);
         fresh.emplace(shared->info.id, std::move(shared));
     }
 
@@ -714,34 +931,23 @@ std::string Host::call(const std::string& id, const std::string& method, const s
         env["params"] = std::move(params);
     }
 
+    RawReply r;
     if (rt->lua) {
-        const RawReply r = lua_call_entry(*rt, method, conf_.instruction_budget, envelope);
-        if (!r.invoked) {
-            return fail(r.error);
-        }
-        const auto* obj = std::get_if<glz::generic::object_t>(&r.reply.data);
-        if (obj == nullptr) {
-            spdlog::warn("[plugin:{}] {}: malformed response (non-table)", id, method);
-            return fail("malformed response: not a table");
-        }
-        const glz::generic* okv = member(obj, "ok");
-        if (okv == nullptr || std::get_if<bool>(&okv->data) == nullptr) {
-            spdlog::warn("[plugin:{}] {}: malformed response (missing ok)", id, method);
-            return fail("malformed response: missing ok");
-        }
-        if (!*std::get_if<bool>(&okv->data)) {
-            const glz::generic* ev = member(obj, "error");
-            const bool is_str = ev != nullptr && std::get_if<std::string>(&ev->data) != nullptr;
-            const std::string msg = is_str ? std::get<std::string>(ev->data) : std::string("plugin error");
-            spdlog::warn("[plugin:{}] {} returned error: {}", id, method, msg);
-            return fail(msg);
-        }
-        static const glz::generic null_v;
-        const glz::generic* data = member(obj, "data");
-        record(true, "");
-        return R"({"ok":true,"data":)" + dump_json(data ? *data : null_v) + "}";
+        r = lua_call_entry(*rt, method, conf_.instruction_budget, envelope);
+    } else if (rt->wasm) {
+        r = wasm::invoke(*rt->wasm, dump_json(envelope));
+    } else {
+        return fail("runtime '" + rt->info.runtime + "' not supported");
     }
-    return fail("runtime '" + rt->info.runtime + "' not supported");
+    if (!r.invoked) {
+        return fail(r.error);
+    }
+    std::string shape_err;
+    if (std::optional<std::string> res = checked_reply(r.reply, id, method, shape_err)) {
+        record(true, "");
+        return *res;
+    }
+    return fail(std::move(shape_err));
 }
 
 CallHealth Host::health(const std::string& id) const {
