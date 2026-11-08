@@ -49,6 +49,9 @@ struct Rig {
 
     void seed(const std::string& key) { REQUIRE(cache.store(key, "img", "body:" + key).has_value()); }
     bool on_disk(const std::string& key) { return cache.peek(key, "img").has_value(); }
+    bool on_disk_rel(const std::string& key, const std::string& rel) {
+        return cache.peek(key, "img", rel).has_value();
+    }
 };
 
 } // namespace
@@ -91,4 +94,87 @@ TEST_CASE("worker: start/stop sanity -- idle stop and reuse after stop are quiet
     reader::Worker worker{rig.cache};
     worker.stop(); // idempotent: the destructor stops again
     CHECK(rig.fake.fetched.empty());
+}
+
+TEST_CASE("worker: structured placement -- complete ctx lands <plugin>/<slug>/chNNN/pNNN.<ext>") {
+    Rig rig;
+    rig.fake.bodies = {{"http://x/1.jpg", "1"}, {"http://x/2.jpg", "2"}, {"http://y/1.jpg", "3"}};
+
+    // One full window: two pages of ch001. Page numbers are the 1-based
+    // position in the batch, so ch001/p001 < ch001/p002 in lex order.
+    {
+        reader::Worker worker{rig.cache};
+        worker.nudge({"http://x/1.jpg", "http://x/2.jpg"}, reader::WindowCtx{"md", "slug-a", 1});
+        worker.stop();
+    }
+    CHECK(rig.on_disk_rel("http://x/1.jpg", "md/slug-a/ch001/p001.jpg"));
+    CHECK(rig.on_disk_rel("http://x/2.jpg", "md/slug-a/ch001/p002.jpg"));
+
+    // Second window of the same manga: one page of ch002. Two separate
+    // windows (each drained on stop) keep ch001 and ch002 side by side.
+    {
+        reader::Worker worker{rig.cache};
+        worker.nudge({"http://y/1.jpg"}, reader::WindowCtx{"md", "slug-a", 2});
+        worker.stop();
+    }
+    CHECK(rig.on_disk_rel("http://y/1.jpg", "md/slug-a/ch002/p001.jpg"));
+    // Zero-pad keeps ch001..ch010 in reading order across a full chapter span.
+    const std::vector<std::string> dirs = {"ch001", "ch002", "ch010"};
+    for (std::size_t i = 1; i < dirs.size(); ++i) CHECK(dirs[i - 1] < dirs[i]);
+}
+
+TEST_CASE("worker: sha fallback -- missing slug or chapter stays on the exact old path") {
+    Rig rig;
+    rig.fake.bodies = {{"http://x/a.png", "a"}};
+    const reader::WindowCtx ctx{"md", "slug-a", 1};
+
+    {
+        reader::Worker w{rig.cache};
+        w.nudge({"http://x/a.png"}); // no ctx at all
+        w.stop();
+    }
+    CHECK(rig.on_disk("http://x/a.png")); // flat <sha>.png, no structured copy
+    CHECK(!rig.on_disk_rel("http://x/a.png", "md/slug-a/ch001/p001.png"));
+
+    // ctx present but slug missing -> same flat path.
+    {
+        reader::Worker w{rig.cache};
+        w.nudge({"http://x/a.png"}, reader::WindowCtx{"md", "", 1});
+        w.stop();
+    }
+    CHECK(rig.on_disk("http://x/a.png"));
+    CHECK(!rig.on_disk_rel("http://x/a.png", "md//ch001/p001.png"));
+
+    // ctx present but url has no extension -> structured layout needs the
+    // url's ext, so it stays on the flat path.
+    rig.fake.bodies["http://x/plain"] = "p";
+    {
+        reader::Worker w{rig.cache};
+        w.nudge({"http://x/plain"}, ctx);
+        w.stop();
+    }
+    CHECK(rig.on_disk("http://x/plain"));
+    CHECK(!rig.on_disk_rel("http://x/plain", "md/slug-a/ch001/p001.bin"));
+}
+
+TEST_CASE("worker: store reuse -- peek with the same rel_path hits, a second rel refetches") {
+    Rig rig;
+    rig.fake.bodies = {{"http://x/a.jpg", "body-a"}};
+    const reader::WindowCtx ctx{"md", "slug-a", 1};
+
+    {
+        reader::Worker worker{rig.cache};
+        worker.nudge({"http://x/a.jpg"}, ctx); // ch001 window
+        worker.stop(); // coalescing is newest-wins: drain before the next nudge
+    }
+    {
+        reader::Worker worker{rig.cache};
+        worker.nudge({"http://x/a.jpg"}, reader::WindowCtx{"md", "slug-a", 2}); // second rel
+        worker.stop();
+    }
+    CHECK(rig.on_disk_rel("http://x/a.jpg", "md/slug-a/ch001/p001.jpg"));
+    CHECK(rig.on_disk_rel("http://x/a.jpg", "md/slug-a/ch002/p001.jpg"));
+    const int calls = rig.fake.fetched.size();
+    CHECK(rig.on_disk_rel("http://x/a.jpg", "md/slug-a/ch001/p001.jpg")); // peek = hit, no fetch
+    CHECK(rig.fake.fetched.size() == calls);
 }

@@ -1,3 +1,6 @@
+## 2026-11-08
+* **Update**: Updated concept `architecture/image-cache-offline.md`.
+
 ## 2026-11-07
 * **Update**: Linked `decisions/deps-and-plugins.md` to `architecture/cli-config.md` (POST /config is a REST route per curl-first ruling; registry wraps CLI11/SimpleIni/glaze APIs.).
 * **Update**: Linked `architecture/manga-viewer-core.md` to `architecture/cli-config.md` (Config layer feeds the host core (paths/port wiring to store, plugin, cache); registry is consumer of its dependency APIs.).

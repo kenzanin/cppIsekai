@@ -18,6 +18,7 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(VIPS REQUIRED IMPORTED_TARGET vips)
 pkg_check_modules(LUA REQUIRED IMPORTED_TARGET lua5.4)
 find_package(spdlog REQUIRED) # system shared 1.17.0; links fmt 12.2.0
+pkg_check_modules(LIBZIP REQUIRED IMPORTED_TARGET libzip) # system shared (pacman libzip); CBZ export
 
 set(TP ${PROJECT_SOURCE_DIR}/third_party)
 
@@ -33,7 +34,8 @@ target_include_directories(sqlite3 PUBLIC ${TP}/libsql/sqlite)
 
 # --- app ---
 add_executable(cppIsekai src/main.cpp src/store/store.cpp src/http/http.cpp
-                         src/plugin/plugin.cpp src/cache/cache.cpp src/reader/window.cpp)
+                         src/plugin/plugin.cpp src/cache/cache.cpp src/reader/window.cpp
+                         ${TP}/libzippp/libzippp.cpp src/http/export_cbz.cpp)
 target_include_directories(
   cppIsekai
   PRIVATE src
@@ -42,12 +44,13 @@ target_include_directories(
           ${TP}/readerwriterqueue/include
           ${TP}/glaze
           ${TP}/simpleini
-          ${TP}/sqlite_orm/include)
+          ${TP}/sqlite_orm/include
+          ${TP}/libzippp)
 target_link_libraries(
   cppIsekai
   PRIVATE wasm3 sqlite3 PkgConfig::VIPS PkgConfig::LUA
           ${TP}/curl-impersonate/lib/libcurl-impersonate-chrome.so.4.8.0
-          spdlog::spdlog)
+          spdlog::spdlog PkgConfig::LIBZIP)
 target_compile_options(cppIsekai PRIVATE -Wall -Wextra)
 set_target_properties(cppIsekai PROPERTIES BUILD_RPATH
                                            "${TP}/curl-impersonate/lib")
@@ -89,6 +92,12 @@ target_include_directories(test_cache PRIVATE src)
 target_compile_options(test_cache PRIVATE -Wall -Wextra)
 add_test(NAME cache COMMAND test_cache)
 
+# slug pragma (1.1): header-only title->folder rule + collision suffix; no src sources
+add_executable(test_slug tests/test_slug.cpp)
+target_include_directories(test_slug PRIVATE src)
+target_compile_options(test_slug PRIVATE -Wall -Wextra)
+add_test(NAME slug COMMAND test_slug)
+
 # config core (1.1): header-only registry + layered resolve; CLI11 parse, no env leakage
 add_executable(test_config tests/test_config.cpp)
 target_include_directories(test_config PRIVATE src ${TP}/simpleini ${TP}/glaze)
@@ -101,6 +110,13 @@ add_executable(test_http_img tests/test_http_img.cpp src/cache/cache.cpp)
 target_include_directories(test_http_img PRIVATE src)
 target_compile_options(test_http_img PRIVATE -Wall -Wextra)
 add_test(NAME http_img COMMAND test_http_img)
+
+# CBZ export core: in-memory zip of the cached tree, crow-free
+add_executable(test_export tests/test_export.cpp src/http/export_cbz.cpp ${TP}/libzippp/libzippp.cpp)
+target_include_directories(test_export PRIVATE src/http ${TP}/libzippp)
+target_link_libraries(test_export PRIVATE PkgConfig::LIBZIP)
+target_compile_options(test_export PRIVATE -Wall -Wextra)
+add_test(NAME export COMMAND test_export)
 
 # stale layer (2.2): wrapper around the ABI call; cache + glaze, no server
 add_executable(test_stale tests/test_stale.cpp src/cache/cache.cpp)

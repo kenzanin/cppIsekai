@@ -3,6 +3,7 @@
 
 #include <chrono>
 #include <filesystem>
+#include <fstream>
 #include <map>
 #include <memory>
 #include <optional>
@@ -45,6 +46,23 @@ struct TempRoot {
 };
 
 bool ok(const std::optional<std::string>& p) { return p && fs::exists(*p); }
+
+// Seed the tree by hand (boot-walk / purge fixtures bypass the cache).
+void put(const fs::path& p, const std::string& body) {
+    std::error_code ec;
+    fs::create_directories(p.parent_path(), ec);
+    REQUIRE(!ec);
+    std::ofstream out(p, std::ios::binary);
+    out.write(body.data(), static_cast<std::streamsize>(body.size()));
+    REQUIRE(out.good());
+}
+
+// Backdate mtime so boot seeds recency deterministically.
+void age(const fs::path& p, std::chrono::hours h) {
+    std::error_code ec;
+    fs::last_write_time(p, fs::last_write_time(p, ec) - h, ec);
+    REQUIRE(!ec);
+}
 
 } // namespace
 
@@ -144,9 +162,92 @@ TEST_CASE("cache: api pool separates; failed fetch leaves nothing behind") {
 
     CHECK(cache.ensure("http://x/none.jpg", "img") == std::nullopt);
     std::size_t files = 0;
-    for (const auto& e : fs::directory_iterator(root.path / "img")) {
+    std::error_code nodir; // img pool created lazily on first store
+    for (const auto& e : fs::directory_iterator(root.path / "img", nodir)) {
         static_cast<void>(e);
         ++files; // no stray .tmp / partial file from the failed insert
     }
     CHECK(files == 0);
+}
+
+TEST_CASE("cache: rel_path nests the file, peek/ensure honor it, api ignores it") {
+    TempRoot root;
+    auto state = std::make_shared<FakeState>();
+    state->bodies = {{"http://x/a.jpg", forty('a')}};
+    cache::Cache cache(cache::Config{root.path.string(), 1 << 20},
+                       [state](const std::string& k) { return state->get(k); });
+
+    const std::string rel = "mangadex/slug-x/ch003/p002.jpg";
+    const auto p = cache.store("http://x/a.jpg", "img", forty('a'), rel);
+    REQUIRE(ok(p));
+    CHECK(*p == (root.path / "img" / rel).string()); // exact structured landing
+    CHECK(cache.peek("http://x/a.jpg", "img", rel).value_or("") == forty('a'));
+
+    const int calls = state->calls; // store never fetches
+    CHECK(cache.ensure("http://x/a.jpg", "img", rel) == p); // same entry on hit
+    CHECK(state->calls == calls);
+
+    // Index is on-disk-path keyed: a second rel for the same sha refetches and
+    // lands beside the first; neither copy is dropped.
+    const auto q = cache.ensure("http://x/a.jpg", "img", "mangadex/slug-x/ch003/p001.jpg");
+    REQUIRE(ok(q));
+    CHECK(q != p);
+    CHECK(state->calls == calls + 1);
+    CHECK(fs::exists(*p));
+
+    // api stays sha-keyed whatever rel it is handed (stale layer, D7).
+    const auto j = cache.store("mangadex|chapters|q", "api", "{}", "ignored/rel.json");
+    REQUIRE(ok(j));
+    CHECK(fs::path(*j).parent_path().filename() == "api");
+    CHECK(fs::path(*j).stem() == sha1_hex("mangadex|chapters|q"));
+}
+
+TEST_CASE("cache: boot walk spans tree depth; trim evicts across pools by mtime") {
+    TempRoot root;
+    const auto deep = root.path / "img" / "mangadex" / "slug-x" / "ch001" / "p001.jpg";
+    const auto flat = root.path / "img" / (sha1_hex("f") + ".png");
+    const auto apif = root.path / "api" / (sha1_hex("q") + ".json");
+    put(deep, forty('d'));
+    put(flat, forty('f'));
+    put(apif, forty('j'));
+    age(apif, std::chrono::hours(3)); // oldest: flat api pool
+    age(deep, std::chrono::hours(2)); // then the nested img page
+    // flat img stays newest; boot seeds recency in mtime order over the whole tree
+
+    auto state = std::make_shared<FakeState>();
+    state->bodies = {{"n", forty('n')}};
+    cache::Cache cache(cache::Config{root.path.string(), 100},
+                       [state](const std::string& k) { return state->get(k); });
+
+    const auto n = cache.ensure("n", "img"); // 160B > 100B: two oldest evicted
+    REQUIRE(ok(n));
+    CHECK(state->calls == 1);
+    CHECK_FALSE(fs::exists(apif)); // cross-pool LRU victim
+    CHECK_FALSE(fs::exists(deep)); // nested depth was indexed, then evicted
+    CHECK(fs::exists(flat));
+    CHECK(fs::exists(*n));
+}
+
+TEST_CASE("cache: one-time purge flattens v1 pools; rollback copy swept next boot") {
+    TempRoot root;
+    const auto img = root.path / "img";
+    put(img / (sha1_hex("u") + ".png"), forty('u')); // pure sha-flat: the v1 signature
+    put(root.path / ".legacy-api-old" / "x.json", "{}"); // stale rollback, even earlier boot
+
+    cache::Cache first(cache::Config{root.path.string(), 1 << 20}, {});
+    CHECK_FALSE(fs::exists(img));                                // pool renamed away...
+    CHECK(fs::exists(root.path / ".legacy-img"));                // ...under the rollback name
+    CHECK(fs::exists(root.path / ".legacy-img" / (sha1_hex("u") + ".png")));
+    CHECK_FALSE(fs::exists(root.path / ".legacy-api-old"));      // earlier copy swept now
+
+    put(img / (sha1_hex("v") + ".png"), forty('v')); // flat pool refills post-purge
+    cache::Cache again(cache::Config{root.path.string(), 1 << 20}, {});
+    CHECK(fs::exists(img / (sha1_hex("v") + ".png")));           // purge is once: stamped
+    CHECK_FALSE(fs::exists(root.path / ".legacy-img"));          // prior copy swept
+
+    // Non-sha names are live data, not residue: untouched, stamp or not.
+    TempRoot live;
+    put(live.path / "api" / "custom.json", "{}");
+    cache::Cache third(cache::Config{live.path.string(), 1 << 20}, {});
+    CHECK(fs::exists(live.path / "api" / "custom.json"));
 }

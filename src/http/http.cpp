@@ -1,4 +1,5 @@
 #include "http.hpp"
+#include "export_cbz.hpp"
 #include "img.hpp"
 #include "stale.hpp"
 
@@ -519,6 +520,25 @@ void serve(Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool, 
         res.code = r.code;
         res.body = std::move(r.body);
         res.set_header("Content-Type", std::string(r.mime));
+        return res;
+    });
+
+    // CBZ export (cache-layout D6): stream the cached tree as an in-memory zip;
+    // empty/unknown slug = empty-but-valid zip, never 404.
+    CROW_ROUTE(app, "/export/cbz")
+    ([](const crow::request& req) {
+        crow::response res;
+        const auto zip = cbz::build("data/cache", param(req, "plugin"), param(req, "slug"));
+        if (!zip) {
+            res.code = 500;
+            res.set_header("Content-Type", "text/plain");
+            res.body = "export failed";
+            return res;
+        }
+        res.body = std::move(*zip);
+        res.set_header("Content-Type", "application/zip");
+        res.set_header("Content-Disposition",
+                       "attachment; filename=\"" + param(req, "slug") + ".cbz\"");
         return res;
     });
 
