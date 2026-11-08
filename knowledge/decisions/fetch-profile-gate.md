@@ -1,7 +1,7 @@
 ---
 type: decision
 title: "Fetch profile gate: centralized curl-impersonate, dynamic per-call profile"
-description: "User steer 2026-11-08: move the impersonate gate to src/fetch/ (single call site); per-call profile from plugin opts > fetch_profile ini; live default via POST /config; linked-lib targets chrome99-116/edge99-101/safari15; firefox = phase 2 (separate .so); hand-rolled JA3 profile-class rejected."
+description: "User steer 2026-11-08: move the impersonate gate to src/fetch/ (single call site); per-call profile from plugin opts > fetch_profile ini; live default via POST /config; linked-lib targets chrome99-116/edge99-101/safari15; firefox = phase 1 via dual-.so dlopen vtable (steer 2026-11-08); hand-rolled JA3 profile-class rejected."
 tags: [fetch, curl-impersonate, plugin-api, config, performance]
 generated: { by: agent/mcp, at: "2026-11-08T08:30:00Z" }
 status: stable
@@ -24,12 +24,13 @@ ini. Live default: config is read at call time (shared snapshot), not captured i
 closures at load -> `POST /config plugin.fetch_profile=...` applies to subsequent calls
 without restart/reload.
 
-## D3 - Targets & phases
+## D3 - Targets & families
 
 The linked lib (`libcurl-impersonate-chrome.so.4.8.0`) accepts: chrome99/100/101/104/107/110/116,
-edge99/101, safari15 (strings probe). Phase 1 = this target set only. Phase 2 = firefox:
-requires vendoring the separate `libcurl-impersonate-firefox` (NSS TLS) - follow-up, does
-not change the gate.
+edge99/101, safari15 (strings probe). Firefox (user steer 2026-11-08, same phase): the separate
+`libcurl-impersonate-firefox` (NSS TLS) loads `dlopen(RTLD_LOCAL)` behind a per-family symbol
+vtable - one gate, two independent lib copies; `firefox*` targets route to it, list probed from
+the lib (fetch-gate task 1.3).
 
 ## D4 - Rejected: manual profile class
 

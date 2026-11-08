@@ -20,6 +20,12 @@ reload.
 - **THEN** the next plugin request without an explicit profile uses the new value without
   host restart
 
+#### Scenario: Firefox-family target
+- **WHEN** a plugin passes a `firefox*` profile while the default stays a chrome-family
+  target
+- **THEN** that request runs on the firefox engine's target via the family vtable and
+  later chrome-family defaults are unaffected
+
 ### Requirement: Persistent per-plugin cookie jar
 The host fetch gate SHALL support a per-plugin cookie jar stored at
 `data/plugin-state/<id>.cookies.txt`, enabled per request via options; cookies SHALL

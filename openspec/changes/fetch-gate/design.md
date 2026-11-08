@@ -8,7 +8,7 @@ Current state & constraints: two impersonate call sites (`fetch_sync` in plugin.
 
 **Goals:** one gate (`src/fetch/`) — single impersonate call site; per-call profile + live default; persistent per-plugin cookie jar; parity with existing http behavior.
 
-**Non-Goals:** firefox target (phase 2, separate .so); a hand-rolled JA3/UA profile class; the read-model cache (change `search-cache`); per-request user-agent overrides.
+**Non-Goals:** a hand-rolled JA3/UA profile class; the read-model cache (change `search-cache`); per-request user-agent overrides.
 
 ## Decisions
 
@@ -19,11 +19,14 @@ Current state & constraints: two impersonate call sites (`fetch_sync` in plugin.
 - **D5 — Legacy parity.** The old lua path (:562) folds into the gate; response shape and the ponytail retry are preserved; diff behavior guarded by existing tests (test_plugin 10/10 required).
 - **D6 — Testing. Unit: target-name validation + fallback, jar round-trip in a tmp dir, two-jar isolation; parity: existing tests. Live smoke: `PLUGIN_SMOKE_URL` style, optional; ctest stays network-free.
 
+- **D7 — Firefox family via dual-.so vtable (user steer 2026-11-08).** `libcurl-impersonate-firefox` loads `dlopen(..., RTLD_LOCAL)`; the gate keeps a per-family vtable (the ~12 curl symbols it uses, `dlsym`-resolved at first load, `curl_global_init` once per family) so handles never cross families. Routing: target `firefox*` => firefox vtable, else chrome. The legal firefox target list is probed from the lib, never hardcoded.
+
 ## Risks / Trade-offs
 
 - Touches the hot path of every plugin — mitigated by parity tests + a mechanical move.
 - Live default via `POST /config`: the snapshot swap must be thread-safe (atomic shared_ptr) — the pattern already exists in store conf reads.
+- Dual-.so: family-scoped vtables only; a handle from one lib must never touch the other's symbols — guarded by the family-map unit test; real dual-family fetch stays smoke-level (network).
 
 ## Open Questions
 
-None; the target list follows the OKF probe (chrome99-116/edge99-101/safari15).
+None; chrome targets per the OKF probe; firefox list probed from its lib (task 1.3).
