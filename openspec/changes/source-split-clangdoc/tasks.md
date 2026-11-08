@@ -30,4 +30,4 @@
 ## 6. Verify & bookkeeping
 
 - [x] 6.1 Full ctest green, zero new warnings; code-loc audit per D1b (comments/blank stripped) vs the pruned scope; `git diff --color-moved=plain` spot check; large functions verified unsplit; optional `clang-doc` dry-run
-- [ ] 6.2 Update the AGENTS.md crown-file note; record the layout decision in OKF (close pipeline)
+- [x] 6.2 Update the AGENTS.md crown-file note; record the layout decision in OKF (close pipeline)
