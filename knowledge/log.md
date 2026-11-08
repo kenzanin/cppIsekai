@@ -75,3 +75,5 @@
 * **Creation**: Initialized OKF v0.2 project memory.
 * **Creation**: Documented concept `decisions/plugin-runtimes-wasm-js.md` (Kontrak dual runtime: wasm3 ABI + quickjs realm di balik satu core shape/health; parity tools; budget gas/interrupt; lessons JS-refcount, stack-rebase, glz-brace).
 * **Update**: Linked `decisions/plugin-runtimes-wasm-js.md` to `decisions/deps-and-plugins.md` and `architecture/plugin-system.md` (Kontrak eksekusi runtime mengeksekusi rencana parity + vendoring kedua concept itu).
+* **Creation**: Documented concept `decisions/fetch-profile-gate.md` (Gate impersonate terpusat src/fetch/, profile per-call, default live; targets probe lib; firefox phase 2).
+* **Update**: Linked `decisions/fetch-profile-gate.md` to `decisions/deps-and-plugins.md`, `architecture/cli-config.md`, `architecture/plugin-system.md` (Gate mengeksekusi ruling curl-first, memakai knob fetch_profile, memperluas opts ABI plugin).
