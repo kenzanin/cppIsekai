@@ -73,3 +73,5 @@
 * **Creation**: Documented concept `decisions/third-party-dependencies.md` (Dependency vendoring: system-shared dulu, vendor minimal).
 * **Creation**: Documented concept `decisions/build-toolchain-cpp23.md` (Build system: CMake + C++23, exe-only).
 * **Creation**: Initialized OKF v0.2 project memory.
+* **Creation**: Documented concept `decisions/plugin-runtimes-wasm-js.md` (Kontrak dual runtime: wasm3 ABI + quickjs realm di balik satu core shape/health; parity tools; budget gas/interrupt; lessons JS-refcount, stack-rebase, glz-brace).
+* **Update**: Linked `decisions/plugin-runtimes-wasm-js.md` to `decisions/deps-and-plugins.md` and `architecture/plugin-system.md` (Kontrak eksekusi runtime mengeksekusi rencana parity + vendoring kedua concept itu).

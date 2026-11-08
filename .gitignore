@@ -4,5 +4,6 @@ build/
 
 data/
 plugins_dev/**/config.json
-test_store.db
+test_*.db
+test_*.log
 build/

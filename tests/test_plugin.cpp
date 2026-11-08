@@ -171,3 +171,103 @@ TEST_CASE("health: last call outcome per plugin") {
         CHECK(host.health("ghost").ok);
     }
 }
+
+TEST_CASE("fs.read: confined read-only plugin file access") {
+    namespace fs = std::filesystem;
+    const auto base = fs::temp_directory_path() / "cppisekai_fsread_test";
+    fs::remove_all(base);
+    fs::create_directories(base / "sub");
+    {
+        std::ofstream o(base / "config.json");
+        o << "{\"k\":1}";
+    }
+    {
+        std::ofstream o(base / "sub" / "nested.txt");
+        o << "nested";
+    }
+
+    CHECK(plugin::fs_read(base, "config.json").value_or("!") == "{\"k\":1}");
+    CHECK(plugin::fs_read(base, "sub/nested.txt").value_or("!") == "nested");
+    CHECK(plugin::fs_read(base, "./sub/../config.json").value_or("!") == "{\"k\":1}");
+    CHECK(plugin::fs_read(base, "missing.txt") == std::nullopt);
+    CHECK(plugin::fs_read(base, "../outside") == std::nullopt);
+    CHECK(plugin::fs_read(base, "/etc/hostname") == std::nullopt);
+    CHECK(plugin::fs_read(base, "") == std::nullopt);
+    CHECK(plugin::fs_read(base, "sub") == std::nullopt);  // directory, not a regular file
+
+    // Lua binding end-to-end: fixture plugin reads its own entry file.
+    LogSetup ls;
+    Store store("test_fsread.db");
+    plugin::Host host(test_conf());
+    host.load_all(store);
+    const std::string res = host.call("fsread", "ping", "{}");
+    CHECK(res.find("\"ok\":true") != std::string::npos);
+    CHECK(res.find("\"len\"") != std::string::npos);
+    const std::string esc = host.call("fsread", "escape", "{}");
+    CHECK(esc.find("\"gone\":true") != std::string::npos);
+
+    fs::remove_all(base);
+    std::error_code ec;
+    fs::remove("test_fsread.db", ec);
+}
+
+TEST_CASE("wasm runtime: ABI call over wasm3") {
+    LogSetup ls;
+    Store store("test_wasm.db");
+    plugin::Host host(test_conf());
+    host.load_all(store);
+
+    const std::string res = host.call("wasmfix", "ping", "{}");
+    CHECK(res.find("\"ok\":true") != std::string::npos);
+    CHECK(res.find("\"wasm\":\"pong\"") != std::string::npos);
+    CHECK(host.health("wasmfix").ok);
+}
+
+TEST_CASE("wasm runtime: broken module loads as absent") {
+    LogSetup ls;
+    Store store("test_wasmbad.db");
+    plugin::Host host(test_conf());
+    host.load_all(store);
+
+    // wasmbad fails wasm parse => not registered; wasmfix in the same scan is.
+    CHECK(host.call("wasmbad", "x", "{}").find("no plugin 'wasmbad'") != std::string::npos);
+    CHECK(host.call("wasmfix", "ping", "{}").find("\"ok\":true") != std::string::npos);
+}
+
+TEST_CASE("wasm runtime: gas trap maps to ok:false") {
+    LogSetup ls;
+    Store store("test_wasmspin.db");
+    plugin::Host host(test_conf());
+    host.load_all(store);
+
+    const std::string res = host.call("wasmspin", "x", "{}");
+    CHECK(res.find("\"ok\":false") != std::string::npos);
+    CHECK_FALSE(host.health("wasmspin").ok);
+}
+
+TEST_CASE("js runtime: realm call over quickjs") {
+    LogSetup ls;
+    Store store("test_js.db");
+    plugin::Host host(test_conf());
+    host.load_all(store);
+
+    const std::string res = host.call("jsfix", "ping", "{}");
+    CHECK(res.find("\"ok\":true") != std::string::npos);
+    CHECK(res.find("\"js\":\"pong\"") != std::string::npos);
+    CHECK(host.health("jsfix").ok);
+
+    // budget: spin loops forever; the interrupt handler ends it ok:false
+    const std::string spin = host.call("jsfix", "spin", "{}");
+    CHECK(spin.find("\"ok\":false") != std::string::npos);
+}
+
+TEST_CASE("js runtime: broken entry loads as absent") {
+    LogSetup ls;
+    Store store("test_jsbad.db");
+    plugin::Host host(test_conf());
+    host.load_all(store);
+
+    // jsbad fails to parse => not registered; jsfix in the same scan is.
+    CHECK(host.call("jsbad", "x", "{}").find("no plugin 'jsbad'") != std::string::npos);
+    CHECK(host.call("jsfix", "ping", "{}").find("\"ok\":true") != std::string::npos);
+}

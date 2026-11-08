@@ -1,4 +1,6 @@
 #pragma once
+
+#include "fs.hpp" // plugin::fs_read -- confined read-only file helper (also drags <filesystem>/<fstream> for embedders)
 // Plugin discovery, Lua sandbox, host tools, ABI envelope dispatch.
 // Layout: one folder per plugin under Config::dir with main.json (manifest),
 // the entry script (main.lua) and an optional logo file.
@@ -74,7 +76,9 @@ public:
     // calls run inline — fine for single-threaded tests.
     void use_db(BS::thread_pool<>* db);
 
-    // ABI call. Returns the response as JSON text:
+    // ABI call. Dispatches on the manifest runtime; envelope, health
+    // bookkeeping and response shape are the runtime-agnostic core. Returns
+    // the response as JSON text:
     // {"ok":true,"data":...} or {"ok":false,"error":"..."}.
     std::string call(const std::string& id, const std::string& method, const std::string& params_json);
 
