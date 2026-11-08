@@ -23,7 +23,7 @@ using FetchResult = fetch::Result;
 FetchResult fetch_sync(const std::string& url, long timeout_ms, const std::string& profile, const std::string& method,
                        const std::string& body, const std::string& accept_header, const std::string& ua_header,
                        const std::vector<std::pair<std::string, std::string>>& extra_headers,
-                       const std::string& proxy);
+                       const std::string& proxy, const std::string& cookie_jar = {});
 
 /** \brief Unknown-target guard (task 1.2): empty => live default; a target
  *  the linked libs do not know => warn and fall back (the request runs). */

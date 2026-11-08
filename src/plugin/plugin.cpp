@@ -79,6 +79,7 @@ wasm::HttpFetch make_wasm_fetch(const std::string& id, const Config& conf, const
         std::string body;
         std::string accept_header;
         std::string ua_header;
+        bool use_cookies = false; // 2.2: opts.cookie => per-plugin jar (cookie_jar_path)
         std::vector<std::pair<std::string, std::string>> extra_headers;
 
         glz::generic o;
@@ -104,6 +105,11 @@ wasm::HttpFetch make_wasm_fetch(const std::string& id, const Config& conf, const
                 str("body", body);
                 str("accept", accept_header);
                 str("user_agent", ua_header);
+                if (const auto* b = member(obj, "cookie")) {
+                    if (const auto* bb = std::get_if<bool>(&b->data)) {
+                        use_cookies = *bb;
+                    }
+                }
                 if (const auto* h = member(obj, "headers")) {
                     if (const auto* ho = std::get_if<glz::generic::object_t>(&h->data)) {
                         for (const auto& [k, v] : *ho) {
@@ -117,8 +123,9 @@ wasm::HttpFetch make_wasm_fetch(const std::string& id, const Config& conf, const
         }
 
         profile_name = checked_profile(std::move(profile_name), live_default);
+        const std::string cookie_jar = use_cookies ? cookie_jar_path(id) : std::string{};
         const FetchResult fr = fetch_sync(url, ms, profile_name, method, body, accept_header, ua_header,
-                                          extra_headers, proxy);
+                                          extra_headers, proxy, cookie_jar);
         if (!fr.error.empty()) {
             spdlog::warn("[plugin:{}] fetch {} failed: {}", id, url, fr.error);
             return std::nullopt;

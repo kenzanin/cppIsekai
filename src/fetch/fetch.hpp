@@ -31,6 +31,7 @@ struct Request {
     std::string accept_header;
     std::string ua_header;
     std::vector<std::pair<std::string, std::string>> headers;
+    // 2.1/2.2: per-plugin jar path; the runtime opts opt in via a cookie flag.
     std::string cookie_jar;
 };
 

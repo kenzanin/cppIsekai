@@ -9,7 +9,7 @@
 ## 2. Cookie jar
 
 - [x] 2.1 `cookie_jar` on the gate (`CURLOPT_COOKIEFILE/JAR`) + `data/plugin-state/<id>.cookies.txt` helper; off by default; failure => non-fatal warn
-- [ ] 2.2 Plugin opt to enable cookies; short doc in `docs/` or the gate header comment
+- [x] 2.2 Plugin opt to enable cookies; short doc in `docs/` or the gate header comment
 
 ## 3. Verify
 
