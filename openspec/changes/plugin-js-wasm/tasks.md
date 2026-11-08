@@ -2,7 +2,7 @@
 
 ## 1. Runtime-agnostic core
 
-- [ ] 1.1 Extract envelope build / response-shape validation / health bookkeeping from `Host::call` into a runtime-agnostic core; `Runtime` gains a variant holder; Lua dispatch behavior unchanged; existing `test_plugin` green
+- [x] 1.1 Extract envelope build / response-shape validation / health bookkeeping from `Host::call` into a runtime-agnostic core; `Runtime` gains a variant holder; Lua dispatch behavior unchanged; existing `test_plugin` green
 - [ ] 1.2 `fs_read(plugin_dir, rel)` helper (normalize, confine to plugin dir, regular files only) + `fs.read` bound into the Lua runtime; unit tests: own-file ok, `..` escape, absolute path, missing file
 
 ## 2. WASM runtime (wasm3)
