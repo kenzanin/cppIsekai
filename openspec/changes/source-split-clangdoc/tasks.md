@@ -14,7 +14,7 @@
 
 ## 3. runtime seams
 
-- [ ] 3.1 wasm -> `src/plugin/wasm/`: `wasm_rt.{hpp,cpp}` (invoke/guest_mem) + `wasm_load.cpp` (dtor/load/imports); ctest green
+- [x] 3.1 wasm -> `src/plugin/wasm/`: `wasm_rt.{hpp,cpp}` (invoke/guest_mem) + `wasm_load.cpp` (dtor/load/imports); ctest green
 - [ ] 3.2 js -> `src/plugin/js/`: `js_rt.{hpp,cpp}` (load/invoke/lifecycle) + `js_bindings.cpp` (C callbacks + bind helper); ctest green
 
 ## 4. config & cache

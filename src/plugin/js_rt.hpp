@@ -7,7 +7,7 @@
 // Globals: standard builtins plus the host tools (http/storage/log/fs/now);
 // no module loader, no os/process -- sandbox by absence (ponytail: explicit
 // prune if a plugin ever needs tighter walls).
-#include "wasm_rt.hpp" // RawReply + Services reuse (ponytail: hoist on a 3rd consumer)
+#include "plugin/wasm/wasm_rt.hpp" // RawReply/Services via the wasm aliases
 
 #include <quickjs.h>
 

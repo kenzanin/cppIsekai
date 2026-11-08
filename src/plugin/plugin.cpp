@@ -2,7 +2,7 @@
 #include "fs.hpp"
 #include "lua/bridge.hpp"
 #include "http_client.hpp"
-#include "wasm_rt.hpp"
+#include "plugin/wasm/wasm_rt.hpp"
 #include "js_rt.hpp"
 
 #include "store/store.hpp"
