@@ -7,8 +7,8 @@
 
 ## 2. WASM runtime (wasm3)
 
-- [ ] 2.1 `wasm_rt` adapter: module load from entry `.wasm`, `handle/alloc/result_len` ABI per design D3, host-tool imports (`http.fetch`, `storage.*`, `log.*`, `now`, `fs.read`) and fuel/stack limits; failure to load => plugin unregistered + logged
-- [ ] 2.2 Echo fixture plugin (`tests/fixtures/plugins/wasm/`, prebuilt `.wasm` + regen note) and ctest cases: happy path call, bad envelope, budget loop, fs.read confined
+- [x] 2.1 `wasm_rt` adapter: module load from entry `.wasm`, `handle/alloc/result_len` ABI per design D3, host-tool imports (`http.fetch`, `storage.*`, `log.*`, `now`, `fs.read`) and fuel/stack limits; failure to load => plugin unregistered + logged
+- [x] 2.2 Echo fixture plugin (`tests/fixtures/plugins/wasm/`, prebuilt `.wasm` + regen note) and ctest cases: happy path call, bad envelope, budget loop, fs.read confined
 
 ## 3. JS runtime (quickjs-ng)
 
