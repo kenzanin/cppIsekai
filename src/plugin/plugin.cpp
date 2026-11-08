@@ -63,6 +63,15 @@ std::string err_json(std::string msg) {
     return dump_json(root);
 }
 
+// Object member view: nullptr when there is no object or the key is absent.
+const glz::generic* member(const glz::generic::object_t* obj, const char* key) {
+    if (obj == nullptr) {
+        return nullptr;
+    }
+    const auto it = obj->find(std::string(key));
+    return it != obj->end() ? &it->second : nullptr;
+}
+
 sol::object json_to_sol(lua_State* L, const glz::generic& g) {
     sol::state_view sv(L);
     return std::visit(
@@ -419,12 +428,19 @@ void install_host_tools(lua_State* L, const std::string& id, const Config& conf,
     };
 } // anonymous namespace
 
+// Per-plugin runtime holder, variant-ready: the loader engages the member
+// matching info.runtime ("lua" today; wasm/js add their state beside it and a
+// dispatch arm in Host::call -- tasks 2.1/3.2). Health bookkeeping, the call
+// mutex, the request envelope and the response-shape rules stay in
+// Host::call, shared by every backend.
 struct Runtime {
     PluginInfo info;
-    std::unique_ptr<lua_State, decltype(&lua_close)> L{nullptr, &lua_close};
-    std::mutex mu; // one call at a time per state
+    std::mutex mu; // one call at a time per runtime, whatever the backend
     glz::generic cfg;  // parsed config.json; meaningful only when has_cfg
     bool has_cfg = false;
+
+    // lua backend (info.runtime == "lua")
+    std::unique_ptr<lua_State, decltype(&lua_close)> lua{nullptr, &lua_close};
 };
 
 // Manifest; optional members may be absent, the rest are required by glaze.
@@ -434,6 +450,63 @@ struct Manifest {
     std::optional<std::vector<std::string>> capabilities;
     int api{};
 };
+
+// ---------------------------------------------------------------------------
+// Runtime seams (design D2: JSON envelope in, raw reply out). Host::call owns
+// everything shared -- health, call mutex, envelope, response shape; a seam
+// owns the runtime-specific rest and answers for its own invocation errors.
+// ---------------------------------------------------------------------------
+
+// Raw reply handed back to the core: the plugin's return value marshaled
+// as-is, shape-checked later. When the entry never produced one, invoked is
+// false and error carries the host-side diagnostic (already logged).
+struct RawReply {
+    bool invoked = false;
+    std::string error;
+    glz::generic reply;
+};
+
+// lua seam: materialize the envelope as lua values, invoke handle, marshal
+// the reply back to JSON. Lua-level failures (exception, budget) are logged
+// here; the reply value itself always reaches the core's shape check.
+RawReply lua_call_entry(const Runtime& rt, const std::string& method, long instruction_budget,
+                        const glz::generic& envelope) {
+    RawReply out;
+    lua_State* L = rt.lua.get();
+    sol::state_view sv(L);
+
+    const sol::object env = json_to_sol(L, envelope);
+    const sol::object h = sv["handle"];
+    if (h.get_type() != sol::type::function) {
+        out.error = "no handle() defined";
+        return out;
+    }
+
+    t_budget_left = instruction_budget;
+    lua_sethook(L, count_hook, LUA_MASKCOUNT, 1000);
+    const sol::protected_function_result res = sol::protected_function(h)(env);
+    lua_sethook(L, nullptr, 0, 0);
+    const bool timed_out = t_budget_left <= 0;
+
+    if (!res.valid()) {
+        const sol::error e = res;
+        if (timed_out) {
+            spdlog::warn("[plugin:{}] {} timed out", rt.info.id, method);
+            out.error = "timeout: instruction budget exhausted";
+            return out;
+        }
+        spdlog::warn("[plugin:{}] {} failed: {}", rt.info.id, method, e.what());
+        out.error = e.what();
+        return out;
+    }
+
+    out.invoked = true;
+    const sol::object r = res;
+    // depth -1: reply members marshal where the data value always has, so the
+    // wrapper level does not eat one rung of the cyclic-table depth budget.
+    out.reply = sol_to_json(r, -1);
+    return out;
+}
 } // namespace
 
 struct plugin::Host::Impl {
@@ -551,7 +624,7 @@ int Host::load_all(Store& store) {
             spdlog::warn("plugin {}: lua state allocation failed", rt.info.id);
             continue;
         }
-        rt.L = {L, &lua_close};
+        rt.lua = {L, &lua_close};
         open_sandbox(L);
         install_host_tools(L, rt.info.id, conf_, rt.cfg, rt.has_cfg, sget, sset);
         // Entry scripts return nothing; run them, check validity explicitly.
@@ -576,7 +649,7 @@ int Host::load_all(Store& store) {
 
         auto shared = std::make_shared<Runtime>();
         shared->info = std::move(rt.info);
-        shared->L = std::move(rt.L);
+        shared->lua = std::move(rt.lua);
         fresh.emplace(shared->info.id, std::move(shared));
     }
 
@@ -612,65 +685,56 @@ std::string Host::call(const std::string& id, const std::string& method, const s
     };
 
     const std::scoped_lock call_lock(rt->mu);
-    lua_State* L = rt->L.get();
-    sol::state_view sv(L);
 
-    sol::object params_obj;
+    // Runtime-agnostic request envelope; each backend marshals this itself.
+    glz::generic envelope;
+    auto& env = envelope.data.emplace<glz::generic::object_t>();
+    glz::generic api_v;
+    api_v.data = static_cast<double>(kHostApi);
+    env["api"] = std::move(api_v);
+    glz::generic method_v;
+    method_v.data = method;
+    env["method"] = std::move(method_v);
     if (params_json.empty()) {
-        params_obj = sol::make_object(L, sol::table(L, sol::new_table()));
+        glz::generic empty_obj;
+        empty_obj.data.emplace<glz::generic::object_t>();
+        env["params"] = std::move(empty_obj);
     } else {
-        glz::generic g;
-        if (auto ec = glz::read_json(g, params_json)) {
+        glz::generic params;
+        if (auto ec = glz::read_json(params, params_json)) {
             return fail("bad params json");
         }
-        params_obj = json_to_sol(L, g);
+        env["params"] = std::move(params);
     }
 
-    const sol::object h = sv["handle"];
-    if (h.get_type() != sol::type::function) {
-        return fail("no handle() defined");
-    }
-
-    sol::table env = sol::table(L, sol::new_table()); // constructed directly on L
-    env["api"] = kHostApi;
-    env["method"] = method;
-    env["params"] = params_obj;
-
-    t_budget_left = conf_.instruction_budget;
-    lua_sethook(L, count_hook, LUA_MASKCOUNT, 1000);
-    const sol::protected_function_result res = sol::protected_function(h)(env);
-    lua_sethook(L, nullptr, 0, 0);
-    const bool timed_out = t_budget_left <= 0;
-
-    if (!res.valid()) {
-        const sol::error e = res;
-        if (timed_out) {
-            spdlog::warn("[plugin:{}] {} timed out", id, method);
-            return fail("timeout: instruction budget exhausted");
+    if (rt->lua) {
+        const RawReply r = lua_call_entry(*rt, method, conf_.instruction_budget, envelope);
+        if (!r.invoked) {
+            return fail(r.error);
         }
-        spdlog::warn("[plugin:{}] {} failed: {}", id, method, e.what());
-        return fail(e.what());
+        const auto* obj = std::get_if<glz::generic::object_t>(&r.reply.data);
+        if (obj == nullptr) {
+            spdlog::warn("[plugin:{}] {}: malformed response (non-table)", id, method);
+            return fail("malformed response: not a table");
+        }
+        const glz::generic* okv = member(obj, "ok");
+        if (okv == nullptr || std::get_if<bool>(&okv->data) == nullptr) {
+            spdlog::warn("[plugin:{}] {}: malformed response (missing ok)", id, method);
+            return fail("malformed response: missing ok");
+        }
+        if (!*std::get_if<bool>(&okv->data)) {
+            const glz::generic* ev = member(obj, "error");
+            const bool is_str = ev != nullptr && std::get_if<std::string>(&ev->data) != nullptr;
+            const std::string msg = is_str ? std::get<std::string>(ev->data) : std::string("plugin error");
+            spdlog::warn("[plugin:{}] {} returned error: {}", id, method, msg);
+            return fail(msg);
+        }
+        static const glz::generic null_v;
+        const glz::generic* data = member(obj, "data");
+        record(true, "");
+        return R"({"ok":true,"data":)" + dump_json(data ? *data : null_v) + "}";
     }
-
-    const sol::object r = res;
-    if (r.get_type() != sol::type::table) {
-        spdlog::warn("[plugin:{}] {}: malformed response (non-table)", id, method);
-        return fail("malformed response: not a table");
-    }
-    const sol::table t = r;
-    const sol::object okv = t["ok"];
-    if (okv.get_type() != sol::type::boolean) {
-        spdlog::warn("[plugin:{}] {}: malformed response (missing ok)", id, method);
-        return fail("malformed response: missing ok");
-    }
-    if (!okv.as<bool>()) {
-        const sol::object ev = t["error"];
-        const std::string msg = ev.get_type() == sol::type::string ? ev.as<std::string>() : std::string("plugin error");
-        spdlog::warn("[plugin:{}] {} returned error: {}", id, method, msg);
-        return fail(msg);
-    }
-    record(true, "");
-    return R"({"ok":true,"data":)" + dump_json(sol_to_json(t["data"])) + "}";
+    return fail("runtime '" + rt->info.runtime + "' not supported");
 }
 
 CallHealth Host::health(const std::string& id) const {
