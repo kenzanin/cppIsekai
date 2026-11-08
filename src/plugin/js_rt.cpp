@@ -219,12 +219,15 @@ Loaded load(std::string id, std::string dir, std::string entry_src, wasm::Servic
 wasm::RawReply invoke(Instance& inst, const std::string& envelope_json) {
     wasm::RawReply out;
     JSContext* c = inst.ctx;
+    JS_UpdateStackTop(inst.rt); // pool-thread stack base differs from the loader's
     inst.ops_left = kOpsPerCall;
 
     JSValue env = JS_ParseJSON(c, envelope_json.data(), envelope_json.size(), "<env>");
     if (JS_IsException(env)) {
+        const std::string why = exception_msg(c);
+        spdlog::warn("[js:dbg] env={} err={}", envelope_json, why);
+        out.error = "js: bad envelope: " + why;
         JS_FreeValue(c, JS_GetException(c));
-        out.error = "js: bad envelope";
         return out;
     }
     JSValue g = JS_GetGlobalObject(c);
