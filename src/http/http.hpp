@@ -12,7 +12,7 @@
 
 /** \brief Production fetcher for cache misses: one curl GET, body on 2xx,
  *  else nullopt. Single choke point by design -- proxy (ini [server] proxy)
- *  rides on every handle via plugin::applyProxy; keep it that way. */
+ *  rides on every handle via the fetch gate (src/fetch); keep it that way. */
 cache::Fetcher makeCurlFetcher(std::string proxy);
 
 /** \brief Composition root: registers every route on a fresh crow app and

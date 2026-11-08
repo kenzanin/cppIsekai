@@ -32,18 +32,10 @@ struct Config {
     // per 1000 vm instructions).
     long instruction_budget = 5000000;
 
-    // Host-wide outbound proxy (ini [server] proxy), applied to every handle
-    // via applyProxy; empty = direct.
+    // Host-wide outbound proxy (ini [server] proxy); the fetch gate applies
+    // it to every handle; empty = direct.
     std::string proxy;
 };
-
-/** \brief One proxy rule for every outbound curl handle (plugin fetch + image
- *  getter): empty string means direct, no CURLOPT_PROXY set. */
-inline void applyProxy(CURL* e, const std::string& proxy) {
-    if (!proxy.empty()) {
-        curl_easy_setopt(e, CURLOPT_PROXY, proxy.c_str());
-    }
-}
 
 struct PluginInfo {
     std::string id, name, version, runtime, entry;
