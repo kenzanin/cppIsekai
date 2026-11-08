@@ -29,6 +29,13 @@ file(GLOB WASM3_SRC CONFIGURE_DEPENDS ${TP}/wasm3/src/*.c)
 add_library(wasm3 STATIC ${WASM3_SRC})
 target_include_directories(wasm3 PUBLIC ${TP}/wasm3/src)
 
+# --- vendored static: quickjs-ng (js plugin runtime, plugin-js-wasm; pin d4187c7 2026-11-07) ---
+file(GLOB QUICKJS_SRC CONFIGURE_DEPENDS ${TP}/quickjs/*.c)
+add_library(quickjs STATIC ${QUICKJS_SRC})
+target_include_directories(quickjs PUBLIC ${TP}/quickjs)
+target_compile_definitions(quickjs PRIVATE _GNU_SOURCE)
+target_link_libraries(quickjs PUBLIC m ${CMAKE_DL_LIBS} pthread)
+
 add_library(sqlite3 STATIC ${TP}/libsql/sqlite/sqlite3.c)
 target_include_directories(sqlite3 PUBLIC ${TP}/libsql/sqlite)
 
@@ -48,7 +55,7 @@ target_include_directories(
           ${TP}/libzippp)
 target_link_libraries(
   cppIsekai
-  PRIVATE wasm3 sqlite3 PkgConfig::VIPS PkgConfig::LUA
+  PRIVATE wasm3 quickjs sqlite3 PkgConfig::VIPS PkgConfig::LUA
           ${TP}/curl-impersonate/lib/libcurl-impersonate-chrome.so.4.8.0
           spdlog::spdlog PkgConfig::LIBZIP)
 target_compile_options(cppIsekai PRIVATE -Wall -Wextra)
@@ -75,7 +82,7 @@ target_include_directories(
           ${TP}/sqlite_orm/include ${TP}/readerwriterqueue/include)
 target_link_libraries(
   test_plugin
-  PRIVATE wasm3 sqlite3 PkgConfig::LUA
+  PRIVATE wasm3 quickjs sqlite3 PkgConfig::LUA
           ${TP}/curl-impersonate/lib/libcurl-impersonate-chrome.so.4.8.0
           spdlog::spdlog)
 target_compile_options(test_plugin PRIVATE -Wall -Wextra)
