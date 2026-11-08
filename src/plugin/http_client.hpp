@@ -41,17 +41,17 @@ inline std::string checked_profile(std::string want, const std::string& live_def
     return want;
 }
 
-/** \brief Per-plugin cookie-jar path (task 2.1):
- *  data/plugin-state/<id>.cookies.txt, the dir created on first use; a dir
+/** \brief Per-plugin cookie-jar path (task 2.1): <base>/<id>.cookies.txt
+ *  (the default base data/plugin-state), the dir created on first use; a dir
  *  failure warns and the request still proceeds (curl tolerates a missing
- *  jar file, it just starts an empty engine). */
-inline std::string cookie_jar_path(const std::string& id) {
+ *  jar file, it just starts an empty engine). The base overrides for tests. */
+inline std::string cookie_jar_path(const std::string& id, const std::string& base = "data/plugin-state") {
     std::error_code ec;
-    std::filesystem::create_directories("data/plugin-state", ec);
+    std::filesystem::create_directories(base, ec);
     if (ec) {
         spdlog::warn("[plugin:{}] cookie state dir unavailable: {}", id, ec.message());
     }
-    return "data/plugin-state/" + id + ".cookies.txt";
+    return base + "/" + id + ".cookies.txt";
 }
 
 /** \brief The live default-profile cell type itself is plugin::LiveProfile

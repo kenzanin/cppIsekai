@@ -13,4 +13,4 @@
 
 ## 3. Verify
 
-- [ ] 3.1 Unit: invalid-target fallback; tmp-dir jar round-trip; two-jar isolation; full ctest green zero new warnings; `openspec validate --specs`; optional live smoke via `PLUGIN_SMOKE_URL`
+- [x] 3.1 Unit: invalid-target fallback; tmp-dir jar round-trip; two-jar isolation; full ctest green zero new warnings; `openspec validate --specs`; optional live smoke via `PLUGIN_SMOKE_URL`
