@@ -19,8 +19,8 @@
 
 ## 4. config & cache
 
-- [ ] 4.1 `config.hpp` -> umbrella + `config_registry.hpp` + `config_io.hpp`; consumer surface unchanged (`config.hpp` still the include); ctest green
-- [ ] 4.2 `cache.cpp` -> LRU core + `cache_scan.cpp` (boot walk, purge-once); ctest green
+- [x] 4.1 `config.hpp` -> umbrella + `config_registry.hpp` + `config_io.hpp`; consumer surface unchanged (`config.hpp` still the include); ctest green
+- [x] 4.2 `cache.cpp` -> LRU core + `cache_scan.cpp` (boot walk, purge-once); ctest green
 
 ## 5. clang-doc conversion
 
@@ -29,5 +29,5 @@
 
 ## 6. Verify & bookkeeping
 
-- [ ] 6.1 Full ctest green, zero new warnings; code-loc audit per D1b (comments/blank stripped) vs the pruned scope; `git diff --color-moved=plain` spot check; large functions verified unsplit; optional `clang-doc` dry-run
+- [x] 6.1 Full ctest green, zero new warnings; code-loc audit per D1b (comments/blank stripped) vs the pruned scope; `git diff --color-moved=plain` spot check; large functions verified unsplit; optional `clang-doc` dry-run
 - [ ] 6.2 Update the AGENTS.md crown-file note; record the layout decision in OKF (close pipeline)
