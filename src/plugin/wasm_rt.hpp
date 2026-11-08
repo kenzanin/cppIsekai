@@ -20,6 +20,8 @@
 
 #include <glaze/glaze.hpp>
 
+#include "plugin/runtime_common.hpp"
+
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -33,27 +35,12 @@
 
 namespace plugin::wasm {
 
-// Raw reply handed to the core; the lua seam (plugin.cpp) aliases this type so
-// both backends feed the same shape check.
-struct RawReply {
-    bool invoked = false;
-    std::string error; // host-side diagnostic when !invoked (already logged)
-    glz::generic reply;
-};
-
-// Host services the guest reaches through env.* imports, bound per plugin at
-// load. nullopt results are the import's -1 (domain failure).
-using StateGet = std::function<std::optional<std::string>(const std::string& plugin_id, const std::string& key)>;
-using StateSet = std::function<void(const std::string& plugin_id, const std::string& key, const std::string& value)>;
-// url + opts JSON in, reply JSON out ({"status","body","headers"}, the lua
-// http.fetch shape); nullopt = fetch failure.
-using HttpFetch = std::function<std::optional<std::string>(const std::string& url, const std::string& opts_json)>;
-
-struct Services {
-    StateGet state_get;
-    StateSet state_set;
-    HttpFetch http_fetch;
-};
+// Shared runtime types (RawReply/Services and the state/fetch signatures) live
+// in plugin::runtime_common.hpp; aliased here so the wasm seam keeps its
+// spelling. The lua seam consumes the same via plugin::lua, the core directly.
+using RawReply = plugin::RawReply;
+using Services = plugin::Services;
+using HttpFetch = plugin::HttpFetch;
 
 // One loaded module: runtime + parsed image + resolved imports. The wasm bytes
 // must outlive the module (m3 keeps pointers into them), hence the member.

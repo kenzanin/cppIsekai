@@ -47,13 +47,6 @@ namespace {
 // json <-> lua bridges. glz::generic = variant<null,double,string,bool,vec,map>
 // ---------------------------------------------------------------------------
 
-std::string dump_json(const glz::generic& g) {
-    if (auto s = glz::write_json(g)) {
-        return std::move(*s);
-    }
-    return "null";
-}
-
 std::string err_json(std::string msg) {
     glz::generic ok;
     glz::generic err;
@@ -64,15 +57,6 @@ std::string err_json(std::string msg) {
     obj.insert({"ok", std::move(ok)});
     obj.insert({"error", std::move(err)});
     return dump_json(root);
-}
-
-// Object member view: nullptr when there is no object or the key is absent.
-const glz::generic* member(const glz::generic::object_t* obj, const char* key) {
-    if (obj == nullptr) {
-        return nullptr;
-    }
-    const auto it = obj->find(std::string(key));
-    return it != obj->end() ? &it->second : nullptr;
 }
 
 sol::object json_to_sol(lua_State* L, const glz::generic& g) {
@@ -391,11 +375,6 @@ void open_sandbox(lua_State* L) {
     lua_pop(L, 1);
 }
 
-// Plugin state accessors: (plugin_id, key) -> value. Routed to the db worker
-// when one is attached; inline otherwise (tests).
-using StateGet = std::function<std::optional<std::string>(const std::string&, const std::string&)>;
-using StateSet = std::function<void(const std::string&, const std::string&, const std::string&)>;
-
 void install_host_tools(lua_State* L, const std::string& id, const Config& conf, const glz::generic& cfg, bool has_cfg,
                         const StateGet& sget, const StateSet& sset, const std::string& dir) {
     sol::state_view sv(L);
@@ -631,11 +610,9 @@ struct Manifest {
 // ---------------------------------------------------------------------------
 
 // Raw reply handed back to the core: the plugin's return value marshaled
-// as-is, shape-checked later. When the entry never produced one, invoked is
-// false and error carries the host-side diagnostic (already logged).
-// The struct itself lives in wasm_rt.hpp (plugin::wasm::RawReply) so the wasm
-// seam can fill it too; this alias keeps the lua path's spelling.
-using RawReply = wasm::RawReply;
+// as-is, shape-checked later (plugin::RawReply, runtime_common.hpp). When the
+// entry never produced one, invoked is false and error carries the
+// host-side diagnostic (already logged).
 
 // lua seam: materialize the envelope as lua values, invoke handle, marshal
 // the reply back to JSON. Lua-level failures (exception, budget) are logged
