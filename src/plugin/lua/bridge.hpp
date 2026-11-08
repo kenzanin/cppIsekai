@@ -10,6 +10,7 @@
  */
 
 #include "plugin/runtime_common.hpp"
+#include "plugin/plugin.hpp" // LiveProfile: the 1.2 install_host_tools signature
 
 #include <glaze/glaze.hpp>
 

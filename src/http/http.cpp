@@ -1,25 +1,42 @@
 #include "http.hpp"
 #include "http_routes.hpp"
 
-#include "fetch/fetch.hpp"
 #include "reader/worker.hpp"
 
+#include <cstdio>
+#include <optional>
 #include <string>
 #include <utility>
 
-// The image-cache fetcher rides the same gate as the plugins (one
-// curl_easy_impersonate call site); the profile stays pinned chrome116 here --
-// task 1.2's live default is a plugin-path concern.
-cache::Fetcher makeCurlFetcher(std::string proxy) {
-    return [proxy = std::move(proxy)](const std::string& url) -> std::optional<std::string> {
-        fetch::Request req;
-        req.url = url;
-        req.profile = "chrome116"; // ponytail: plugin-parity 30s, no per-pool knobs
-        const fetch::Result fr = fetch::sync(req, proxy);
-        if (!fr.error.empty() || fr.status < 200 || fr.status >= 300) {
-            return std::nullopt; // error pages must not become cache entries
+// The image-cache fetcher: a curl CLI subprocess. ponytail: the host process
+// already carries the impersonate libcurl; loading a second libcurl TLS stack
+// in-process segfaults on first use, and the impersonate stacks themselves
+// die with SSL_CONNECT_ERROR against uploads.mangadex.org's CDN. The system
+// CLI (OpenSSL) is the only engine proven to handshake there; promote to a
+// dedicated out-of-process fetch helper if anything heavier than images
+// ever needs it.
+cache::Fetcher makeCurlFetcher(std::string /*proxy*/) {
+    return [](const std::string& url) -> std::optional<std::string> {
+        // Shell-safe single quoting for the URL.
+        std::string quoted;
+        for (const char c : url) {
+            quoted += c == '\'' ? "'\\''" : std::string(1, c);
         }
-        return fr.body;
+        // -f: HTTP errors become non-zero exits, never cached bodies.
+        FILE* pipe = popen(("curl -sfL --max-time 30 '" + quoted + "' 2>/dev/null").c_str(), "r");
+        if (!pipe) {
+            return std::nullopt;
+        }
+        std::string body;
+        char buf[65536];
+        size_t n = 0;
+        while ((n = fread(buf, 1, sizeof buf, pipe)) > 0) {
+            body.append(buf, n);
+        }
+        if (pclose(pipe) != 0) {
+            return std::nullopt;
+        }
+        return body;
     };
 }
 

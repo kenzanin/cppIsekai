@@ -125,6 +125,47 @@ const CurlApi* firefox_api() {
     return ok ? &api : nullptr;
 }
 
+/** \brief The system libcurl family: dlopen'd the same way as the ff lib, but
+ *  OpenSSL TLS and NO impersonation -- the only stack proven to handshake with
+ *  uploads.mangadex.org's CDN (the impersonate builds' TLS dies there, and
+ *  plain curl always succeeded). Absent lib => nullptr, the caller degrades. */
+const CurlApi* system_api() {
+    static std::once_flag once;
+    static CurlApi api{};
+    static bool ok = false;
+    std::call_once(once, [] {
+        void* h = dlopen("libcurl.so.4", RTLD_NOW | RTLD_LOCAL);
+        if (!h) {
+            spdlog::warn("[fetch] system libcurl dlopen failed ({}); system family unavailable", dlerror());
+            return;
+        }
+        const auto sym = [&h](const char* n) { return dlsym(h, n); };
+        // This lib's global init never ran (the linked impersonate lib did its
+        // own): two libcurl instances in one process need independent SSL init,
+        // else the first easy_perform segfaults.
+        const auto global_init = reinterpret_cast<CURLcode (*)(long)>(sym("curl_global_init"));
+        if (!global_init || global_init(CURL_GLOBAL_DEFAULT) != CURLE_OK) {
+            spdlog::warn("[fetch] system libcurl global_init failed; system family unavailable");
+            return;
+        }
+        api.easy_init = reinterpret_cast<CURL* (*)()>(sym("curl_easy_init"));
+        api.easy_cleanup = reinterpret_cast<void (*)(CURL*)>(sym("curl_easy_cleanup"));
+        api.easy_setopt = reinterpret_cast<CURLcode (*)(CURL*, CURLoption, ...)>(sym("curl_easy_setopt"));
+        api.easy_perform = reinterpret_cast<CURLcode (*)(CURL*)>(sym("curl_easy_perform"));
+        api.easy_getinfo = reinterpret_cast<CURLcode (*)(CURL*, CURLINFO, ...)>(sym("curl_easy_getinfo"));
+        api.slist_append = reinterpret_cast<curl_slist* (*)(curl_slist*, const char*)>(sym("curl_slist_append"));
+        api.easy_strerror = reinterpret_cast<const char* (*)(CURLcode)>(sym("curl_easy_strerror"));
+        // No easy_impersonate on purpose: the system family never impersonates.
+        if (!api.easy_init || !api.easy_cleanup || !api.easy_setopt || !api.easy_perform || !api.easy_getinfo ||
+            !api.slist_append || !api.easy_strerror) {
+            spdlog::warn("[fetch] system libcurl missing symbols; system family unavailable");
+            return;
+        }
+        ok = true;
+    });
+    return ok ? &api : nullptr;
+}
+
 /** \brief The single transfer body, family-parameterized. The option block,
  *  the retry and the proxy rule are identical for both libs. */
 Result run_with(const CurlApi& c, const Request& req, const std::string& profile, const std::string& proxy) {
@@ -174,7 +215,9 @@ Result run_with(const CurlApi& c, const Request& req, const std::string& profile
         if (hdrs) {
             c.easy_setopt(e.get(), CURLOPT_HTTPHEADER, hdrs); // freed with the handle's cache; lives this call
         }
-        c.easy_impersonate(e.get(), profile.c_str(), 1);
+        if (!req.plain) {
+            c.easy_impersonate(e.get(), profile.c_str(), 1);
+        }
     };
     setup(easy);
     // ponytail: the impersonate builds intermittently fail the TLS handshake
@@ -207,6 +250,15 @@ Result run_with(const CurlApi& c, const Request& req, const std::string& profile
 
 Result sync(const Request& req, const std::string& proxy) {
     std::string profile = req.profile.empty() ? std::string("chrome116") : req.profile;
+    if (req.plain) {
+        // The system family: stock TLS, no impersonation -- the only engine
+        // proven to handshake with uploads.mangadex.org's CDN. Degrades to
+        // the linked chrome lib (impersonation skipped) if dlopen fails.
+        if (const CurlApi* sys = system_api()) {
+            return run_with(*sys, req, profile, proxy);
+        }
+        return run_with(chrome_api(), req, profile, proxy);
+    }
     if (family_of(profile) == Family::Firefox) {
         if (const CurlApi* ff = firefox_api()) {
             return run_with(*ff, req, profile, proxy);

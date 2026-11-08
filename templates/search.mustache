@@ -65,7 +65,7 @@
       <li class="list-none">
         <div class="aspect-[3/4] rounded overflow-hidden"
              :style="'background:hsl('+(idx*47%360)+' 40% 28%)'">
-          <img :src="it.cover" class="w-full h-full object-cover" loading="lazy"
+          <img :src="'/cache/img?url='+encodeURIComponent(it.cover)" class="w-full h-full object-cover" loading="lazy"
                @error="$el.style.display='none'" alt="">
         </div>
         <p class="mt-1 text-sm truncate" x-text="it.name"></p>

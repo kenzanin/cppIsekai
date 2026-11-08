@@ -33,6 +33,10 @@ struct Request {
     std::vector<std::pair<std::string, std::string>> headers;
     // 2.1/2.2: per-plugin jar path; the runtime opts opt in via a cookie flag.
     std::string cookie_jar;
+    // true: skip impersonation entirely (stock curl). Image-cache fetcher
+    // uses this -- the chrome116 fingerprint triggers MangaDex CDN's
+    // anti-bot challenge on uploads.mangadex.org (plain curl gets the JPEG).
+    bool plain = false;
 };
 
 /** \brief Transfer outcome; error non-empty means no response at all. */
@@ -64,7 +68,7 @@ inline bool is_known_target(std::string_view t) {
     return false;
 }
 
-/** \brief Which lib family serves the profile: ff*/firefox* run on the
+/** \brief Which lib family serves the profile: ff / firefox prefixes run on the
  *  firefox sibling lib, everything else on the linked chrome family. */
 enum class Family { Chrome, Firefox };
 
