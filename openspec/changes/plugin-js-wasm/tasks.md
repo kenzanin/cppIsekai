@@ -19,4 +19,4 @@
 ## 4. Verify
 
 - [x] 4.1 Full `ctest` green, zero new warnings; `openspec validate --specs`
-- [ ] 4.2 Live smoke: deploy js+wasm fixture plugins to a scratch plugins dir, boot daemon, `curl` the plugin call route for both runtimes (happy + error path), then remove
+- [x] 4.2 Live smoke: deploy js+wasm fixture plugins to a scratch plugins dir, boot daemon, `curl` the plugin call route for both runtimes (happy + error path), then remove
