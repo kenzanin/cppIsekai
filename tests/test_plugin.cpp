@@ -244,3 +244,30 @@ TEST_CASE("wasm runtime: gas trap maps to ok:false") {
     CHECK(res.find("\"ok\":false") != std::string::npos);
     CHECK_FALSE(host.health("wasmspin").ok);
 }
+
+TEST_CASE("js runtime: realm call over quickjs") {
+    LogSetup ls;
+    Store store("test_js.db");
+    plugin::Host host(test_conf());
+    host.load_all(store);
+
+    const std::string res = host.call("jsfix", "ping", "{}");
+    CHECK(res.find("\"ok\":true") != std::string::npos);
+    CHECK(res.find("\"js\":\"pong\"") != std::string::npos);
+    CHECK(host.health("jsfix").ok);
+
+    // budget: spin loops forever; the interrupt handler ends it ok:false
+    const std::string spin = host.call("jsfix", "spin", "{}");
+    CHECK(spin.find("\"ok\":false") != std::string::npos);
+}
+
+TEST_CASE("js runtime: broken entry loads as absent") {
+    LogSetup ls;
+    Store store("test_jsbad.db");
+    plugin::Host host(test_conf());
+    host.load_all(store);
+
+    // jsbad fails to parse => not registered; jsfix in the same scan is.
+    CHECK(host.call("jsbad", "x", "{}").find("no plugin 'jsbad'") != std::string::npos);
+    CHECK(host.call("jsfix", "ping", "{}").find("\"ok\":true") != std::string::npos);
+}

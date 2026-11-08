@@ -1,6 +1,7 @@
 #include "plugin.hpp"
 #include "fs.hpp"
 #include "wasm_rt.hpp"
+#include "js_rt.hpp"
 
 #include "store/store.hpp"
 
@@ -610,6 +611,9 @@ struct Runtime {
 
     // wasm backend (info.runtime == "wasm"): loaded module + host services.
     std::unique_ptr<wasm::Instance> wasm;
+
+    // js backend (info.runtime == "js"): quickjs realm + host globals.
+    std::unique_ptr<js::Instance> js;
 };
 
 // Manifest; optional members may be absent, the rest are required by glaze.
@@ -812,8 +816,9 @@ int Host::load_all(Store& store) {
 
         const bool is_lua = m.runtime == "lua";
         const bool is_wasm = m.runtime == "wasm";
-        if (!is_lua && !is_wasm) {
-            spdlog::warn("plugin {}: runtime '{}' not loadable (host loads: lua, wasm)", rt.info.id, m.runtime);
+        const bool is_js = m.runtime == "js";
+        if (!is_lua && !is_wasm && !is_js) {
+            spdlog::warn("plugin {}: runtime '{}' not loadable (host loads: lua, wasm, js)", rt.info.id, m.runtime);
             continue;
         }
         if (m.api > kHostApi) {
@@ -845,6 +850,22 @@ int Host::load_all(Store& store) {
             // The chunk may leave a nil result on the stack; balance it so the
             // protected-call path below never sees a stray value.
             lua_pop(L, lua_gettop(L));
+        } else if (is_js) {
+            // js: entry is source text; the seam owns the realm and globals.
+            std::ifstream jf(fs::path(rt.info.dir) / rt.info.entry, std::ios::binary);
+            if (!jf) {
+                spdlog::warn("plugin {}: js entry {} unreadable", rt.info.id, rt.info.entry);
+                continue;
+            }
+            std::stringstream jbuf;
+            jbuf << jf.rdbuf();
+            js::Loaded loaded = js::load(rt.info.id, rt.info.dir, std::move(jbuf).str(),
+                                         wasm::Services{sget, sset, make_wasm_fetch(rt.info.id, conf_)});
+            if (!loaded.instance) {
+                spdlog::warn("plugin {}: js load failed: {}", rt.info.id, loaded.error);
+                continue;
+            }
+            rt.js = std::move(loaded.instance);
         } else {
             // wasm: entry is a prebuilt .wasm image; the seam owns load/link.
             std::ifstream wf(fs::path(rt.info.dir) / rt.info.entry, std::ios::binary);
@@ -874,6 +895,7 @@ int Host::load_all(Store& store) {
         shared->info = std::move(rt.info);
         shared->lua = std::move(rt.lua);
         shared->wasm = std::move(rt.wasm);
+        shared->js = std::move(rt.js);
         fresh.emplace(shared->info.id, std::move(shared));
     }
 
@@ -936,6 +958,8 @@ std::string Host::call(const std::string& id, const std::string& method, const s
         r = lua_call_entry(*rt, method, conf_.instruction_budget, envelope);
     } else if (rt->wasm) {
         r = wasm::invoke(*rt->wasm, dump_json(envelope));
+    } else if (rt->js) {
+        r = js::invoke(*rt->js, dump_json(envelope));
     } else {
         return fail("runtime '" + rt->info.runtime + "' not supported");
     }
