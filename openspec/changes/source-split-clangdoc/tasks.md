@@ -2,6 +2,7 @@
 
 ## 1. plugin module split
 
+- [ ] 1.0 Baseline re-measure on the D1b code-loc metric (comments/blank stripped) across `src/**`; publish the table and prune the split scope to files actually >200 code-loc (borderlines: cache, js_rt, config may drop out)
 - [ ] 1.1 Hoist shared runtime types: `RawReply` + `Services` from `wasm_rt.hpp` -> new `src/plugin/runtime_common.hpp`; `plugin.cpp`, wasm, js include it
 - [ ] 1.2 Extract the lua layer under `src/plugin/lua/`: `lua_runtime.cpp` + internal `bridge.{hpp,cpp}` (bridges, sandbox, host tools, budget hook, `lua_call_entry`); split `bridge.cpp` further if the unit lands >300 (pre-approved, design D2)
 - [ ] 1.3 Extract the sync http client: `src/plugin/http_client.{hpp,cpp}` (`FetchResult`, sinks, `fetch_sync`, `applyProxy`, `make_wasm_fetch`); root-level, interim home until `fetch-gate`
@@ -28,5 +29,5 @@
 
 ## 6. Verify & bookkeeping
 
-- [ ] 6.1 Full ctest green, zero new warnings; `wc -l` audit vs design D2; `git diff --color-moved=plain` spot check; optional `clang-doc` dry-run
+- [ ] 6.1 Full ctest green, zero new warnings; code-loc audit per D1b (comments/blank stripped) vs the pruned scope; `git diff --color-moved=plain` spot check; large functions verified unsplit; optional `clang-doc` dry-run
 - [ ] 6.2 Update the AGENTS.md crown-file note; record the layout decision in OKF (close pipeline)
