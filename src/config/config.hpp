@@ -1,6 +1,9 @@
-// Config core: layered resolve (default < ini < env < explicit flag) over the registry.
-// All config knowledge lives in src/config/ (D1); header-only, no .cpp.
 #pragma once
+
+/** \file config.hpp
+ *  \brief Config core: layered resolve (default < ini < env < explicit flag)
+ *  over the registry. All config knowledge lives in src/config/ (D1);
+ *  header-only, no .cpp. */
 
 #include "registry.hpp"
 
@@ -40,7 +43,8 @@ struct Overrides {
     std::array<CLI::Option*, kEntryCount> opt{};
 };
 
-// Binds every registry knob as a long option; second name rides CLI11's comma list.
+/** \brief Binds every registry knob as a long option; second name rides
+ *  CLI11's comma list. */
 inline void build_cli(CLI::App& app, Overrides& o) {
     for (std::size_t i = 0; i < kEntryCount; ++i) {
         const Entry& e = kEntries[i];
@@ -56,7 +60,8 @@ using EnvLookup = std::function<const char*(const char*)>;
 
 namespace detail {
 
-// Lenient numeric read: empty/unparseable falls back to the registry default.
+/** \brief Lenient numeric read: empty/unparseable falls back to the registry
+ *  default. */
 template <class T> inline T num_or(const std::string& s, const char* def) {
     try {
         return static_cast<T>(std::stoll(s));
@@ -65,7 +70,8 @@ template <class T> inline T num_or(const std::string& s, const char* def) {
     return static_cast<T>(std::stoll(def)); // registry defaults are well-formed
 }
 
-// Resolved strings -> typed fields. Indexes must stay in lockstep with kEntries.
+/** \brief Resolved strings -> typed fields. Indexes must stay in lockstep
+ *  with kEntries. */
 inline Config to_config(const std::array<std::string, kEntryCount>& v) {
     Config c;
     c.port = num_or<int>(v[0], kEntries[0].def);
@@ -86,10 +92,10 @@ inline Config to_config(const std::array<std::string, kEntryCount>& v) {
 
 } // namespace detail
 
-// POST /config body coercion: JSON object -> updates map in string form.
-// Integers up to 1e18 keep exact integer text; fractional doubles go through
-// to_string(double); any other value type is an error. Crow-free so the
-// branchy part is unit-testable (review I1).
+/** \brief POST /config body coercion: JSON object -> updates map in string
+ *  form. Integers up to 1e18 keep exact integer text; fractional doubles go
+ *  through to_string(double); any other value type is an error. Crow-free so
+ *  the branchy part is unit-testable (review I1). */
 inline bool parse_updates(const std::string& body, std::map<std::string, std::string>& out,
                           std::string& err) {
     glz::generic root;
@@ -112,7 +118,8 @@ inline bool parse_updates(const std::string& body, std::map<std::string, std::st
     return true;
 }
 
-// env lookup injectable for tests; pass {} to run with no env at all.
+/** \brief Layered resolve; env lookup injectable for tests; pass {} to run
+ *  with no env at all. */
 inline Config resolve(
     const Overrides& flags, const std::string& ini_path,
     const EnvLookup& env = [](const char* n) { return std::getenv(n); }) {
@@ -140,19 +147,19 @@ inline Config resolve(
     return detail::to_config(v);
 }
 
-// Minimal value escaping per SimpleIni load rules: a bare value gets trimmed,
-// so only quote when surrounding whitespace must survive. Registry defaults
-// are single-line; nothing else needs escaping (D4).
+/** \brief Minimal value escaping per SimpleIni load rules: a bare value gets
+ *  trimmed, so only quote when surrounding whitespace must survive. Registry
+ *  defaults are single-line; nothing else needs escaping (D4). */
 inline std::string ini_literal(std::string_view v) {
     if (!v.empty() && (v.front() == ' ' || v.back() == ' '))
         return '"' + std::string(v) + '"';
     return std::string(v);
 }
 
-// D4: ini template rendered straight from the registry -- one [section] header
-// per group, `; doc` above every key, `key = default`. Pure string on purpose:
-// file governance lives in the caller, so dumping never touches an existing
-// config and runs with no --config at all.
+/** \brief D4: ini template rendered straight from the registry -- one
+ *  [section] header per group, `; doc` above every key, `key = default`. Pure
+ *  string on purpose: file governance lives in the caller, so dumping never
+ *  touches an existing config and runs with no --config at all. */
 inline std::string dump() {
     std::string out;
     std::string section;
@@ -176,13 +183,14 @@ inline std::string dump() {
     return out;
 }
 
-// D5: merge-save. Validation runs first -- every "section.key" must be a
-// registry entry and numeric knobs take integer strings -- so a rejected
-// body never touches the file. The existing ini is then edited in place by
-// SimpleIni, which is what keeps comments and ordering; a missing file is
-// seeded from dump() so a fresh config ships fully documented. Returns keys
-// written, -1 on rejected input (nothing written), -2 when the file cannot
-// be written; *err carries the reason when non-null.
+/** \brief D5: merge-save. Validation runs first -- every "section.key" must
+ *  be a registry entry and numeric knobs take integer strings -- so a
+ *  rejected body never touches the file. The existing ini is then edited in
+ *  place by SimpleIni, which is what keeps comments and ordering; a missing
+ *  file is seeded from dump() so a fresh config ships fully documented.
+ *
+ *  Returns keys written, -1 on rejected input (nothing written), -2 when the
+ *  file cannot be written; \p err carries the reason when non-null. */
 inline int save(const std::map<std::string, std::string>& updates, const std::string& ini_path,
                 std::string* err = nullptr) {
     auto reject = [&](std::string why, int rc) {

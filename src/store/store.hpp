@@ -1,7 +1,11 @@
 #pragma once
-// The only SQL in the program lives in this class. Callers get methods, never
-// statement text. sqlite_orm (vendored, Pimpl-hidden) under the hood.
-// ponytail: sqlite_orm is not thread-safe; all calls must come from the db worker.
+
+/** \file store.hpp
+ *  \brief The only SQL in the program lives in this class; callers get
+ *  methods, never statement text (sqlite_orm vendored, Pimpl-hidden).
+ *
+ *  ponytail: sqlite_orm is not thread-safe; all calls must come from the db
+ *  worker. */
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -36,16 +40,18 @@ public:
     Store& operator=(const Store&) = delete;
 
     std::vector<Plugin> plugins();
-    // Register/upsert a discovered plugin keyed by its stable id.
+    /** \brief Register/upsert a discovered plugin keyed by its stable id. */
     void upsert_plugin(const std::string& id, const std::string& name, const std::string& version,
                        const std::string& capabilities, const std::string& runtime);
     void set_plugin_enabled(std::int64_t id, bool on);
-    // Gate for call paths; absent row (unregistered id) counts as enabled.
+    /** \brief Gate for call paths; absent row (unregistered id) counts as
+     *  enabled. */
     bool plugin_enabled(const std::string& plugin_id);
     int count(const std::string& plugin, const std::string& query);
     std::vector<Title> search(const std::string& plugin, const std::string& query, int limit, int offset);
 
-    // Per-plugin key-value state (tokens etc.); survives restart. nullopt when absent.
+    /** \brief Per-plugin key-value state (tokens etc.); survives restart.
+     *  nullopt when absent. */
     std::optional<std::string> state_get(const std::string& plugin_id, const std::string& key);
     void state_set(const std::string& plugin_id, const std::string& key, const std::string& value);
 

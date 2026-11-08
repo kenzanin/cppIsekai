@@ -1,9 +1,13 @@
-// Stale-serve layer (design D3): ONE wrap around the ABI call route, no
-// per-plugin branches. Success -> persist the response envelope; failure
-// (`ok:false` / malformed) -> last-good + `"cached":true` on top level, merged
-// through glaze -- never string-spliced. Opt-in read-only methods only.
-// The call itself is injected (any callable), so tests fake it hermetically.
 #pragma once
+
+/** \file stale.hpp
+ *  \brief Stale-serve layer (design D3): ONE wrap around the ABI call route,
+ *  no per-plugin branches.
+ *
+ *  Success -> persist the response envelope; failure (`ok:false` / malformed)
+ *  -> last-good + `"cached":true` on top level, merged through glaze -- never
+ *  string-spliced. Opt-in read-only methods only. The call itself is injected
+ *  (any callable), so tests fake it hermetically. */
 
 #include "cache/cache.hpp"
 #include "cache/sha1.hpp"
@@ -14,14 +18,15 @@
 #include <string>
 #include <utility>
 
-// Read-only methods allowed to serve stale (exact opt-in list, design D3;
-// `pages` lands with 3.1 and is listed here from the start).
+/** \brief Read-only methods allowed to serve stale (exact opt-in list, design
+ *  D3; `pages` lands with 3.1 and is listed here from the start). */
 inline bool stale_optin(const std::string& method) {
     return method == "search" || method == "detail" || method == "chapters" ||
            method == "pages" || method == "genres";
 }
 
-// `ok` of an ABI envelope; anything but a literal true is a failure to serve.
+/** \brief `ok` of an ABI envelope; anything but a literal true is a failure
+ *  to serve. */
 inline bool envelope_ok(const glz::generic& g) {
     const auto* obj = std::get_if<glz::generic::object_t>(&g.data);
     if (!obj) return false;
@@ -30,8 +35,8 @@ inline bool envelope_ok(const glz::generic& g) {
     return b && *b;
 }
 
-// `data` of an ok ABI envelope, copied; nullopt on any malformed shape.
-// Consumers: the reader window composition and, later, the prefetch worker.
+/** \brief `data` of an ok ABI envelope, copied; nullopt on any malformed
+ *  shape. Consumers: the reader window composition and the prefetch worker. */
 inline std::optional<glz::generic::array_t> envelope_data(const std::string& envelope) {
     glz::generic parsed;
     if (glz::read_json(parsed, envelope) || !envelope_ok(parsed) || !parsed.is_object())
@@ -41,12 +46,13 @@ inline std::optional<glz::generic::array_t> envelope_data(const std::string& env
     return data->second.get_array();
 }
 
-// sha1(plugin|method|sorted-query): params re-serialized with keys sorted
-// (glz::generic_sorted), so permuted query order hashes to one entry.
-// Unparsable params hash verbatim -- the route always sends an object anyway.
-// ponytail: no response-shape version in the key -- a plugin that reshapes its
-// payload under an unchanged query serves old-shape stale; add a version
-// segment here when a redesign actually ships.
+/** \brief sha1(plugin|method|sorted-query): params re-serialized with keys
+ *  sorted (glz::generic_sorted), so permuted query order hashes to one entry.
+ *  Unparsable params hash verbatim -- the route always sends an object anyway.
+ *
+ *  ponytail: no response-shape version in the key -- a plugin that reshapes
+ *  its payload under an unchanged query serves old-shape stale; add a version
+ *  segment here when a redesign actually ships. */
 inline std::string stale_key(const std::string& plugin, const std::string& method,
                              const std::string& params_json) {
     std::string canon = params_json;
@@ -57,9 +63,9 @@ inline std::string stale_key(const std::string& plugin, const std::string& metho
     return sha1_hex(plugin + '|' + method + '|' + canon);
 }
 
-// The wrap: run `call`, then persist on success / fall back to last-good with
-// `cached:true` on failure. Envelopes that glaze cannot re-shape pass through
-// untouched in both directions.
+/** \brief The wrap: run \p call, then persist on success / fall back to
+ *  last-good with `cached:true` on failure. Envelopes that glaze cannot
+ *  re-shape pass through untouched in both directions. */
 template <class Call> // std::string() -- the ABI call seam
 std::string call_cached(cache::Cache& cache, const std::string& id, const std::string& method,
                         const std::string& params_json, Call&& call) {

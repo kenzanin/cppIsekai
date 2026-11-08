@@ -1,6 +1,10 @@
 #pragma once
-// Pure core of GET /cache/img -- no crow, so tests run without a server:
-// cache hit serves disk, miss fetches+stores then serves, failed fetch 404s.
+
+/** \file img.hpp
+ *  \brief Pure core of GET /cache/img -- no crow, so tests run without a
+ *  server: cache hit serves disk, miss fetches+stores then serves, failed
+ *  fetch 404s. */
+
 #include "cache/cache.hpp"
 
 #include <fstream>
@@ -8,8 +12,8 @@
 #include <string>
 #include <string_view>
 
-// Content-Type by file extension (cache stores the url's lowercased ext);
-// unknown or absent -> octet-stream.
+/** \brief Content-Type by file extension (cache stores the url's lowercased
+ *  ext); unknown or absent -> octet-stream. */
 inline const char* image_mime(std::string_view name) {
     const std::string_view ext = name.substr(name.find_last_of('.') + 1);
     if (ext == "jpg" || ext == "jpeg") {
@@ -40,6 +44,8 @@ struct ImgReply {
     std::string_view mime = "application/octet-stream";
 };
 
+/** \brief The /cache/img answer for \p url: 200+body+mime on hit, the 404
+ *  shape otherwise. */
 inline ImgReply serve_cached_image(cache::Cache& images, std::string_view url) {
     const auto path = images.ensure(std::string(url), "img");
     if (!path) {

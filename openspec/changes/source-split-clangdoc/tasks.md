@@ -24,8 +24,8 @@
 
 ## 5. clang-doc conversion
 
-- [ ] 5.1 Headers: `/** \file */` banners on new units; `\brief`/`\param`/`\return` on every function declaration in `src/**.hpp`
-- [ ] 5.2 Sources: convert pre-existing doc-comments on definitions; keep ponytail/why notes as plain comments
+- [x] 5.1 Headers: `/** \file */` banners on new units; `\brief`/`\param`/`\return` on every function declaration in `src/**.hpp`
+- [x] 5.2 Sources: convert pre-existing doc-comments on definitions; keep ponytail/why notes as plain comments
 
 ## 6. Verify & bookkeeping
 

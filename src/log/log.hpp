@@ -1,8 +1,13 @@
 #pragma once
-// spdlog has no websocket sink. This is the whole bridge: a sink pushes each
-// formatted line into a queue, one log worker drains it to a file and a ring
-// buffer, and the websocket replays that buffer. ponytail: fixed 200-line
-// replay; raise it or page from the file when the log page needs history.
+
+/** \file log.hpp
+ *  \brief spdlog has no websocket sink. This is the whole bridge: a sink
+ *  pushes each formatted line into a queue, one log worker drains it to a
+ *  file and a ring buffer, and the websocket replays that buffer.
+ *
+ *  ponytail: fixed 200-line replay; raise it or page from the file when the
+ *  log page needs history. */
+
 #include <readerwriterqueue.h>
 
 #include <spdlog/sinks/base_sink.h>

@@ -1,8 +1,13 @@
 #pragma once
-// slug — manga title -> filesystem-safe lowercase folder name (design D1).
-// Pure/header-only: no crow, no cache.hpp, no DB. Collision rule per spec
-// "Slug uniqueness without a DB": suffix `-<last 8 chars of id>` only when a
-// second id lands on the same base slug; a lone manga is never suffixed.
+
+/** \file slug.hpp
+ *  \brief slug -- manga title -> filesystem-safe lowercase folder name
+ *  (design D1).
+ *
+ *  Pure/header-only: no crow, no cache.hpp, no DB. Collision rule per spec
+ *  "Slug uniqueness without a DB": suffix `-<last 8 chars of id>` only when a
+ *  second id lands on the same base slug; a lone manga is never suffixed. */
+
 #include <cctype>
 #include <cstddef>
 #include <map>
@@ -13,7 +18,7 @@ namespace cache {
 
 inline constexpr std::size_t slug_max = 64;
 
-// Longest prefix <= max that ends on a UTF-8 character boundary.
+/** \brief Longest prefix <= max that ends on a UTF-8 character boundary. */
 inline std::size_t capped_len(std::string_view s, std::size_t max) {
     std::size_t n = std::min(s.size(), max);
     while (n > 0 && n < s.size() && (static_cast<unsigned char>(s[n]) & 0xC0) == 0x80)
@@ -21,9 +26,9 @@ inline std::size_t capped_len(std::string_view s, std::size_t max) {
     return n;
 }
 
-// Base slug: [a-z0-9] plus verbatim non-ASCII UTF-8 (keeps CJK titles unique;
-// bytes >= 0x80 are fs-safe), runs of anything else collapsed to one '-',
-// trimmed. Empty/blank title -> "untitled".
+/** \brief Base slug: [a-z0-9] plus verbatim non-ASCII UTF-8 (keeps CJK
+ *  titles unique; bytes >= 0x80 are fs-safe), runs of anything else collapsed
+ *  to one '-', trimmed. Empty/blank title -> "untitled". */
 inline std::string slug_base(std::string_view title) {
     std::string s;
     s.reserve(title.size());
@@ -47,8 +52,9 @@ inline std::string slug_base(std::string_view title) {
     return s.empty() ? std::string("untitled") : s;
 }
 
-// Slug for `id` within the known manga set `titles` (id -> title): the base
-// slug, plus the id suffix only on a base-slug collision with another id.
+/** \brief Slug for \p id within the known manga set \p titles (id -> title):
+ *  the base slug, plus the id suffix only on a base-slug collision with
+ *  another id. */
 inline std::string manga_slug(const std::map<std::string, std::string>& titles, const std::string& id) {
     const auto self = titles.find(id);
     if (self == titles.end())
