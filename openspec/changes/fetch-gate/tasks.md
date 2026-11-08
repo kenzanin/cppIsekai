@@ -2,14 +2,14 @@
 
 ## 1. Gate module
 
-- [ ] 1.1 `src/fetch/fetch.{hpp,cpp}`: `Request`/`sync`, sink+retry+applyProxy pindah, satu-satunya `curl_easy_impersonate`; plugin.cpp jadi consumer; full `ctest` green (perilaku identik)
-- [ ] 1.2 Opts `profile` threading lua/js/wasm + default live (snapshot conf dibaca saat call; `POST /config` efektif tanpa reload); target invalid => warn + fallback
+- [ ] 1.1 `src/fetch/fetch.{hpp,cpp}`: `Request`/`sync`, sink+retry+applyProxy moved, single `curl_easy_impersonate`; plugin.cpp becomes a consumer; full `ctest` green (identical behavior)
+- [ ] 1.2 `profile` opt threading lua/js/wasm + live default (config snapshot read at call time; `POST /config` effective without reload); unknown target => warn + fallback
 
 ## 2. Cookie jar
 
-- [ ] 2.1 `cookie_jar` di gate (`CURLOPT_COOKIEFILE/JAR`) + helper `data/plugin-state/<id>.cookies.txt`; off by default; failure => warn non-fatal
-- [ ] 2.2 Opts plugin untuk enable cookie; dok singkat di `docs/` atau comment header gate
+- [ ] 2.1 `cookie_jar` on the gate (`CURLOPT_COOKIEFILE/JAR`) + `data/plugin-state/<id>.cookies.txt` helper; off by default; failure => non-fatal warn
+- [ ] 2.2 Plugin opt to enable cookies; short doc in `docs/` or the gate header comment
 
 ## 3. Verify
 
-- [ ] 3.1 Unit: fallback target invalid; jar round-trip tmp; isolasi dua jar; full ctest green zero new warnings; `openspec validate --specs`; smoke live opsional `PLUGIN_SMOKE_URL`
+- [ ] 3.1 Unit: invalid-target fallback; tmp-dir jar round-trip; two-jar isolation; full ctest green zero new warnings; `openspec validate --specs`; optional live smoke via `PLUGIN_SMOKE_URL`

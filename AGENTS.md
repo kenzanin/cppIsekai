@@ -75,6 +75,7 @@ openspec validate --specs             # validate main specs
 - C++23, `-Wall -Wextra` clean — no new warnings on build; doctest for tests; one test target per module (`tests/test_<module>.cpp`); fixtures under `tests/fixtures/`.
 - Header-only modules preferred (config core, slug, reader worker, stale layer); crown files are `main.cpp` / `http.cpp` / `plugin.cpp` / `store.cpp` / `cache.cpp`.
 - All internationalizable content is en_US in code/identifiers; user_chat language = Indonesian (casual).
+- Generated files (docs, knowledge, openspec artifacts, reports, briefs): English only — Indonesian appears in user chat, never in committed files.
 - Commit subjects: short, lowercase imperative (e.g., `cache: slug pragma header-only (title->folder, collision id suffix) + tests`).
 - Branch per change named after change id (e.g., `cli-config`, `cache-layout`, `image-cache`); merge to main with `--no-ff` after review.
 - OpenSpec planning artifacts are captured in the change dir per spec-driven schema: `proposal.md`, `design.md` (name decisions D1..Dn), `specs/<capability>/spec.md` (ADDED/MODIFIED/REMOVED delta style), `tasks.md` (checkboxes).

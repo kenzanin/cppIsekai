@@ -1,27 +1,35 @@
 ---
 type: decision
 title: "Plugin cookie jars: libcurl-native, per-plugin file state"
-description: "User approve 2026-11-08: cookie engine native libcurl (CURLOPT_COOKIEFILE/JAR), satu jar per plugin di data/plugin-state/<id>.cookies.txt, diaktifkan lewat opsi fetch gate; tanpa dependensi baru; implementasi menyusul di change fetch-gate."
+description: "User approved 2026-11-08: native libcurl cookie engine (CURLOPT_COOKIEFILE/JAR), one jar per plugin at data/plugin-state/<id>.cookies.txt, enabled via a fetch-gate option; no new dependencies; implementation lands in change fetch-gate."
 tags: [cookie, curl, plugin-state, fetch, security]
 generated: { by: agent/mcp, at: "2026-11-08T09:00:00Z" }
 status: stable
 ---
 
-Jawaban atas "cookie jar perlu library?" - **tidak**; libcurl sudah membawa engine-nya.
+Answer to "do we need a library for cookie jars?" - **no**; libcurl ships the engine.
 
-## Kebijakan
+## Policy
 
-- **Engine**: `CURLOPT_COOKIEFILE` (path jar; string kosong = enable tanpa load) + `CURLOPT_COOKIEJAR` (persist format Netscape saat cleanup). Inspeksi via `CURLOPT_COOKIELIST`/`CURLINFO_COOKIE_LIST`.
-- **Lokasi**: `data/plugin-state/<id>.cookies.txt` - sengaja di data/, BUKAN folder plugin (folder plugin read-only per `decisions/plugin-data-segregation`; state memang dipisah).
-- **Isolasi**: handle curl dibuat fresh per request + load jar milik sendiri => antar-plugin terisolasi gratis; persist antar-restart otomatis.
-- **Kontrol**: opsi `cookie_jar` (path) di `fetch::Request` - gate `src/fetch/` yang memasang; kosong = cookie engine off (perilaku sekarang).
+- **Engine**: `CURLOPT_COOKIEFILE` (jar path; empty string = enable without loading) +
+  `CURLOPT_COOKIEJAR` (Netscape-format persist on cleanup). Inspection via
+  `CURLOPT_COOKIELIST`/`CURLINFO_COOKIE_LIST`.
+- **Location**: `data/plugin-state/<id>.cookies.txt` - deliberately under data/, NOT the
+  plugin folder (plugin folders are read-only per
+  `decisions/plugin-data-segregation`; state is separated by design).
+- **Isolation**: a fresh curl handle per request + loading only its own jar => per-plugin
+  isolation for free; persists across restarts automatically.
+- **Control**: a `cookie_jar` (path) option on `fetch::Request` - the gate sets it up;
+  empty = cookie engine off (today's behavior).
 
-## Relevansi
+## Relevance
 
-Mangadex memakai `storage.*` untuk token OAuth; jar ini untuk site yang bergantung session cookie (CF clearance, dsb). Implementasi menyusul di change `fetch-gate` (titik tembus sama dengan gate impersonate).
+Mangadex uses `storage.*` for OAuth tokens; this jar covers sites that depend on session
+cookies (CF clearance etc.). Implementation lands in change `fetch-gate` (same choke
+point as the impersonate gate).
 
 ## Related
 
-- [Plugin data segregation: host .ini is host-only](plugin-data-segregation.md): Alasan jar di data/, bukan folder plugin.
-- [Fetch profile gate: centralized curl-impersonate, dynamic per-call profile](fetch-profile-gate.md): Gate yang memasang cookie engine.
-- [Plugin system: folder packaging, manifest, multi-runtime data-contract ABI](../architecture/plugin-system.md): Opts plugin yang ditambah field cookie.
+- [Plugin data segregation: host .ini is host-only](plugin-data-segregation.md): Why the jar lives in data/, not the plugin folder.
+- [Fetch profile gate: centralized curl-impersonate, dynamic per-call profile](fetch-profile-gate.md): The gate that mounts the cookie engine.
+- [Plugin system: folder packaging, manifest, multi-runtime data-contract ABI](../architecture/plugin-system.md): Plugin opts gaining the cookie field.

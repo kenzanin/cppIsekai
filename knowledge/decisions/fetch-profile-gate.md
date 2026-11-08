@@ -1,36 +1,49 @@
 ---
 type: decision
 title: "Fetch profile gate: centralized curl-impersonate, dynamic per-call profile"
-description: "User steer 2026-11-08: gate impersonate pindah ke src/fetch/ (satu-satunya call site), profile per-call dari opts plugin > fetch_profile ini, default live via POST /config; targets lib ter-link chrome99-116/edge99-101/safari15; firefox = phase 2 (.so terpisah); menolak profile-class JA3 hand-rolled."
+description: "User steer 2026-11-08: move the impersonate gate to src/fetch/ (single call site); per-call profile from plugin opts > fetch_profile ini; live default via POST /config; linked-lib targets chrome99-116/edge99-101/safari15; firefox = phase 2 (separate .so); hand-rolled JA3 profile-class rejected."
 tags: [fetch, curl-impersonate, plugin-api, config, performance]
 generated: { by: agent/mcp, at: "2026-11-08T08:30:00Z" }
 status: stable
 ---
 
-Keputusan ini mengeksekusi arah user dari diskusi `tmp/curl-impresionate.md` (demo BrowserProfile): dynamic profile switching TANPA class JA3 hand-rolled.
+This decision executes the user direction from the `tmp/curl-impresionate.md` discussion (a BrowserProfile demo): dynamic profile switching WITHOUT a hand-rolled JA3 class.
 
-## D1 - Gate terpusat di src/fetch/
+## D1 - Centralized gate in src/fetch/
 
-`src/fetch/fetch.hpp/.cpp` = satu-satunya tempat `curl_easy_impersonate` di seluruh tree. `fetch::Request{url, timeout_ms, profile?, method, body, headers...}` + `fetch::sync(Request, proxy) -> {status, body, headers, error}`. `fetch_sync` + `applyProxy` + sink pindah dari plugin.cpp; duplikat call-site impersonate (:261 retry & :562 legacy lua) ikut hilang. Retry ponytail existing dipertahani di gate.
+`src/fetch/fetch.hpp/.cpp` = the only `curl_easy_impersonate` call site in the tree.
+`fetch::Request{url, timeout_ms, profile?, method, body, headers...}` +
+`fetch::sync(Request, proxy) -> {status, body, headers, error}`. `fetch_sync` +
+`applyProxy` + the sinks move out of plugin.cpp; the duplicate call sites (:261 retry &
+:562 legacy lua) disappear with it. The existing ponytail retry is preserved in the gate.
 
-## D2 - Resolusi profile & default live
+## D2 - Profile resolution & live default
 
-Precedence: `opts.profile` (per-call, dari plugin lua/js/wasm) > `plugin.fetch_profile` ini. Default LIVE: konf dibaca saat call (shared snapshot), bukan di-capture closure saat load -> `POST /config plugin.fetch_profile=...` efektif untuk call berikutnya tanpa restart/reload.
+Precedence: `opts.profile` (per-call, from lua/js/wasm plugins) > `plugin.fetch_profile`
+ini. Live default: config is read at call time (shared snapshot), not captured in
+closures at load -> `POST /config plugin.fetch_profile=...` applies to subsequent calls
+without restart/reload.
 
-## D3 - Targets & phase
+## D3 - Targets & phases
 
-Lib ter-link (`libcurl-impersonate-chrome.so.4.8.0`) menerima: chrome99/100/101/104/107/110/116, edge99/101, safari15 (hasil probe strings). Phase 1 = target set ini saja. Phase 2 = firefox: butuh vendor `libcurl-impersonate-firefox` terpisah (TLS NSS) - follow-up, tidak mengubah gate.
+The linked lib (`libcurl-impersonate-chrome.so.4.8.0`) accepts: chrome99/100/101/104/107/110/116,
+edge99/101, safari15 (strings probe). Phase 1 = this target set only. Phase 2 = firefox:
+requires vendoring the separate `libcurl-impersonate-firefox` (NSS TLS) - follow-up, does
+not change the gate.
 
-## D4 - Ditolak: profile-class manual
+## D4 - Rejected: manual profile class
 
-UA/headers/cipher/EC-curves per-browser (gaya demo) tidak diimplementasi - `curl_easy_impersonate` sudah bake semuanya per target; klas hanya menambah drift terhadap fingerprint lib.
+Per-browser UA/headers/ciphers/EC-curves (demo style) will not be implemented -
+`curl_easy_impersonate` already bakes all of it per target; a class would only drift
+from the lib's fingerprint.
 
-## Follow-up (di luar change ini)
+## Follow-ups (outside this change)
 
-Cookie jar persist per-plugin dan cache read-model search (JSONB) - lihat diskusi 2026-11-08; masing-masing jadi keputusan/change sendiri.
+Persistent per-plugin cookie jars and the search read-model cache - see the 2026-11-08
+decisions; each is its own decision/change.
 
 ## Related
 
-- [Dependencies & plugins: curl-first APIs, runtime parity, no hand-rolled crypto](deps-and-plugins.md): Ruling curl-first yang gate ini turun-terapan.
-- [cli-config: registry-backed config surface](../architecture/cli-config.md): Pemilik knob `plugin.fetch_profile` yang jadi fallback default.
-- [Plugin system: folder packaging, manifest, multi-runtime data-contract ABI](../architecture/plugin-system.md: ABI yang opts-nya ditambah field `profile`.
+- [Dependencies & plugins: curl-first APIs, runtime parity, no hand-rolled crypto](deps-and-plugins.md): The curl-first ruling this gate implements.
+- [cli-config: registry-backed config surface](../architecture/cli-config.md): Owner of the `plugin.fetch_profile` knob used as the fallback default.
+- [Plugin system: folder packaging, manifest, multi-runtime data-contract ABI](../architecture/plugin-system.md): The ABI whose opts gain a `profile` field.

@@ -9,7 +9,7 @@ status: stable
 
 Keputusan-keputusan ini di-stack di atas decisions/third-party-dependencies dan architecture/plugin-system.
 
-Eksekusi runtime parity + vendoring quickjs-ng (wasm3 ABI, budget, sandbox fs) tercatat di decisions/plugin-runtimes-wasm-js.
+The runtime-parity execution and the quickjs-ng vendoring (wasm3 ABI, budgets, sandboxed fs) are recorded in decisions/plugin-runtimes-wasm-js.
 
 ## R1 - Curl-first APIs
 SEMUA feature aplikasi harus bisa diakses via curl (REST routes) agar mudah debug dan test. Implikasi langsung: CBZ export = host route `GET /export/cbz?manga=<id>&chapters=...`, BUKAN plugin capability.

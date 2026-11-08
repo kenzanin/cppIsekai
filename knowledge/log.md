@@ -6,8 +6,8 @@
 * **Update**: Linked `architecture/manga-viewer-core.md` to `architecture/cli-config.md` (Config layer feeds the host core (paths/port wiring to store, plugin, cache); registry is consumer of its dependency APIs.).
 * **Creation**: Documented concept `architecture/cli-config.md` (cli-config: registry-backed config surface (CLI/env/ini/dump/save)).
 * **Update**: Updated concept `architecture/image-cache-offline.md`.
-* **Update**: Linked `decisions/third-party-dependencies.md` to `decisions/deps-and-plugins.md` (Extension of vendoring policy: tambah libzippp+libzip (CBZ), stbrumme/hash-library, quickjs-ng; base64 reuse glaze; no hand-rolled crypto.).
-* **Update**: Linked `architecture/plugin-system.md` to `decisions/deps-and-plugins.md` (Runtime parity: quickjs-ng menjadi runtime kedua dengan feature set & signature sama (data-contract ABI tetap; wasm3 tidak diprioritaskan).).
+* **Update**: Linked `decisions/third-party-dependencies.md` to `decisions/deps-and-plugins.md` (Extension of the vendoring policy: add libzippp+libzip (CBZ), stbrumme/hash-library, quickjs-ng; base64 via glaze; no hand-rolled crypto.).
+* **Update**: Linked `architecture/plugin-system.md` to `decisions/deps-and-plugins.md` (Runtime parity: quickjs-ng becomes the second runtime with the same feature set & signatures (data-contract ABI intact; wasm3 not prioritized).).
 * **Creation**: Documented concept `decisions/deps-and-plugins.md` (Dependencies & plugins: curl-first APIs, runtime parity, no hand-rolled crypto).
 * **Update**: Linked `architecture/manga-viewer-core.md` to `architecture/image-cache-offline.md`.
 * **Creation**: Documented concept `architecture/image-cache-offline.md` (cppIsekai image-cache + offline-first pathway).
@@ -28,7 +28,7 @@
 * **Update**: Linked `architecture/plugin-system.md` to `architecture/normalization-contract.md` (Plugins normalize to MangaDex canonical format and unix time per the contract).
 * **Update**: Linked `architecture/plugin-system.md` to `architecture/manga-viewer-core.md` (Plugin system realizes the host-tools orchestration of the core architecture).
 * **Creation**: Documented concept `architecture/plugin-system.md` (Plugin system: folder packaging, manifest, multi-runtime data-contract ABI).
-* **Update**: Linked `architecture/normalization-contract.md` to `architecture/fts5-search-dedup.md` (Policy normalisasi unix-time + JSON menajamkan kontrak yang dieksekusi plugin).
+* **Update**: Linked `architecture/normalization-contract.md` to `architecture/fts5-search-dedup.md` (The unix-time + JSON normalization policy sharpens the contract the plugins execute).
 * **Update**: Linked `architecture/normalization-contract.md` to `architecture/detail-page.md` (Unix-time + JSON policy refines the normalisation contract concept (okf_update wipes relations)).
 * **Update**: Updated concept `architecture/normalization-contract.md`.
 * **Update**: Linked `architecture/normalization-contract.md` to `architecture/manga-viewer-core.md` (Normalisation duty belongs to plugins orchestrated by the host).
@@ -51,8 +51,8 @@
 * **Update**: Linked `architecture/store-orm-migration.md` to `references/dependency-api.md` (sqlite_orm entry in the dependency API reference with the escape/limit/pragma caveats).
 * **Update**: Linked `architecture/store-orm-migration.md` to `references/code-layers.md` (ORM migration realizes the code-layer rules: Store remains the sole SQL gate, now via sqlite_orm).
 * **Creation**: Documented concept `architecture/store-orm-migration.md` (Store migrated to sqlite_orm (Pimpl)).
-* **Update**: Linked `references/dependency-api.md` to `decisions/third-party-dependencies.md` (API reference untuk dependensi yang diputuskan di concept ini).
-* **Update**: Linked `decisions/third-party-dependencies.md` to `decisions/build-toolchain-cpp23.md` (Dependency choices (system cli11, vendored simpleini, dst) implement the toolchain/build decision).
+* **Update**: Linked `references/dependency-api.md` to `decisions/third-party-dependencies.md` (API reference for the dependencies decided in this concept).
+* **Update**: Linked `decisions/third-party-dependencies.md` to `decisions/build-toolchain-cpp23.md` (Dependency choices (system cli11, vendored simpleini, etc.) implement the toolchain/build decision).
 * **Update**: Linked `references/code-layers.md` to `references/dependency-api.md` (Log bridge uses the verified ReaderWriterQueue/spdlog entry points).
 * **Update**: Linked `references/code-layers.md` to `architecture/home-demo.md` (Code layer map shows how the home-demo decision is realized in source).
 * **Creation**: Documented concept `references/code-layers.md` (Source layer map and rules (store / log / http)).
@@ -67,17 +67,17 @@
 * **Update**: Updated concept `references/dependency-api.md`.
 * **Update**: Updated concept `decisions/third-party-dependencies.md`.
 * **Update**: Updated concept `decisions/build-toolchain-cpp23.md`.
-* **Update**: Linked `references/dependency-api.md` to `decisions/third-party-dependencies.md` (Daftar fungsi/APA dari dependensi yang diputuskan di concept ini).
-* **Creation**: Documented concept `references/dependency-api.md` (API surface dependensi cppIsekai).
-* **Update**: Linked `decisions/third-party-dependencies.md` to `decisions/build-toolchain-cpp23.md` (Pilihan vendor/linking dependensi mengeksekusi keputusan toolchain build (C++23, shared-first)).
-* **Creation**: Documented concept `decisions/third-party-dependencies.md` (Dependency vendoring: system-shared dulu, vendor minimal).
+* **Update**: Linked `references/dependency-api.md` to `decisions/third-party-dependencies.md` (Function/API list of the dependencies decided in this concept).
+* **Creation**: Documented concept `references/dependency-api.md` (cppIsekai dependency API surface).
+* **Update**: Linked `decisions/third-party-dependencies.md` to `decisions/build-toolchain-cpp23.md` (Vendor/linking choices execute the toolchain decision (C++23, shared-first)).
+* **Creation**: Documented concept `decisions/third-party-dependencies.md` (Dependency vendoring: system-shared first, minimal vendoring).
 * **Creation**: Documented concept `decisions/build-toolchain-cpp23.md` (Build system: CMake + C++23, exe-only).
 * **Creation**: Initialized OKF v0.2 project memory.
-* **Creation**: Documented concept `decisions/plugin-runtimes-wasm-js.md` (Kontrak dual runtime: wasm3 ABI + quickjs realm di balik satu core shape/health; parity tools; budget gas/interrupt; lessons JS-refcount, stack-rebase, glz-brace).
-* **Update**: Linked `decisions/plugin-runtimes-wasm-js.md` to `decisions/deps-and-plugins.md` and `architecture/plugin-system.md` (Kontrak eksekusi runtime mengeksekusi rencana parity + vendoring kedua concept itu).
-* **Creation**: Documented concept `decisions/fetch-profile-gate.md` (Gate impersonate terpusat src/fetch/, profile per-call, default live; targets probe lib; firefox phase 2).
-* **Update**: Linked `decisions/fetch-profile-gate.md` to `decisions/deps-and-plugins.md`, `architecture/cli-config.md`, `architecture/plugin-system.md` (Gate mengeksekusi ruling curl-first, memakai knob fetch_profile, memperluas opts ABI plugin).
-* **Creation**: Documented concept `decisions/plugin-cookie-jars.md` (Cookie engine native libcurl; jar per-plugin di data/plugin-state; dipasang gate fetch; zero dependensi baru).
-* **Creation**: Documented concept `decisions/search-read-model-cache.md` (Read-model JSONB search via call_cached opt-in; fresh=SELECT tanpa HTTP; TTL per method; file-cache tetap fallback).
-* **Update**: Linked `decisions/plugin-cookie-jars.md` to `decisions/plugin-data-segregation.md`, `decisions/fetch-profile-gate.md`, `architecture/plugin-system.md` (Kebijakan lokasi state, gate pemasang, dan ABI opts).
-* **Update**: Linked `decisions/search-read-model-cache.md` to `architecture/normalization-contract.md`, `architecture/plugin-system.md`, `references/code-layers.md` (Sumber keputusan jsonb, prinsip wire-format, dan layering SQL).
+* **Creation**: Documented concept `decisions/plugin-runtimes-wasm-js.md` (Dual-runtime contract: wasm3 ABI + quickjs realm behind one shape/health core; parity tools; gas/interrupt budgets; JS-refcount, stack-rebase, glz-brace lessons).
+* **Update**: Linked `decisions/plugin-runtimes-wasm-js.md` to `decisions/deps-and-plugins.md` and `architecture/plugin-system.md` (The execution contract implements both concepts' parity/vendoring plans).
+* **Creation**: Documented concept `decisions/fetch-profile-gate.md` (Centralized impersonate gate in src/fetch/, per-call profile, live default; probed lib targets; firefox phase 2).
+* **Update**: Linked `decisions/fetch-profile-gate.md` to `decisions/deps-and-plugins.md`, `architecture/cli-config.md`, `architecture/plugin-system.md` (The gate executes the curl-first ruling, uses the fetch_profile knob, extends the plugin opts ABI).
+* **Creation**: Documented concept `decisions/plugin-cookie-jars.md` (Native libcurl cookie engine; per-plugin jar in data/plugin-state; mounted by the fetch gate; zero new dependencies).
+* **Creation**: Documented concept `decisions/search-read-model-cache.md` (JSONB search read-model via opt-in call_cached; fresh=SELECT no HTTP; per-method TTL; file cache stays as fallback).
+* **Update**: Linked `decisions/plugin-cookie-jars.md` to `decisions/plugin-data-segregation.md`, `decisions/fetch-profile-gate.md`, `architecture/plugin-system.md` (State-location policy, mounting gate, and the opts ABI).
+* **Update**: Linked `decisions/search-read-model-cache.md` to `architecture/normalization-contract.md`, `architecture/plugin-system.md`, `references/code-layers.md` (jsonb decision source, wire-format principle, and the SQL layering).
