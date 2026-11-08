@@ -12,6 +12,7 @@
 #include <BS_thread_pool.hpp>
 #include <curl/curl.h>
 
+#include <atomic>
 #include <memory>
 #include <string>
 #include <vector>
@@ -24,6 +25,11 @@ namespace plugin {
  *  api are skipped at load (older ones run best-effort). */
 constexpr int kHostApi = 1;
 
+/** \brief Live default-profile cell (task 1.2): POST /config swaps the value
+ *  through Host::set_default_profile; the runtimes read it per call. Points
+ *  into Host::Impl -- stable for the Host's lifetime. */
+using LiveProfile = std::atomic<std::shared_ptr<const std::string>>;
+
 struct Config {
     std::string dir = "data/plugins";
     long fetch_timeout_ms = 30000;
@@ -32,18 +38,10 @@ struct Config {
     // per 1000 vm instructions).
     long instruction_budget = 5000000;
 
-    // Host-wide outbound proxy (ini [server] proxy), applied to every handle
-    // via applyProxy; empty = direct.
+    // Host-wide outbound proxy (ini [server] proxy); the fetch gate applies
+    // it to every handle; empty = direct.
     std::string proxy;
 };
-
-/** \brief One proxy rule for every outbound curl handle (plugin fetch + image
- *  getter): empty string means direct, no CURLOPT_PROXY set. */
-inline void applyProxy(CURL* e, const std::string& proxy) {
-    if (!proxy.empty()) {
-        curl_easy_setopt(e, CURLOPT_PROXY, proxy.c_str());
-    }
-}
 
 struct PluginInfo {
     std::string id, name, version, runtime, entry;
@@ -88,6 +86,13 @@ public:
 
     /** \brief Last-call outcome for id; ok-when-unknown when never called. */
     [[nodiscard]] CallHealth health(const std::string& id) const;
+
+    /** \brief Swap the live default profile (task 1.2); the config route
+     *  calls this after a successful save. */
+    void set_default_profile(std::string profile);
+
+    /** \brief Current live default profile (plugin.fetch_profile). */
+    [[nodiscard]] std::string default_profile() const;
 
     /** \brief Logo file path for id; empty when the plugin (or its logo) is
      *  absent. */

@@ -26,11 +26,13 @@ without restart/reload.
 
 ## D3 - Targets & families
 
-The linked lib (`libcurl-impersonate-chrome.so.4.8.0`) accepts: chrome99/100/101/104/107/110/116,
-edge99/101, safari15 (strings probe). Firefox (user steer 2026-11-08, same phase): the separate
-`libcurl-impersonate-firefox` (NSS TLS) loads `dlopen(RTLD_LOCAL)` behind a per-family symbol
-vtable - one gate, two independent lib copies; `firefox*` targets route to it, list probed from
-the lib (fetch-gate task 1.3).
+The linked lib (`libcurl-impersonate-chrome.so.4.8.0`, v0.6.1) accepts: chrome99/100/101/104/107/110/116,
+edge99/101, safari15_3, safari15_5 (strings probe; no plain safari15). Firefox (user steer 2026-11-08,
+same phase): the sibling `libcurl-impersonate-ff.so.4` (NSS build, v0.6.1, vendored next to the chrome
+lib) loads `dlopen(RTLD_LOCAL)` behind a per-family symbol vtable - one gate, two independent lib
+copies; ff*/firefox* targets route to it, the ff set probed from the lib:
+ff91esr/95/98/100/102/109/117. Shipped in change fetch-gate 6/6 (ctest 10/10); the absent-lib path
+degrades to the chrome engine instead of failing the request.
 
 ## D4 - Rejected: manual profile class
 

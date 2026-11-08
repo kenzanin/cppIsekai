@@ -2,6 +2,7 @@
 #include <doctest/doctest.h>
 
 #include "log/log.hpp"
+#include "plugin/http_client.hpp"
 #include "plugin/plugin.hpp"
 #include "store/store.hpp"
 
@@ -10,6 +11,8 @@
 
 #include <cstdlib>
 #include <ctime>
+#include <filesystem>
+#include <fstream>
 #include <string>
 
 namespace {
@@ -270,4 +273,48 @@ TEST_CASE("js runtime: broken entry loads as absent") {
     // jsbad fails to parse => not registered; jsfix in the same scan is.
     CHECK(host.call("jsbad", "x", "{}").find("no plugin 'jsbad'") != std::string::npos);
     CHECK(host.call("jsfix", "ping", "{}").find("\"ok\":true") != std::string::npos);
+}
+
+TEST_CASE("fetch: family map, target list, profile guard") {
+    CHECK(fetch::family_of("chrome116") == fetch::Family::Chrome);
+    CHECK(fetch::family_of("ff117") == fetch::Family::Firefox);
+    CHECK(fetch::family_of("firefox120") == fetch::Family::Firefox);
+    CHECK(fetch::family_of("") == fetch::Family::Chrome);
+    CHECK(fetch::is_known_target("ff91esr"));
+    CHECK(fetch::is_known_target("safari15_3"));
+    CHECK_FALSE(fetch::is_known_target("nope120"));
+    CHECK(plugin::checked_profile("", "chrome116") == "chrome116");
+    CHECK(plugin::checked_profile("bogus9", "chrome116") == "chrome116");
+    CHECK(plugin::checked_profile("ff117", "chrome116") == "ff117");
+}
+
+TEST_CASE("fetch: cookie jar round-trip and per-plugin isolation") {
+    std::error_code ec;
+    const auto base = (std::filesystem::temp_directory_path() / "cppisekai_test_jars").string();
+    std::filesystem::remove_all(base, ec);
+    const std::string jar_a = plugin::cookie_jar_path("alpha", base);
+    const std::string jar_b = plugin::cookie_jar_path("beta", base);
+    CHECK(jar_a != jar_b);
+
+    const auto page = std::filesystem::temp_directory_path() / "cppisekai_test_page.txt";
+    {
+        std::ofstream f(page);
+        f << "hello";
+    }
+
+    fetch::Request req;
+    req.url = "file://" + page.string(); // network-free: curl's local file handler
+    req.cookie_jar = jar_a;
+    const auto ra = fetch::sync(req, {});
+    CHECK(ra.error.empty());
+    CHECK(std::filesystem::exists(jar_a)); // jar written at handle cleanup
+
+    const auto ra2 = fetch::sync(req, {}); // the reload path parses the existing jar
+    CHECK(ra2.error.empty());
+
+    req.cookie_jar = jar_b;
+    const auto rb = fetch::sync(req, {});
+    CHECK(rb.error.empty());
+    CHECK(std::filesystem::exists(jar_b));
+    CHECK(std::filesystem::exists(jar_a)); // alpha's jar untouched by beta's run
 }

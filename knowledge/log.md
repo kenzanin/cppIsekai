@@ -85,3 +85,4 @@
 * **Update**: Linked `decisions/search-read-model-cache.md` to `architecture/normalization-contract.md`, `architecture/plugin-system.md`, `references/code-layers.md` (jsonb decision source, wire-format principle, and the SQL layering).
 * **Creation**: Documented concept `decisions/source-layout-policy.md` (Post-split layout policy: crown facades, ~200-loc units, per-runtime seams, clang-doc doc-comments; sub-200 prune; audits in source-split-clangdoc/codeloc-final.txt).
 * **Update**: Updated concept `decisions/fetch-profile-gate.md` (firefox pulled into phase 1: dual-.so dlopen vtable, family routing; user steer 2026-11-08).
+* **Update**: Updated concept `decisions/fetch-profile-gate.md` (shipped state: real ff soname v0.6.1 pair vendored, probed safari15_3/_5 + ff target list, chrome-degrade path; change fetch-gate 6/6).

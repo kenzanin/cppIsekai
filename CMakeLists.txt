@@ -41,7 +41,7 @@ target_include_directories(sqlite3 PUBLIC ${TP}/libsql/sqlite)
 
 # --- app ---
 add_executable(cppIsekai src/main.cpp src/store/store.cpp src/http/http.cpp src/http/http_pages.cpp src/http/http_api.cpp
-                         src/plugin/plugin.cpp src/plugin/lua/bridge.cpp src/plugin/lua/lua_runtime.cpp src/plugin/http_client.cpp src/plugin/wasm_rt.cpp src/plugin/wasm/wasm_rt.cpp src/plugin/wasm/wasm_load.cpp src/plugin/js/js_rt.cpp src/plugin/js/js_bindings.cpp src/cache/cache.cpp src/reader/window.cpp
+                         src/fetch/fetch.cpp src/plugin/plugin.cpp src/plugin/lua/bridge.cpp src/plugin/lua/lua_runtime.cpp src/plugin/http_client.cpp src/plugin/wasm_rt.cpp src/plugin/wasm/wasm_rt.cpp src/plugin/wasm/wasm_load.cpp src/plugin/js/js_rt.cpp src/plugin/js/js_bindings.cpp src/cache/cache.cpp src/reader/window.cpp
                          ${TP}/libzippp/libzippp.cpp src/http/export_cbz.cpp)
 target_include_directories(
   cppIsekai
@@ -58,6 +58,7 @@ target_link_libraries(
   PRIVATE wasm3 quickjs sqlite3 PkgConfig::VIPS PkgConfig::LUA
           ${TP}/curl-impersonate/lib/libcurl-impersonate-chrome.so.4.8.0
           spdlog::spdlog PkgConfig::LIBZIP)
+target_compile_definitions(cppIsekai PRIVATE CPPISEKAI_FETCH_LIB_DIR="${CMAKE_SOURCE_DIR}/third_party/curl-impersonate/lib")
 target_compile_options(cppIsekai PRIVATE -Wall -Wextra)
 set_target_properties(cppIsekai PROPERTIES BUILD_RPATH
                                            "${TP}/curl-impersonate/lib")
@@ -75,7 +76,7 @@ add_test(NAME store COMMAND test_store)
 # plugin module: loader/sandbox/ABI/host tools; fixtures under tests/fixtures
 target_include_directories(cppIsekai PRIVATE ${TP}/glaze ${TP}/sol2/include)
 add_executable(test_plugin tests/test_plugin.cpp src/plugin/plugin.cpp
-                           src/plugin/lua/bridge.cpp src/plugin/lua/lua_runtime.cpp src/plugin/http_client.cpp src/plugin/wasm_rt.cpp src/plugin/wasm/wasm_rt.cpp src/plugin/wasm/wasm_load.cpp src/plugin/js/js_rt.cpp src/plugin/js/js_bindings.cpp src/store/store.cpp)
+                           src/plugin/lua/bridge.cpp src/plugin/lua/lua_runtime.cpp src/plugin/http_client.cpp src/plugin/wasm_rt.cpp src/plugin/wasm/wasm_rt.cpp src/plugin/wasm/wasm_load.cpp src/plugin/js/js_rt.cpp src/plugin/js/js_bindings.cpp src/store/store.cpp src/fetch/fetch.cpp)
 target_include_directories(
   test_plugin
   PRIVATE src ${TP}/glaze ${TP}/sol2/include ${TP}/thread_pool/include
@@ -158,3 +159,8 @@ add_custom_target(
   COMMAND ${CLANG_FORMAT} -i src/*.cpp src/*/*.cpp src/main.cpp src/*/*.hpp
           tests/*.cpp
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+add_custom_target(
+    fix
+    COMMAND ${CLANG_TIDY} -p ${CMAKE_BINARY_DIR} -fix -fix-errors src/main.cpp src/store/store.cpp
+            src/http/http.cpp src/plugin/plugin.cpp src/cache/cache.cpp src/reader/window.cpp
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

@@ -322,6 +322,12 @@ void register_api(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, BS:
         if (written < 0)
             return fail(written == -2 ? 500 : 400, std::move(err));
 
+        // Live default (task 1.2): the running Host picks up the new
+        // plugin.fetch_profile without a restart.
+        if (const auto it = updates.find("plugin.fetch_profile"); it != updates.end()) {
+            plugins.set_default_profile(it->second);
+        }
+
         crow::json::wvalue out;
         out["ok"] = true;
         out["written"] = written;

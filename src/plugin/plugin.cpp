@@ -66,15 +66,20 @@ std::string err_json(std::string msg) {
 // The wasm env.http_fetch service: the same option names the lua front takes,
 // JSON-encoded; the lua-shaped result ({status, body, headers}) as JSON back.
 // nullopt = fetch failure (the import reports -1).
-wasm::HttpFetch make_wasm_fetch(const std::string& id, const Config& conf) {
-    return [id, timeout_ms = conf.fetch_timeout_ms, profile = conf.fetch_profile, proxy = conf.proxy](
+wasm::HttpFetch make_wasm_fetch(const std::string& id, const Config& conf, const LiveProfile& live_profile) {
+    return [id, timeout_ms = conf.fetch_timeout_ms, live = &live_profile, proxy = conf.proxy](
                const std::string& url, const std::string& opts_json) -> std::optional<std::string> {
         long ms = timeout_ms;
-        std::string profile_name = profile;
+        std::string live_default;
+        if (auto p = live->load()) {
+            live_default = *p;
+        }
+        std::string profile_name = live_default;
         std::string method = "GET";
         std::string body;
         std::string accept_header;
         std::string ua_header;
+        bool use_cookies = false; // 2.2: opts.cookie => per-plugin jar (cookie_jar_path)
         std::vector<std::pair<std::string, std::string>> extra_headers;
 
         glz::generic o;
@@ -100,6 +105,11 @@ wasm::HttpFetch make_wasm_fetch(const std::string& id, const Config& conf) {
                 str("body", body);
                 str("accept", accept_header);
                 str("user_agent", ua_header);
+                if (const auto* b = member(obj, "cookie")) {
+                    if (const auto* bb = std::get_if<bool>(&b->data)) {
+                        use_cookies = *bb;
+                    }
+                }
                 if (const auto* h = member(obj, "headers")) {
                     if (const auto* ho = std::get_if<glz::generic::object_t>(&h->data)) {
                         for (const auto& [k, v] : *ho) {
@@ -112,8 +122,10 @@ wasm::HttpFetch make_wasm_fetch(const std::string& id, const Config& conf) {
             }
         }
 
+        profile_name = checked_profile(std::move(profile_name), live_default);
+        const std::string cookie_jar = use_cookies ? cookie_jar_path(id) : std::string{};
         const FetchResult fr = fetch_sync(url, ms, profile_name, method, body, accept_header, ua_header,
-                                          extra_headers, proxy);
+                                          extra_headers, proxy, cookie_jar);
         if (!fr.error.empty()) {
             spdlog::warn("[plugin:{}] fetch {} failed: {}", id, url, fr.error);
             return std::nullopt;
@@ -265,6 +277,7 @@ std::optional<std::string> checked_reply(const glz::generic& reply, const std::s
 
 struct plugin::Host::Impl {
     Config conf;
+    LiveProfile live_profile;
     std::mutex mu;
     std::map<std::string, std::shared_ptr<Runtime>> plugins;
     BS::thread_pool<>* db = nullptr; // db-worker gate for storage.*, set via use_db
@@ -273,12 +286,24 @@ struct plugin::Host::Impl {
 
 Host::Host(Config conf) : conf_(conf), impl_(std::make_unique<Host::Impl>()) {
     impl_->conf = std::move(conf);
+    impl_->live_profile = std::make_shared<const std::string>(conf_.fetch_profile);
 }
 
 Host::~Host() = default;
 
 void Host::use_db(BS::thread_pool<>* db) {
     impl_->db = db;
+}
+
+void Host::set_default_profile(std::string profile) {
+    impl_->live_profile = std::make_shared<const std::string>(std::move(profile));
+}
+
+std::string Host::default_profile() const {
+    if (auto p = impl_->live_profile.load()) {
+        return *p;
+    }
+    return conf_.fetch_profile;
 }
 
 int Host::load_all(Store& store) {
@@ -390,7 +415,8 @@ int Host::load_all(Store& store) {
             }
             rt.lua = {L, &lua_close};
             open_sandbox(L);
-            install_host_tools(L, rt.info.id, conf_, rt.cfg, rt.has_cfg, sget, sset, rt.info.dir);
+            install_host_tools(L, rt.info.id, conf_, rt.cfg, rt.has_cfg, sget, sset, rt.info.dir,
+                               impl_->live_profile);
             // Entry scripts return nothing; run them, check validity explicitly.
             const sol::protected_function_result script =
                 sol::state_view(L).safe_script_file((fs::path(rt.info.dir) / rt.info.entry).string());
@@ -412,7 +438,7 @@ int Host::load_all(Store& store) {
             std::stringstream jbuf;
             jbuf << jf.rdbuf();
             js::Loaded loaded = js::load(rt.info.id, rt.info.dir, std::move(jbuf).str(),
-                                         wasm::Services{sget, sset, make_wasm_fetch(rt.info.id, conf_)});
+                                         wasm::Services{sget, sset, make_wasm_fetch(rt.info.id, conf_, impl_->live_profile)});
             if (!loaded.instance) {
                 spdlog::warn("plugin {}: js load failed: {}", rt.info.id, loaded.error);
                 continue;
@@ -426,7 +452,7 @@ int Host::load_all(Store& store) {
                 continue;
             }
             std::vector<std::uint8_t> bytes{std::istreambuf_iterator<char>(wf), {}};
-            wasm::Services services{sget, sset, make_wasm_fetch(rt.info.id, conf_)};
+            wasm::Services services{sget, sset, make_wasm_fetch(rt.info.id, conf_, impl_->live_profile)};
             wasm::Loaded loaded = wasm::load(rt.info.id, rt.info.dir, std::move(bytes), std::move(services));
             if (!loaded.instance) {
                 spdlog::warn("plugin {}: wasm load failed: {}", rt.info.id, loaded.error);
