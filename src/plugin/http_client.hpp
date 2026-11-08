@@ -7,6 +7,7 @@
 
 #include "fetch/fetch.hpp"
 
+#include <filesystem>
 #include <spdlog/spdlog.h>
 #include <string>
 #include <utility>
@@ -38,6 +39,19 @@ inline std::string checked_profile(std::string want, const std::string& live_def
         want = live_default.empty() ? "chrome116" : live_default;
     }
     return want;
+}
+
+/** \brief Per-plugin cookie-jar path (task 2.1):
+ *  data/plugin-state/<id>.cookies.txt, the dir created on first use; a dir
+ *  failure warns and the request still proceeds (curl tolerates a missing
+ *  jar file, it just starts an empty engine). */
+inline std::string cookie_jar_path(const std::string& id) {
+    std::error_code ec;
+    std::filesystem::create_directories("data/plugin-state", ec);
+    if (ec) {
+        spdlog::warn("[plugin:{}] cookie state dir unavailable: {}", id, ec.message());
+    }
+    return "data/plugin-state/" + id + ".cookies.txt";
 }
 
 /** \brief The live default-profile cell type itself is plugin::LiveProfile

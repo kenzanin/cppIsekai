@@ -158,6 +158,12 @@ Result run_with(const CurlApi& c, const Request& req, const std::string& profile
         c.easy_setopt(e.get(), CURLOPT_TIMEOUT_MS, std::max(1L, req.timeout_ms));
         c.easy_setopt(e.get(), CURLOPT_CAINFO, "/etc/ssl/certs/ca-certificates.crt");
         applyProxy(e.get(), proxy); // host-wide; empty = direct
+        if (!req.cookie_jar.empty()) {
+            // 2.1: load on start, save on handle cleanup. A not-yet-existing
+            // file just starts an empty engine, so no pre-check is needed.
+            c.easy_setopt(e.get(), CURLOPT_COOKIEFILE, req.cookie_jar.c_str());
+            c.easy_setopt(e.get(), CURLOPT_COOKIEJAR, req.cookie_jar.c_str());
+        }
         if (req.method != "GET") {
             c.easy_setopt(e.get(), CURLOPT_CUSTOMREQUEST, req.method.c_str());
         }
