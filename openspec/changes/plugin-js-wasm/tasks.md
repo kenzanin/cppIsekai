@@ -12,7 +12,7 @@
 
 ## 3. JS runtime (quickjs-ng)
 
-- [ ] 3.1 Vendor quickjs-ng static sources under `third_party/quickjs/` + wire into CMake (`cppIsekai` + test targets), attribution header
+- [x] 3.1 Vendor quickjs-ng static sources under `third_party/quickjs/` + wire into CMake (`cppIsekai` + test targets), attribution header
 - [ ] 3.2 `js_rt` adapter per design D4: realm per plugin, whitelisted globals incl `fs.read`, interrupt budget, `handle(env)` dispatch, exception => ok:false; failure to load => unregistered + logged
 - [ ] 3.3 Echo fixture plugin (`tests/fixtures/plugins/js/main.js`) and ctest cases: happy path, syntax-error entry, budget loop, host-tool parity spot-check
 
