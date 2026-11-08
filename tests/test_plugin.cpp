@@ -2,6 +2,7 @@
 #include <doctest/doctest.h>
 
 #include "log/log.hpp"
+#include "plugin/http_client.hpp"
 #include "plugin/plugin.hpp"
 #include "store/store.hpp"
 
@@ -270,4 +271,17 @@ TEST_CASE("js runtime: broken entry loads as absent") {
     // jsbad fails to parse => not registered; jsfix in the same scan is.
     CHECK(host.call("jsbad", "x", "{}").find("no plugin 'jsbad'") != std::string::npos);
     CHECK(host.call("jsfix", "ping", "{}").find("\"ok\":true") != std::string::npos);
+}
+
+TEST_CASE("fetch: family map, target list, profile guard") {
+    CHECK(fetch::family_of("chrome116") == fetch::Family::Chrome);
+    CHECK(fetch::family_of("ff117") == fetch::Family::Firefox);
+    CHECK(fetch::family_of("firefox120") == fetch::Family::Firefox);
+    CHECK(fetch::family_of("") == fetch::Family::Chrome);
+    CHECK(fetch::is_known_target("ff91esr"));
+    CHECK(fetch::is_known_target("safari15_3"));
+    CHECK_FALSE(fetch::is_known_target("nope120"));
+    CHECK(plugin::checked_profile("", "chrome116") == "chrome116");
+    CHECK(plugin::checked_profile("bogus9", "chrome116") == "chrome116");
+    CHECK(plugin::checked_profile("ff117", "chrome116") == "ff117");
 }

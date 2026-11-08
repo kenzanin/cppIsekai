@@ -50,17 +50,28 @@ inline void applyProxy(CURL* e, const std::string& proxy) {
     }
 }
 
-/** \brief Targets the linked curl-impersonate libs accept (OKF probe
- *  2026-11-08); the firefox family extends this in task 1.3. */
+/** \brief Targets the curl-impersonate pair accept: chrome/edge/safari from
+ *  the linked lib, ff* from the firefox sibling (both probed, v0.6.1). */
 inline bool is_known_target(std::string_view t) {
     for (std::string_view k :
          {"chrome99", "chrome100", "chrome101", "chrome104", "chrome107", "chrome110", "chrome116", "edge99",
-          "edge101", "safari15"}) {
+          "edge101", "safari15_3", "safari15_5", "ff91esr", "ff95", "ff98", "ff100", "ff102", "ff109", "ff117"}) {
         if (t == k) {
             return true;
         }
     }
     return false;
+}
+
+/** \brief Which lib family serves the profile: ff*/firefox* run on the
+ *  firefox sibling lib, everything else on the linked chrome family. */
+enum class Family { Chrome, Firefox };
+
+inline Family family_of(std::string_view profile) {
+    if (profile.rfind("ff", 0) == 0 || profile.rfind("firefox", 0) == 0) {
+        return Family::Firefox;
+    }
+    return Family::Chrome;
 }
 
 /** \brief Execute \p req; on SSL_CONNECT_ERROR retry once on a fresh handle

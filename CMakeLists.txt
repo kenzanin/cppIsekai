@@ -58,6 +58,7 @@ target_link_libraries(
   PRIVATE wasm3 quickjs sqlite3 PkgConfig::VIPS PkgConfig::LUA
           ${TP}/curl-impersonate/lib/libcurl-impersonate-chrome.so.4.8.0
           spdlog::spdlog PkgConfig::LIBZIP)
+target_compile_definitions(cppIsekai PRIVATE CPPISEKAI_FETCH_LIB_DIR="${CMAKE_SOURCE_DIR}/third_party/curl-impersonate/lib")
 target_compile_options(cppIsekai PRIVATE -Wall -Wextra)
 set_target_properties(cppIsekai PROPERTIES BUILD_RPATH
                                            "${TP}/curl-impersonate/lib")
@@ -158,3 +159,8 @@ add_custom_target(
   COMMAND ${CLANG_FORMAT} -i src/*.cpp src/*/*.cpp src/main.cpp src/*/*.hpp
           tests/*.cpp
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+add_custom_target(
+    fix
+    COMMAND ${CLANG_TIDY} -p ${CMAKE_BINARY_DIR} -fix -fix-errors src/main.cpp src/store/store.cpp
+            src/http/http.cpp src/plugin/plugin.cpp src/cache/cache.cpp src/reader/window.cpp
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
