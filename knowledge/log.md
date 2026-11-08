@@ -77,3 +77,7 @@
 * **Update**: Linked `decisions/plugin-runtimes-wasm-js.md` to `decisions/deps-and-plugins.md` and `architecture/plugin-system.md` (Kontrak eksekusi runtime mengeksekusi rencana parity + vendoring kedua concept itu).
 * **Creation**: Documented concept `decisions/fetch-profile-gate.md` (Gate impersonate terpusat src/fetch/, profile per-call, default live; targets probe lib; firefox phase 2).
 * **Update**: Linked `decisions/fetch-profile-gate.md` to `decisions/deps-and-plugins.md`, `architecture/cli-config.md`, `architecture/plugin-system.md` (Gate mengeksekusi ruling curl-first, memakai knob fetch_profile, memperluas opts ABI plugin).
+* **Creation**: Documented concept `decisions/plugin-cookie-jars.md` (Cookie engine native libcurl; jar per-plugin di data/plugin-state; dipasang gate fetch; zero dependensi baru).
+* **Creation**: Documented concept `decisions/search-read-model-cache.md` (Read-model JSONB search via call_cached opt-in; fresh=SELECT tanpa HTTP; TTL per method; file-cache tetap fallback).
+* **Update**: Linked `decisions/plugin-cookie-jars.md` to `decisions/plugin-data-segregation.md`, `decisions/fetch-profile-gate.md`, `architecture/plugin-system.md` (Kebijakan lokasi state, gate pemasang, dan ABI opts).
+* **Update**: Linked `decisions/search-read-model-cache.md` to `architecture/normalization-contract.md`, `architecture/plugin-system.md`, `references/code-layers.md` (Sumber keputusan jsonb, prinsip wire-format, dan layering SQL).
