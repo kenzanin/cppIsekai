@@ -35,7 +35,7 @@ target_include_directories(sqlite3 PUBLIC ${TP}/libsql/sqlite)
 # --- app ---
 add_executable(cppIsekai src/main.cpp src/store/store.cpp src/http/http.cpp
                          src/plugin/plugin.cpp src/cache/cache.cpp src/reader/window.cpp
-                         ${TP}/libzippp/libzippp.cpp)
+                         ${TP}/libzippp/libzippp.cpp src/http/export_cbz.cpp)
 target_include_directories(
   cppIsekai
   PRIVATE src
@@ -110,6 +110,13 @@ add_executable(test_http_img tests/test_http_img.cpp src/cache/cache.cpp)
 target_include_directories(test_http_img PRIVATE src)
 target_compile_options(test_http_img PRIVATE -Wall -Wextra)
 add_test(NAME http_img COMMAND test_http_img)
+
+# CBZ export core: in-memory zip of the cached tree, crow-free
+add_executable(test_export tests/test_export.cpp src/http/export_cbz.cpp ${TP}/libzippp/libzippp.cpp)
+target_include_directories(test_export PRIVATE src/http ${TP}/libzippp)
+target_link_libraries(test_export PRIVATE PkgConfig::LIBZIP)
+target_compile_options(test_export PRIVATE -Wall -Wextra)
+add_test(NAME export COMMAND test_export)
 
 # stale layer (2.2): wrapper around the ABI call; cache + glaze, no server
 add_executable(test_stale tests/test_stale.cpp src/cache/cache.cpp)
