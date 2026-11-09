@@ -12,8 +12,8 @@
 
 ## 3. Verification
 
-- [ ] 3.1 Full suite green: `cmake --build build -j` zero new warnings, `ctest --test-dir build --output-on-failure` 10/10, `openspec validate --changes` passes; verify: commands run clean
-- [ ] 3.2 E2E smoke per spec scenarios: stale-serve (plugin-fail path via bogus upstream proxy) renders from cache with `cached:true`; refresh overwrite; unknown slug 404; verify: each scenario demonstrated live against the running daemon
+- [x] 3.1 Full suite green: `cmake --build build -j` zero new warnings, `ctest --test-dir build --output-on-failure` 10/10, `openspec validate --changes` passes; verify: commands run clean
+- [x] 3.2 E2E smoke per spec scenarios: stale-serve (plugin-fail path via bogus upstream proxy) renders from cache with `cached:true`; refresh overwrite; unknown slug 404; verify: each scenario demonstrated live against the running daemon
 
 ## Workflow follow-up
 
