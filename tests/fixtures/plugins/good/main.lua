@@ -8,8 +8,8 @@ function handle(req)
   elseif req.method == "no_ok" then
     return {data="x"}
   elseif req.method == "log" then
-    log.info("good plugin says hi")
-    return {ok=true, data={t=now()}}
+    host.log.info("good plugin says hi")
+    return {ok=true, data={t=host.now()}}
   end
   return {ok=false, error="unknown method"}
 end

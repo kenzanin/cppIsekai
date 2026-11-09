@@ -74,18 +74,24 @@ enable_testing()
 add_test(NAME store COMMAND test_store)
 
 # plugin module: loader/sandbox/ABI/host tools; fixtures under tests/fixtures
-target_include_directories(cppIsekai PRIVATE ${TP}/glaze ${TP}/sol2/include)
+# lexbor static lib (vendored source; the html/css/dom/core subtrees only)
+file(GLOB_RECURSE LEXBOR_SOURCES ${TP}/lexbor/source/lexbor/*.c)
+add_library(lexbor STATIC ${LEXBOR_SOURCES})
+target_include_directories(lexbor PUBLIC ${TP}/lexbor/source)
+target_compile_options(lexbor PRIVATE -w) # C vendor lib; do not gate on -Wall -Wextra
+target_include_directories(cppIsekai PRIVATE ${TP}/glaze ${TP}/sol2/include ${TP}/lexbor/source)
 add_executable(test_plugin tests/test_plugin.cpp src/plugin/plugin.cpp
-                           src/plugin/lua/bridge.cpp src/plugin/lua/lua_runtime.cpp src/plugin/http_client.cpp src/plugin/wasm/wasm_rt.cpp src/plugin/wasm/wasm_load.cpp src/plugin/js/js_rt.cpp src/plugin/js/js_bindings.cpp src/store/store.cpp src/fetch/fetch.cpp)
+                           src/plugin/lua/bridge.cpp src/plugin/lua/lua_runtime.cpp src/plugin/http_client.cpp src/plugin/wasm/wasm_rt.cpp src/plugin/wasm/wasm_load.cpp src/plugin/js/js_rt.cpp src/plugin/js/js_bindings.cpp src/plugin/htmltext.cpp src/store/store.cpp src/fetch/fetch.cpp)
 target_include_directories(
   test_plugin
   PRIVATE src ${TP}/glaze ${TP}/sol2/include ${TP}/thread_pool/include
+          ${TP}/lexbor/source
           ${TP}/sqlite_orm/include ${TP}/readerwriterqueue/include)
 target_link_libraries(
   test_plugin
-  PRIVATE wasm3 quickjs sqlite3 PkgConfig::LUA
+  PRIVATE wasm3 quickjs sqlite3 PkgConfig::LUA re2
           ${TP}/curl-impersonate/lib/libcurl-impersonate-chrome.so.4.8.0
-          spdlog::spdlog)
+          spdlog::spdlog lexbor)
 target_compile_options(test_plugin PRIVATE -Wall -Wextra)
 target_compile_definitions(
   test_plugin

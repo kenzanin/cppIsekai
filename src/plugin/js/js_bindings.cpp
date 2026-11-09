@@ -2,10 +2,13 @@
 #include "js_internal.hpp"
 
 #include "plugin/fs.hpp" // plugin::fs_read -- the fs.read body
+#include "plugin/htmltext.hpp" // host.re2/html core (task 1.3)
 
 #include <spdlog/spdlog.h>
 
 #include <ctime>
+#include <stdexcept>
+#include <vector>
 
 namespace plugin::js {
 
@@ -127,6 +130,67 @@ JSValue js_storage_set(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueC
     return JS_UNDEFINED;
 }
 
+// Host-side heavy primitives (design D4 one core, thin marshals). RE2 throws
+// on bad patterns (loud); html helpers return [] on no-match / bad HTML.
+// An empty group list is returned as []; a failed group (RE2 group skipped)
+// is represented as null for positional parity with lua/wasm.
+
+JSValue js_re2_match(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
+    if (argc < 2) {
+        return JS_ThrowTypeError(ctx, "re2.match(pattern, text)");
+    }
+    try {
+        const std::vector<std::string> groups = re2_match(arg_str(ctx, argv[0]), arg_str(ctx, argv[1]));
+        JSValue arr = JS_NewArray(ctx);
+        for (size_t i = 0; i < groups.size(); ++i) {
+            JS_SetPropertyUint32(ctx, arr, i, JS_NewStringLen(ctx, groups[i].data(), groups[i].size()));
+        }
+        return arr;
+    } catch (const std::invalid_argument& e) {
+        return JS_ThrowTypeError(ctx, e.what());
+    }
+}
+
+JSValue js_re2_find(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
+    if (argc < 2) {
+        return JS_ThrowTypeError(ctx, "re2.find(pattern, text)");
+    }
+    try {
+        const std::vector<std::string> groups = re2_find(arg_str(ctx, argv[0]), arg_str(ctx, argv[1]));
+        JSValue arr = JS_NewArray(ctx);
+        for (size_t i = 0; i < groups.size(); ++i) {
+            JS_SetPropertyUint32(ctx, arr, i, JS_NewStringLen(ctx, groups[i].data(), groups[i].size()));
+        }
+        return arr;
+    } catch (const std::invalid_argument& e) {
+        return JS_ThrowTypeError(ctx, e.what());
+    }
+}
+
+JSValue js_html_select(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
+    if (argc < 2) {
+        return JS_ThrowTypeError(ctx, "html.select(html, css)");
+    }
+    const std::vector<std::string> texts = html_select(arg_str(ctx, argv[0]), arg_str(ctx, argv[1]));
+    JSValue arr = JS_NewArray(ctx);
+    for (size_t i = 0; i < texts.size(); ++i) {
+        JS_SetPropertyUint32(ctx, arr, i, JS_NewStringLen(ctx, texts[i].data(), texts[i].size()));
+    }
+    return arr;
+}
+
+JSValue js_html_attr(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
+    if (argc < 3) {
+        return JS_ThrowTypeError(ctx, "html.attr(html, css, attr)");
+    }
+    const std::vector<std::string> vals = html_attr(arg_str(ctx, argv[0]), arg_str(ctx, argv[1]), arg_str(ctx, argv[2]));
+    JSValue arr = JS_NewArray(ctx);
+    for (size_t i = 0; i < vals.size(); ++i) {
+        JS_SetPropertyUint32(ctx, arr, i, JS_NewStringLen(ctx, vals[i].data(), vals[i].size()));
+    }
+    return arr;
+}
+
 } // namespace
 
 void bind_host_globals(JSContext* c) {
@@ -135,25 +199,44 @@ void bind_host_globals(JSContext* c) {
         JS_SetPropertyStr(c, obj, name, fn); // consumes the reference
     };
 
-    bind(g, "now", JS_NewCFunction(c, js_now, "now", 0));
+    // One namespaced surface: everything the host provides lives under
+    // `host.` (parity with the lua/wasm tables; no bare globals).
+    JSValue host = JS_NewObject(c);
+
+    bind(host, "now", JS_NewCFunction(c, js_now, "now", 0));
 
     JSValue log = JS_NewObject(c);
     bind(log, "info", JS_NewCFunctionMagic(c, js_log, "info", 1, JS_CFUNC_generic_magic, 0));
     bind(log, "error", JS_NewCFunctionMagic(c, js_log, "error", 1, JS_CFUNC_generic_magic, 1));
-    bind(g, "log", log);
+    bind(host, "log", log);
 
     JSValue http = JS_NewObject(c);
     bind(http, "fetch", JS_NewCFunction(c, js_http_fetch, "fetch", 2));
-    bind(g, "http", http);
+    bind(host, "http", http);
 
     JSValue fs = JS_NewObject(c);
     bind(fs, "read", JS_NewCFunction(c, js_fs_read, "read", 1));
-    bind(g, "fs", fs);
+    bind(host, "fs", fs);
 
     JSValue storage = JS_NewObject(c);
     bind(storage, "get", JS_NewCFunction(c, js_storage_get, "get", 1));
     bind(storage, "set", JS_NewCFunction(c, js_storage_set, "set", 2));
-    bind(g, "storage", storage);
+    bind(host, "storage", storage);
+
+    // Host-side heavy primitives (design D4 one core, thin marshals): RE2
+    // (linear-time, no ReDoS) and lexbor DOM selectors. Bad patterns throw
+    // (loud); no-match / malformed HTML return [].
+    JSValue re2 = JS_NewObject(c);
+    bind(re2, "find", JS_NewCFunction(c, js_re2_find, "find", 2));
+    bind(re2, "match", JS_NewCFunction(c, js_re2_match, "match", 2));
+    bind(host, "re2", re2);
+
+    JSValue html = JS_NewObject(c);
+    bind(html, "select", JS_NewCFunction(c, js_html_select, "select", 2));
+    bind(html, "attr", JS_NewCFunction(c, js_html_attr, "attr", 3));
+    bind(host, "html", html);
+
+    bind(g, "host", host); // consumes the host reference tree
 
     JS_FreeValue(c, g);
 }

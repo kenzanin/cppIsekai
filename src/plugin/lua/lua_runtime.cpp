@@ -1,6 +1,7 @@
 #include "bridge.hpp"
 
 #include "plugin/http_client.hpp"
+#include "plugin/htmltext.hpp"  // host.re2/html core (task 1.3)
 #include "plugin/plugin.hpp"
 
 #include <spdlog/spdlog.h>
@@ -33,16 +34,19 @@ void install_host_tools(lua_State* L, const std::string& id, const Config& conf,
     // Routed through the default logger, whose sinks include the queue sink
     // feeding the log page (wired in main).
     // fs.read: confined read-only access into this plugin's own folder (D5).
-    sol::table fs_tab = sv.create_named_table("fs");
-    fs_tab["read"] = [dir](const std::string& rel) -> std::optional<std::string> {
+    sol::table fs_tab = sv.create_named_table("host");
+    sol::table fs = sv.create_table();
+    fs["read"] = [dir](const std::string& rel) -> std::optional<std::string> {
         return fs_read(dir, rel);
     };
+    fs_tab["fs"] = fs;
 
-    sol::table log = sv.create_named_table("log");
+    sol::table log = sv.create_table();
     log["info"] = [id](const std::string& msg) { spdlog::info("[plugin:{}] {}", id, msg); };
     log["error"] = [id](const std::string& msg) { spdlog::error("[plugin:{}] {}", id, msg); };
+    fs_tab["log"] = log;
 
-    sv.set_function("now", [] { return static_cast<long long>(std::time(nullptr)); });
+    fs_tab["now"] = sol::as_function([] { return static_cast<long long>(std::time(nullptr)); });
 
     // ponytail: io shim is read-only via istream; widen only when a plugin
     // needs incremental reads (io.lines multi-arg / formats).
@@ -95,7 +99,7 @@ void install_host_tools(lua_State* L, const std::string& id, const Config& conf,
     };
 
     // storage.get/set: host-owned per-plugin state (tokens), db-backed, survives restarts.
-    sol::table storage = sv.create_named_table("storage");
+    sol::table storage = sv.create_table();
     storage["get"] = [id, sget](const std::string& key, sol::this_state ts) -> sol::object {
         if (auto v = sget(id, key)) {
             return sol::make_object(ts, *v);
@@ -103,10 +107,11 @@ void install_host_tools(lua_State* L, const std::string& id, const Config& conf,
         return sol::make_object(ts, sol::lua_nil);
     };
     storage["set"] = [id, sset](const std::string& key, const std::string& val) { sset(id, key, val); };
+    fs_tab["storage"] = storage;
 
     // Blocking fetch on the calling (plugin-pool) worker; curl's own timeout
     // guards the network half, the instruction hook the CPU half.
-    sol::table http = sv.create_named_table("http");
+    sol::table http = sv.create_table();
     http["fetch"] = [id, timeout_ms = conf.fetch_timeout_ms, live = &live_profile,
                      proxy = conf.proxy](
                         const std::string& url, const sol::optional<sol::table>& opts,
@@ -180,6 +185,56 @@ void install_host_tools(lua_State* L, const std::string& id, const Config& conf,
         out["headers"] = sol::make_object(ts, hh);
         return {sol::make_object(ts, out), std::nullopt};
     };
+    fs_tab["http"] = http;
+
+    // Host-side heavy primitives (design D4 one core, thin marshals): RE2
+    // (linear-time, no ReDoS) and lexbor DOM selectors. Bad patterns throw
+    // (loud); no-match / malformed HTML return empty lists.
+    sol::table re2 = sv.create_table();
+    re2["find"] = [](sol::this_state ts, const std::string& p, const std::string& t) -> sol::object {
+        std::vector<std::string> groups;
+        try {
+            groups = re2_find(p, t);
+        } catch (const std::invalid_argument& e) {
+            throw std::runtime_error(e.what());
+        }
+        sol::table out(ts.lua_state(), sol::new_table());
+        for (size_t i = 0; i < groups.size(); ++i) {
+            out[i + 1] = groups[i]; // lua arrays are 1-based
+        }
+        return out;
+    };
+    re2["match"] = [](sol::this_state ts, const std::string& p, const std::string& t) -> sol::object {
+        std::vector<std::string> groups;
+        try {
+            groups = re2_match(p, t);
+        } catch (const std::invalid_argument& e) {
+            throw std::runtime_error(e.what());
+        }
+        sol::table out(ts.lua_state(), sol::new_table());
+        for (size_t i = 0; i < groups.size(); ++i) {
+            out[i + 1] = groups[i];
+        }
+        return out;
+    };
+    fs_tab["re2"] = re2;
+
+    sol::table html = sv.create_table();
+    const auto to_table = [](sol::this_state ts, const std::vector<std::string>& vals) {
+        sol::table out(ts.lua_state(), sol::new_table());
+        for (size_t i = 0; i < vals.size(); ++i) {
+            out[i + 1] = vals[i];
+        }
+        return out;
+    };
+    html["select"] = [to_table](sol::this_state ts, const std::string& h, const std::string& c) -> sol::object {
+        return to_table(ts, html_select(h, c));
+    };
+    html["attr"] = [to_table](sol::this_state ts, const std::string& h, const std::string& c,
+                              const std::string& a) -> sol::object {
+        return to_table(ts, html_attr(h, c, a));
+    };
+    fs_tab["html"] = html;
 }
 
 } // namespace plugin::lua
