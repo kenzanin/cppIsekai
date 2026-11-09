@@ -125,6 +125,13 @@ target_include_directories(test_cache PRIVATE src)
 target_compile_options(test_cache PRIVATE -Wall -Wextra)
 add_test(NAME cache COMMAND test_cache)
 
+# transcode core (cache-layout-v3 1.2): header-only vips buffer in/out
+add_executable(test_transcode tests/test_transcode.cpp)
+target_include_directories(test_transcode PRIVATE src)
+target_link_libraries(test_transcode PRIVATE PkgConfig::VIPS)
+target_compile_options(test_transcode PRIVATE -Wall -Wextra)
+add_test(NAME transcode COMMAND test_transcode)
+
 # slug pragma (1.1): header-only title->folder rule + collision suffix; no src sources
 add_executable(test_slug tests/test_slug.cpp)
 target_include_directories(test_slug PRIVATE src)
