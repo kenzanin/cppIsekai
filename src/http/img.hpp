@@ -7,6 +7,7 @@
 
 #include "cache/cache.hpp"
 
+#include <filesystem>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -62,9 +63,10 @@ inline ImgReply serve_cached_image(cache::Cache& images, std::string_view url,
     ss << f.rdbuf();
     auto reply = ImgReply{200, ss.str(), image_mime(*path), std::nullopt};
     if (cover_ctx.cover) {
-        const auto side = cache::Cache::sidecar(*path);
-        if (side && side->ratio > 0.0)
-            reply.ratio_header = std::to_string(side->ratio);
+        const double ratio =
+            cache::Cache::ratio_of_name(std::filesystem::path(*path).filename().string());
+        if (ratio > 0.0)
+            reply.ratio_header = std::to_string(ratio);
     }
     return reply;
 }

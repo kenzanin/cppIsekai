@@ -61,9 +61,26 @@ bool legacy_v1(const fs::path& root) {
 // --- layout v3 (cache-layout-v3 D1-D4) helpers ---
 
 // V3 layout helpers: cover / chapter dir / hash fallback rel_path builders.
+// Cover ratio rides in the filename as fixed-point 4 digits (no dot):
+// <hash>-6988.webp == ratio 0.6988. Sidecar .json files are gone.
 std::string cover_rel(const std::string& plugin, const std::string& url_hash,
-                      const std::string& ext) {
-    return plugin + "/cover/" + url_hash + "." + ext;
+                      const std::string& ext, double ratio) {
+    const int r4 = ratio > 0.0 ? static_cast<int>(std::lround(ratio * 10000.0)) : 0;
+    return plugin + "/cover/" + url_hash + "-" + std::to_string(r4) + "." + ext;
+}
+
+/** \brief Ratio from a cover filename tail "<hash>-<r4>.<ext>"; 0.0 when
+ *  absent/zero (old files without the suffix keep serving, no header). */
+double ratio_from_name(const std::string& name) {
+    const auto dot = name.find_last_of('.');
+    if (dot == std::string::npos) return 0.0;
+    const auto dash = name.find_last_of('-', dot);
+    if (dash == std::string::npos) return 0.0;
+    const std::string digits = name.substr(dash + 1, dot - dash - 1);
+    if (digits.empty() || digits.size() > 5 ||
+        !std::all_of(digits.begin(), digits.end(), ::isdigit))
+        return 0.0;
+    return static_cast<double>(std::stoi(digits)) / 10000.0;
 }
 
 std::string page_rel(const std::string& plugin, const std::string& slug, int chapter,
@@ -84,23 +101,7 @@ std::string id8_of(const std::string& s) {
     return h.substr(h.size() - 8);
 }
 
-// One-line JSON sidecar next to a stored cover: decoded dims + ratio.
-bool write_sidecar(const fs::path& base, int w, int h, double ratio) {
-    std::ostringstream json;
-    json << "{\"w\":" << w << ",\"h\":" << h << ",\"ratio\":" << ratio << "}";
-    const std::string tmp = base.string() + ".sidecar.tmp";
-    std::ofstream out(tmp, std::ios::binary | std::ios::trunc);
-    if (!out) return false;
-    out << json.str();
-    out.close();
-    std::error_code ec;
-    if (out.fail()) {
-        fs::remove(tmp, ec);
-        return false;
-    }
-    fs::rename(tmp, base.string() + ".json", ec);
-    return !ec;
-}
+// (sidecar writer removed: ratio now rides in the cover filename)
 
 } // namespace
 
@@ -261,7 +262,10 @@ std::optional<std::string> Cache::img_store(const std::string& key, const std::s
     std::string rel;
     if (cover_ctx.cover) {
         const auto h = sha1_hex(cover_ctx.url.empty() ? key : cover_ctx.url).substr(0, 16);
-        rel = cover_rel(cover_ctx.plugin.empty() ? "common" : cover_ctx.plugin, h, ext);
+        rel = cover_rel(cover_ctx.plugin.empty() ? "common" : cover_ctx.plugin, h, ext,
+                    cover_ctx.w > 0 && cover_ctx.h > 0
+                        ? static_cast<double>(cover_ctx.w) / static_cast<double>(cover_ctx.h)
+                        : 0.0);
     } else if (page_ctx.plugin.empty() || page_ctx.slug.empty() || page_ctx.chapter < 1 ||
                page_ctx.page < 1) {
         rel = {}; // no complete page context: sha fallback
@@ -276,13 +280,6 @@ std::optional<std::string> Cache::img_store(const std::string& key, const std::s
                                          : (fs::path(conf_.root) / "img" / rel).string();
     auto stored = persist_locked(path, body);
     if (!stored) return std::nullopt;
-    if (cover_ctx.cover && cover_ctx.w > 0 && cover_ctx.h > 0) {
-        const double ratio = static_cast<double>(cover_ctx.w) / static_cast<double>(cover_ctx.h);
-        if (!write_sidecar(fs::path(*stored), cover_ctx.w, cover_ctx.h, ratio)) {
-            // ponytail: sidecar write failure is not fatal — the image itself
-            // is stored; ratio just won't be available on serve.
-        }
-    }
     return stored;
 }
 
@@ -342,37 +339,17 @@ std::optional<std::string> Cache::img_ensure(const std::string& key, const Cover
 std::optional<std::string> Cache::cover_serve(const std::string& plugin,
                                               const std::string& url) {
     // Extension-free lookup (D1): entries_ keys are full on-disk paths
-    // (<root>/img/...); covers land at <root>/img/<plugin>/cover/<sha1(url)-16>.<ext>.
-    // Match the tail; sidecars (.json) stay excluded.
+    // (<root>/img/...); covers land at <root>/img/<plugin>/cover/<sha1(url)-16>-<r4>.<ext>.
+    // Match the tail (hash prefix, any ratio suffix and ext).
     const std::lock_guard lock(mu_);
     const std::string tail = "img/" +
                              (plugin.empty() ? std::string("common") : plugin) +
-                             "/cover/" + sha1_hex(url).substr(0, 16) + ".";
+                             "/cover/" + sha1_hex(url).substr(0, 16) + "-";
     for (const auto& [path, _] : entries_) {
-        if (path.find(tail) != std::string::npos && !path.ends_with(".json"))
+        if (path.find(tail) != std::string::npos)
             return path;
     }
     return std::nullopt;
-}
-
-std::optional<Cache::CoverCtx> Cache::sidecar(const std::string& cover_path) {
-    // One-line JSON {w,h,ratio} written by img_store; tolerant parse —
-    // malformed/missing returns nullopt, caller omits the header.
-    std::ifstream in(cover_path + ".json", std::ios::binary);
-    if (!in) return std::nullopt;
-    std::string body{(std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>()};
-    auto num = [&body](const char* key, double& out) -> bool {
-        const auto i = body.find(key);
-        if (i == std::string::npos) return false;
-        const auto j = body.find(':', i);
-        if (j == std::string::npos) return false;
-        out = std::strtod(body.c_str() + j + 1, nullptr);
-        return true;
-    };
-    double w{}, h{}, ratio{};
-    if (!num("\"w\"", w) || !num("\"h\"", h) || w <= 0 || h <= 0) return std::nullopt;
-    num("\"ratio\"", ratio); // optional field; 0.0 = unknown
-    return CoverCtx{.url{}, .w{static_cast<int>(w)}, .h{static_cast<int>(h)}, .ratio{ratio}};
 }
 
 void Cache::trim(const std::string& keep) {
@@ -392,5 +369,8 @@ void Cache::trim(const std::string& keep) {
         entries_.erase(victim);
     }
 }
+
+// Cache::ratio_of_name — public wrapper over the anonymous-namespace helper.
+double Cache::ratio_of_name(const std::string& cover_name) { return ratio_from_name(cover_name); }
 
 } // namespace cache

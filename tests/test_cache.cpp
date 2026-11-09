@@ -299,20 +299,17 @@ TEST_CASE("cache v3: cover landing + sidecar round-trip") {
     const auto c = cache.img_store("http://x/cover.png", "F", cv, {});
     REQUIRE(ok(c));
     CHECK(fs::path(*c).parent_path().filename() == "cover");
-    CHECK(fs::exists(*c + ".json"));
-    const auto side = cache::Cache::sidecar(*c);
-    REQUIRE(side.has_value());
-    CHECK(side->w == 800);
-    CHECK(side->h == 1200);
-    CHECK(side->ratio > 0.6);
-    CHECK(side->ratio < 0.7);
+    // ratio rides in the filename as fixed-point 4 digits: 800/1200 -> 6667
+    CHECK(fs::path(*c).filename().string().find("-6667.") != std::string::npos);
+    CHECK(!fs::exists(*c + ".json")); // no sidecar files anymore
+    CHECK(cache::Cache::ratio_of_name(fs::path(*c).filename().string()) > 0.66);
+    CHECK(cache::Cache::ratio_of_name(fs::path(*c).filename().string()) < 0.67);
 
-    // cover without dims -> no sidecar written, image itself is fine
+    // cover without dims -> "-0" suffix, ratio parse yields 0.0 (no header)
     cache::Cache::CoverCtx nodims{.url = "http://x/c2.png", .cover = true};
     const auto c2 = cache.img_store("http://x/c2.png", "G", nodims, {});
     REQUIRE(ok(c2));
-    CHECK(!fs::exists(*c2 + ".json"));
-    CHECK(!cache::Cache::sidecar(*c2));
+    CHECK(cache::Cache::ratio_of_name(fs::path(*c2).filename().string()) == 0.0);
 }
 
 TEST_CASE("cache v3: cover_serve is extension-free; absent -> nullopt") {

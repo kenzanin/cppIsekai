@@ -100,9 +100,10 @@ public:
     std::optional<std::string> cover_serve(const std::string& plugin,
                                            const std::string& url);
 
-    /** \brief Read the cover sidecar {w,h,ratio} for a cover path; nullopt
-     *  when the sidecar is missing or malformed. */
-    static std::optional<CoverCtx> sidecar(const std::string& cover_path);
+    /** \brief Ratio from a cover filename tail "<hash>-<r4>.<ext>"
+     *  (fixed-point 4 digits, no dot in the name besides the extension);
+     *  0.0 when absent/malformed — caller omits the X-Image-Ratio header. */
+    static double ratio_of_name(const std::string& cover_name);
 
 private:
     std::string path_for(const std::string& key, const std::string& kind,
