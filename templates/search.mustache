@@ -66,7 +66,7 @@
         <a :href="'/view/manga/'+plugin+'/'+encodeURIComponent(it.id)" class="block group">
           <div class="aspect-[3/4] rounded overflow-hidden"
                :style="'background:hsl('+(idx*47%360)+' 40% 28%)'">
-            <img :src="'/cache/img?url='+encodeURIComponent(it.cover)" class="w-full h-full object-cover" loading="lazy"
+            <img :src="'/cache/img?url='+encodeURIComponent(it.cover)+'&cover=1&plugin='+encodeURIComponent(plugin)" class="w-full h-full object-cover" loading="lazy"
                  @error="$el.style.display='none'" alt="">
           </div>
           <p class="mt-1 text-sm truncate group-hover:text-white" x-text="it.name"></p>

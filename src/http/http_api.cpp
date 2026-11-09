@@ -434,13 +434,32 @@ void register_api(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, BS:
 
     // Serve-through image cache: hit = disk, miss+online = fetch+store+serve,
     // miss+offline = 404. Mime from the stored file's extension.
+    // V3 (cache-layout-v3 D6): optional context params (plugin, slug, ch,
+    // page, cover) drive the layout-specific landing path; a client-supplied
+    // ratio is ignored — host sidecar is the source of truth (D3).
     CROW_ROUTE(app, "/cache/img")
     ([&](const crow::request& req) {
-        const ImgReply r = serve_cached_image(images, param(req, "url"));
+        const auto url = param(req, "url");
+        const bool cover = param(req, "cover") == "1" || param(req, "cover") == "true";
+        const auto plugin = param(req, "plugin");
+        const auto slug = param(req, "slug");
+        const int ch = std::atoi(param(req, "ch").c_str());
+        const int page = std::atoi(param(req, "page").c_str());
+        cache::Cache::CoverCtx cctx;
+        cache::Cache::PageCtx pctx;
+        if (cover) {
+            cctx.cover = true;
+            cctx.plugin = plugin;
+            cctx.url = url;
+        } else if (!plugin.empty() && !slug.empty() && ch >= 1 && page >= 1) {
+            pctx = {plugin, slug, ch, page, /*page_id=*/url};
+        }
+        const ImgReply r = serve_cached_image(images, url, cctx, pctx);
         crow::response res;
         res.code = r.code;
         res.body = std::move(r.body);
         res.set_header("Content-Type", std::string(r.mime));
+        if (r.ratio_header) res.set_header("X-Image-Ratio", *r.ratio_header);
         return res;
     });
 

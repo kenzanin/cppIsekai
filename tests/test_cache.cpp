@@ -251,3 +251,80 @@ TEST_CASE("cache: one-time purge flattens v1 pools; rollback copy swept next boo
     cache::Cache third(cache::Config{live.path.string(), 1 << 20}, {});
     CHECK(fs::exists(live.path / "api" / "custom.json"));
 }
+
+
+// V3 (cache-layout-v3): context-aware landing paths, sidecar, extension-free lookup.
+TEST_CASE("cache v3: page landing paths + duplicate chapter disambiguation") {
+    TempRoot root;
+    auto state = std::make_shared<FakeState>();
+    cache::Cache cache(cache::Config{root.path.string(), 1 << 20},
+                       [state](const std::string& k) { return state->get(k); });
+
+    cache::Cache::PageCtx pg{.plugin = "mangadex", .slug = "solo-leveling",
+                             .chapter = 12, .page = 3, .page_id = "8f3a2c1b9d"};
+    const auto p = cache.img_store("http://x/p3.png", "B", {}, pg);
+    REQUIRE(ok(p));
+    CHECK(*p == (root.path / "img" / "mangadex" / "manga" / "solo-leveling" /
+                 "ch012-88230349" / "p003.png").string());
+
+    // same ch12, different chapter id -> sibling dir, both survive
+    cache::Cache::PageCtx dup = pg;
+    dup.page_id = "00deadbeef";
+    const auto q = cache.img_store("http://x/p3b.png", "C", {}, dup);
+    REQUIRE(ok(q));
+    CHECK(fs::path(*q).parent_path().filename() == "ch012-b5850973");
+    CHECK(fs::exists(*p));
+    CHECK(fs::exists(*q));
+
+    // zero-pad: ch 2 -> ch002; empty page_id falls back to the key for id8
+    cache::Cache::PageCtx p2 = pg;
+    p2.chapter = 2; p2.page = 1; p2.page_id.clear();
+    const auto r = cache.img_store("http://x/p1.jpg", "D", {}, p2);
+    REQUIRE(ok(r));
+    CHECK(fs::path(*r).parent_path().filename().string().rfind("ch002-9266cd27", 0) == 0);
+
+    // no context -> sha fallback at pool root
+    const auto f = cache.img_store("http://x/plain.gif", "E", {}, {});
+    REQUIRE(ok(f));
+    CHECK(fs::path(*f).parent_path().filename() == "img");
+}
+
+TEST_CASE("cache v3: cover landing + sidecar round-trip") {
+    TempRoot root;
+    auto state = std::make_shared<FakeState>();
+    cache::Cache cache(cache::Config{root.path.string(), 1 << 20},
+                       [state](const std::string& k) { return state->get(k); });
+
+    cache::Cache::CoverCtx cv{.url = "http://x/cover.png", .w = 800, .h = 1200, .cover = true};
+    const auto c = cache.img_store("http://x/cover.png", "F", cv, {});
+    REQUIRE(ok(c));
+    CHECK(fs::path(*c).parent_path().filename() == "cover");
+    CHECK(fs::exists(*c + ".json"));
+    const auto side = cache::Cache::sidecar(*c);
+    REQUIRE(side.has_value());
+    CHECK(side->w == 800);
+    CHECK(side->h == 1200);
+    CHECK(side->ratio > 0.6);
+    CHECK(side->ratio < 0.7);
+
+    // cover without dims -> no sidecar written, image itself is fine
+    cache::Cache::CoverCtx nodims{.url = "http://x/c2.png", .cover = true};
+    const auto c2 = cache.img_store("http://x/c2.png", "G", nodims, {});
+    REQUIRE(ok(c2));
+    CHECK(!fs::exists(*c2 + ".json"));
+    CHECK(!cache::Cache::sidecar(*c2));
+}
+
+TEST_CASE("cache v3: cover_serve is extension-free; absent -> nullopt") {
+    TempRoot root;
+    auto state = std::make_shared<FakeState>();
+    state->bodies = {{"http://x/cv.jpg", forty('i')}};
+    cache::Cache cache(cache::Config{root.path.string(), 1 << 20},
+                       [state](const std::string& k) { return state->get(k); });
+
+    cache::Cache::CoverCtx cv{.url = "http://x/cv.jpg", .plugin = "mangadex",
+                              .w = 100, .h = 200, .cover = true};
+    REQUIRE(ok(cache.img_store("http://x/cv.jpg", "H", cv, {})));
+    REQUIRE(cache.cover_serve("mangadex", "http://x/cv.jpg").has_value());
+    CHECK(!cache.cover_serve("mangadex", "http://x/other.jpg").has_value());
+}

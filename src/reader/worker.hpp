@@ -16,6 +16,7 @@
  *  routes or state: the queue is the only worker state, newest list wins. */
 
 #include "cache/cache.hpp"
+#include "cache/sha1.hpp"
 
 #include <cctype>
 #include <condition_variable>
@@ -57,9 +58,15 @@ inline std::string rel_path(const WindowCtx& ctx, int page, const std::string& u
             return {};
         c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
     }
-    const auto pad = [](int n) { return "000" + std::to_string(n); };
-    return ctx.plugin + "/" + ctx.slug + "/ch" + pad(ctx.chapter).substr(1) + "/p" + pad(page).substr(1) +
-           "." + ext;
+    const auto pad = [](int n) {
+        auto s = std::to_string(n);
+        while (s.size() < 3) s = "0" + s;
+        return s;
+    };
+    // V3 (cache-layout-v3 D4): ch<n>-<id8> where id8 = last 8 of sha1(url).
+    const std::string id8 = sha1_hex(url).substr(sha1_hex(url).size() - 8);
+    return ctx.plugin + "/" + ctx.slug + "/ch" + pad(ctx.chapter) + "-" + id8 +
+           "/p" + pad(page) + "." + ext;
 }
 
 class Worker {
