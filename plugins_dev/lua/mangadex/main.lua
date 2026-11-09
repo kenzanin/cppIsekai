@@ -1,5 +1,5 @@
 -- MangaDex plugin: search/detail/chapters via api.mangadex.org, using only
--- http.fetch + json + base/string/table libs. Canonical output fields:
+-- host.http.fetch + json + base/string/table libs. Canonical output fields:
 -- {id, name, cover, status, tags, release_at, chapters = {id, number, title, release_at}}
 local API = "https://api.mangadex.org"
 local AUTH = "https://auth.mangadex.org/realms/mangadex/protocol/openid-connect/token"
@@ -24,7 +24,7 @@ local function token_post(fields)
   for k, v in pairs(fields) do pairs_[#pairs_ + 1] = k .. "=" .. tostring(v):gsub("[^%w%.%-~_]", function(c)
     return string.format("%%%02X", c:byte())
   end) end
-  local res, err = http.fetch(AUTH, {
+  local res, err = host.http.fetch(AUTH, {
     method = "POST",
     body = table.concat(pairs_, "&"),
     headers = { ["Content-Type"] = "application/x-www-form-urlencoded" },
@@ -42,10 +42,10 @@ end
 -- expires_at. force=true skips the freshness check (401 path).
 local function access_token(force)
   if not have_creds() then return nil end
-  local tok = storage.get("access_token")
-  local exp = tonumber(storage.get("expires_at")) or 0
-  local refresh = storage.get("refresh_token")
-  if tok ~= nil and not force and now() < exp - 30 then return tok end
+  local tok = host.storage.get("access_token")
+  local exp = tonumber(host.storage.get("expires_at")) or 0
+  local refresh = host.storage.get("refresh_token")
+  if tok ~= nil and not force and host.now() < exp - 30 then return tok end
   local body
   if refresh ~= nil then
     body = token_post({ grant_type = "refresh_token", refresh_token = refresh, client_id = cid, client_secret = csecret })
@@ -56,9 +56,9 @@ local function access_token(force)
       client_secret = csecret })
     if body == nil then return nil, err end
   end
-  storage.set("access_token", body.access_token)
-  storage.set("refresh_token", body.refresh_token or "")
-  storage.set("expires_at", tostring(now() + (tonumber(body.expires_in) or 900)))
+  host.storage.set("access_token", body.access_token)
+  host.storage.set("refresh_token", body.refresh_token or "")
+  host.storage.set("expires_at", tostring(host.now() + (tonumber(body.expires_in) or 900)))
   return body.access_token
 end
 
@@ -87,18 +87,18 @@ local function get(path, query)
   end
   -- MangaDex serves the bot-challenge page to browser UAs on API endpoints;
   -- an app UA gets clean JSON. accept=json keeps content negotiation honest.
-  local res, err = http.fetch(url, opts)
+  local res, err = host.http.fetch(url, opts)
   if err ~= nil then return nil, err end
   local ct = (res.headers and res.headers["content-type"]) or "?"
-  log.info("GET " .. url .. " -> " .. res.status .. " len=" .. #res.body .. " ct=" .. ct)
+  host.log.info("GET " .. url .. " -> " .. res.status .. " len=" .. #res.body .. " ct=" .. ct)
   if res.status == 401 and have_creds() then
     -- stale-but-unexpired token: refresh once, retry once, then surface the error
     local at = access_token(true)
     if at ~= nil then
       opts.headers = { Authorization = "Bearer " .. at }
-      res, err = http.fetch(url, opts)
+      res, err = host.http.fetch(url, opts)
       if err ~= nil then return nil, err end
-      log.info("GET(retry) " .. url .. " -> " .. res.status)
+      host.log.info("GET(retry) " .. url .. " -> " .. res.status)
     end
   end
   if res.status ~= 200 then return nil, "upstream status " .. res.status .. ": " .. res.body:sub(1, 80) end

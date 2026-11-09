@@ -2,12 +2,14 @@
 #include "wasm_internal.hpp"
 
 #include "plugin/fs.hpp" // plugin::fs_read -- the env.fs_read body
+#include "plugin/htmltext.hpp" // host.re2/html core (task 1.3)
 
 #include <spdlog/spdlog.h>
 
 #include <array>
 #include <cstring>
 #include <ctime>
+#include <stdexcept>
 
 namespace plugin::wasm {
 namespace {
@@ -20,6 +22,7 @@ constexpr uint32_t kStackBytes = 64 * 1024;
 // Import-domain failures carried in i32 results.
 constexpr int32_t kNotFound = -1;  // key/relation/file absent, fetch failed
 constexpr int32_t kTruncated = -2; // result larger than the guest's cap
+constexpr int32_t kBadPattern = -3; // re2 pattern failed compilation
 
 std::optional<std::string> guest_str(Instance& inst, uint32_t off, uint32_t len) {
     const auto mem = guest_mem(inst, off, len);
@@ -168,6 +171,116 @@ struct Import {
     M3RawCall fn;
 };
 
+// host.re2/html: one core (plugin::htmltext), results as JSON arrays written
+// into guest memory via the same guest_write convention as fs_read/storage.
+const void* host_re2_call(IM3Runtime, IM3ImportContext ctx, uint64_t* sp, void*, bool full) {
+    auto& self = *static_cast<Instance*>(ctx->userdata);
+    uint64_t* args = sp + 1;
+    const uint32_t pat_off = arg_i32(args);
+    const uint32_t pat_len = arg_i32(args);
+    const uint32_t txt_off = arg_i32(args);
+    const uint32_t txt_len = arg_i32(args);
+    const uint32_t out = arg_i32(args);
+    const uint32_t cap = arg_i32(args);
+
+    int32_t rc = kNotFound;
+    const auto pat = guest_str(self, pat_off, pat_len);
+    const auto txt = guest_str(self, txt_off, txt_len);
+    if (pat && txt) {
+        try {
+            const auto groups = full ? plugin::re2_match(*pat, *txt) : plugin::re2_find(*pat, *txt);
+            // JSON array of groups; empty list on no-match (never an error).
+            std::string json = "[";
+            for (size_t i = 0; i < groups.size(); ++i) {
+                if (i != 0) {
+                    json += ',';
+                }
+                json += '"';
+                for (const char c : groups[i]) {
+                    if (c == '"' || c == '\\') {
+                        json += '\\';
+                    }
+                    json += c;
+                }
+                json += '"';
+            }
+            json += ']';
+            if (guest_write(self, out, cap, json)) {
+                rc = static_cast<int32_t>(json.size());
+            } else {
+                rc = kTruncated;
+            }
+        } catch (const std::invalid_argument&) {
+            rc = kBadPattern; // loud: bad pattern is the plugin's bug
+        }
+    }
+    *reinterpret_cast<int32_t*>(sp) = rc;
+    return m3Err_none;
+}
+
+const void* host_re2_match(IM3Runtime rt, IM3ImportContext ctx, uint64_t* sp, void* mem) {
+    return host_re2_call(rt, ctx, sp, mem, /*full=*/true);
+}
+
+const void* host_re2_find(IM3Runtime rt, IM3ImportContext ctx, uint64_t* sp, void* mem) {
+    return host_re2_call(rt, ctx, sp, mem, /*full=*/false);
+}
+
+const void* host_html_call(IM3Runtime, IM3ImportContext ctx, uint64_t* sp, void*, bool want_attr) {
+    auto& self = *static_cast<Instance*>(ctx->userdata);
+    uint64_t* args = sp + 1;
+    const uint32_t html_off = arg_i32(args);
+    const uint32_t html_len = arg_i32(args);
+    const uint32_t sel_off = arg_i32(args);
+    const uint32_t sel_len = arg_i32(args);
+    uint32_t attr_off = 0, attr_len = 0;
+    if (want_attr) {
+        attr_off = arg_i32(args);
+        attr_len = arg_i32(args);
+    }
+    const uint32_t out = arg_i32(args);
+    const uint32_t cap = arg_i32(args);
+
+    int32_t rc = kNotFound;
+    const auto html = guest_str(self, html_off, html_len);
+    const auto sel = guest_str(self, sel_off, sel_len);
+    const auto attr = want_attr ? guest_str(self, attr_off, attr_len) : std::optional<std::string>{};
+    if (html && sel && (!want_attr || attr)) {
+        // JSON string array; malformed HTML / no match => [] (lenient).
+        const auto vals = want_attr ? plugin::html_attr(*html, *sel, *attr) : plugin::html_select(*html, *sel);
+        std::string json = "[";
+        for (size_t i = 0; i < vals.size(); ++i) {
+            if (i != 0) {
+                json += ',';
+            }
+            json += '"';
+            for (const char c : vals[i]) {
+                if (c == '"' || c == '\\') {
+                    json += '\\';
+                }
+                json += c;
+            }
+            json += '"';
+        }
+        json += ']';
+        if (guest_write(self, out, cap, json)) {
+            rc = static_cast<int32_t>(json.size());
+        } else {
+            rc = kTruncated;
+        }
+    }
+    *reinterpret_cast<int32_t*>(sp) = rc;
+    return m3Err_none;
+}
+
+const void* host_html_select(IM3Runtime rt, IM3ImportContext ctx, uint64_t* sp, void* mem) {
+    return host_html_call(rt, ctx, sp, mem, /*want_attr=*/false);
+}
+
+const void* host_html_attr(IM3Runtime rt, IM3ImportContext ctx, uint64_t* sp, void* mem) {
+    return host_html_call(rt, ctx, sp, mem, /*want_attr=*/true);
+}
+
 constexpr std::array kImports{
     Import{"now", "I", host_now},
     Import{"log_info", "v(ii)", host_log_info},
@@ -175,6 +288,10 @@ constexpr std::array kImports{
     Import{"storage_get", "i(iiii)", host_storage_get},
     Import{"storage_set", "v(iiii)", host_storage_set},
     Import{"http_fetch", "i(iiiiii)", host_http_fetch},
+    Import{"re2_match", "i(iiiiii)", host_re2_match},
+    Import{"re2_find", "i(iiiiii)", host_re2_find},
+    Import{"html_select", "i(iiiii)", host_html_select},
+    Import{"html_attr", "i(iiiiiii)", host_html_attr},
 };
 
 } // namespace
