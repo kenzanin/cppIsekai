@@ -6,5 +6,5 @@
    - [x] 1.3 `host.*` bindings all three runtimes (lua sol2 table, js frozen global, wasm `env.host_<group>_<fn>` imports per D5) incl. lua `fs.read` parity
    - [x] 1.4 Migrate `plugins_dev/lua/mangadex/main.lua` to `host.*`; grep plugins_dev for stragglers
 2. Verification
-   - [ ] 2.1 Parity doctest per D6: 11-tool set resolves in lua/js/wasm fixtures; identical JSON shapes; RE2/DOM scenario cases from spec
-   - [ ] 2.2 Full ctest green (zero new warnings) + `openspec validate --specs`; live smoke: mangadex search/detail unchanged through the migrated plugin
+   - [x] 2.1 Parity doctest per D6: 11-tool set resolves in lua/js/wasm fixtures; identical JSON shapes; RE2/DOM scenario cases from spec
+   - [x] 2.2 Full ctest green (zero new warnings) + `openspec validate --specs`; live smoke: mangadex search/detail unchanged through the migrated plugin
