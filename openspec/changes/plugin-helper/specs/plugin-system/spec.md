@@ -10,6 +10,11 @@ runtime, with identical names, argument order, and return shapes. The host-tool 
 `host.html.select`, `host.html.attr`. WASM exposes the same set as flat `env.*`
 imports (`env.host_<group>_<fn>`) because wasm imports cannot nest.
 
+#### Scenario: Same tool semantics in js and lua
+- **WHEN** a `js` plugin and a `lua` plugin each call `host.http.fetch` against an
+  unreachable host with the same options
+- **THEN** both observe the same error shape and neither crashes the host
+
 #### Scenario: Parity across lua, js, and wasm
 - **WHEN** a fixture plugin in each runtime (lua, js, wasm) inspects its host-tool
   surface and calls `host.now`, `host.http.fetch` against a local fixture server, and
@@ -22,11 +27,13 @@ imports (`env.host_<group>_<fn>`) because wasm imports cannot nest.
 - **THEN** the file body is returned under the same path confinement rules js/wasm use
 - **AND** paths escaping the plugin directory are rejected identically to js/wasm
 
+## ADDED Requirements
+
 ### Requirement: Regex host helper (RE2)
-`host.re2.match(pattern, text)` returns an array of capture groups (element 0 = whole
-match, then submatches; empty array when the pattern does not match).
-`host.re2.find(pattern, text)` returns the first match as the same array form, or an
-empty array when there is no match. Patterns are evaluated with linear-time RE2.
+`host.re2.match(pattern, text)` SHALL return an array of capture groups (element 0 =
+whole match, then submatches; empty array when the pattern does not match).
+`host.re2.find(pattern, text)` SHALL return the first match in the same array form, or
+an empty array when there is no match. Patterns SHALL be evaluated with linear-time RE2.
 
 #### Scenario: Match and find on fixture text
 - **WHEN** a plugin calls `host.re2.match("ch(\\d+)", "Chapter ch1050")` and
@@ -44,10 +51,11 @@ empty array when there is no match. Patterns are evaluated with linear-time RE2.
   wasm trap) naming the compile failure
 
 ### Requirement: DOM host helpers (lexbor)
-`host.html.select(html, css)` returns the trimmed text contents of all elements
-matching the CSS selector. `host.html.attr(html, css, attr)` returns the values of the
-named attribute for all matching elements that have it (elements without the attribute
-are skipped). No-match yields an empty array; malformed HTML is parsed leniently.
+`host.html.select(html, css)` SHALL return the trimmed text contents of all elements
+matching the CSS selector. `host.html.attr(html, css, attr)` SHALL return the values of
+the named attribute for all matching elements that have it (elements without the
+attribute are skipped). No-match SHALL yield an empty array; malformed HTML SHALL be
+parsed leniently.
 
 #### Scenario: Select text from fixture HTML
 - **WHEN** a plugin calls `host.html.select(fixture_html, "div.title > a")`
