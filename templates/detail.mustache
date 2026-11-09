@@ -1,0 +1,83 @@
+{{>top.mustache}}
+<div x-data="detailPage" x-init="boot()">
+  <!-- header: cover + meta -->
+  <div class="flex gap-5 mb-6">
+    <template x-if="detail.cover">
+      <img :src="'/cache/img?url='+encodeURIComponent(detail.cover)" class="w-40 h-56 object-cover rounded-lg shrink-0" @error="coverBroken=true" x-show="!coverBroken" alt="">
+    </template>
+    <div class="flex-1 min-w-0">
+      <h1 class="text-2xl font-semibold mb-2 leading-tight" x-text="detail.name || '…'"></h1>
+      <div class="flex flex-wrap gap-1.5 mb-2" x-show="detail.status || detail.release_at" x-cloak>
+        <span class="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300" x-show="detail.status" x-text="detail.status"></span>
+        <span class="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400" x-show="detail.release_at" x-text="fmtDate(detail.release_at)"></span>
+        <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-900/40 text-emerald-300 border border-emerald-800" x-show="cached">cached</span>
+      </div>
+      <div class="flex flex-wrap gap-1.5 mb-3" x-show="detail.tags && detail.tags.length" x-cloak>
+        <template x-for="t in detail.tags" :key="t">
+          <span class="text-xs px-2 py-0.5 rounded-full border border-zinc-700 text-zinc-400" x-text="t"></span>
+        </template>
+      </div>
+      <p class="text-sm text-zinc-400 leading-relaxed" x-show="detail.description" x-text="detail.description"></p>
+      <div class="flex gap-2 mt-4">
+        <button @click="refresh()" :disabled="refreshing"
+                class="px-3 py-1.5 text-sm border border-zinc-700 text-zinc-300 hover:bg-zinc-800 rounded-md disabled:opacity-40"
+                x-text="refreshing ? '…' : '⟳ Update'"></button>
+      </div>
+      <p class="text-xs text-red-400 mt-2" x-show="err" x-text="err" x-cloak></p>
+    </div>
+  </div>
+
+  <!-- chapters -->
+  <h2 class="text-xl font-semibold mb-4">Chapters</h2>
+  <p class="text-sm text-zinc-500 mb-3" x-show="!loading && !chapters.length && !err" x-cloak>No chapters.</p>
+  <div class="divide-y divide-zinc-800 border border-zinc-800 rounded-lg" x-show="chapters.length" x-cloak>
+    <template x-for="ch in chapters" :key="ch.id">
+      <div class="flex items-center gap-3 px-4 py-2.5 hover:bg-zinc-900/50">
+        <span class="text-sm font-medium w-20 shrink-0" x-text="chLabel(ch)"></span>
+        <span class="text-xs text-zinc-500 flex-1 truncate" x-text="ch.title"></span>
+        <span class="text-xs text-zinc-500" x-text="fmtDate(ch.release_at)"></span>
+        <a :href="'/reader?plugin='+plugin+'&id='+encodeURIComponent(ch.id)"
+           class="text-xs px-2 py-1 rounded border border-zinc-700 text-zinc-300 hover:bg-zinc-800">Read</a>
+        <a :href="'/export/cbz?plugin='+plugin+'&slug='+encodeURIComponent(slug+'/'+chSlug(ch))"
+           class="text-xs h-7 px-2 inline-flex items-center rounded border border-zinc-700 text-zinc-300 hover:bg-zinc-800">⬇ cbz</a>
+      </div>
+    </template>
+  </div>
+</div>
+
+<script>
+function detailPage() {
+  const parts = location.pathname.split('/').filter(Boolean); // view manga <plugin> <slug...>
+  return {
+    plugin: parts[2] || '', slug: parts.slice(3).join('/') || '',
+    detail: {}, chapters: [], cached: false, loading: true, refreshing: false,
+    err: '', coverBroken: false,
+    async boot() {
+      await this.load();
+    },
+    async load() {
+      this.loading = true; this.err = '';
+      try {
+        const d = await (await fetch(`/api/detail/${this.plugin}/${encodeURIComponent(this.slug)}`)).json();
+        const c = await (await fetch(`/api/chapters/${this.plugin}/${encodeURIComponent(this.slug)}`)).json();
+        if (!d.ok || !c.ok) { this.err = d.error || c.error || 'load failed'; return; }
+        this.detail = d.data || {}; this.cached = !!(d.cached || c.cached);
+        this.chapters = (c.data || []).slice().sort((a, b) => (b.number ?? 0) - (a.number ?? 0));
+      } catch (e) { this.err = String(e); }
+      this.loading = false;
+    },
+    async refresh() {
+      this.refreshing = true;
+      try {
+        const r = await (await fetch(`/api/refresh/${this.plugin}/${encodeURIComponent(this.slug)}`, {method: 'POST'})).json();
+        if (!r.ok) { this.err = r.error || 'refresh failed'; } else { await this.load(); this.cached = false; }
+      } catch (e) { this.err = String(e); }
+      this.refreshing = false;
+    },
+    chLabel(ch) { const n = Number(ch.number); return Number.isFinite(n) ? 'ch ' + String(n).padStart(3, '0') : (ch.title || 'ch'); },
+    chSlug(ch) { const n = Number(ch.number); return Number.isFinite(n) && n > 0 ? 'ch' + String(n).padStart(3, '0') : 'chx'; },
+    fmtDate(ts) { if (!ts) return ''; const d = new Date(ts * 1000); return isNaN(d) ? '' : d.toISOString().slice(0, 10); },
+  };
+}
+</script>
+{{>bottom.mustache}}

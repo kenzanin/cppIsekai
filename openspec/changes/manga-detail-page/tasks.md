@@ -7,8 +7,8 @@
 
 ## 2. Detail page (frontend)
 
-- [ ] 2.1 `templates/detail.mustache` per design D1 (layout + cover via `/cache/img`, Alpine fetch of metadata + chapter rows; chapter rows degrade field-by-field per design Risks); verify: page renders for a live title in a browser, chapters list visible
-- [ ] 2.2 Page route `GET /view/manga/<plugin>/<slug>` in `http_pages.cpp` + chapter-row actions: cbz button → existing `/export/cbz?plugin=&slug=<slug>/chNNN`, read link → existing `/reader/*` endpoints; verify: cbz download works from a row, read link opens the reader on a chapter
+- [x] 2.1 `templates/detail.mustache` per design D1 (layout + cover via `/cache/img`, Alpine fetch of metadata + chapter rows; chapter rows degrade field-by-field per design Risks); verify: page renders for a live title in a browser, chapters list visible
+- [x] 2.2 Page route `GET /view/manga/<plugin>/<slug>` in `http_pages.cpp` + chapter-row actions: cbz button → existing `/export/cbz?plugin=&slug=<slug>/chNNN`, read link → existing `/reader/*` endpoints; verify: cbz download works from a row, read link opens the reader on a chapter
 
 ## 3. Verification
 

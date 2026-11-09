@@ -84,6 +84,13 @@ void register_pages(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, L
     ([&](const crow::request& req) { return html("grid.mustache", home_context(store, db, req)); });
 
     CROW_ROUTE(app, "/search")([&] { return html("search.mustache", layout("search")); });
+
+    // manga-detail 2.2: the detail page. Server-side shell only (D1): the
+    // metadata/chapters hydrate from /api/*; slug segments pass through for
+    // Alpine to rebuild the API URLs (the endpoints re-guard them).
+    CROW_ROUTE(app, "/view/manga/<string>/<string>")
+    ([](const crow::request&, std::string, std::string) { return html("detail.mustache", layout("library")); });
+
     CROW_ROUTE(app, "/history")([] { return html("blank.mustache", layout("history")); });
     CROW_ROUTE(app, "/plugins")([&] { return html("plugins.mustache", layout("plugins")); });
     CROW_ROUTE(app, "/about")([] { return html("blank.mustache", layout("about")); });
