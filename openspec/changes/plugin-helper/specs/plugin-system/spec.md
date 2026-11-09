@@ -2,7 +2,7 @@
 
 ## MODIFIED Requirements
 
-### Requirement: Host tools are namespaced and identical across runtimes
+### Requirement: Host-tool parity across runtimes
 All host-provided functions live under a single `host.*` namespace in every plugin
 runtime, with identical names, argument order, and return shapes. The host-tool set is:
 `host.now`, `host.log.info`, `host.log.error`, `host.http.fetch`, `host.storage.get`,
