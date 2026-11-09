@@ -57,6 +57,8 @@ TEST_CASE("config: layered resolve default < ini < env < flag") {
         CHECK(c.fetch_profile == "chrome116");
         CHECK(c.plugin_timeout_ops == 5000000);
         CHECK(c.cache_max_mb == 2048);
+        CHECK(c.image_format == "webp");
+        CHECK(c.cover_max_px == 800);
         CHECK(c.db == "data/library.db");
         CHECK(c.log_file == "data/cppisekai.log");
         CHECK(c.data_dir == "data");
@@ -92,9 +94,21 @@ TEST_CASE("config: layered resolve default < ini < env < flag") {
         CHECK(resolve(none, ini, fake_env({})).port == 8090);
     }
 
-    SUBCASE("garbage numeric falls back to default") {
-        auto ini = tmp_ini("[cache]\ncache_max_mb = lots\n");
-        CHECK(resolve(none, ini, fake_env({})).cache_max_mb == 2048);
+    SUBCASE("cache knobs round-trip env and flag") {
+        auto ini = tmp_ini("[cache]\nimage_format = avif\ncover_max_px = 400\n");
+        Config a = resolve(none, ini, fake_env({}));
+        CHECK(a.image_format == "avif");
+        CHECK(a.cover_max_px == 400);
+
+        Config b = resolve(none, "no-such-cfg.ini",
+                           fake_env({{"CPPISEKAI_IMAGE_FORMAT", "jxl"}, {"CPPISEKAI_COVER_MAX_PX", "1200"}}));
+        CHECK(b.image_format == "jxl");
+        CHECK(b.cover_max_px == 1200);
+
+        Overrides flagged = parse_args({"prog", "--image-format", "none", "--cover-max-px", "600"});
+        Config c = resolve(flagged, ini, fake_env({{"CPPISEKAI_IMAGE_FORMAT", "jxl"}}));
+        CHECK(c.image_format == "none"); // explicit flag beats env and ini
+        CHECK(c.cover_max_px == 600);
     }
 }
 

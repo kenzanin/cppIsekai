@@ -122,8 +122,16 @@ add_test(NAME htmltext COMMAND test_htmltext)
 # cache core: disk LRU store; fetcher injected -> network-free tests
 add_executable(test_cache tests/test_cache.cpp src/cache/cache.cpp)
 target_include_directories(test_cache PRIVATE src)
+target_link_libraries(test_cache PRIVATE PkgConfig::VIPS)
 target_compile_options(test_cache PRIVATE -Wall -Wextra)
 add_test(NAME cache COMMAND test_cache)
+
+# transcode core (cache-layout-v3 1.2): header-only vips buffer in/out
+add_executable(test_transcode tests/test_transcode.cpp)
+target_include_directories(test_transcode PRIVATE src)
+target_link_libraries(test_transcode PRIVATE PkgConfig::VIPS)
+target_compile_options(test_transcode PRIVATE -Wall -Wextra)
+add_test(NAME transcode COMMAND test_transcode)
 
 # slug pragma (1.1): header-only title->folder rule + collision suffix; no src sources
 add_executable(test_slug tests/test_slug.cpp)
@@ -141,6 +149,7 @@ add_test(NAME config COMMAND test_config)
 # cache ctor, so no server, curl or store linkage is needed here.
 add_executable(test_http_img tests/test_http_img.cpp src/cache/cache.cpp)
 target_include_directories(test_http_img PRIVATE src)
+target_link_libraries(test_http_img PRIVATE PkgConfig::VIPS)
 target_compile_options(test_http_img PRIVATE -Wall -Wextra)
 add_test(NAME http_img COMMAND test_http_img)
 
@@ -154,6 +163,7 @@ add_test(NAME export COMMAND test_export)
 # stale layer (2.2): wrapper around the ABI call; cache + glaze, no server
 add_executable(test_stale tests/test_stale.cpp src/cache/cache.cpp)
 target_include_directories(test_stale PRIVATE src ${TP}/glaze)
+target_link_libraries(test_stale PRIVATE PkgConfig::VIPS)
 target_compile_options(test_stale PRIVATE -Wall -Wextra)
 add_test(NAME stale COMMAND test_stale)
 
@@ -166,6 +176,7 @@ add_test(NAME window COMMAND test_window)
 # worker (3.3): delta prefetch on an injected cache; no server, no crow
 add_executable(test_worker tests/test_worker.cpp src/cache/cache.cpp)
 target_include_directories(test_worker PRIVATE src)
+target_link_libraries(test_worker PRIVATE PkgConfig::VIPS)
 target_compile_options(test_worker PRIVATE -Wall -Wextra)
 add_test(NAME worker COMMAND test_worker)
 

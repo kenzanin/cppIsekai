@@ -31,6 +31,8 @@ struct Config {
     std::string fetch_profile;
     std::int64_t plugin_timeout_ops;
     std::int64_t cache_max_mb;
+    std::string image_format;    // [cache] image_format: webp|avif|jxl|none
+    std::int64_t cover_max_px;   // [cache] cover_max_px: cover resize cap
     std::string db;
     std::string log_file;
     std::string data_dir;
@@ -81,9 +83,11 @@ inline Config to_config(const std::array<std::string, kEntryCount>& v) {
     c.fetch_profile = v[4];
     c.plugin_timeout_ops = num_or<std::int64_t>(v[5], kEntries[5].def);
     c.cache_max_mb = num_or<std::int64_t>(v[6], kEntries[6].def);
-    c.db = v[7];
-    c.log_file = v[8];
-    c.data_dir = v[9];
+    c.image_format = v[7];
+    c.cover_max_px = num_or<std::int64_t>(v[8], kEntries[8].def);
+    c.db = v[9];
+    c.log_file = v[10];
+    c.data_dir = v[11];
     if (c.port <= 0) {
         c.port = num_or<int>(kEntries[0].def, kEntries[0].def); // design ceiling: port > 0
     }

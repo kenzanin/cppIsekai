@@ -24,7 +24,7 @@ struct Entry {
 };
 
 // Order is the projection order consumed by config.hpp -- do not reorder.
-inline constexpr std::array<Entry, 10>
+inline constexpr std::array<Entry, 12>
     kEntries{
         {
             // section      key                   flag                 alias          env def doc
@@ -84,6 +84,22 @@ inline constexpr std::array<Entry, 10>
              .env = "CPPISEKAI_CACHE_MAX_MB",
              .def = "2048",
              .doc = "Image cache cap (MiB)",
+             .type = Type::Int64},
+            {.section = "cache",
+             .key = "image_format",
+             .flag = "image-format",
+             .alias = "",
+             .env = "CPPISEKAI_IMAGE_FORMAT",
+             .def = "webp",
+             .doc = "Stored image format (webp|avif|jxl|none)",
+             .type = Type::Str},
+            {.section = "cache",
+             .key = "cover_max_px",
+             .flag = "cover-max-px",
+             .alias = "",
+             .env = "CPPISEKAI_COVER_MAX_PX",
+             .def = "800",
+             .doc = "Cover longest-side cap (px)",
              .type = Type::Int64},
             {.section = "paths",
              .key = "library",

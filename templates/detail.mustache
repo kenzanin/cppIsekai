@@ -3,7 +3,7 @@
   <!-- header: cover + meta -->
   <div class="flex gap-5 mb-6">
     <template x-if="detail.cover">
-      <img :src="'/cache/img?url='+encodeURIComponent(detail.cover)" class="w-40 h-56 object-cover rounded-lg shrink-0" @error="coverBroken=true" x-show="!coverBroken" alt="">
+      <img :src="'/cache/img?url='+encodeURIComponent(detail.cover)+'&cover=1&plugin='+encodeURIComponent(plugin)+'&slug='+encodeURIComponent(slug)" class="w-40 h-56 object-cover rounded-lg shrink-0" @error="coverBroken=true" x-show="!coverBroken" alt="">
     </template>
     <div class="flex-1 min-w-0">
       <h1 class="text-2xl font-semibold mb-2 leading-tight" x-text="detail.name || '…'"></h1>

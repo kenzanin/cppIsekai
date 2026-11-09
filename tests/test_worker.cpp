@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "cache/cache.hpp"
+#include "cache/sha1.hpp"
 #include "reader/worker.hpp"
 
 namespace fs = std::filesystem;
@@ -107,8 +108,10 @@ TEST_CASE("worker: structured placement -- complete ctx lands <plugin>/<slug>/ch
         worker.nudge({"http://x/1.jpg", "http://x/2.jpg"}, reader::WindowCtx{"md", "slug-a", 1});
         worker.stop();
     }
-    CHECK(rig.on_disk_rel("http://x/1.jpg", "md/slug-a/ch001/p001.jpg"));
-    CHECK(rig.on_disk_rel("http://x/2.jpg", "md/slug-a/ch001/p002.jpg"));
+    const auto r1 = "md/slug-a/ch001-edd003c0/p001.jpg";
+    const auto r2 = "md/slug-a/ch001-c3142807/p002.jpg";
+    CHECK(rig.on_disk_rel("http://x/1.jpg", r1));
+    CHECK(rig.on_disk_rel("http://x/2.jpg", r2));
 
     // Second window of the same manga: one page of ch002. Two separate
     // windows (each drained on stop) keep ch001 and ch002 side by side.
@@ -117,7 +120,8 @@ TEST_CASE("worker: structured placement -- complete ctx lands <plugin>/<slug>/ch
         worker.nudge({"http://y/1.jpg"}, reader::WindowCtx{"md", "slug-a", 2});
         worker.stop();
     }
-    CHECK(rig.on_disk_rel("http://y/1.jpg", "md/slug-a/ch002/p001.jpg"));
+    const auto r3 = "md/slug-a/ch002-e106a54b/p001.jpg";
+    CHECK(rig.on_disk_rel("http://y/1.jpg", r3));
     // Zero-pad keeps ch001..ch010 in reading order across a full chapter span.
     const std::vector<std::string> dirs = {"ch001", "ch002", "ch010"};
     for (std::size_t i = 1; i < dirs.size(); ++i) CHECK(dirs[i - 1] < dirs[i]);
@@ -172,9 +176,11 @@ TEST_CASE("worker: store reuse -- peek with the same rel_path hits, a second rel
         worker.nudge({"http://x/a.jpg"}, reader::WindowCtx{"md", "slug-a", 2}); // second rel
         worker.stop();
     }
-    CHECK(rig.on_disk_rel("http://x/a.jpg", "md/slug-a/ch001/p001.jpg"));
-    CHECK(rig.on_disk_rel("http://x/a.jpg", "md/slug-a/ch002/p001.jpg"));
+    const auto ra1 = "md/slug-a/ch001-6d46c90d/p001.jpg";
+    const auto ra2 = "md/slug-a/ch002-6d46c90d/p001.jpg";
+    CHECK(rig.on_disk_rel("http://x/a.jpg", ra1));
+    CHECK(rig.on_disk_rel("http://x/a.jpg", ra2));
     const int calls = rig.fake.fetched.size();
-    CHECK(rig.on_disk_rel("http://x/a.jpg", "md/slug-a/ch001/p001.jpg")); // peek = hit, no fetch
+    CHECK(rig.on_disk_rel("http://x/a.jpg", ra1)); // peek = hit, no fetch
     CHECK(rig.fake.fetched.size() == calls);
 }
