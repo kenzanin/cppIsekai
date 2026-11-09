@@ -100,6 +100,25 @@ set_target_properties(test_plugin PROPERTIES BUILD_RPATH
                                              "${TP}/curl-impersonate/lib")
 add_test(NAME plugin COMMAND test_plugin)
 
+# host-helper core + runtime parity (plugin-helper 2.1): htmltext core cases
+# direct; lua/js/wasm parity through the real Host on migrated fixtures.
+add_executable(test_htmltext tests/test_htmltext.cpp src/plugin/plugin.cpp
+                             src/plugin/lua/bridge.cpp src/plugin/lua/lua_runtime.cpp src/plugin/http_client.cpp src/plugin/wasm/wasm_rt.cpp src/plugin/wasm/wasm_load.cpp src/plugin/js/js_rt.cpp src/plugin/js/js_bindings.cpp src/plugin/htmltext.cpp src/store/store.cpp src/fetch/fetch.cpp)
+target_include_directories(test_htmltext PRIVATE src ${TP}/glaze ${TP}/sol2/include ${TP}/thread_pool/include ${TP}/lexbor/source
+                          ${TP}/sqlite_orm/include ${TP}/readerwriterqueue/include)
+target_link_libraries(
+  test_htmltext
+  PRIVATE wasm3 quickjs sqlite3 PkgConfig::LUA re2 lexbor
+          ${TP}/curl-impersonate/lib/libcurl-impersonate-chrome.so.4.8.0
+          spdlog::spdlog)
+target_compile_options(test_htmltext PRIVATE -Wall -Wextra)
+target_compile_definitions(
+  test_htmltext
+  PRIVATE TEST_PLUGIN_FIXTURES="${PROJECT_SOURCE_DIR}/tests/fixtures/plugins")
+set_target_properties(test_htmltext PROPERTIES BUILD_RPATH
+                                               "${TP}/curl-impersonate/lib")
+add_test(NAME htmltext COMMAND test_htmltext)
+
 # cache core: disk LRU store; fetcher injected -> network-free tests
 add_executable(test_cache tests/test_cache.cpp src/cache/cache.cpp)
 target_include_directories(test_cache PRIVATE src)
