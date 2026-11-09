@@ -287,7 +287,7 @@ void register_api(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, BS:
                 if (glz::read_json(env, fresh[i]) || !envelope_ok(env)) {
                     const std::string body =
                         std::string("{\"ok\":false,\"error\":\"refresh failed: ") + methods[i] + "\"}";
-                    crow::response r{body};
+                    crow::response r{502, body}; // upstream plugin call failed, not the route
                     r.set_header("Content-Type", "application/json");
                     return r; // cache untouched: nothing stored yet
                 }
