@@ -1,3 +1,9 @@
+## 2026-11-09
+* **Update**: Updated concept `architecture/manga-detail-page.md`.
+* **Update**: Linked `architecture/manga-detail-page.md` to `architecture/image-cache-offline.md`.
+* **Update**: Linked `architecture/manga-detail-page.md` to `architecture/manga-viewer-core.md`.
+* **Creation**: Documented concept `architecture/manga-detail-page.md` (manga-detail-page: stale-serve + fail-safe refresh pattern).
+
 ## 2026-11-08
 * **Update**: Linked `references/uploads-cdn-tls-constraint.md` to `architecture/image-cache-offline.md`.
 * **Update**: Linked `references/uploads-cdn-tls-constraint.md` to `decisions/fetch-profile-gate.md`.
