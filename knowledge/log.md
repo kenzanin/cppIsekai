@@ -1,4 +1,6 @@
 ## 2026-11-09
+* **Update**: Linked `decisions/plugin-runtimes-wasm-js.md` to `architecture/plugin-system.md`.
+* **Update**: Updated concept `decisions/plugin-runtimes-wasm-js.md`.
 * **Update**: Updated concept `architecture/manga-detail-page.md`.
 * **Update**: Linked `architecture/manga-detail-page.md` to `architecture/image-cache-offline.md`.
 * **Update**: Linked `architecture/manga-detail-page.md` to `architecture/manga-viewer-core.md`.

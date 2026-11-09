@@ -1,68 +1,25 @@
 ---
 type: decision
 title: "Plugin runtimes: wasm3 + quickjs-ng execution contract"
-description: "Change plugin-js-wasm 9/9: dual runtime (wasm3 ABI + quickjs realm) behind ONE shared shape/health core; parity host tools; confined fs.read; gas/interrupt budgets; hardening lessons (JS refcount consume, per-invoke stack rebase, glz brace-init)."
-tags: [plugin-runtime, wasm, quickjs, abi, sandbox, security]
-generated: { by: agent/mcp, at: "2026-11-08T06:00:00Z" }
+description: "plugin-helper landed: unified host.* namespace (11 tools) across lua/js/wasm, RE2 + lexbor heavy helpers behind one htmltext core, lua fs.read parity closed; lexbor vendor pitfalls (ports/posix memory.c, separate selectors/ subtree) recorded."
+tags: [plugin-runtime, host-tools, re2, lexbor, parity, helper-api, html, regex]
+generated: { by: agent/mcp, at: "2026-11-09T07:35:16Z" }
 status: stable
 ---
 
-This contract executes the runtime-parity and vendoring plan from
-`decisions/deps-and-plugins`, and extends the ABI in `architecture/plugin-system`.
-Delivered via change `plugin-js-wasm` (9/9 tasks; independent review PREAPPROVED
-0C/0I/4m; ctest 10/10; live HTTP smoke js+wasm).
+DECISION (change plugin-helper, merged cd87738, archived 2026-11-09; 6/6 tasks, ctest 11/11, live smoke ok):
 
-## Contract
+HOST NAMESPACE. All host tools live under one `host.*` surface in lua and js; bare globals (http/storage/log/now/fs) removed, no aliases. WASM exposes flat env.* imports (cannot nest): now, log_info, fs_read, storage_get/set, http_fetch, re2_match/find, html_select/attr. 11-tool set: host.now, host.log.info/error, host.http.fetch, host.storage.get/set, host.fs.read, host.re2.match/find, host.html.select/attr.
 
-The plugin envelope stays `{api,method,params}` JSON-in, `{ok,data}`/`{ok,error}`-out.
-**One** shape gate (`plugin::checked_reply`) and **one** health/call-mutex core in
-`Host::call`; per-runtime seams only marshal. Runtime from the manifest; load failure =
-plugin absent + warn.
+HELPERS (one core src/plugin/htmltext.{hpp,cpp}, three thin marshals):
+- re2 (system lib, linear-time/no ReDoS): match anchors both ends, find first-found; groups vector (element 0 whole match); no-match = empty (never error); bad pattern throws invalid_argument (lua->runtime_error, js->TypeError, wasm->rc kBadPattern=-3).
+- html (lexbor vendored): select = trimmed text per matched element, attr = qualified-name attr values (missing attr skips element); no-match/bad HTML = empty, lenient; lxb_selectors_find callback (node, specificity, ctx) collects nodes.
 
-## WASM (wasm3, vendored)
+LEXBOR VENDOR NOTES (third_party/lexbor): layout source/lexbor/{html,core,dom,css,selectors,style,ns,tag}; REQUIRED non-obvious bits: css/selectors subtree is the parser, dom-level matching is the separate selectors/ subtree; default allocator impl lives in ports/posix/lexbor/core/memory.c (copied as core/lexbor_memory.c) - without it the static lib links with undefined lexbor_calloc; file(GLOB_RECURSE) needs a reconfigure after adding files.
 
-Module exports `alloc(i32)->ptr`, `handle(ptr,len)->ptr (0=fail)`, `last_len()->i32` over
-linear memory; imports `env.{now,log,fs.read,storage.get/set,http.fetch}` via
-`m3_LinkRawFunctionEx` + instance userdata; **no WASI**. Budget = gas
-`m3_SetResourceLimit` (armed pre-compile, refreshed per call); any trap => ok:false. The
-host always bounds-checks guest pointers (`guest_mem`).
+MIGRATION: mangadex main.lua + fixtures (good/fetcher/fsread) moved to host.* in the same change (in-house plugins, no compat aliases).
 
-## JS (quickjs-ng d4187c7, core only)
+GOTCHAS: sol2 as_table does not convert to sol::object - build sol::table manually (1-based keys); Store ctor takes a db PATH not :memory:; after build-dir resets, CMake can consider stale corrupt binaries up-to-date (BAD_COMMAND/Permission denied) - rm the binary and rebuild; multi-config generator mixed with Makefiles leaves binaries in config subdirs - keep single generator.
 
-Entry = source evaluated in a per-plugin realm; the entry defines a global `handle(env)`.
-Host globals: `now`, `log.info/error`, `http.fetch`, `fs.read`, `storage.get/set` (fs via
-`plugin::fs_read` confined to the plugin folder; http reuses the lua curl-sync path).
-Budget = interrupt handler, 200k ops (512/call chunks), **initialised before the entry
-eval**.
-
-## Lessons (hard-won)
-
-1. `JS_SetPropertyStr` **consumes** the value ref - never free it afterwards.
-2. The pool thread's stack base differs from the loader thread's:
-   `JS_UpdateStackTop(rt)` on **every** invoke, else "Maximum call stack size exceeded"
-   on any parse.
-3. `glz::generic{T}` brace-init mangles scalars - assign via `.data`.
-4. The shape check must be runtime-agnostic and live in the shared core.
-
-## Parity & security
-
-Host tools keep the same names/semantics across runtimes; recorded deviation: http
-failure lua=nil+msg vs js=null (ponytail). `fs.read` is read-only, lexically confined
-(prefix+boundary) to the plugin folder; symlink escape tolerated in v1.
-
-## Fixtures & toolchain
-
-`tests/fixtures/plugins`: freestanding `clang --target=wasm32` wasm echo/bad/spin-gas
-(wasi-sdk present at `/opt/wasi-sdk`, deliberately unused - user steer); js fix/bad
-pairs; regen commands in each README.
-
-## Deferred (accepted by review)
-
-Guest-side import smoke; the wasm bad-reply-shape test; js realm global pruning; http
-failure-shape unification; `make_wasm_fetch` naming; gas vs op-hook granularity; the
-pre-existing `test_plugin:137` empty-body warning.
-
-## Related
-
-- [Dependencies & plugins: curl-first APIs, runtime parity, no hand-rolled crypto](deps-and-plugins.md): The parity + vendoring ruling this contract executes.
-- [Plugin system: folder packaging, manifest, multi-runtime data-contract ABI](../architecture/plugin-system.md): The data-contract ABI this runtime layer extends with js/wasm execution.
+# Related Concepts
+- Related to [Plugin system: folder packaging, manifest, multi-runtime data-contract ABI](../architecture/plugin-system.md)
