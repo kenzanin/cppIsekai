@@ -261,6 +261,47 @@ void register_api(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, BS:
         return title_data_response(plugins, images, db, plugin_pool, store, plugin, slug, "chapters");
     });
 
+    // manga-detail 1.2: forced refresh (design D3). Call-through both methods,
+    // overwrite the stale entries on success; the first failure returns it and
+    // leaves every cached entry untouched.
+    CROW_ROUTE(app, "/api/refresh/<string>/<string>").methods(crow::HTTPMethod::POST)
+    ([&](const crow::request& /*req*/, std::string plugin, std::string slug) -> crow::response {
+        if (!valid_title_pair(plugin, slug)) {
+            return crow::response{404, R"({"ok":false,"error":"unknown title"})"};
+        }
+        const bool enabled = on_pool(db, [&] { return store.plugin_enabled(plugin); });
+        if (!enabled) {
+            crow::response r{R"({"ok":false,"error":"plugin disabled"})"};
+            r.set_header("Content-Type", "application/json");
+            return r;
+        }
+        return crow::response{on_pool(plugin_pool, [&] {
+            crow::json::wvalue p;
+            p["id"] = slug;
+            const std::string params = p.dump();
+            std::string fresh[2];
+            const char* methods[2] = {"detail", "chapters"};
+            for (int i = 0; i < 2; ++i) {
+                fresh[i] = plugins.call(plugin, methods[i], params);
+                glz::generic env;
+                if (glz::read_json(env, fresh[i]) || !envelope_ok(env)) {
+                    const std::string body =
+                        std::string("{\"ok\":false,\"error\":\"refresh failed: ") + methods[i] + "\"}";
+                    crow::response r{body};
+                    r.set_header("Content-Type", "application/json");
+                    return r; // cache untouched: nothing stored yet
+                }
+            }
+            for (int i = 0; i < 2; ++i) {
+                const std::string key = stale_key(plugin, methods[i], params);
+                images.store(key, "api", fresh[i]); // same key shape call_cached persists under
+            }
+            crow::response r{R"({"ok":true})"};
+            r.set_header("Content-Type", "application/json");
+            return r;
+        })};
+    });
+
     // Reader prefetch input (image-cache): remember the position -- it is the
     // anchor the skip-rerun reads back -- and report the window. No worker
     // here; task 3.3 consumes the returned page list.

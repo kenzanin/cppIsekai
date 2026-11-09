@@ -3,7 +3,7 @@
 ## 1. JSON endpoints (backend)
 
 - [x] 1.1 `GET /api/detail/<plugin>/<slug>` + `GET /api/chapters/<plugin>/<slug>` via `call_cached` (stale-first, `cached:true`), slug guard (404 on separators/`..`); verify: curl against a live title returns envelope JSON, unknown slug 404s
-- [ ] 1.2 `POST /api/refresh/<plugin>/<slug>` per design D3 (call-through detail→chapters, overwrite cache, first-error-fails with cache intact); verify: curl refresh on a live title returns ok and the next detail fetch shows fresh data; failure path leaves cached data intact
+- [x] 1.2 `POST /api/refresh/<plugin>/<slug>` per design D3 (call-through detail→chapters, overwrite cache, first-error-fails with cache intact); verify: curl refresh on a live title returns ok and the next detail fetch shows fresh data; failure path leaves cached data intact
 
 ## 2. Detail page (frontend)
 
