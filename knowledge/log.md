@@ -1,4 +1,8 @@
 ## 2026-11-09
+* **Update**: Linked `references/cache-v3-followup-backlog.md` to `architecture/cache-layout-v3.md` (Follow-up gaps discovered during cache-layout-v3 final review: cbz lexicographic sort, common/ cover namespace, VIPS link requirement).
+* **Update**: Linked `architecture/cache-layout-v3.md` to `architecture/image-cache-offline.md` (Supersedes/extends: v3 reorganizes the v2 image pool into per-plugin layout and adds global transcode + host-computed cover ratio).
+* **Creation**: Documented concept `references/cache-v3-followup-backlog.md` (cache-v3 follow-up backlog: cbz lexicographic sort, common/ cover namespace, VIPS link requirement).
+* **Creation**: Documented concept `architecture/cache-layout-v3.md` (cache-layout-v3: per-plugin layout, global transcode, host cover ratio).
 * **Update**: Linked `decisions/plugin-runtimes-wasm-js.md` to `architecture/plugin-system.md`.
 * **Update**: Updated concept `decisions/plugin-runtimes-wasm-js.md`.
 * **Update**: Updated concept `architecture/manga-detail-page.md`.
