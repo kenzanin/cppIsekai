@@ -1,9 +1,9 @@
 ---
 type: decision
 title: "manga-detail-page: stale-serve + fail-safe refresh pattern"
-description: "Detail page pattern: stale-serve detail/chapters via existing call_cached, fail-safe POST refresh that overwrites both stale entries only after both envelopes validate, SSR shell + Alpine hydrate, per-chapter CBZ links, slug guard 404."
+description: "Detail page pattern: stale-serve detail/chapters via call_cached, fail-safe POST refresh overwriting both stale entries only after both envelopes validate, SSR shell + Alpine hydrate, per-chapter CBZ links, slug guard 404. Integration: search results link to /view/manga/<plugin>/<slug> (commit 6808ed5)."
 tags: [detail-page, stale-serve, refresh, cbz, alpine, ssr]
-generated: { by: agent/mcp, at: "2026-11-09T03:01:44Z" }
+generated: { by: agent/mcp, at: "2026-11-09T03:22:45Z" }
 status: stable
 ---
 

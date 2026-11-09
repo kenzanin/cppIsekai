@@ -1,4 +1,5 @@
 ## 2026-11-09
+* **Update**: Updated concept `architecture/manga-detail-page.md`.
 * **Update**: Linked `architecture/manga-detail-page.md` to `architecture/image-cache-offline.md`.
 * **Update**: Linked `architecture/manga-detail-page.md` to `architecture/manga-viewer-core.md`.
 * **Creation**: Documented concept `architecture/manga-detail-page.md` (manga-detail-page: stale-serve + fail-safe refresh pattern).
