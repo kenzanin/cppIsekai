@@ -23,6 +23,7 @@
 #include <cstdlib>
 
 #include "cache/cache.hpp"
+#include "config/config.hpp"
 #include "log/log.hpp"
 #include "reader/worker.hpp"
 #include "reader/cover_worker.hpp"
@@ -72,6 +73,7 @@ void register_pages(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, L
 /** \brief JSON API: plugin registry/call routes, reader position/skip,
  *  config save, image cache, CBZ export, dev reload. */
 void register_api(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool,
-                  plugin::Host& plugins, cache::Cache& images, reader::Worker& prefetch, reader::CoverWorker& covers, const std::string& ini_path);
+                  plugin::Host& plugins, cache::Cache& images, reader::Worker& prefetch, reader::CoverWorker& covers, const std::string& ini_path,
+                  const config::Overrides& overrides);
 
 } // namespace http

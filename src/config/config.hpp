@@ -98,6 +98,67 @@ inline Config to_config(const std::array<std::string, kEntryCount>& v) {
 
 } // namespace detail
 
+/** \brief One registry knob projected for read-only display: resolved
+ *  value plus the layer that won. `source` is "default" when neither ini,
+ *  env nor flag supplied a value; "ini"/"env"/"flag" otherwise (flag wins
+ *  env wins ini wins default, same order as resolve). Pure re-resolve per
+ *  call -- the on-disk ini may change under a long-lived daemon (D1). */
+struct Describe {
+    std::string section, key, full_key, doc, flag, env, def, value, source;
+    Type type{};
+};
+
+inline std::vector<Describe> describe(const std::string& ini_path, const Overrides& flags,
+                                      const EnvLookup& env = [](const char* n) { return std::getenv(n); }) {
+    CSimpleIniA ini;
+    const bool have_ini = ini.LoadFile(ini_path.c_str()) >= 0;
+    std::vector<Describe> out;
+    out.reserve(kEntryCount);
+    for (std::size_t i = 0; i < kEntryCount; ++i) {
+        const Entry& e = kEntries[i];
+        Describe d;
+        d.section = e.section;
+        d.key = e.key;
+        d.full_key = std::string(e.section) + '.' + e.key;
+        d.doc = e.doc;
+        d.flag = e.flag;
+        d.env = e.env;
+        d.def = e.def;
+        d.type = e.type;
+        d.value = e.def;
+        d.source = "default";
+        if (have_ini) {
+            if (const char* iv = ini.GetValue(e.section, e.key, nullptr)) {
+                d.value = iv;
+                d.source = "ini";
+            }
+        }
+        if (env) {
+            if (const char* ev = env(e.env)) {
+                d.value = ev;
+                d.source = "env";
+            }
+        }
+        if ((flags.opt[i] != nullptr) && flags.opt[i]->count() > 0) {
+            d.value = flags.value[i];
+            d.source = "flag";
+        }
+        if (e.type != Type::Str) { // same lenient fallback as to_config: bad numerics show the default
+            try {
+                std::size_t used = 0;
+                std::stoll(d.value, &used);
+                if (used != d.value.size())
+                    throw 0;
+            } catch (...) {
+                d.value = e.def; // lenient fallback (same as to_config)
+                d.source = "default";
+            }
+        }
+        out.push_back(std::move(d));
+    }
+    return out;
+}
+
 /** \brief POST /config body coercion: JSON object -> updates map in string
  *  form. Integers up to 1e18 keep exact integer text; fractional doubles go
  *  through to_string(double); any other value type is an error. Crow-free so

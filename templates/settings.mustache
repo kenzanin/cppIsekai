@@ -1,0 +1,119 @@
+{{>top.mustache}}
+<div x-data="settingsPage" x-init="boot()">
+  <h1 class="text-lg font-semibold mb-3">Settings</h1>
+  <p class="text-xs text-zinc-500 mb-3">Values resolve per layer: default &lt; ini &lt; <code>CPPISEKAI_*</code> env &lt; <code>--flag</code>. Rows won by env/flag are read-only. Save writes the ini in place; comments survive.</p>
+  <p class="text-sm text-red-400 mb-2" x-show="err" x-text="err" x-cloak></p>
+  <p class="text-sm text-zinc-500 mb-2" x-show="note" x-text="note" x-cloak></p>
+
+  <div x-show="loading" class="text-sm text-zinc-500">…</div>
+
+  <template x-for="section in sections()" :key="section">
+    <section class="mb-5">
+      <h2 class="text-xs uppercase tracking-wide text-zinc-500 mb-2" x-text="section"></h2>
+      <ul class="space-y-2">
+        <template x-for="k in knobs.filter(x => x.section === section)" :key="k.fullKey">
+          <li class="border border-zinc-800 rounded p-3">
+            <div class="flex items-center gap-2 flex-wrap">
+              <code class="text-xs text-zinc-400" x-text="k.fullKey"></code>
+              <span class="text-[10px] uppercase rounded px-1.5 py-0.5 bg-zinc-800 text-zinc-400" x-text="sourceOf(k)"></span>
+              <span class="text-[10px] rounded px-1.5 py-0.5 bg-amber-900/40 text-amber-400" x-show="k.restart">restart to apply</span>
+              <span class="text-[10px] rounded px-1.5 py-0.5 bg-emerald-900/40 text-emerald-400" x-show="k.live">applied live</span>
+              <span class="flex-1"></span>
+              <!-- input -->
+              <template x-if="enumOf(k)">
+                <select class="bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-sm"
+                        :value="k.value" :disabled="readOnly(k)"
+                        @change="dirty[k.fullKey] = $event.target.value">
+                  <template x-for="opt in enumOf(k)" :key="opt">
+                    <option :value="opt" :selected="opt === k.value" x-text="opt"></option>
+                  </template>
+                </select>
+              </template>
+              <template x-if="!enumOf(k) && k.type !== 'str'">
+                <input type="number" class="bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-sm w-40"
+                       :value="k.value" :disabled="readOnly(k)"
+                       @input="dirty[k.fullKey] = $event.target.value">
+              </template>
+              <template x-if="!enumOf(k) && k.type === 'str'">
+                <span class="flex items-center gap-2">
+                  <template x-if="k.fullKey === 'server.proxy' && !reveal[k.fullKey]">
+                    <input type="password" class="bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-sm w-80"
+                           :value="k.value" :disabled="readOnly(k)"
+                           @input="dirty[k.fullKey] = $event.target.value">
+                  </template>
+                  <template x-if="!(k.fullKey === 'server.proxy' && !reveal[k.fullKey])">
+                    <input type="text" class="bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-sm w-80"
+                           :value="k.value" :disabled="readOnly(k)"
+                           @input="dirty[k.fullKey] = $event.target.value">
+                  </template>
+                  <button type="button" x-show="k.fullKey === 'server.proxy'" class="text-xs text-zinc-500 underline"
+                          @click="reveal[k.fullKey] = !reveal[k.fullKey]" x-text="reveal[k.fullKey] ? 'hide' : 'show'"></button>
+                </span>
+              </template>
+            </div>
+            <p class="text-xs text-zinc-500 mt-1" x-text="k.doc"></p>
+            <p class="text-xs text-amber-500/80 mt-1" x-show="readOnly(k)"
+               x-text="'won by ' + sourceOf(k) + ' — editing the ini will not change this value'"></p>
+          </li>
+        </template>
+      </ul>
+    </section>
+  </template>
+
+  <div class="flex gap-2 mt-4">
+    <button @click="save()" :disabled="saving || Object.keys(dirty).length === 0"
+            class="px-4 py-1.5 text-sm rounded bg-zinc-100 text-zinc-900 disabled:opacity-40">Save changes</button>
+    <button @click="dirty = {}" class="px-4 py-1.5 text-sm rounded bg-zinc-800 hover:bg-zinc-700">Discard edits</button>
+  </div>
+</div>
+<script>
+function settingsPage() {
+  const RESTART = new Set(['server.port', 'paths.library', 'paths.log_file', 'paths.data_dir',
+                           'cache.cache_max_mb', 'cache.image_format', 'cache.cover_max_px', 'log.level']);
+  const LIVE = new Set(['plugin.fetch_profile']);
+  const ENUMS = { 'cache.image_format': ['webp', 'avif', 'jxl', 'none'],
+                  'log.level': ['trace', 'debug', 'info', 'warning', 'error'] };
+  return {
+    knobs: [], dirty: {}, reveal: {}, loading: true, saving: false, err: '', note: '',
+    async boot() {
+      try {
+        const j = await (await fetch('/config')).json();
+        this.knobs = (j.knobs || []).map(k => ({
+          ...k,
+          fullKey: k.fullKey,
+          restart: RESTART.has(k.fullKey),
+          live: LIVE.has(k.fullKey),
+        }));
+      } catch (e) { this.err = String(e); }
+      this.loading = false;
+    },
+    sections() { return [...new Set(this.knobs.map(k => k.section))]; },
+    sourceOf(k) { return k.source; },
+    enumOf(k) { return ENUMS[k.fullKey] || null; },
+    readOnly(k) { return k.source === 'env' || k.source === 'flag'; },
+    patched() {
+      const out = {};
+      for (const [key, value] of Object.entries(this.dirty)) {
+        const t = this.knobs.find(k => k.fullKey === key);
+        if (t && t.type !== 'str') {
+          const n = Number(value);
+          if (Number.isFinite(n)) out[key] = n; else out[key] = value; // server is the validator
+        } else out[key] = value;
+      }
+      return out;
+    },
+    async save() {
+      this.saving = true; this.err = ''; this.note = '';
+      try {
+        const r = await fetch('/config', { method: 'POST', headers: {'Content-Type': 'application/json'},
+                                           body: JSON.stringify(this.patched()) });
+        const j = await r.json();
+        if (!j.ok) { this.err = j.error || ('HTTP ' + r.status); }
+        else { this.note = 'saved (' + j.written + ' key(s) written)'; this.dirty = {}; await this.boot(); }
+      } catch (e) { this.err = String(e); }
+      this.saving = false;
+    },
+  };
+}
+</script>
+{{>bottom.mustache}}

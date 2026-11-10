@@ -3,6 +3,8 @@
 
 #include <CLI/CLI.hpp>
 
+#include <algorithm>
+
 #include <filesystem>
 #include <fstream>
 #include <map>
@@ -38,8 +40,10 @@ Overrides parse_args(std::initializer_list<const char*> args) {
     Overrides o;
     CLI::App app{"test"};
     build_cli(app, o);
-    std::vector<const char*> argv{args};
-    app.parse(static_cast<int>(argv.size()), argv.data());
+    std::vector<std::string> argv;
+    for (const char* a : args) argv.emplace_back(a);
+    std::reverse(argv.begin(), argv.end()); // CLI11 vector<string> overload consumes reversed
+    app.parse(argv);
     return o;
 }
 
@@ -79,14 +83,14 @@ TEST_CASE("config: layered resolve default < ini < env < flag") {
 
     SUBCASE("explicit flag beats env; unset flag keeps ini") {
         auto ini = tmp_ini("[server]\nport = 1234\n[cache]\ncache_max_mb = 64\n");
-        Overrides flagged = parse_args({"prog", "--port", "9000"});
+        Overrides flagged = parse_args({"--port", "9000"});
         Config c = resolve(flagged, ini, fake_env({{"CPPISEKAI_PORT", "2222"}}));
         CHECK(c.port == 9000);
         CHECK(c.cache_max_mb == 64); // --cache-max-mb not passed: ini value survives
     }
 
     SUBCASE("alias --server-port binds the same knob") {
-        CHECK(resolve(parse_args({"prog", "--server-port", "7777"}), "no-such-cfg.ini", fake_env({})).port == 7777);
+        CHECK(resolve(parse_args({"--server-port", "7777"}), "no-such-cfg.ini", fake_env({})).port == 7777);
     }
 
     SUBCASE("port <= 0 falls back to default (validation ceiling)") {
@@ -105,7 +109,7 @@ TEST_CASE("config: layered resolve default < ini < env < flag") {
         CHECK(b.image_format == "jxl");
         CHECK(b.cover_max_px == 1200);
 
-        Overrides flagged = parse_args({"prog", "--image-format", "none", "--cover-max-px", "600"});
+        Overrides flagged = parse_args({"--image-format", "none", "--cover-max-px", "600"});
         Config c = resolve(flagged, ini, fake_env({{"CPPISEKAI_IMAGE_FORMAT", "jxl"}}));
         CHECK(c.image_format == "none"); // explicit flag beats env and ini
         CHECK(c.cover_max_px == 600);
@@ -269,4 +273,42 @@ TEST_CASE("config: save merges comment-safe (D5)") {
         CHECK(text.find("; TCP listen port") != std::string::npos);
         CHECK(resolve(Overrides{}, path, fake_env({})).port == 1);
     }
+}
+
+TEST_CASE("config: describe() projects registry with layer provenance (D1/D3)") {
+    Overrides none; // flag layer inert
+    auto ini = tmp_ini("[server]\nport = 1234\n[cache]\ncache_max_mb = bogus\n");
+
+    const auto d = describe(ini, none, fake_env({{"CPPISEKAI_PORT", "9999"}}));
+    REQUIRE(d.size() == kEntryCount);
+    const auto by_full = [&](const char* f) -> const Describe& {
+        for (const auto& x : d)
+            if (x.full_key == f) return x;
+        throw 1;
+    };
+
+    CHECK(by_full("server.port").value == "9999"); // env beats ini
+    CHECK(by_full("server.port").source == "env");
+    CHECK(by_full("cache.cache_max_mb").value == kEntries[6].def); // bad numeric -> default fallback
+    CHECK(by_full("cache.cache_max_mb").source == "default");
+    CHECK(by_full("cache.image_format").source == "default"); // untouched by ini
+    CHECK(by_full("server.proxy").source == "default");
+
+    // resolver does not write the file
+    auto read = [](const std::string& p) {
+        std::ifstream f{p};
+        return std::string{std::istreambuf_iterator<char>{f}, std::istreambuf_iterator<char>{}};
+    };
+    const auto before = read(ini);
+    describe(ini, none, fake_env({}));
+    CHECK(read(ini) == before);
+
+    // flag beats env beats ini
+    auto flagged = parse_args({"--port", "7777"});
+    const auto d2 = describe(ini, flagged, fake_env({{"CPPISEKAI_PORT", "9999"}}));
+    for (const auto& x : d2)
+        if (x.full_key == "server.port") {
+            CHECK(x.value == "7777");
+            CHECK(x.source == "flag");
+        }
 }

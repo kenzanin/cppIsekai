@@ -152,7 +152,7 @@ std::vector<std::string> reader_window(Store& store, BS::thread_pool<>& db, BS::
 
 void register_api(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool,
                   plugin::Host& plugins, cache::Cache& images, reader::Worker& prefetch, reader::CoverWorker& covers,
-                  const std::string& ini_path) {
+                  const std::string& ini_path, const config::Overrides& overrides_ref) {
     // Dev endpoint: rescan the plugin dir, re-register, no restart.
     CROW_ROUTE(app, "/plugins/reload").methods(crow::HTTPMethod::POST)([&] {
         const int n = on_pool(db, [&] { return plugins.load_all(store); });
@@ -591,6 +591,33 @@ void register_api(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, BS:
             res.set_header("Content-Type", "application/json");
             return res;
         });
+
+    // Config read (settings page): registry projection with layer provenance.
+    // Re-resolves per request (ini may change on disk); no writes.
+    CROW_ROUTE(app, "/config").methods(crow::HTTPMethod::GET)([&] {
+        crow::json::wvalue knobs(crow::json::type::List);
+        int i = 0;
+        for (const auto& d : config::describe(ini_path, overrides_ref)) {
+            crow::json::wvalue k;
+            k["section"] = d.section;
+            k["key"] = d.key;
+            k["fullKey"] = d.full_key;
+            k["doc"] = d.doc;
+            k["type"] = d.type == config::Type::Str ? "str" : (d.type == config::Type::Int ? "int" : "int64");
+            k["flag"] = d.flag;
+            k["env"] = d.env;
+            k["default"] = d.def;
+            k["value"] = d.value;
+            k["source"] = d.source;
+            knobs[i++] = std::move(k);
+        }
+        crow::json::wvalue out;
+        out["ok"] = true;
+        out["knobs"] = std::move(knobs);
+        crow::response r{out};
+        r.set_header("Content-Type", "application/json");
+        return r;
+    });
 
     // Config save (D5): validation-first merge, comments/ordering survive.
     // Body {"section.key": string|number} in resolved full-key form.

@@ -42,7 +42,7 @@ cache::Fetcher makeCurlFetcher(std::string /*proxy*/) {
 }
 
 void serve(Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool, plugin::Host& plugins, LogBuffer& logs,
-           cache::Cache& images, int port, const std::string& ini_path) {
+           cache::Cache& images, int port, const std::string& ini_path, const config::Overrides& overrides) {
     crow::SimpleApp app;
     crow::mustache::set_base("templates");
 
@@ -56,7 +56,7 @@ void serve(Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool, 
     // Crow's built-in static handler already serves /static/<path> from ./static.
 
     http::register_pages(app, store, db, logs, covers);
-    http::register_api(app, store, db, plugin_pool, plugins, images, prefetch, covers, ini_path);
+    http::register_api(app, store, db, plugin_pool, plugins, images, prefetch, covers, ini_path, overrides);
 
     app.port(port).concurrency(4).run();
 }
