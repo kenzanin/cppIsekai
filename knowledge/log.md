@@ -1,4 +1,5 @@
 ## 2026-11-10
+* **Creation**: Documented concept `decisions/chapter-zero-falsy-regression.md` (reader: chapter 0 is valid — falsy-zero regression fixed + unit-locked).
 * **Update**: Updated concept `architecture/settings-page-openspec.md`.
 * **Creation**: Documented concept `architecture/settings-page-openspec.md` (settings-page: openspec change drafted (GET /config projection + /settings UI)).
 * **Update**: Updated concept `architecture/cover-prefetch-worker.md`.
