@@ -1,4 +1,5 @@
 ## 2026-11-10
+* **Creation**: Documented concept `decisions/cache-stale-hit-guard.md` (cache stale-hit guard: wipe no longer serves 200-blank).
 * **Creation**: Documented concept `decisions/chapter-list-controls.md` (chapter-list-controls: read-state routes and detail rows).
 * **Creation**: Documented concept `architecture/reader-readahead.md` (reader: read-ahead cross-chapter prefetch (worker + 10-page window)).
 * **Update**: Updated concept `references/reader-page-gaps.md`.
