@@ -23,4 +23,4 @@
 ## 5. Verification
 
 - [x] 5.1 `ctest` green (`test_store` extended); `openspec validate --change library-save` clean (note: `openspec validate` accepts `--changes` for all; per-change flag may not exist — fall back to `--changes` and grep the line).
-- [ ] 5.2 Live smoke (Chrome via blueprint): save from detail → card appears on home with correct name/cover; unsave → disappears; empty state when `saved_manga` is empty; detail toggle state correct on reload; saved view ignores `?page=`; broken cover falls back to hue div.
+- [x] 5.2 Live smoke (Chrome via blueprint): save from detail → card appears on home with correct name/cover; unsave → disappears; empty state when `saved_manga` is empty; detail toggle state correct on reload; saved view ignores `?page=`; broken cover falls back to hue div.
