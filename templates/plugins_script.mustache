@@ -1,0 +1,38 @@
+<script>
+function pluginsPage() {
+  return {
+    rows: [], q: '', busy: false,
+    broken: {},
+    async load() {
+      this.busy = true
+      const j = await (await fetch('/api/plugins')).json()
+      this.rows = j.plugins || []
+      this.busy = false
+    },
+    get view() {
+      const q = this.q.trim().toLowerCase()
+      if (!q) return this.rows
+      return this.rows.filter(r =>
+        r.name.toLowerCase().includes(q) || (r.caps || '').toLowerCase().includes(q))
+    },
+    caps(r) { return (r.caps || '').split(',').filter(Boolean) },
+    stateText(r) { return !r.enabled ? '○ disabled' : (r.state === 'error' ? '⚠ error' : '● active') },
+    stateClass(r) {
+      if (!r.enabled) return 'text-zinc-500'
+      return r.state === 'error' ? 'text-yellow-400' : 'text-green-400'
+    },
+    async toggle(r) {
+      await fetch('/plugin/' + r.id + '/enabled', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: !r.enabled })
+      })
+      await this.load()
+    },
+    async reload() {
+      this.busy = true
+      await fetch('/plugins/reload', { method: 'POST' })
+      await this.load()
+    },
+  }
+}
+</script>

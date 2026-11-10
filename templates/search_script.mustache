@@ -1,0 +1,63 @@
+<script>
+function searchPage() {
+  const PAGE = 12
+  return {
+    plugins: [], plugin: '', q: '', tags: [], genres: [],
+    items: [], total: null, page: 1, loading: false, err: '', notice: '',
+    logoBroken: false,
+    logoFor(k) { return k && !this.logoBroken },
+    async boot() {
+      const j = await (await fetch('/api/plugins')).json()
+      this.plugins = (j.plugins || []).filter(p => p.enabled && p.key)
+      const u = new URL(location)
+      this.plugin = u.searchParams.get('plugin') || ''
+      this.q = u.searchParams.get('q') || ''
+      this.page = parseInt(u.searchParams.get('page')) || 1
+      this.tags = (u.searchParams.get('tags') || '').split(',').filter(Boolean)
+      if (this.plugin) { await this.loadGenres(); await this.run(false) }
+      else if (!this.plugins.length) this.notice = 'No enabled plugin — aktifkan satu di halaman Plugins.'
+    },
+    async pick() { this.tags = []; this.items = []; this.total = null; this.page = 1; this.sync()
+      await this.loadGenres() },
+    async loadGenres() {
+      this.genres = []
+      if (!this.plugin) return
+      try {
+        const j = await (await fetch(`/plugin/${this.plugin}/genres`)).json()
+        if (j.ok) this.genres = j.data
+      } catch (e) { /* no row */ }
+    },
+    toggleTag(g) {
+      const i = this.tags.indexOf(g)
+      i >= 0 ? this.tags.splice(i, 1) : this.tags.push(g)
+      this.page = 1; this.run()
+    },
+    search() { this.page = 1; this.run() },
+    go(p) { if (p >= 1 && p <= this.pages()) { this.page = p; this.run() } },
+    pages() { return this.total === null ? 1 : Math.max(1, Math.ceil(this.total / PAGE)) },
+    async run(push = true) {
+      if (!this.plugin) return
+      this.loading = true; this.err = ''
+      const u = new URL(`/plugin/${this.plugin}/search`, location.origin)
+      u.searchParams.set('title', this.q); u.searchParams.set('page', this.page); u.searchParams.set('limit', PAGE)
+      if (this.tags.length) u.searchParams.set('tags', this.tags.join(','))
+      try {
+        const j = await (await fetch(u)).json()
+        if (!j.ok) { this.err = j.error || 'search failed' }
+        else { this.items = j.data.items; this.total = j.data.total }
+      } catch (e) { this.err = String(e) }
+      this.loading = false
+      if (push) this.sync()
+    },
+    sync() {
+      const u = new URL(location); u.search = ''
+      if (this.plugin) u.searchParams.set('plugin', this.plugin)
+      if (this.q) u.searchParams.set('q', this.q)
+      if (this.tags.length) u.searchParams.set('tags', this.tags.join(','))
+      if (this.page > 1) u.searchParams.set('page', this.page)
+      history.pushState({}, '', u)
+    },
+  }
+}
+window.addEventListener('popstate', () => location.reload())
+</script>

@@ -1,0 +1,50 @@
+<script>
+function settingsPage() {
+  const RESTART = new Set(['server.port', 'paths.library', 'paths.log_file', 'paths.data_dir', 'paths.templates_dir',
+                           'cache.cache_max_mb', 'cache.image_format', 'cache.cover_max_px', 'log.level']);
+  const LIVE = new Set(['plugin.fetch_profile']);
+  const ENUMS = { 'cache.image_format': ['webp', 'avif', 'jxl', 'none'],
+                  'log.level': ['trace', 'debug', 'info', 'warning', 'error'] };
+  return {
+    knobs: [], dirty: {}, reveal: {}, loading: true, saving: false, err: '', note: '',
+    async boot() {
+      try {
+        const j = await (await fetch('/config')).json();
+        this.knobs = (j.knobs || []).map(k => ({
+          ...k,
+          fullKey: k.fullKey,
+          restart: RESTART.has(k.fullKey),
+          live: LIVE.has(k.fullKey),
+        }));
+      } catch (e) { this.err = String(e); }
+      this.loading = false;
+    },
+    sections() { return [...new Set(this.knobs.map(k => k.section))]; },
+    sourceOf(k) { return k.source; },
+    enumOf(k) { return ENUMS[k.fullKey] || null; },
+    readOnly(k) { return k.source === 'env' || k.source === 'flag'; },
+    patched() {
+      const out = {};
+      for (const [key, value] of Object.entries(this.dirty)) {
+        const t = this.knobs.find(k => k.fullKey === key);
+        if (t && t.type !== 'str') {
+          const n = Number(value);
+          if (Number.isFinite(n)) out[key] = n; else out[key] = value; // server is the validator
+        } else out[key] = value;
+      }
+      return out;
+    },
+    async save() {
+      this.saving = true; this.err = ''; this.note = '';
+      try {
+        const r = await fetch('/config', { method: 'POST', headers: {'Content-Type': 'application/json'},
+                                           body: JSON.stringify(this.patched()) });
+        const j = await r.json();
+        if (!j.ok) { this.err = j.error || ('HTTP ' + r.status); }
+        else { this.note = 'saved (' + j.written + ' key(s) written)'; this.dirty = {}; await this.boot(); }
+      } catch (e) { this.err = String(e); }
+      this.saving = false;
+    },
+  };
+}
+</script>
