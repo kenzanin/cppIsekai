@@ -134,8 +134,6 @@ TEST_CASE("http.fetch via curl-impersonate") {
     LogSetup ls;
     Store store("test_plugin_fetch.db");
     plugin::Config c = test_conf();
-    if (const char* smoke = std::getenv("PLUGIN_SMOKE_URL"); smoke != nullptr)
-        ; // live smoke exercised separately below when env set
     plugin::Host host(c);
     host.load_all(store);
 
@@ -280,12 +278,13 @@ TEST_CASE("fetch: family map, target list, profile guard") {
     CHECK(fetch::family_of("ff117") == fetch::Family::Firefox);
     CHECK(fetch::family_of("firefox120") == fetch::Family::Firefox);
     CHECK(fetch::family_of("") == fetch::Family::Chrome);
-    CHECK(fetch::is_known_target("ff91esr"));
+    CHECK_FALSE(fetch::is_known_target("ff91esr")); // ff* builds unsupported (NSS vs BoringSSL), see fetch.hpp
     CHECK(fetch::is_known_target("safari15_3"));
     CHECK_FALSE(fetch::is_known_target("nope120"));
     CHECK(plugin::checked_profile("", "chrome116") == "chrome116");
     CHECK(plugin::checked_profile("bogus9", "chrome116") == "chrome116");
-    CHECK(plugin::checked_profile("ff117", "chrome116") == "ff117");
+    CHECK(plugin::checked_profile("edge101", "chrome116") == "edge101"); // known target passes through
+    CHECK(plugin::checked_profile("ff117", "chrome116") == "chrome116"); // ff* falls back to the chrome engine
 }
 
 TEST_CASE("fetch: cookie jar round-trip and per-plugin isolation") {

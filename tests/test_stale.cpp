@@ -59,16 +59,16 @@ TEST_CASE("stale: success persists, then failing call serves last-good + cached:
     const std::string first = call_cached(store, "mangadex", "search", R"({"q":"one piece"})", std::ref(call));
     CHECK(has(first, R"("ok":true)"));
     CHECK(call.calls == 1);
-    // age the row past ttl so the failure path (not the fresh look-aside) drives the second call
+    // ttl=0 expires the row: still served local-first, flagged cached.
     store.api_cache_put("mangadex", stale_key("mangadex", "search", R"({"q":"one piece"})"),
                         R"({"q":"one piece"})", first, 1, 0);
 
-    call.succeed = false; // plugin goes dark; same query, second attempt
+    call.succeed = false; // plugin goes dark; irrelevant -- the row wins
     const std::string second = call_cached(store, "mangadex", "search", R"({"q":"one piece"})", std::ref(call));
-    REQUIRE(has(second, R"("cached":true)")); // flag injected, top level
+    REQUIRE(has(second, R"("cached":true)")); // expired-row flag, top level
     CHECK(has(second, R"("titles":["one piece"])")); // last-good body intact
     CHECK(has(second, R"("ok":true)"));
-    CHECK(call.calls == 2); // failure path still called once, then served stale
+    CHECK(call.calls == 1); // local-first: any cached row wins, plugin not called
 }
 
 TEST_CASE("stale: fresh row within ttl is served without calling the plugin") {
