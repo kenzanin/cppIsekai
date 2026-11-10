@@ -41,7 +41,7 @@ target_include_directories(sqlite3 PUBLIC ${TP}/libsql/sqlite)
 
 # --- app ---
 add_executable(cppIsekai src/main.cpp src/store/store.cpp src/http/http.cpp src/http/http_pages.cpp src/http/http_api.cpp src/http/http_api_admin.cpp src/http/http_api_library.cpp src/http/http_api_title.cpp src/http/http_api_reader.cpp src/http/http_api_state.cpp src/http/http_api_content.cpp src/http/pages_api.cpp
-                         src/fetch/fetch.cpp src/plugin/plugin_core.cpp src/plugin/plugin_load.cpp src/plugin/plugin_call.cpp src/plugin/lua/bridge.cpp src/plugin/lua/lua_runtime.cpp src/plugin/http_client.cpp src/plugin/wasm/wasm_rt.cpp src/plugin/wasm/wasm_load.cpp src/plugin/js/js_rt.cpp src/plugin/js/js_bindings.cpp src/plugin/htmltext.cpp src/cache/cache.cpp src/reader/window.cpp
+                         src/fetch/fetch.cpp src/plugin/plugin_core.cpp src/plugin/plugin_load.cpp src/plugin/plugin_call.cpp src/plugin/lua/bridge.cpp src/plugin/lua/lua_runtime.cpp src/plugin/http_client.cpp src/plugin/wasm/wasm_rt.cpp src/plugin/wasm/wasm_load.cpp src/plugin/js/js_rt.cpp src/plugin/js/js_bindings.cpp src/plugin/htmltext.cpp src/cache/cache.cpp src/cache/cache_img.cpp src/reader/window.cpp
                          ${TP}/libzippp/libzippp.cpp src/http/export_cbz.cpp)
 target_include_directories(
   cppIsekai
@@ -120,7 +120,7 @@ set_target_properties(test_htmltext PROPERTIES BUILD_RPATH
 add_test(NAME htmltext COMMAND test_htmltext)
 
 # cache core: disk LRU store; fetcher injected -> network-free tests
-add_executable(test_cache tests/test_cache.cpp src/cache/cache.cpp)
+add_executable(test_cache tests/test_cache.cpp src/cache/cache.cpp src/cache/cache_img.cpp)
 target_include_directories(test_cache PRIVATE src)
 target_link_libraries(test_cache PRIVATE spdlog::spdlog PkgConfig::VIPS)
 target_compile_options(test_cache PRIVATE -Wall -Wextra)
@@ -147,7 +147,7 @@ add_test(NAME config COMMAND test_config)
 
 # /cache/img serve-through: pure route core, crow-free; fetcher injected via the
 # cache ctor, so no server, curl or store linkage is needed here.
-add_executable(test_http_img tests/test_http_img.cpp src/cache/cache.cpp)
+add_executable(test_http_img tests/test_http_img.cpp src/cache/cache.cpp src/cache/cache_img.cpp)
 target_include_directories(test_http_img PRIVATE src)
 target_link_libraries(test_http_img PRIVATE spdlog::spdlog PkgConfig::VIPS)
 target_compile_options(test_http_img PRIVATE -Wall -Wextra)
@@ -188,7 +188,7 @@ target_compile_options(test_window PRIVATE -Wall -Wextra)
 add_test(NAME window COMMAND test_window)
 
 # worker (3.3): delta prefetch on an injected cache; no server, no crow
-add_executable(test_worker tests/test_worker.cpp src/cache/cache.cpp)
+add_executable(test_worker tests/test_worker.cpp src/cache/cache.cpp src/cache/cache_img.cpp)
 target_include_directories(test_worker PRIVATE src)
 target_link_libraries(test_worker PRIVATE spdlog::spdlog PkgConfig::VIPS)
 target_compile_options(test_worker PRIVATE -Wall -Wextra)
@@ -202,7 +202,7 @@ find_program(CLANG_FORMAT clang-format)
 add_custom_target(
   tidy
   COMMAND ${CLANG_TIDY} -p ${CMAKE_BINARY_DIR} src/main.cpp src/store/store.cpp
-          src/http/http.cpp src/plugin/plugin_core.cpp src/plugin/plugin_load.cpp src/plugin/plugin_call.cpp src/cache/cache.cpp src/reader/window.cpp
+          src/http/http.cpp src/plugin/plugin_core.cpp src/plugin/plugin_load.cpp src/plugin/plugin_call.cpp src/cache/cache.cpp src/cache/cache_img.cpp src/reader/window.cpp
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 add_custom_target(
   format
@@ -212,5 +212,5 @@ add_custom_target(
 add_custom_target(
     fix
     COMMAND ${CLANG_TIDY} -p ${CMAKE_BINARY_DIR} -fix -fix-errors src/main.cpp src/store/store.cpp
-            src/http/http.cpp src/plugin/plugin_core.cpp src/plugin/plugin_load.cpp src/plugin/plugin_call.cpp src/cache/cache.cpp src/reader/window.cpp
+            src/http/http.cpp src/plugin/plugin_core.cpp src/plugin/plugin_load.cpp src/plugin/plugin_call.cpp src/cache/cache.cpp src/cache/cache_img.cpp src/reader/window.cpp
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
