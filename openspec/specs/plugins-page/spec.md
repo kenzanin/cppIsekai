@@ -48,8 +48,8 @@ The title count SHALL be a link to `/library?plugin=<id>`; the library page SHAL
 to that plugin's titles.
 
 #### Scenario: Count click
-- **WHEN** the Flame row shows `12` and it is clicked
-- **THEN** the library page lists exactly Flame's titles
+- **WHEN** a plugin row shows its title count and it is clicked
+- **THEN** the library page lists exactly that plugin's titles
 
 ### Requirement: Reload
 Each row SHALL have a reload action that triggers the existing plugin rescan; the page
