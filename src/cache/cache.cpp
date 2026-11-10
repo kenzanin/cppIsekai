@@ -40,7 +40,7 @@ std::string ext_of(const std::string& key) {
 // one is sha-named; any subdir or foreign name is live v2 layout -- keep it.
 bool legacy_v1(const fs::path& root) {
     bool seen = false;
-    for (const char* kind : {"img", "api"}) {
+    for (const char* kind : {"img"}) {
         std::error_code ec;
         fs::directory_iterator it(root / kind, ec), end{};
         for (; !ec && it != end; it.increment(ec)) {
@@ -111,7 +111,7 @@ Cache::Cache(Config conf, Fetcher fetch) : conf_(std::move(conf)), fetch_(std::m
     const fs::path root(conf_.root);
 
     std::error_code ec;
-    for (const char* kind : {"img", "api"}) fs::create_directories(root / kind, ec);
+    for (const char* kind : {"img"}) fs::create_directories(root / kind, ec);
     std::vector<fs::path> stale; // rollback copies left by earlier boots
     for (const fs::directory_entry& e : fs::directory_iterator(root, ec)) {
         if (e.path().filename().string().rfind(".legacy-", 0) == 0) stale.push_back(e.path());
@@ -128,7 +128,7 @@ Cache::Cache(Config conf, Fetcher fetch) : conf_(std::move(conf)), fetch_(std::m
     const fs::path stamp = root / ".cache-v2";
     if (!fs::exists(stamp, ec)) {
         if (legacy_v1(root)) {
-            for (const char* kind : {"img", "api"}) {
+            for (const char* kind : {"img"}) {
                 std::error_code rec;
                 const fs::path from = root / kind;
                 if (fs::exists(from, rec)) fs::rename(from, root / (std::string(".legacy-") + kind), rec);
@@ -153,7 +153,7 @@ Cache::Cache(Config conf, Fetcher fetch) : conf_(std::move(conf)), fetch_(std::m
         std::error_code fec;
         if (!it->is_regular_file(fec) || fec) continue;
         // ponytail: cover sidecars (<hash>.json next to covers) excluded from
-        // LRU byte accounting (D3); api-pool .json entries stay counted.
+        // LRU byte accounting (D3).
         if (it->path().parent_path().filename() == "cover" &&
             it->path().extension() == ".json")
             continue;

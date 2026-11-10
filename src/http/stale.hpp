@@ -1,27 +1,33 @@
 #pragma once
 
 /** \file stale.hpp
- *  \brief Stale-serve layer (design D3): ONE wrap around the ABI call route,
- *  no per-plugin branches.
+ *  \brief Stale-serve / fresh-serve layer (search-cache design D3): ONE wrap
+ *  around the ABI call route, no per-plugin branches.
  *
- *  Success -> persist the response envelope; failure (`ok:false` / malformed)
- *  -> last-good + `"cached":true` on top level, merged through glaze -- never
- *  string-spliced. Opt-in read-only methods only. The call itself is injected
- *  (any callable), so tests fake it hermetically. */
+ *  Opt-in read-only methods. Fresh row in `api_cache` (JSONB, store-gated)
+ *  is served without touching the plugin; on plugin success the envelope is
+ *  upserted as JSONB; on failure the last-good row is served with
+ *  `"cached":true` on top level, merged through glaze -- never
+ *  string-spliced. The call itself is injected (any callable), so tests fake
+ *  it hermetically. */
 
-#include "cache/cache.hpp"
 #include "cache/sha1.hpp"
+#include "store/store.hpp"
 
 #include <glaze/glaze.hpp>
 
+#include <ctime>
 #include <optional>
 #include <string>
 #include <utility>
 
 #include <spdlog/spdlog.h>
 
-/** \brief Read-only methods allowed to serve stale (exact opt-in list, design
- *  D3; `pages` lands with 3.1 and is listed here from the start). */
+/** Constant per-method TTL for the api_cache read model; ponytail: knob later. */
+inline constexpr std::int64_t kApiCacheTtl = 24 * 3600;
+
+/** \brief Read-only methods allowed to serve from api_cache (exact opt-in
+ *  list; all of them, not just search). */
 inline bool stale_optin(const std::string& method) {
     return method == "search" || method == "detail" || method == "chapters" ||
            method == "pages" || method == "genres";
@@ -65,33 +71,42 @@ inline std::string stale_key(const std::string& plugin, const std::string& metho
     return sha1_hex(plugin + '|' + method + '|' + canon);
 }
 
-/** \brief The wrap: run \p call, then persist on success / fall back to
- *  last-good with `cached:true` on failure. Envelopes that glaze cannot
- *  re-shape pass through untouched in both directions. */
+/** \brief The wrap: store look-aside -> plugin -> write-through, stale-serve
+ *  on failure. Envelopes that glaze cannot re-shape pass through untouched
+ *  in both directions. */
 template <class Call> // std::string() -- the ABI call seam
-std::string call_cached(cache::Cache& cache, const std::string& id, const std::string& method,
+std::string call_cached(Store& store, const std::string& id, const std::string& method,
                         const std::string& params_json, Call&& call) {
+    if (!stale_optin(method)) return call();
+
+    const std::string key = stale_key(id, method, params_json);
+    const std::int64_t now = static_cast<std::int64_t>(std::time(nullptr));
+
+    // Look-aside: fresh row serves without touching the plugin. ttl_s <= 0
+    // means always-expired (test hook).
+    if (auto row = store.api_cache_get(id, key))
+        if (row->ttl_s > 0 && row->fetched_at + row->ttl_s > now)
+            return row->payload;
+
     std::string res = call();
-    if (!stale_optin(method)) return res;
 
     glz::generic env;
     if (glz::read_json(env, res)) return res; // malformed: no shape to key on
-    const std::string key = stale_key(id, method, params_json);
 
     if (envelope_ok(env)) {
         spdlog::debug("[plugin:{}] {} fresh envelope cached", id, method);
-        cache.store(key, "api", res);
+        store.api_cache_put(id, key, params_json, res, now, kApiCacheTtl);
         return res;
     }
 
-    if (auto stale = cache.peek(key, "api")) {
+    if (auto row = store.api_cache_get(id, key)) {
         spdlog::debug("[plugin:{}] {} failed -> stale-serve", id, method);
         glz::generic served;
-        if (!glz::read_json(served, *stale) && served.is_object()) {
+        if (!glz::read_json(served, row->payload) && served.is_object()) {
             served.get_object()["cached"].data = true; // top-level flag, via glaze
             if (auto out = glz::write_json(served)) return std::move(*out);
         }
-        return *stale; // unshapeable last-good still beats a fresh error
+        return row->payload; // unshapeable last-good still beats a fresh error
     }
     return res;
 }

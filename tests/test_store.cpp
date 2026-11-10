@@ -171,3 +171,40 @@ TEST_CASE("Store: saved_manga save/unsave/list (library-save 1.2)") {
         store.unsave_manga("md", "abc-slug-del"); // idempotent remove
     }
 }
+
+TEST_CASE("Store: api_cache JSONB round-trip (write via jsonb(), read via json())") {
+    Store store("test_store.db"); // same file as above; unique keys per run
+    const auto run = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+    const std::string plugin = "md_" + run;
+    const std::string key = "hash_" + run;
+    const std::string payload = R"({"ok":true,"data":[{"id":"a"}]})";
+
+    CHECK_FALSE(store.api_cache_get(plugin, key).has_value());
+
+    store.api_cache_put(plugin, key, R"({"q":"x"})", payload, 1000, 3600);
+    const auto row = store.api_cache_get(plugin, key);
+    REQUIRE(row.has_value());
+    CHECK(row->payload == payload); // json() round-trip preserves content
+    CHECK(row->params_json == R"({"q":"x"})");
+    CHECK(row->fetched_at == 1000);
+    CHECK(row->ttl_s == 3600);
+
+    // upsert on same PK replaces, never duplicates
+    store.api_cache_put(plugin, key, R"({"q":"y"})", R"({"ok":true,"data":[]})", 2000, 0);
+    const auto updated = store.api_cache_get(plugin, key);
+    REQUIRE(updated.has_value());
+    CHECK(updated->payload == R"({"ok":true,"data":[]})");
+    CHECK(updated->fetched_at == 2000);
+    CHECK(updated->ttl_s == 0);
+
+    // malformed JSON is rejected by jsonb() at write time; existing row preserved
+    store.api_cache_put(plugin, key, R"({"q":"y"})", R"({"unterminated)", 3000, 99);
+    const auto kept = store.api_cache_get(plugin, key);
+    REQUIRE(kept.has_value());
+    CHECK(kept->payload == R"({"ok":true,"data":[]})"); // not overwritten by garbage
+    CHECK(kept->fetched_at == 2000);
+
+    // plugin isolation
+    const auto other = store.api_cache_get("other_" + run, key);
+    CHECK_FALSE(other.has_value());
+}
