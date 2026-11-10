@@ -1,4 +1,5 @@
 ## 2026-11-10
+* **Update**: Updated concept `decisions/source-layout-policy.md`.
 * **Update**: Updated concept `decisions/chapter-zero-falsy-regression.md`.
 * **Creation**: Documented concept `decisions/chapter-zero-falsy-regression.md` (reader: chapter 0 is valid — falsy-zero regression fixed + unit-locked).
 * **Update**: Updated concept `architecture/settings-page-openspec.md`.
