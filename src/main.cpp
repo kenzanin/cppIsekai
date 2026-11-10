@@ -103,7 +103,10 @@ int main(int argc, char** argv) {
 
     // [cache]: one shared disk-LRU (img now, api in 3.3); cap resolved in MiB.
     const std::int64_t cache_max_bytes = cfg.cache_max_mb << 20;
-    cache::Cache images{cache::Config{"data/cache", cache_max_bytes}, makeCurlFetcher(cfg.proxy)};
+    cache::Config ccfg{"data/cache", cache_max_bytes};
+    ccfg.image_format = cfg.image_format;   // ponytail: must ride Config, else ini knob silently ignored
+    ccfg.cover_max_px = cfg.cover_max_px;
+    cache::Cache images{ccfg, makeCurlFetcher(cfg.proxy)};
 
     spdlog::info("cppIsekai listening on :{} (config: {})", cfg.port, ini_path);
     serve(store, db_pool, plugin_pool, plugins, logs, images, cfg.port, ini_path, overrides, cfg.templates_dir);

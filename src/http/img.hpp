@@ -32,6 +32,9 @@ inline const char* image_mime(std::string_view name) {
     if (ext == "avif") {
         return "image/avif";
     }
+    if (ext == "jxl") {
+        return "image/jxl";
+    }
     if (ext == "svg") {
         return "image/svg+xml";
     }
