@@ -322,8 +322,13 @@ std::optional<ApiCacheRow> Store::api_cache_get(const std::string& plugin_id, co
         if (sqlite3_step(stmt) == SQLITE_ROW) {
             const auto* params = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
             const auto* payload = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
-            row = ApiCacheRow{params ? params : "", payload ? payload : "",
-                              sqlite3_column_int64(stmt, 2), sqlite3_column_int64(stmt, 3)};
+            const int plen = sqlite3_column_bytes(stmt, 1);
+            // Empty/NULL payload (e.g. row written before payload existed) is a
+            // row-shaped miss, not a fresh hit -- otherwise the caller serves
+            // a 200 with an empty body.
+            if (payload && plen > 0)
+                row = ApiCacheRow{params ? params : "", std::string(payload, static_cast<std::size_t>(plen)),
+                                  sqlite3_column_int64(stmt, 2), sqlite3_column_int64(stmt, 3)};
         }
         sqlite3_finalize(stmt);
     }
