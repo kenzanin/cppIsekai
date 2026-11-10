@@ -27,10 +27,12 @@
 inline constexpr std::int64_t kApiCacheTtl = 24 * 3600;
 
 /** \brief Read-only methods allowed to serve from api_cache (exact opt-in
- *  list; all of them, not just search). */
+ *  list; all of them, not just search). Library reads are local-first: the
+ *  network is only used on a cold miss (nothing cached) or when the caller
+ *  explicitly refreshes. */
 inline bool stale_optin(const std::string& method) {
     return method == "search" || method == "detail" || method == "chapters" ||
-           method == "pages" || method == "genres";
+           method == "pages" || method == "genres" || method == "related";
 }
 
 /** \brief `ok` of an ABI envelope; anything but a literal true is a failure
@@ -82,19 +84,24 @@ std::string call_cached(Store& store, const std::string& id, const std::string& 
     const std::string key = stale_key(id, method, params_json);
     const std::int64_t now = static_cast<std::int64_t>(std::time(nullptr));
 
-    // Look-aside: fresh row serves without touching the plugin. ttl_s <= 0
-    // means always-expired (test hook).
-    if (auto row = store.api_cache_get(id, key))
-        if (row->ttl_s > 0 && row->fetched_at + row->ttl_s > now) {
-            spdlog::debug("[plugin:{}] {} api_cache HIT ({} B, age={}s)", id, method,
-                          row->payload.size(), now - row->fetched_at);
-            return row->payload;
-        } else {
-            spdlog::debug("[plugin:{}] {} api_cache EXPIRED (age={}s ttl={}s), refreshing", id, method,
-                          now - row->fetched_at, row->ttl_s);
+    // Local-first: any cached row wins, regardless of age. The cache TTL is
+    // only written for the refresh button / test hooks to interpret; page
+    // opens never trigger a plugin call when a row exists. Cold miss is the
+    // sole automatic network path (it cannot be avoided).
+    if (auto row = store.api_cache_get(id, key)) {
+        spdlog::debug("[plugin:{}] {} api_cache SERVE ({} B, age={}s ttl={}s)", id, method,
+                      row->payload.size(), now - row->fetched_at, row->ttl_s);
+        glz::generic served;
+        if (!glz::read_json(served, row->payload) && served.is_object()) {
+            // cold hit carries no flag; an expired row is marked cached so the
+            // UI can show ⬇/Update is meaningful.
+            const bool fresh = row->ttl_s > 0 && row->fetched_at + row->ttl_s > now;
+            if (!fresh) served.get_object()["cached"].data = true;
+            if (auto out = glz::write_json(served)) return std::move(*out);
         }
-    else
-        spdlog::debug("[plugin:{}] {} api_cache MISS", id, method);
+        return row->payload;
+    }
+    spdlog::debug("[plugin:{}] {} api_cache MISS", id, method);
 
     std::string res = call();
 

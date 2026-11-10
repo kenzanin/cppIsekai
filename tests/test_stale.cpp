@@ -84,21 +84,19 @@ TEST_CASE("stale: fresh row within ttl is served without calling the plugin") {
     CHECK(!has(second, "cached")); // fresh serve carries no flag
 }
 
-TEST_CASE("stale: expired row triggers refresh, row replaced") {
+TEST_CASE("stale: expired row is served local-first, plugin not called") {
     TempRoot root;
     Store store = store_at(root.path);
-    // ttl_s <= 0 => always expired (test hook via direct put)
+    // ttl_s <= 0 => always expired (test hook via direct put); local-first
+    // still serves it and flags cached:true so the UI can offer Update.
     store.api_cache_put("m", stale_key("m", "search", R"({"q":"x"})"), R"({"q":"x"})",
                         R"({"ok":true,"data":{"n":"old"}})", 1, 0);
     FakeCall call{R"({"ok":true,"data":{"n":"new"}})", R"({"ok":false,"error":"offline"})"};
 
     const std::string res = call_cached(store, "m", "search", R"({"q":"x"})", std::ref(call));
-    CHECK(call.calls == 1); // plugin ran despite a row existing
-    CHECK(has(res, R"("n":"new")"));
-    const auto row = store.api_cache_get("m", stale_key("m", "search", R"({"q":"x"})"));
-    REQUIRE(row.has_value());
-    CHECK(has(row->payload, R"("n":"new")"));
-    CHECK(row->ttl_s == kApiCacheTtl); // re-written with real ttl
+    CHECK(call.calls == 0); // page opens never reach the network with a row present
+    CHECK(has(res, R"("n":"old")"));
+    CHECK(has(res, R"("cached":true)"));
 }
 
 TEST_CASE("stale: permuted query order is one entry") {
