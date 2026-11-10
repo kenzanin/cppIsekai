@@ -1,10 +1,10 @@
 ---
 type: Decision
 title: "settings-page: openspec change drafted (GET /config projection + /settings UI)"
-description: "OpenSpec change 'settings-page' drafted + validated 2026-11-10 (proposal/design D1-D7/spec delta/tasks). Web UI Settings page: GET /config projects the registry with layer provenance (default|ini|env|flag, read-only when env/flag wins), edits go through existing POST /config merge-save (comments preserved, plugin.fetch_profile stays live), restart badges for non-live knobs, nav entry after Plugins."
+description: "Settings page shipped and archived 2026-11-10 (applied + committed b884ff7, templates_dir knob added aa1e213, daemon on :8090 restarted with new build). Archived via openspec archive settings-page (-y): delta merged into openspec/specs/settings-page/spec.md, Purpose filled in, --specs validate clean (17/17). GET /config projects the registry with layer provenance; /settings UI; edits via existing POST /config merge-save."
 tags: [config, ui, openspec, settings, proposal]
-generated: { by: agent/mcp, at: "2026-11-10T10:13:35Z" }
+generated: { by: agent/mcp, at: "2026-11-10T11:09:26Z" }
 status: stable
 ---
 
-Not implemented yet. Key rulings: D1 GET /config projects the registry (helper in src/config/, re-resolved per request), D2 edit path is existing POST /config unchanged, D3 layer provenance surfaced as read-only rows, D4 restart hints not auto-restart, D5 enum selects for image_format/log.level, D6 proxy treated as password field, D7 nav after Plugins. Validation: `openspec change validate settings-page` clean. Tasks: 1.1-1.3 read projection + config::describe helper + unit test, 2.1-2.3 settings.mustache + /settings route + nav, 3.1-3.3 verify.
+Shipped 2026-11-10 and archived same day. Proposal/design/specs/tasks applied; 9/9 tasks complete; openspec validate clean; ctest 14/14; live smoke on :8124 and :8090. Commits b884ff7 (apply), aa1e213 (paths.templates_dir knob + settings restart badge). Main spec: openspec/specs/settings-page/spec.md. Archive dir: openspec/changes/archive/2026-11-10-settings-page/.
