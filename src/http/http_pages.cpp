@@ -94,18 +94,20 @@ void register_pages(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, L
     ([&](const crow::request&, const std::string& plugin, const std::string& slug) {
         const auto pos = on_pool(db, [&] { return store.position_get(plugin, slug); });
         int ch = 1, page = 1;
-        std::string mode, dir;
+        std::string mode, dir, zoom;
         if (pos) {
             ch = std::max(1, static_cast<int>(pos->chapter_number));
             page = std::max(1, pos->page);
             mode = std::move(pos->mode);
             dir = std::move(pos->direction);
+            zoom = std::move(pos->zoom);
         }
         auto ctx = layout("library");
         ctx["resume_ch"] = ch;
         ctx["resume_page"] = page;
         ctx["resume_mode"] = std::move(mode);
         ctx["resume_dir"] = std::move(dir);
+        ctx["resume_zoom"] = std::move(zoom);
         return html("reader.mustache", std::move(ctx));
     });
 

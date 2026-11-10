@@ -19,6 +19,8 @@ inline ReaderPosition merge_position(const std::optional<ReaderPosition>& stored
             next.mode = stored->mode;
         if (next.direction.empty())
             next.direction = stored->direction;
+        if (next.zoom.empty())
+            next.zoom = stored->zoom;
     }
     return next;
 }

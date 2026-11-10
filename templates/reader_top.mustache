@@ -1,0 +1,23 @@
+<!-- top overlay: back + chapter jump + page jump. Shown only while navShown. -->
+<div x-show="navShown && !done" x-cloak
+     class="fixed top-0 inset-x-0 z-30 flex items-center gap-2 px-2 py-2 bg-zinc-950/90 border-b border-zinc-800 backdrop-blur">
+  <a :href="'/view/manga/'+encodeURIComponent(plugin)+'/'+encodeURIComponent(slug)"
+     class="flex items-center gap-1.5 px-2 py-2 rounded border border-zinc-700 text-zinc-100 hover:bg-zinc-800" aria-label="Back to detail">
+    <svg class="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 19l-7-7 7-7"/><path d="M3.5 12H14"/><path d="M14 4h4a2 2 0 012 2v12a2 2 0 01-2 2h-4"/></svg>
+    <span class="text-sm font-medium">Detail</span>
+  </a>
+  <select :value="ch" @change="gotoChapter($event.target.value)" aria-label="Chapter"
+          class="bg-zinc-900 border border-zinc-700 rounded px-2 py-2 text-sm max-w-[35vw]">
+    <template x-for="c in chaptersList" :key="c.id">
+      <option :value="c.number" :selected="Number(c.number) === this.ch" x-text="'ch ' + c.number + (c.title ? ' — ' + c.title : '')"></option>
+    </template>
+  </select>
+  <select :value="page" @change="goto_page(Number($event.target.value))" aria-label="Page"
+          class="bg-zinc-900 border border-zinc-700 rounded px-2 py-2 text-sm">
+    <template x-for="n in pages.length" :key="n">
+      <option :value="n" :selected="n === this.page" x-text="'p ' + n"></option>
+    </template>
+  </select>
+  <span class="flex-1"></span>
+  <span class="text-xs text-zinc-500 tabular-nums pr-1" x-text="label()"></span>
+</div>

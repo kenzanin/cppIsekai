@@ -222,6 +222,7 @@ methods.chapters = function(params)
       number = tonumber(attrs.chapter) or 0,
       title = attrs.title or "",
       release_at = epoch(attrs.publishAt),
+      pages = tonumber(attrs.pages) or 0,
     }
   end
   return { ok = true, data = out }

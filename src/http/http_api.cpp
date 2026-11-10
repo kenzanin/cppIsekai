@@ -320,6 +320,7 @@ void register_api(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, BS:
         out["page"] = pos->page;
         out["mode"] = pos->mode;
         out["direction"] = pos->direction;
+        out["zoom"] = pos->zoom;
         crow::response r{out};
         r.set_header("Content-Type", "application/json");
         return r;
@@ -347,10 +348,11 @@ void register_api(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, BS:
 
             // reader-page 2.2: optional mode/direction -- absent keeps the stored
             // value (the same db hop stamps updated_at and stores the result).
-            std::string mode, direction;
+            std::string mode, direction, zoom;
             if (body) {
                 mode = str_field(body, "mode");
                 direction = str_field(body, "direction");
+                zoom = str_field(body, "zoom");
             }
             // The chapter NUMBER rides along (the reader knows it from ?ch/the
             // pages list); absent keeps the stored one. Feeds the resume hint
@@ -360,7 +362,7 @@ void register_api(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, BS:
                 chapter_number = body["chapter_number"].d();
             on_pool(db, [&] {
                 const auto stored = store.position_get(plugin, manga);
-                ReaderPosition next{plugin, manga, chapter, chapter_number, pos.page, mode, direction, 0};
+                ReaderPosition next{plugin, manga, chapter, chapter_number, pos.page, mode, direction, zoom, 0};
                 if (stored) {
                     if (next.chapter_number <= 0)
                         next.chapter_number = stored->chapter_number;

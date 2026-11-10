@@ -1,0 +1,47 @@
+<!-- bottom overlay: mode/dir/zoom + page jump row. Shown only while navShown. -->
+<div x-show="navShown && !done" x-cloak
+     class="fixed bottom-0 inset-x-0 z-30 bg-zinc-950/90 border-t border-zinc-800 backdrop-blur">
+  <div class="flex items-center gap-2 px-2 pt-2">
+    <select x-model="mode" @change="modeChanged()" aria-label="Reading mode"
+            class="bg-zinc-900 border border-zinc-700 rounded px-2 py-2 text-sm">
+      <option value="webtoon">webtoon</option>
+      <option value="paged">paged</option>
+      <option value="spread-h">spread h</option>
+      <option value="spread-v">spread v</option>
+    </select>
+    <select x-model="dir" x-show="mode !== 'webtoon'" @change="persist()" aria-label="Direction"
+            class="bg-zinc-900 border border-zinc-700 rounded px-2 py-2 text-sm">
+      <option value="ltr">ltr</option>
+      <option value="rtl">rtl</option>
+    </select>
+    <div class="flex items-center gap-1" role="group" aria-label="Image zoom">
+      <button @click="zoomOut()" :disabled="zoomPct <= 50" aria-label="Zoom out"
+              class="w-9 h-9 rounded border border-zinc-700 text-lg leading-none text-zinc-100 hover:bg-zinc-800 disabled:opacity-30">&#8722;</button>
+      <span class="w-12 text-center text-xs tabular-nums text-zinc-400 select-none" x-text="zoomPct + '%'"></span>
+      <button @click="zoomIn()" :disabled="zoomPct >= 200" aria-label="Zoom in"
+              class="w-9 h-9 rounded border border-zinc-700 text-lg leading-none text-zinc-100 hover:bg-zinc-800 disabled:opacity-30">+</button>
+    </div>
+    <select x-model="zoom" @change="persist()" aria-label="Zoom"
+            class="bg-zinc-900 border border-zinc-700 rounded px-2 py-2 text-sm">
+      <option value="fit-h">fit H</option>
+      <option value="fit-w">fit W</option>
+      <option value="1:1">1:1</option>
+    </select>
+    <span class="flex-1"></span>
+    <template x-if="pages.length > 24">
+      <button @click="focusPageJump()"
+              class="text-3xl leading-none font-semibold tabular-nums px-4 py-1 rounded border border-zinc-700 text-zinc-100 hover:bg-zinc-800"
+              x-text="page + ' / ' + pages.length" aria-label="Jump to page"></button>
+    </template>
+  </div>
+  <template x-if="pages.length <= 24">
+    <div class="flex gap-1 flex-wrap justify-center px-2 pb-2 pt-1">
+      <template x-for="n in pages.length" :key="n">
+        <button @click="goto_page(n)"
+                :class="n === page ? 'bg-zinc-100 text-zinc-900 border-zinc-100' : 'text-zinc-300 border-zinc-700 hover:bg-zinc-800'"
+                class="w-10 h-10 text-base leading-none font-medium tabular-nums rounded border"
+                x-text="n"></button>
+      </template>
+    </div>
+  </template>
+</div>

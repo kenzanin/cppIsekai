@@ -1,4 +1,5 @@
 #include "store.hpp"
+#include <sqlite3.h>
 
 #include <sqlite_orm/sqlite_orm.h>
 
@@ -40,6 +41,7 @@ struct ReaderPositionEntity {
     int page{};
     std::string mode;
     std::string direction;
+    std::string zoom;
     std::int64_t updated_at{};
 };
 
@@ -64,6 +66,7 @@ inline auto create_storage(const std::string& path) {
                    make_column("chapter_number", &ReaderPositionEntity::chapter_number),
                    make_column("page", &ReaderPositionEntity::page), make_column("mode", &ReaderPositionEntity::mode),
                    make_column("direction", &ReaderPositionEntity::direction),
+                   make_column("zoom", &ReaderPositionEntity::zoom, default_value("")),
                    make_column("updated_at", &ReaderPositionEntity::updated_at),
                    primary_key(&ReaderPositionEntity::plugin, &ReaderPositionEntity::slug)));
 }
@@ -82,12 +85,24 @@ Store::Store(const std::string& path) : impl_(std::make_unique<StoreImpl>(path))
     // FK: pragma_t has no foreign_keys setter in v1.9.1; make_storage enables it
     // automatically because the schema declares a foreign_key.
     impl_->storage.sync_schema();
+    // ponytail: sqlite_orm sync_schema won't ALTER an existing table; add zoom additively here.
+    {
+        const auto cols = impl_->storage.pragma.table_info("reader_positions");
+        bool has_zoom = false;
+        for (const auto& c : cols) has_zoom = has_zoom || c.name == "zoom";
+        if (!has_zoom) {
+            sqlite3* db = nullptr;
+            sqlite3_open(path.c_str(), &db);
+            sqlite3_exec(db, "ALTER TABLE reader_positions ADD COLUMN zoom TEXT DEFAULT ''", nullptr, nullptr, nullptr);
+            sqlite3_close(db); // one-shot migration alongside the ORM connection
+        }
+    }
 
     if (impl_->storage.count<TitleEntity>() == 0) {
         static constexpr const char* kPlugins[] = {"Asura", "Flame", "Reaper", "Void"};
         auto guard = impl_->storage.transaction_guard();
         for (const char* plugin_name : kPlugins) {
-            const auto plugin_id = impl_->storage.insert(PluginEntity{0, plugin_name, "", "", ""});
+            const auto plugin_id = impl_->storage.insert(PluginEntity{0, plugin_name, "", "", "", 1, ""});
             for (int n = 1; n <= 12; ++n)
                 impl_->storage.insert(
                     TitleEntity{0, plugin_id, std::string(plugin_name) + " Scans #" + std::to_string(n)});
@@ -213,7 +228,7 @@ void Store::position_set(const ReaderPosition& pos) {
     // REPLACE on the (plugin, slug) PK: the route layers optional fields over
     // the stored row, this just persists the result. updated_at stamped here.
     impl_->storage.replace(ReaderPositionEntity{pos.plugin, pos.slug, pos.chapter_id, pos.chapter_number,
-                                                pos.page, pos.mode, pos.direction,
+                                                pos.page, pos.mode, pos.direction, pos.zoom,
                                                 static_cast<std::int64_t>(std::time(nullptr))});
 }
 
@@ -223,7 +238,7 @@ std::optional<ReaderPosition> Store::position_get(const std::string& plugin, con
     if (rows.empty())
         return std::nullopt;
     const auto& r = rows[0];
-    return ReaderPosition{r.plugin, r.slug, r.chapter_id, r.chapter_number, r.page, r.mode, r.direction, r.updated_at};
+    return ReaderPosition{r.plugin, r.slug, r.chapter_id, r.chapter_number, r.page, r.mode, r.direction, r.zoom, r.updated_at};
 }
 
 
@@ -232,5 +247,5 @@ std::optional<ReaderPosition> Store::position_last() {
     if (rows.empty())
         return std::nullopt;
     const auto& r = rows[0];
-    return ReaderPosition{r.plugin, r.slug, r.chapter_id, r.chapter_number, r.page, r.mode, r.direction, r.updated_at};
+    return ReaderPosition{r.plugin, r.slug, r.chapter_id, r.chapter_number, r.page, r.mode, r.direction, r.zoom, r.updated_at};
 }

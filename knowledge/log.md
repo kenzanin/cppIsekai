@@ -1,3 +1,10 @@
+## 2026-11-10
+* **Update**: Updated concept `references/reader-page-gaps.md`.
+* **Creation**: Documented concept `architecture/reader-fullscreen.md` (reader-fullscreen: full-screen reader chrome + zoom persistence (implemented, uncommitted)).
+* **Update**: Linked `architecture/reader-page-progress.md` to `references/reader-page-gaps.md` (reader-page decision references the gaps/facts backlog from the same session (zoom unpersisted, skip off-by-skip, legacy cn=0 rows, MangaDex empty at-home data[], main-branch commits).).
+* **Creation**: Documented concept `references/reader-page-gaps.md` (reader-page: gaps and important facts (post-archive 2026-11-10)).
+* **Update**: Updated concept `architecture/reader-page-progress.md`.
+
 ## 2026-11-09
 * **Update**: Updated concept `architecture/reader-page-progress.md`.
 * **Update**: Linked `architecture/reader-page-progress.md` to `architecture/cache-layout-v3.md` (reader-page pages land in the v3 layout img/<plugin>/manga/<slug>/chNNN-<id8>/pNNN.<ext>; the open /cache/img page-context 404 bug lives in img_ensure introduced by v3.).

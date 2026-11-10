@@ -39,6 +39,7 @@ struct ReaderPosition {
     int page{1};               // 1-based
     std::string mode;          // reading mode; empty = unset
     std::string direction;     // ltr | rtl; empty = unset
+    std::string zoom;          // fit-h | fit-w | 1:1; empty = unset
     std::int64_t updated_at{}; // unix seconds; stamped by the store on write
 };
 

@@ -72,7 +72,7 @@ TEST_CASE("Store: seed, plugins, search, count") {
     SUBCASE("reader position round-trip, upsert, per-manga scope") {
         const auto slug = "pos_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
         CHECK_FALSE(store.position_get("md", slug).has_value());
-        store.position_set({"md", slug, "ch-uuid-1", 12.5, 3, "spread-h", "rtl", 0});
+        store.position_set({"md", slug, "ch-uuid-1", 12.5, 3, "spread-h", "rtl", "fit-w", 0});
         const auto pos = store.position_get("md", slug);
         REQUIRE(pos.has_value());
         CHECK(pos->plugin == "md");
@@ -86,7 +86,7 @@ TEST_CASE("Store: seed, plugins, search, count") {
 
         // same (plugin, slug) replaces: the 2.2 route layers optional fields
         // over the stored row before calling this
-        store.position_set({"md", slug, "ch-uuid-2", 13, 1, "", "", 0});
+        store.position_set({"md", slug, "ch-uuid-2", 13, 1, "", "", "", 0});
         const auto upd = store.position_get("md", slug);
         REQUIRE(upd.has_value());
         CHECK(upd->chapter_id == "ch-uuid-2");
@@ -94,7 +94,7 @@ TEST_CASE("Store: seed, plugins, search, count") {
         CHECK(upd->mode.empty());
         CHECK(upd->direction.empty());
 
-        store.position_set({"md", slug + "x", "c", 1, 1, "", "", 0}); // neighbor manga isolated
+        store.position_set({"md", slug + "x", "c", 1, 1, "", "", "", 0}); // neighbor manga isolated
         CHECK(store.position_get("md", slug)->chapter_id == "ch-uuid-2");
         CHECK_FALSE(store.position_get("other", slug).has_value()); // plugin scope too
 
