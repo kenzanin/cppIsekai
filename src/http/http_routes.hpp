@@ -77,3 +77,7 @@ void register_api(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, BS:
                   const config::Overrides& overrides);
 
 } // namespace http
+
+namespace http {
+void register_static(crow::SimpleApp&);
+} // namespace http

@@ -1,5 +1,8 @@
 #include "http_routes.hpp"
 
+#include <fstream>
+#include <sstream>
+
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
@@ -174,3 +177,47 @@ void register_pages(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, L
 }
 
 } // namespace http
+
+
+namespace {
+crow::response br_asset(const crow::request& req, const char* path, const char* mime) {
+    // Serve precompressed brotli body when the client advertises it; else
+    // fall back to the plain sibling (must exist). Content-Encoding: br is
+    // only set on the .br branch, never on the plain one.
+    const std::string ae = req.get_header_value("Accept-Encoding");
+    const bool wants_br = ae.find("br") != std::string::npos;
+    // Vendored assets ship .br only; fall back to it even for clients that
+    // did not advertise br (brotli is universal in modern browsers).
+    std::string file = wants_br ? std::string(path) + ".br" : std::string(path);
+    std::ifstream f(file, std::ios::binary);
+    bool served_br = wants_br;
+    if (!f) {
+        file = std::string(path) + ".br";
+        f.open(file, std::ios::binary);
+        served_br = true;
+        if (!f) {
+            crow::response r{404};
+            return r;
+        }
+    }
+    std::stringstream ss;
+    ss << f.rdbuf();
+    crow::response r{ss.str()};
+    r.set_header("Content-Type", mime);
+    if (served_br) r.set_header("Content-Encoding", "br");
+    r.set_header("Cache-Control", "public, max-age=31536000, immutable");
+    return r;
+}
+} // namespace
+
+void http::register_static(crow::SimpleApp& app) {
+    CROW_ROUTE(app, "/static/htmx.min.js")([](const crow::request& req) {
+        return br_asset(req, "static/htmx.min.js", "application/javascript");
+    });
+    CROW_ROUTE(app, "/static/alpine.min.js")([](const crow::request& req) {
+        return br_asset(req, "static/alpine.min.js", "application/javascript");
+    });
+    CROW_ROUTE(app, "/static/tailwind.min.js")([](const crow::request& req) {
+        return br_asset(req, "static/tailwind.min.js", "application/javascript");
+    });
+}

@@ -54,7 +54,9 @@ void serve(Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool, 
     // library/grid render, cache-first (disk hit = no fetch).
     reader::CoverWorker covers{images};
 
-    // Crow's built-in static handler already serves /static/<path> from ./static.
+    // Static: prefer precompressed .br (vendored js); fall back to crow's
+    // built-in static handler for anything we don't handle here.
+    http::register_static(app);
 
     http::register_pages(app, store, db, logs, covers);
     http::register_api(app, store, db, plugin_pool, plugins, images, prefetch, covers, ini_path, overrides);
