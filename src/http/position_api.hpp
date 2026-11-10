@@ -13,6 +13,18 @@
 /** \brief Absent (empty) mode/direction on the request keep the stored value;
  *  identity, chapter and page always come from the request. The chapter
  *  number is resolved by the route from the window pass, not here. */
+/** \brief Resolve the chapter NUMBER for the write: an explicit 0 in the
+ *  request is a valid chapter (prequel) and wins; an absent request keeps the
+ *  stored number as-is (never coerced to absent or clamped). No stored row and
+ *  no request -> 0. Regression lock for the falsy-zero bug (ch 0 opened as
+ *  chapter 1). */
+inline double resolve_chapter_number(const std::optional<ReaderPosition>& stored,
+                                     const std::optional<double>& incoming) {
+    if (incoming)
+        return *incoming;
+    return stored ? stored->chapter_number : 0.0;
+}
+
 inline ReaderPosition merge_position(const std::optional<ReaderPosition>& stored, ReaderPosition next) {
     if (stored) {
         if (next.mode.empty())

@@ -460,10 +460,8 @@ void register_api(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, BS:
                 chapter_number = body["chapter_number"].d();
             on_pool(db, [&] {
                 const auto stored = store.position_get(plugin, manga);
-                ReaderPosition next{plugin, manga, chapter, chapter_number.value_or(0), pos.page, mode, direction, zoom, 0};
+                ReaderPosition next{plugin, manga, chapter, resolve_chapter_number(stored, chapter_number), pos.page, mode, direction, zoom, 0};
                 if (stored) {
-                    if (!chapter_number) // absent: keep the stored number (0 included)
-                        next.chapter_number = stored->chapter_number;
                     // same chapter, no page sent -> keep the page
                     if (chapter == stored->chapter_id)
                         next.page = pos.page > 1 ? pos.page : stored->page;

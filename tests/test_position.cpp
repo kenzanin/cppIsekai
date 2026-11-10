@@ -27,3 +27,18 @@ TEST_CASE("position: no stored row -> fields exactly as requested") {
     CHECK(row.direction == "rtl");
     CHECK(row.chapter_id == "c1");
 }
+
+TEST_CASE("position: resolve_chapter_number — ch 0 is valid (falsy-zero)") {
+    const std::optional<ReaderPosition> stored = ReaderPosition{"md", "m", "c1", 3, 1, "", "", "", 0};
+
+    CHECK(resolve_chapter_number(stored, std::nullopt) == 3.0); // absent keeps stored
+    CHECK(resolve_chapter_number(std::nullopt, std::nullopt) == 0.0); // nothing stored, nothing sent
+    CHECK(resolve_chapter_number(stored, 0.0) == 0.0); // explicit 0 wins over stored 3
+    CHECK(resolve_chapter_number(stored, 1.5) == 1.5); // fractional passes through
+    CHECK(resolve_chapter_number(std::nullopt, 0.0) == 0.0); // explicit 0, no stored row
+
+    // full request-path shape: stored ch 0, absent chapter_number -> stays 0, not 1
+    const std::optional<ReaderPosition> stored_zero = ReaderPosition{"md", "m", "c0", 0, 1, "", "", "", 0};
+    CHECK(resolve_chapter_number(stored_zero, std::nullopt) == 0.0);
+    CHECK(resolve_chapter_number(stored_zero, 1.0) == 1.0); // jump away from 0
+}
