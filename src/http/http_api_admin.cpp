@@ -7,6 +7,14 @@
 #include <sstream>
 #include <vector>
 
+#include <chrono>
+#include <cstdlib>
+#include <thread>
+#include <unistd.h>
+#include <signal.h>
+#include <errno.h>
+#include <sys/wait.h>
+
 namespace http {
 namespace api {
 
@@ -209,6 +217,70 @@ void register_admin(Ctx& c) {
         out["written"] = written;
         crow::response r{std::move(out)};
         r.set_header("Content-Type", "application/json");
+        return r;
+    });
+
+    // /health: tiny liveness probe for the settings-page restart poll.
+    CROW_ROUTE(app, "/health")([] {
+        crow::json::wvalue out;
+        out["ok"] = true;
+        crow::response r{out};
+        r.set_header("Content-Type", "application/json");
+        return r;
+    });
+
+    // Re-exec in place (D: respawn): fork a watchdog that waits for this
+    // process to die, then execs /proc/self/exe with the original argv.
+    // The response is flushed first; the actual re-exec happens ~300ms later.
+    CROW_ROUTE(app, "/admin/restart").methods(crow::HTTPMethod::POST)([&app] {
+        const pid_t parent = getpid();
+        const pid_t pid = fork();
+        if (pid == 0) {
+            // The watchdog inherits every fd, including crow's listen socket;
+            // hold it and the re-exec'd instance can never bind. Drop them all.
+            for (int fd = 3; fd < 1024; ++fd) close(fd);
+            // Watchdog child: wait for the parent to actually exit (ESRCH), not
+            // EPERM from reparenting under init; then exec with the original argv.
+            for (;;) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                if (kill(parent, 0) != 0 && errno == ESRCH) break;
+            }
+            // Parent is gone but the kernel may still hold the listening
+            // socket briefly; give the port a beat to free before re-exec.
+            std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+            char exe_buf[4096];
+            const ssize_t n = readlink("/proc/self/exe", exe_buf, sizeof(exe_buf) - 1);
+            if (n <= 0) _exit(1);
+            std::string exe(exe_buf, static_cast<std::size_t>(n));
+            // Rebuilt binary since boot: kernel marks the old path " (deleted)".
+            // Strip it and re-exec the current file on disk instead.
+            const std::string deleted = " (deleted)";
+            if (exe.size() > deleted.size() && exe.compare(exe.size() - deleted.size(), deleted.size(), deleted) == 0)
+                exe.erase(exe.size() - deleted.size());
+            // Rebuild argv from /proc/self/cmdline (NUL-separated).
+            std::ifstream cl("/proc/self/cmdline", std::ios::binary);
+            std::string raw((std::istreambuf_iterator<char>(cl)), std::istreambuf_iterator<char>());
+            std::vector<char*> args;
+            size_t i = 0;
+            while (i < raw.size()) {
+                const size_t end = raw.find('\0', i);
+                args.push_back(const_cast<char*>(raw.data()) + i);
+                i = (end == std::string::npos ? raw.size() : end + 1);
+            }
+            args.push_back(nullptr);
+            execv(exe.c_str(), args.data());
+            _exit(127);
+        }
+        crow::json::wvalue out;
+        out["ok"] = true;
+        crow::response r{out};
+        r.set_header("Content-Type", "application/json");
+        // Ask crow to stop shortly after the response is flushed, so the
+        // watchdog's parent-liveness poll trips and the exec happens.
+        std::thread([&app] {
+            std::this_thread::sleep_for(std::chrono::milliseconds(300));
+            app.stop();
+        }).detach();
         return r;
     });
 }

@@ -6,7 +6,7 @@ function detailPage() {
     detail: {}, chapters: [], cached: false, loading: true, refreshing: false,
     err: '', coverBroken: false, hint: null, related: [], pluginName: '', pluginLogoOk: true,
     inLibrary: false, libraryBusy: false,
-    chPage: 0, showHidden: false, readState: {}, // id -> {skip, read} (chapter-list-controls 1.2)
+    chPage: 0, showHidden: false, readState: {}, cbzReady: {}, // id -> {skip, read} (chapter-list-controls 1.2); cbzReady: chapter fully cached
     get pageCount() { return Math.max(1, Math.ceil(this.visibleChapters().length / 20)); },
     visibleChapters() { return this.showHidden ? this.chapters : this.chapters.filter(c => !c.done); },
     chPageRows() { return this.visibleChapters().slice(this.chPage * 20, this.chPage * 20 + 20); },
@@ -61,6 +61,7 @@ function detailPage() {
         if (!d.ok || !c.ok) { this.err = d.error || c.error || 'load failed'; return; }
         this.detail = d.data || {}; this.cached = !!(d.cached || c.cached);
         this.chapters = (c.data || []).slice().sort((a, b) => (b.number ?? 0) - (a.number ?? 0));
+        this.checkCbz();
       } catch (e) { this.err = String(e); }
       this.loading = false;
     },
@@ -74,6 +75,19 @@ function detailPage() {
     },
     chLabel(ch) { const n = Number(ch.number); return Number.isFinite(n) ? 'ch ' + String(n).padStart(3, '0') : (ch.title || 'ch'); },
     chSlug(ch) { const n = Number(ch.number); return Number.isFinite(n) && n > 0 ? 'ch' + String(n).padStart(3, '0') : 'chx'; },
+    async checkCbz() {
+      // per-chapter cache-full probe for the cbz button gate.
+      for (const ch of this.chapters) {
+        const n = Number(ch.number);
+        const total = ch.pages || 0;
+        if (!Number.isFinite(n) || n <= 0 || !total || this.cbzReady[ch.id]) continue;
+        try {
+          const r = await fetch(`/api/cbz-ready?plugin=${encodeURIComponent(this.plugin)}&slug=${encodeURIComponent(this.slug)}&ch=${n}&pages=${total}`);
+          const j = r.ok ? await r.json() : null;
+          this.cbzReady[ch.id] = !!(j && j.full);
+        } catch (e) { this.cbzReady[ch.id] = false; }
+      }
+    },
     fmtDate(ts) { if (!ts) return ''; const d = new Date(ts * 1000); return isNaN(d) ? '' : d.toISOString().slice(0, 10); },
     async loadRelated() {
       try {

@@ -6,7 +6,7 @@ function settingsPage() {
   const ENUMS = { 'cache.image_format': ['webp', 'avif', 'jxl', 'none'],
                   'log.level': ['trace', 'debug', 'info', 'warning', 'error'] };
   return {
-    knobs: [], dirty: {}, reveal: {}, loading: true, saving: false, err: '', note: '',
+    knobs: [], dirty: {}, reveal: {}, loading: true, saving: false, err: '', note: '', restarting: false,
     async boot() {
       try {
         const j = await (await fetch('/config')).json();
@@ -33,6 +33,11 @@ function settingsPage() {
         } else out[key] = value;
       }
       return out;
+    },
+    async restart() {
+      if (!confirm('Restart server sekarang? Koneksi akan putus sebentar.')) return;
+      this.restarting = true;
+      if (window.__srvRestart) await window.__srvRestart();
     },
     async save() {
       this.saving = true; this.err = ''; this.note = '';

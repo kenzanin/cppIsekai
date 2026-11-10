@@ -1,3 +1,41 @@
   </main>
+  <div id="srv-status" style="display:none;position:fixed;top:0;left:0;right:0;z-index:50;text-align:center;font-size:12px;padding:6px 0;"></div>
+  <script>
+  (function () {
+    const el = document.getElementById('srv-status');
+    let down = false, wasDown = false;
+    async function probe() {
+      try {
+        const r = await fetch('/health', {cache: 'no-store'});
+        if (!r.ok) throw 0;
+        if (wasDown) { flash('Server online kembali', '#065f46'); wasDown = false; }
+        else el.style.display = 'none';
+        down = false;
+      } catch (e) {
+        down = true; wasDown = true;
+        el.textContent = 'Server offline — menunggu online…';
+        el.style.background = '#7f1d1d'; el.style.color = '#fecaca'; el.style.display = 'block';
+      }
+    }
+    function flash(msg, bg) {
+      el.textContent = msg; el.style.background = bg; el.style.color = '#d1fae5'; el.style.display = 'block';
+      setTimeout(() => { el.style.display = 'none'; }, 4000);
+    }
+    window.__srvRestart = async function () {
+      wasDown = true;
+      try { await fetch('/admin/restart', {method: 'POST'}); } catch (e) { /* expected: connection drops */ }
+      el.textContent = 'Server restart… menunggu online';
+      el.style.background = '#78350f'; el.style.color = '#fde68a'; el.style.display = 'block';
+      const t = setInterval(async () => {
+        try {
+          const r = await fetch('/health', {cache: 'no-store'});
+          if (r.ok) { clearInterval(t); flash('Server online kembali', '#065f46'); wasDown = false; }
+        } catch (e) {}
+      }, 1000);
+    };
+    setInterval(probe, 5000);
+    probe();
+  })();
+  </script>
 </body>
 </html>

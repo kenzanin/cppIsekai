@@ -5,6 +5,34 @@
 #include "pages_api.hpp"
 
 #include <string>
+#include <filesystem>
+
+namespace fs = std::filesystem;
+
+namespace {
+
+// cache-full check for one chapter: <root>/img/<plugin>/manga/<slug>/<chdir>/pNNN.ext
+// count >= pages. ch-dir matched by chNNN prefix (collision id8 variant counts too).
+bool chapter_cached(const std::string& plugin, const std::string& slug, int chapter, int pages) {
+    if (chapter <= 0 || pages <= 0) return false;
+    const fs::path base = fs::path("data/cache") / "img" / plugin / "manga" / slug;
+    const std::string prefix = "ch" + (chapter < 10 ? std::string("00") : chapter < 100 ? std::string("0") : std::string()) + std::to_string(chapter);
+    std::error_code ec;
+    if (!fs::is_directory(base, ec)) return false;
+    for (const auto& ch : fs::directory_iterator(base, ec)) {
+        if (ec) return false;
+        if (!ch.is_directory(ec)) continue;
+        if (ch.path().filename().string().rfind(prefix, 0) != 0) continue;
+        int n = 0;
+        for (const auto& p : fs::directory_iterator(ch.path(), ec)) {
+            if (!ec && p.is_regular_file(ec)) ++n;
+        }
+        return n >= pages;
+    }
+    return false;
+}
+
+} // namespace
 
 namespace http {
 namespace api {
@@ -116,6 +144,23 @@ void register_content(Ctx& c) {
         res.set_header("Content-Type", std::string(r.mime));
         if (r.ratio_header) res.set_header("X-Image-Ratio", *r.ratio_header);
         return res;
+    });
+
+    // cache-full probe for the detail page CBZ button: per-chapter gate.
+    // Query: ?plugin=&slug=&ch=<n>&pages=<total> -> {"ok":true,"full":bool}
+    CROW_ROUTE(app, "/api/cbz-ready")
+    ([](const crow::request& req) {
+        const auto plugin = param(req, "plugin");
+        const auto slug = param(req, "slug");
+        const int ch = std::atoi(param(req, "ch").c_str());
+        const int pages = std::atoi(param(req, "pages").c_str());
+        const bool full = valid_title_pair(plugin, slug) && chapter_cached(plugin, slug, ch, pages);
+        crow::json::wvalue out;
+        out["ok"] = true;
+        out["full"] = full;
+        crow::response r{out};
+        r.set_header("Content-Type", "application/json");
+        return r;
     });
 
     // CBZ export (cache-layout D6): stream the cached tree as an in-memory zip;

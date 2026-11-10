@@ -60,10 +60,14 @@
     </section>
   </template>
 
-  <div class="flex gap-2 mt-4">
+  <div class="flex gap-2 mt-4 items-center">
     <button @click="save()" :disabled="saving || Object.keys(dirty).length === 0"
             class="px-4 py-1.5 text-sm rounded bg-zinc-100 text-zinc-900 disabled:opacity-40">Save changes</button>
     <button @click="dirty = {}" class="px-4 py-1.5 text-sm rounded bg-zinc-800 hover:bg-zinc-700">Discard edits</button>
+    <span class="flex-1"></span>
+    <button @click="restart()" :disabled="restarting"
+            class="px-4 py-1.5 text-sm rounded bg-red-900/70 hover:bg-red-800 text-red-100 disabled:opacity-40"
+            x-text="restarting ? 'Restarting…' : 'Restart server'"></button>
   </div>
 </div>
 {{>settings_script.mustache}}
