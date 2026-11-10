@@ -97,7 +97,7 @@ TEST_CASE("worker: start/stop sanity -- idle stop and reuse after stop are quiet
     CHECK(rig.fake.fetched.empty());
 }
 
-TEST_CASE("worker: structured placement -- complete ctx lands <plugin>/<slug>/chNNN/pNNN.<ext>") {
+TEST_CASE("worker: structured placement -- complete ctx lands <plugin>/manga/<slug>/chNNN/pNNN.<ext>") {
     Rig rig;
     rig.fake.bodies = {{"http://x/1.jpg", "1"}, {"http://x/2.jpg", "2"}, {"http://y/1.jpg", "3"}};
 
@@ -108,8 +108,8 @@ TEST_CASE("worker: structured placement -- complete ctx lands <plugin>/<slug>/ch
         worker.nudge({"http://x/1.jpg", "http://x/2.jpg"}, reader::WindowCtx{"md", "slug-a", 1});
         worker.stop();
     }
-    const auto r1 = "md/slug-a/ch001-edd003c0/p001.jpg";
-    const auto r2 = "md/slug-a/ch001-c3142807/p002.jpg";
+    const auto r1 = "md/manga/slug-a/ch001/p001.jpg";
+    const auto r2 = "md/manga/slug-a/ch001/p002.jpg";
     CHECK(rig.on_disk_rel("http://x/1.jpg", r1));
     CHECK(rig.on_disk_rel("http://x/2.jpg", r2));
 
@@ -120,7 +120,7 @@ TEST_CASE("worker: structured placement -- complete ctx lands <plugin>/<slug>/ch
         worker.nudge({"http://y/1.jpg"}, reader::WindowCtx{"md", "slug-a", 2});
         worker.stop();
     }
-    const auto r3 = "md/slug-a/ch002-e106a54b/p001.jpg";
+    const auto r3 = "md/manga/slug-a/ch002/p001.jpg";
     CHECK(rig.on_disk_rel("http://y/1.jpg", r3));
     // Zero-pad keeps ch001..ch010 in reading order across a full chapter span.
     const std::vector<std::string> dirs = {"ch001", "ch002", "ch010"};
@@ -149,16 +149,16 @@ TEST_CASE("worker: sha fallback -- missing slug or chapter stays on the exact ol
     CHECK(rig.on_disk("http://x/a.png"));
     CHECK(!rig.on_disk_rel("http://x/a.png", "md//ch001/p001.png"));
 
-    // ctx present but url has no extension -> structured layout needs the
-    // url's ext, so it stays on the flat path.
+    // ctx present but url has no extension -> ext_of falls back to "bin",
+    // structured landing still applies (md/manga/slug-a/ch001/p001.bin).
     rig.fake.bodies["http://x/plain"] = "p";
     {
         reader::Worker w{rig.cache};
         w.nudge({"http://x/plain"}, ctx);
         w.stop();
     }
-    CHECK(rig.on_disk("http://x/plain"));
-    CHECK(!rig.on_disk_rel("http://x/plain", "md/slug-a/ch001/p001.bin"));
+    CHECK(rig.on_disk_rel("http://x/plain", "md/manga/slug-a/ch001/p001.bin"));
+    CHECK(!rig.on_disk("http://x/plain")); // no flat sha landing
 }
 
 TEST_CASE("worker: store reuse -- peek with the same rel_path hits, a second rel refetches") {
@@ -176,8 +176,10 @@ TEST_CASE("worker: store reuse -- peek with the same rel_path hits, a second rel
         worker.nudge({"http://x/a.jpg"}, reader::WindowCtx{"md", "slug-a", 2}); // second rel
         worker.stop();
     }
-    const auto ra1 = "md/slug-a/ch001-6d46c90d/p001.jpg";
-    const auto ra2 = "md/slug-a/ch002-6d46c90d/p001.jpg";
+    // Passthrough transcode (fake body is not a real image) keeps the key's
+    // ext, so the structured landing path is taken. Ch002 ctx -> sibling dir.
+    const auto ra1 = "md/manga/slug-a/ch001/p001.jpg";
+    const auto ra2 = "md/manga/slug-a/ch002/p001.jpg";
     CHECK(rig.on_disk_rel("http://x/a.jpg", ra1));
     CHECK(rig.on_disk_rel("http://x/a.jpg", ra2));
     const int calls = rig.fake.fetched.size();

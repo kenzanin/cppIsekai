@@ -1,4 +1,7 @@
 ## 2026-11-09
+* **Update**: Updated concept `architecture/reader-page-progress.md`.
+* **Update**: Linked `architecture/reader-page-progress.md` to `architecture/cache-layout-v3.md` (reader-page pages land in the v3 layout img/<plugin>/manga/<slug>/chNNN-<id8>/pNNN.<ext>; the open /cache/img page-context 404 bug lives in img_ensure introduced by v3.).
+* **Creation**: Documented concept `architecture/reader-page-progress.md` (reader-page 6/7: four-mode reader UI + persisted positions (4.1 live smoke pending)).
 * **Update**: Linked `references/cache-v3-followup-backlog.md` to `architecture/cache-layout-v3.md` (Follow-up gaps discovered during cache-layout-v3 final review: cbz lexicographic sort, common/ cover namespace, VIPS link requirement).
 * **Update**: Linked `architecture/cache-layout-v3.md` to `architecture/image-cache-offline.md` (Supersedes/extends: v3 reorganizes the v2 image pool into per-plugin layout and adds global transcode + host-computed cover ratio).
 * **Creation**: Documented concept `references/cache-v3-followup-backlog.md` (cache-v3 follow-up backlog: cbz lexicographic sort, common/ cover namespace, VIPS link requirement).

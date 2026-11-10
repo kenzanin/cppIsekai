@@ -3,6 +3,8 @@
 #include "config/config.hpp"
 #include "export_cbz.hpp"
 #include "img.hpp"
+#include "pages_api.hpp"
+#include "position_api.hpp"
 #include "stale.hpp"
 #include "reader/window.hpp"
 
@@ -302,6 +304,27 @@ void register_api(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, BS:
         })};
     });
 
+    // reader-page 2.2: continue-hint data. db worker (store.hpp ponytail);
+    // absent position = 404 so the detail badge stays hidden.
+    CROW_ROUTE(app, "/api/position/<string>/<string>")
+    ([&](const crow::request&, const std::string& plugin, const std::string& manga) -> crow::response {
+        const auto pos = on_pool(db, [&] { return store.position_get(plugin, manga); });
+        if (!pos) {
+            crow::response r{R"({"ok":false})"};
+            r.code = 404;
+            r.set_header("Content-Type", "application/json");
+            return r;
+        }
+        crow::json::wvalue out;
+        out["ch"] = pos->chapter_number;
+        out["page"] = pos->page;
+        out["mode"] = pos->mode;
+        out["direction"] = pos->direction;
+        crow::response r{out};
+        r.set_header("Content-Type", "application/json");
+        return r;
+    });
+
     // Reader prefetch input (image-cache): remember the position -- it is the
     // anchor the skip-rerun reads back -- and report the window. No worker
     // here; task 3.3 consumes the returned page list.
@@ -322,15 +345,32 @@ void register_api(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, BS:
             }
             const reader::Position pos{chapter, static_cast<int>(std::max(1L, num_field(body, "page", 1)))};
 
-            // last spot wins: single-user reader, one live anchor
-            crow::json::wvalue pos_json;
-            pos_json["plugin"] = plugin;
-            pos_json["manga"] = manga;
-            pos_json["chapter"] = chapter;
-            pos_json["page"] = pos.page;
-            const std::string pos_value = pos_json.dump();
+            // reader-page 2.2: optional mode/direction -- absent keeps the stored
+            // value (the same db hop stamps updated_at and stores the result).
+            std::string mode, direction;
+            if (body) {
+                mode = str_field(body, "mode");
+                direction = str_field(body, "direction");
+            }
+            // The chapter NUMBER rides along (the reader knows it from ?ch/the
+            // pages list); absent keeps the stored one. Feeds the resume hint
+            // and the prefetch worker's v3 placement.
+            double chapter_number = 0;
+            if (body && body.has("chapter_number") && body["chapter_number"].t() == crow::json::type::Number)
+                chapter_number = body["chapter_number"].d();
             on_pool(db, [&] {
-                store.state_set(kStateHost, kPositionKey, pos_value);
+                const auto stored = store.position_get(plugin, manga);
+                ReaderPosition next{plugin, manga, chapter, chapter_number, pos.page, mode, direction, 0};
+                if (stored) {
+                    if (next.chapter_number <= 0)
+                        next.chapter_number = stored->chapter_number;
+                    // same chapter, no page sent -> keep the page
+                    if (chapter == stored->chapter_id)
+                        next.page = pos.page > 1 ? pos.page : stored->page;
+                }
+                store.position_set(merge_position(stored, next));
+                spdlog::debug("position {} {} ch={} p={} cn={} mode='{}' dir='{}'", plugin, manga, chapter,
+                              next.page, next.chapter_number, next.mode, next.direction);
                 return 0;
             });
 
@@ -339,8 +379,16 @@ void register_api(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, BS:
             std::vector<crow::json::wvalue> window;
             for (const auto& url : found)
                 window.emplace_back(url);
-            if (!found.empty())
-                prefetch.nudge(found); // background delta fetch (3.3)
+            if (!found.empty()) {
+                if (chapter_number > 0) { // v3 placement; else the sha fallback
+                    spdlog::debug("nudge {} urls, ctx {}.{} ch{} base-p{}", found.size(), plugin, manga,
+                                  int(chapter_number), pos.page + 1);
+                    prefetch.nudge(found, {plugin, manga, int(chapter_number), pos.page + 1});
+                } else {
+                    spdlog::debug("nudge {} urls, no chapter number -> sha fallback", found.size());
+                    prefetch.nudge(found); // background delta fetch (3.3)
+                }
+            }
 
             crow::json::wvalue out;
             out["window"] = std::move(window);
@@ -367,22 +415,20 @@ void register_api(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, BS:
             });
 
             std::vector<crow::json::wvalue> window;
-            if (const std::optional<std::string> stored =
-                    on_pool(db, [&] { return store.state_get(kStateHost, kPositionKey); })) {
-                if (const auto pos = crow::json::load(*stored)) {
-                    const std::string plugin = str_field(pos, "plugin");
-                    const std::string manga = str_field(pos, "manga");
-                    const std::string chapter = str_field(pos, "chapter");
-                    if (!plugin.empty() && !manga.empty() && !chapter.empty()) {
-                        const reader::Position where{chapter,
-                                                     static_cast<int>(std::max(1L, num_field(pos, "page", 1)))};
-                        const std::vector<std::string> found =
-                            reader_window(store, db, plugin_pool, plugins, images, plugin, manga, where);
-                        for (const auto& url : found)
-                            window.emplace_back(url);
-                        if (!found.empty())
-                            prefetch.nudge(found); // rerun delta (3.3)
-                    }
+            const std::optional<ReaderPosition> last =
+                on_pool(db, [&] { return store.position_last(); });
+            if (last) {
+                const std::string& plugin = last->plugin;
+                const std::string& manga = last->slug;
+                const std::string& chapter = last->chapter_id;
+                if (!plugin.empty() && !manga.empty() && !chapter.empty()) {
+                    const reader::Position where{chapter, last->page};
+                    const std::vector<std::string> found =
+                        reader_window(store, db, plugin_pool, plugins, images, plugin, manga, where);
+                    for (const auto& url : found)
+                        window.emplace_back(url);
+                    if (!found.empty())
+                        prefetch.nudge(found); // rerun delta (3.3)
                 }
             }
 
@@ -432,6 +478,74 @@ void register_api(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, BS:
         return r;
     });
 
+// reader-page D1: ordered page URL list for the reader UI. Pages through
+// the stale layer; prev/next chapter resolved from the chapter list by
+// number so the reader can walk chapters without refetching the whole
+// list. Each entry is a host-rendered /cache/img URL (client never
+// builds cache paths -- design D1: ratio suffixes, v3 rel_path and
+// host-side transforms stay host-owned).
+    CROW_ROUTE(app, "/api/pages/<string>/<string>/<int>")
+    ([&](const crow::request& /*req*/, std::string plugin, std::string slug, int ch) -> crow::response {
+        if (!valid_title_pair(plugin, slug)) {
+            return crow::response{404, R"({"ok":false,"error":"unknown title"})"};
+        }
+        const bool enabled = on_pool(db, [&] { return store.plugin_enabled(plugin); });
+        if (!enabled) {
+            crow::response r{R"({"ok":false,"error":"plugin disabled"})"};
+            r.set_header("Content-Type", "application/json");
+            return r;
+        }
+        crow::json::wvalue q;
+        q["id"] = slug;
+        const std::string chs_params = q.dump();
+        const std::string body = on_pool(plugin_pool, [&] {
+            const std::string chs_env =
+                call_cached(images, plugin, "chapters", chs_params,
+                            [&] { return plugins.call(plugin, "chapters", chs_params); });
+            // Pre-resolve the chapter id from the list so the pages call
+            // targets the right one even when the plugin's list is stale.
+            std::string chapter_id;
+            if (const auto chs = envelope_data(chs_env)) {
+                for (const auto& item : *chs) {
+                    if (!item.is_object())
+                        continue;
+                    const auto& entry = item.get_object();
+                    const auto num = entry.find("number");
+                    if (num == entry.end())
+                        continue;
+                    const auto* d = std::get_if<double>(&num->second.data);
+                    if (!d || *d != ch)
+                        continue;
+                    const auto idf = entry.find("id");
+                    if (idf != entry.end()) {
+                        if (const auto* s = std::get_if<std::string>(&idf->second.data)) {
+                            chapter_id = *s;
+                            break;
+                        }
+                    }
+                }
+            }
+            if (chapter_id.empty())
+                return std::string{};
+            crow::json::wvalue pages_q;
+            pages_q["id"] = chapter_id;
+            const std::string pages_params = pages_q.dump();
+            const std::string pages_env =
+                call_cached(images, plugin, "pages", pages_params,
+                            [&] { return plugins.call(plugin, "pages", pages_params); });
+            return build_pages_response(chs_env, pages_env, PagesCtx{plugin, slug, ch}).value_or(std::string{});
+        });
+        crow::response r;
+        if (body.empty()) {
+            r.code = 404;
+            r.body = R"({"ok":false,"error":"unknown chapter"})";
+        } else {
+            r.body = std::move(body);
+        }
+        r.set_header("Content-Type", "application/json");
+        return r;
+    });
+
     // Serve-through image cache: hit = disk, miss+online = fetch+store+serve,
     // miss+offline = 404. Mime from the stored file's extension.
     // V3 (cache-layout-v3 D6): optional context params (plugin, slug, ch,
@@ -452,7 +566,7 @@ void register_api(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, BS:
             cctx.plugin = plugin;
             cctx.url = url;
         } else if (!plugin.empty() && !slug.empty() && ch >= 1 && page >= 1) {
-            pctx = {plugin, slug, ch, page, /*page_id=*/url};
+            pctx = {plugin, slug, ch, page};
         }
         const ImgReply r = serve_cached_image(images, url, cctx, pctx);
         crow::response res;

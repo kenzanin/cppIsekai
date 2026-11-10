@@ -18,6 +18,8 @@
 #include <string>
 #include <utility>
 
+#include <spdlog/spdlog.h>
+
 /** \brief Read-only methods allowed to serve stale (exact opt-in list, design
  *  D3; `pages` lands with 3.1 and is listed here from the start). */
 inline bool stale_optin(const std::string& method) {
@@ -77,11 +79,13 @@ std::string call_cached(cache::Cache& cache, const std::string& id, const std::s
     const std::string key = stale_key(id, method, params_json);
 
     if (envelope_ok(env)) {
+        spdlog::debug("[plugin:{}] {} fresh envelope cached", id, method);
         cache.store(key, "api", res);
         return res;
     }
 
     if (auto stale = cache.peek(key, "api")) {
+        spdlog::debug("[plugin:{}] {} failed -> stale-serve", id, method);
         glz::generic served;
         if (!glz::read_json(served, *stale) && served.is_object()) {
             served.get_object()["cached"].data = true; // top-level flag, via glaze

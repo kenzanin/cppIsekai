@@ -91,3 +91,32 @@ TEST_CASE("img: offline miss is 404 with empty body") {
     CHECK(miss.body.empty());
     CHECK(state->calls == 1);
 }
+
+TEST_CASE("img: page-context miss fetches and lands in the v3 tree") {
+    TempRoot root;
+    auto state = std::make_shared<FakeState>();
+    state->bodies = {{"http://x/p1.jpg", "PAGEBYTES"}};
+    cache::Cache cache = fake_cache(root.path.string(), state);
+
+    // Regression (reader-page live smoke): a complete page context used to
+    // 404 on miss -- the context branch returned before the fetch ran.
+    const cache::Cache::PageCtx ctx{"mangadex", "slug-x", 2, 1};
+    const ImgReply first = serve_cached_image(cache, "http://x/p1.jpg", {}, ctx);
+    CHECK(first.code == 200);
+    CHECK(first.body == "PAGEBYTES");
+    CHECK(state->calls == 1);
+
+    // Stored under the context layout, not the sha fallback.
+    bool v3_landed = false;
+    for (const auto& e : fs::recursive_directory_iterator(root.path / "img"))
+        if (!e.is_directory() && e.path().string().find("manga/slug-x/ch002/p001.") != std::string::npos)
+            v3_landed = true;
+    CHECK(v3_landed);
+
+    // Second view: context hit from disk, no refetch.
+    state->bodies.clear();
+    const ImgReply again = serve_cached_image(cache, "http://x/p1.jpg", {}, ctx);
+    CHECK(again.code == 200);
+    CHECK(again.body == "PAGEBYTES");
+    CHECK(state->calls == 1);
+}

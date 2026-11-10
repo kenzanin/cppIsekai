@@ -261,27 +261,18 @@ TEST_CASE("cache v3: page landing paths + duplicate chapter disambiguation") {
                        [state](const std::string& k) { return state->get(k); });
 
     cache::Cache::PageCtx pg{.plugin = "mangadex", .slug = "solo-leveling",
-                             .chapter = 12, .page = 3, .page_id = "8f3a2c1b9d"};
+                             .chapter = 12, .page = 3};
     const auto p = cache.img_store("http://x/p3.png", "B", {}, pg);
     REQUIRE(ok(p));
     CHECK(*p == (root.path / "img" / "mangadex" / "manga" / "solo-leveling" /
-                 "ch012-88230349" / "p003.png").string());
+                 "ch012" / "p003.png").string());
 
-    // same ch12, different chapter id -> sibling dir, both survive
-    cache::Cache::PageCtx dup = pg;
-    dup.page_id = "00deadbeef";
-    const auto q = cache.img_store("http://x/p3b.png", "C", {}, dup);
-    REQUIRE(ok(q));
-    CHECK(fs::path(*q).parent_path().filename() == "ch012-b5850973");
-    CHECK(fs::exists(*p));
-    CHECK(fs::exists(*q));
-
-    // zero-pad: ch 2 -> ch002; empty page_id falls back to the key for id8
+    // zero-pad: ch 2 -> ch002
     cache::Cache::PageCtx p2 = pg;
-    p2.chapter = 2; p2.page = 1; p2.page_id.clear();
+    p2.chapter = 2; p2.page = 1;
     const auto r = cache.img_store("http://x/p1.jpg", "D", {}, p2);
     REQUIRE(ok(r));
-    CHECK(fs::path(*r).parent_path().filename().string().rfind("ch002-9266cd27", 0) == 0);
+    CHECK(fs::path(*r).parent_path().filename().string() == "ch002");
 
     // no context -> sha fallback at pool root
     const auto f = cache.img_store("http://x/plain.gif", "E", {}, {});

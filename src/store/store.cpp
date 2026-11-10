@@ -2,6 +2,7 @@
 
 #include <sqlite_orm/sqlite_orm.h>
 
+#include <ctime>
 #include <stdexcept>
 #include <utility>
 
@@ -31,6 +32,17 @@ struct StateEntity {
     std::string value;
 };
 
+struct ReaderPositionEntity {
+    std::string plugin; // composite PK with slug: one row per manga
+    std::string slug;
+    std::string chapter_id;
+    double chapter_number{};
+    int page{};
+    std::string mode;
+    std::string direction;
+    std::int64_t updated_at{};
+};
+
 inline auto create_storage(const std::string& path) {
     return make_storage(
         path,
@@ -45,7 +57,15 @@ inline auto create_storage(const std::string& path) {
                    foreign_key(&TitleEntity::plugin_id).references(&PluginEntity::id)),
         make_table("plugin_state", make_column("plugin_id", &StateEntity::plugin_id),
                    make_column("key", &StateEntity::key), make_column("value", &StateEntity::value),
-                   primary_key(&StateEntity::plugin_id, &StateEntity::key)));
+                   primary_key(&StateEntity::plugin_id, &StateEntity::key)),
+        make_table("reader_positions", make_column("plugin", &ReaderPositionEntity::plugin),
+                   make_column("slug", &ReaderPositionEntity::slug),
+                   make_column("chapter_id", &ReaderPositionEntity::chapter_id),
+                   make_column("chapter_number", &ReaderPositionEntity::chapter_number),
+                   make_column("page", &ReaderPositionEntity::page), make_column("mode", &ReaderPositionEntity::mode),
+                   make_column("direction", &ReaderPositionEntity::direction),
+                   make_column("updated_at", &ReaderPositionEntity::updated_at),
+                   primary_key(&ReaderPositionEntity::plugin, &ReaderPositionEntity::slug)));
 }
 
 using StorageType = decltype(create_storage(""));
@@ -187,4 +207,30 @@ std::optional<std::string> Store::state_get(const std::string& plugin_id, const 
 
 void Store::state_set(const std::string& plugin_id, const std::string& key, const std::string& value) {
     impl_->storage.replace(StateEntity{plugin_id, key, value}); // INSERT OR REPLACE on the composite pk: upsert
+}
+
+void Store::position_set(const ReaderPosition& pos) {
+    // REPLACE on the (plugin, slug) PK: the route layers optional fields over
+    // the stored row, this just persists the result. updated_at stamped here.
+    impl_->storage.replace(ReaderPositionEntity{pos.plugin, pos.slug, pos.chapter_id, pos.chapter_number,
+                                                pos.page, pos.mode, pos.direction,
+                                                static_cast<std::int64_t>(std::time(nullptr))});
+}
+
+std::optional<ReaderPosition> Store::position_get(const std::string& plugin, const std::string& slug) {
+    auto rows = impl_->storage.get_all<ReaderPositionEntity>(
+        where(c(&ReaderPositionEntity::plugin) == plugin && c(&ReaderPositionEntity::slug) == slug));
+    if (rows.empty())
+        return std::nullopt;
+    const auto& r = rows[0];
+    return ReaderPosition{r.plugin, r.slug, r.chapter_id, r.chapter_number, r.page, r.mode, r.direction, r.updated_at};
+}
+
+
+std::optional<ReaderPosition> Store::position_last() {
+    auto rows = impl_->storage.get_all<ReaderPositionEntity>(order_by(&ReaderPositionEntity::updated_at).desc(), limit(1));
+    if (rows.empty())
+        return std::nullopt;
+    const auto& r = rows[0];
+    return ReaderPosition{r.plugin, r.slug, r.chapter_id, r.chapter_number, r.page, r.mode, r.direction, r.updated_at};
 }

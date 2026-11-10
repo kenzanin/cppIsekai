@@ -29,6 +29,19 @@ struct Title {
     std::string plugin;
 };
 
+/** Last-read position of one manga (reader-page): resume point + continue
+ *  hint. Keyed by (plugin, slug). */
+struct ReaderPosition {
+    std::string plugin;
+    std::string slug;
+    std::string chapter_id;
+    double chapter_number{};   // denormalized: the hint shows it without a plugin call
+    int page{1};               // 1-based
+    std::string mode;          // reading mode; empty = unset
+    std::string direction;     // ltr | rtl; empty = unset
+    std::int64_t updated_at{}; // unix seconds; stamped by the store on write
+};
+
 struct StoreImpl;
 
 class Store {
@@ -54,6 +67,15 @@ public:
      *  nullopt when absent. */
     std::optional<std::string> state_get(const std::string& plugin_id, const std::string& key);
     void state_set(const std::string& plugin_id, const std::string& key, const std::string& value);
+
+    /** \brief Upsert the last-read position of one manga; updated_at is
+     *  stamped here, any nonzero value in \p pos is ignored. */
+    void position_set(const ReaderPosition& pos);
+    /** \brief nullopt when the manga was never opened. */
+    std::optional<ReaderPosition> position_get(const std::string& plugin, const std::string& slug);
+    /** \brief Most recently updated position across all manga (the single-user
+     *  "live anchor": skip-rerun resumes there). nullopt when none exists. */
+    std::optional<ReaderPosition> position_last();
 
 private:
     std::unique_ptr<StoreImpl> impl_;

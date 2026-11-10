@@ -12,6 +12,8 @@
 #include "cache/sha1.hpp"
 #include "cache/transcode.hpp"
 
+#include <spdlog/spdlog.h>
+
 namespace fs = std::filesystem;
 
 namespace cache {
@@ -83,22 +85,18 @@ double ratio_from_name(const std::string& name) {
     return static_cast<double>(std::stoi(digits)) / 10000.0;
 }
 
-std::string page_rel(const std::string& plugin, const std::string& slug, int chapter,
-                     const std::string& id8, int page) {
+std::string page_rel(const std::string& plugin, const std::string& slug, int chapter, int page) {
     // pad(n) = min-3 zero-padding: ch 2 -> ch002, ch 12 -> ch012, ch 123 -> ch123
     const auto pad = [](int n) {
         auto s = std::to_string(n);
         while (s.size() < 3) s = "0" + s;
         return s;
     };
-    return plugin + "/manga/" + slug + "/ch" + pad(chapter) + "-" + id8 +
-           "/p" + pad(page);
-}
-
-std::string id8_of(const std::string& s) {
-    // fs-safe: last 8 hex of sha1, matching the slug.hpp collision pattern.
-    const auto h = sha1_hex(s);
-    return h.substr(h.size() - 8);
+    // ponytail: number-only dir suffix (lo's call). Fractional numbers keep
+    // '.' (fs-safe); one chapter dir shared by all its pages. If duplicate
+    // chapter numbers across languages ever collide, re-add an id8 suffix
+    // derived from the chapter ID.
+    return plugin + "/manga/" + slug + "/ch" + pad(chapter) + "/p" + pad(page);
 }
 
 // (sidecar writer removed: ratio now rides in the cover filename)
@@ -270,9 +268,8 @@ std::optional<std::string> Cache::img_store(const std::string& key, const std::s
                page_ctx.page < 1) {
         rel = {}; // no complete page context: sha fallback
     } else {
-        rel = page_rel(page_ctx.plugin, page_ctx.slug, page_ctx.chapter,
-                       id8_of(page_ctx.page_id.empty() ? key : page_ctx.page_id), page_ctx.page)
-              + "." + ext;
+        rel = page_rel(page_ctx.plugin, page_ctx.slug, page_ctx.chapter, page_ctx.page) +
+              "." + ext;
     }
 
     const std::lock_guard lock(mu_);
@@ -294,23 +291,28 @@ std::optional<std::string> Cache::img_ensure(const std::string& key, const Cover
         if (!cover_ctx.cover && !page_ctx.plugin.empty() && !page_ctx.slug.empty() &&
             page_ctx.chapter >= 1 && page_ctx.page >= 1) {
             const std::string prefix =
-                page_rel(page_ctx.plugin, page_ctx.slug, page_ctx.chapter,
-                         id8_of(page_ctx.page_id.empty() ? key : page_ctx.page_id),
-                         page_ctx.page) +
-                ".";
+                page_rel(page_ctx.plugin, page_ctx.slug, page_ctx.chapter, page_ctx.page) + ".";
             for (const auto& [path, _] : entries_)
                 if (path.find(prefix) != std::string::npos && !path.ends_with(".json")) {
                     auto it = entries_.find(path);
                     it->second.tick = ++tick_; // recency bump
+                    spdlog::debug("cache: img ctx-hit {} ({})", path, key);
                     return path;
                 }
-            return std::nullopt; // wrong-context miss: never fall through to fetch-less paths
-        }
-        // No (or incomplete) context: sha-fallback hit check.
-        const std::string fb = path_for(key, "img", {});
-        if (auto it = entries_.find(fb); it != entries_.end()) {
-            it->second.tick = ++tick_;
-            return fb;
+            // Context miss: fetch below lands in this exact v3 spot. Deliberately
+            // no sha-fallback lookup here -- an entry there predates this
+            // context's layout and would serve the wrong landing path.
+            spdlog::debug("cache: img ctx-miss, fetching {} (ch{} p{} {})", key, page_ctx.chapter,
+                          page_ctx.page, page_ctx.slug);
+        } else {
+            // No (or incomplete) context: sha-fallback hit check.
+            const std::string fb = path_for(key, "img", {});
+            if (auto it = entries_.find(fb); it != entries_.end()) {
+                it->second.tick = ++tick_;
+                spdlog::debug("cache: img sha-hit {}", fb);
+                return fb;
+            }
+            spdlog::debug("cache: img sha-miss, fetching {}", key);
         }
     }
     if (cover_ctx.cover) {
@@ -324,7 +326,10 @@ std::optional<std::string> Cache::img_ensure(const std::string& key, const Cover
     }
 
     const std::optional<std::string> raw = fetch_ ? fetch_(key) : std::nullopt;
-    if (!raw) return std::nullopt;
+    if (!raw) {
+        spdlog::debug("cache: img fetch failed {}", key);
+        return std::nullopt;
+    }
 
     const auto tc = transcode(*raw, conf_.image_format,
                                          cover_ctx.cover ? static_cast<int>(conf_.cover_max_px) : 0);
@@ -333,7 +338,9 @@ std::optional<std::string> Cache::img_ensure(const std::string& key, const Cover
         ctx.w = tc.width;
         ctx.h = tc.height;
     }
-    return img_store(key, tc.bytes, ctx, page_ctx, tc.ext);
+    auto stored = img_store(key, tc.bytes, ctx, page_ctx, tc.ext);
+    if (stored) spdlog::debug("cache: img stored {} ({} B)", *stored, tc.bytes.size());
+    return stored;
 }
 
 std::optional<std::string> Cache::cover_serve(const std::string& plugin,

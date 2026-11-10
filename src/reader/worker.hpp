@@ -18,6 +18,8 @@
 #include "cache/cache.hpp"
 #include "cache/sha1.hpp"
 
+#include <spdlog/spdlog.h>
+
 #include <cctype>
 #include <condition_variable>
 #include <mutex>
@@ -30,12 +32,15 @@ namespace reader {
 
 /** \brief Placement context for one window batch: the reader knows plugin,
  *  slug (D5) and the chapter number the window belongs to; the page number is
- *  the 1-based position of the url within the batch. Empty fields force the
- *  sha fallback, so http.cpp (no ctx today) writes byte-identical v1 paths. */
+ *  the 1-based position of the url within the batch -- or, when page_base is
+ *  set, chapter-absolute (batch[0] is page_base), matching the /cache/img
+ *  query-page convention so both paths land one file per slot. Empty fields
+ *  force the sha fallback. */
 struct WindowCtx {
     std::string plugin;
     std::string slug;
     int chapter{}; // 1-based chapter number; 0 = unknown
+    int page_base{}; // chapter-absolute page of batch[0]; 0 = legacy batch position
 };
 
 /** \brief <plugin>/<slug>/chNNN/pNNN.<ext> from \p ctx + the url's 1-based
@@ -63,9 +68,12 @@ inline std::string rel_path(const WindowCtx& ctx, int page, const std::string& u
         while (s.size() < 3) s = "0" + s;
         return s;
     };
-    // V3 (cache-layout-v3 D4): ch<n>-<id8> where id8 = last 8 of sha1(url).
-    const std::string id8 = sha1_hex(url).substr(sha1_hex(url).size() - 8);
-    return ctx.plugin + "/" + ctx.slug + "/ch" + pad(ctx.chapter) + "-" + id8 +
+    // V3 (cache-layout-v3 D4): <plugin>/manga/<slug>/chNNN/pNNN.<ext> -- same
+    // shape as cache page_rel, so worker and /cache/img land one file per
+    // slot (ext-free hit, no dupes). ponytail: no per-chapter id8 suffix
+    // (lo's call, see cache::page_rel); upgrade there if duplicate chapter
+    // numbers ever collide.
+    return ctx.plugin + "/manga/" + ctx.slug + "/ch" + pad(ctx.chapter) +
            "/p" + pad(page) + "." + ext;
 }
 
@@ -114,8 +122,15 @@ private:
             ctx_ = {};
             pending_.reset();
             lock.unlock();
-            for (std::size_t i = 0; i < batch.size(); ++i)
-                images_.ensure(batch[i], "img", rel_path(ctx, int(i) + 1, batch[i]));
+            for (std::size_t i = 0; i < batch.size(); ++i) {
+                const int page = ctx.page_base > 0 ? ctx.page_base + int(i) : int(i) + 1;
+                const cache::Cache::PageCtx pctx{ctx.plugin, ctx.slug, ctx.chapter, page};
+                const auto p = ctx.plugin.empty()
+                    ? images_.ensure(batch[i], "img",
+                                     rel_path(ctx, ctx.page_base > 0 ? ctx.page_base + int(i) : int(i) + 1, batch[i]))
+                    : images_.img_ensure(batch[i], {}, pctx); // transcode to [cache] image_format
+                spdlog::debug("worker: prefetch {} -> {}", batch[i], p ? *p : std::string("failed"));
+            }
             lock.lock();
         }
     }

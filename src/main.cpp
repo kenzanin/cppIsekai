@@ -61,6 +61,11 @@ int main(int argc, char** argv) {
         return 2; // no boot: DB untouched, no data/ created
     }
     const config::Config cfg = config::resolve(overrides, ini_path);
+    // Boot-time level from the registry (log.level); bad values keep info.
+    {
+        const auto lvl = spdlog::level::from_str(cfg.log_level);
+        spdlog::set_level(lvl == spdlog::level::off && cfg.log_level != "off" ? spdlog::level::info : lvl);
+    }
 
     std::filesystem::create_directories(cfg.data_dir); // [paths] data_dir, boot-created (D6)
     Store store(cfg.db);

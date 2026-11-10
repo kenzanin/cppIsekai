@@ -1,0 +1,4 @@
+schema: spec-driven
+created: 2026-11-09
+goal: Read manga pages in the browser with four reading modes, smooth prefetch,
+  resume position
