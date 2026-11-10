@@ -42,9 +42,10 @@ cache::Fetcher makeCurlFetcher(std::string /*proxy*/) {
 }
 
 void serve(Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool, plugin::Host& plugins, LogBuffer& logs,
-           cache::Cache& images, int port, const std::string& ini_path, const config::Overrides& overrides) {
+           cache::Cache& images, int port, const std::string& ini_path, const config::Overrides& overrides,
+           const std::string& templates_dir) {
     crow::SimpleApp app;
-    crow::mustache::set_base("templates");
+    crow::mustache::set_base(templates_dir);
 
     // Image-cache 3.3: one background prefetcher over the shared img cache;
     // woken only by the two reader endpoints below, stopped at scope exit.

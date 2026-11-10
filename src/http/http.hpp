@@ -19,4 +19,5 @@ cache::Fetcher makeCurlFetcher(std::string proxy);
 /** \brief Composition root: registers every route on a fresh crow app and
  *  blocks in run() until shutdown. */
 void serve(Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool, plugin::Host& plugins, LogBuffer& logs,
-           cache::Cache& images, int port, const std::string& ini_path, const config::Overrides& overrides);
+           cache::Cache& images, int port, const std::string& ini_path, const config::Overrides& overrides,
+           const std::string& templates_dir);

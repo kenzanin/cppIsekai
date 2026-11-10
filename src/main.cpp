@@ -106,6 +106,6 @@ int main(int argc, char** argv) {
     cache::Cache images{cache::Config{"data/cache", cache_max_bytes}, makeCurlFetcher(cfg.proxy)};
 
     spdlog::info("cppIsekai listening on :{} (config: {})", cfg.port, ini_path);
-    serve(store, db_pool, plugin_pool, plugins, logs, images, cfg.port, ini_path, overrides);
+    serve(store, db_pool, plugin_pool, plugins, logs, images, cfg.port, ini_path, overrides, cfg.templates_dir);
     running.store(false);
 }
