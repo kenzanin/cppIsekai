@@ -53,6 +53,16 @@ struct SavedMangaEntity {
     std::int64_t added_at{};
 };
 
+struct ApiCacheEntity {
+    std::string plugin_id;   // composite PK with query_hash
+    std::string query_hash;
+    std::string params_json;
+    std::int64_t fetched_at{};
+    std::int64_t ttl_s{};
+    // payload deliberately NOT mapped here: sqlite_orm has no JSONB column;
+    // the JSONB blob is written/read through the store's raw connection.
+};
+
 inline auto create_storage(const std::string& path) {
     return make_storage(
         path,
@@ -80,7 +90,13 @@ inline auto create_storage(const std::string& path) {
         make_table("saved_manga", make_column("plugin", &SavedMangaEntity::plugin), make_column("slug", &SavedMangaEntity::slug),
                    make_column("name", &SavedMangaEntity::name), make_column("cover", &SavedMangaEntity::cover),
                    make_column("added_at", &SavedMangaEntity::added_at),
-                   primary_key(&SavedMangaEntity::plugin, &SavedMangaEntity::slug)));
+                   primary_key(&SavedMangaEntity::plugin, &SavedMangaEntity::slug)),
+        make_table("api_cache", make_column("plugin_id", &ApiCacheEntity::plugin_id),
+                   make_column("query_hash", &ApiCacheEntity::query_hash),
+                   make_column("params_json", &ApiCacheEntity::params_json),
+                   make_column("fetched_at", &ApiCacheEntity::fetched_at),
+                   make_column("ttl_s", &ApiCacheEntity::ttl_s),
+                   primary_key(&ApiCacheEntity::plugin_id, &ApiCacheEntity::query_hash)));
 }
 
 using StorageType = decltype(create_storage(""));
@@ -88,8 +104,9 @@ using StorageType = decltype(create_storage(""));
 } // namespace
 
 struct StoreImpl {
+    std::string path; // kept for the raw api_cache JSONB connection
     StorageType storage;
-    explicit StoreImpl(const std::string& path) : storage(create_storage(path)) {}
+    explicit StoreImpl(const std::string& p) : path(p), storage(create_storage(p)) {}
 };
 
 Store::Store(const std::string& path) : impl_(std::make_unique<StoreImpl>(path)) {
@@ -97,6 +114,22 @@ Store::Store(const std::string& path) : impl_(std::make_unique<StoreImpl>(path))
     // FK: pragma_t has no foreign_keys setter in v1.9.1; make_storage enables it
     // automatically because the schema declares a foreign_key.
     impl_->storage.sync_schema();
+    // ponytail: sqlite_orm sync_schema won't ALTER an existing table or add a
+    // JSONB blob column; payload is created/dropped alongside the ORM schema
+    // here (raw connection, same one-shot pattern as reader_positions.zoom).
+    {
+        const auto cols = impl_->storage.pragma.table_info("api_cache");
+        bool has_payload = false;
+        for (const auto& c : cols) has_payload = has_payload || c.name == "payload";
+        sqlite3* db = nullptr;
+        if (sqlite3_open(path.c_str(), &db) == SQLITE_OK) {
+            if (!has_payload)
+                sqlite3_exec(db, "ALTER TABLE api_cache ADD COLUMN payload BLOB", nullptr, nullptr, nullptr);
+            // jsonb_valid CHECK can't be added post-hoc to an existing column
+            // cheaply; enforce at write time (jsonb() rejects malformed input).
+            sqlite3_close(db);
+        }
+    }
     // ponytail: sqlite_orm sync_schema won't ALTER an existing table; add zoom additively here.
     {
         const auto cols = impl_->storage.pragma.table_info("reader_positions");
@@ -283,6 +316,54 @@ std::vector<SavedManga> Store::saved_list() {
     for (const auto& r : rows)
         out.push_back(SavedManga{r.plugin, r.slug, r.name, r.cover, r.added_at});
     return out;
+}
+
+std::optional<ApiCacheRow> Store::api_cache_get(const std::string& plugin_id, const std::string& query_hash) {
+    // Raw connection: payload is JSONB binary — sqlite_orm has no mapping for it.
+    sqlite3* db = nullptr;
+    if (sqlite3_open(impl_->path.c_str(), &db) != SQLITE_OK) return std::nullopt;
+    sqlite3_stmt* stmt = nullptr;
+    std::optional<ApiCacheRow> row;
+    const char* sql = "SELECT params_json, json(payload), fetched_at, ttl_s FROM api_cache "
+                      "WHERE plugin_id = ? AND query_hash = ?";
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_text(stmt, 1, plugin_id.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 2, query_hash.c_str(), -1, SQLITE_TRANSIENT);
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            const auto* params = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
+            const auto* payload = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+            row = ApiCacheRow{params ? params : "", payload ? payload : "",
+                              sqlite3_column_int64(stmt, 2), sqlite3_column_int64(stmt, 3)};
+        }
+        sqlite3_finalize(stmt);
+    }
+    sqlite3_close(db);
+    return row;
+}
+
+void Store::api_cache_put(const std::string& plugin_id, const std::string& query_hash,
+                          const std::string& params_json, const std::string& payload,
+                          std::int64_t fetched_at, std::int64_t ttl_s) {
+    sqlite3* db = nullptr;
+    if (sqlite3_open(impl_->path.c_str(), &db) != SQLITE_OK) return;
+    sqlite3_stmt* stmt = nullptr;
+    // jsonb(?) rejects malformed JSON -> the write fails loudly, never stores garbage.
+    const char* sql = "INSERT INTO api_cache(plugin_id, query_hash, params_json, fetched_at, ttl_s, payload) "
+                      "VALUES(?,?,?,?,?,jsonb(?)) "
+                      "ON CONFLICT(plugin_id, query_hash) DO UPDATE SET "
+                      "params_json=excluded.params_json, fetched_at=excluded.fetched_at, "
+                      "ttl_s=excluded.ttl_s, payload=excluded.payload";
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_text(stmt, 1, plugin_id.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 2, query_hash.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 3, params_json.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_int64(stmt, 4, fetched_at);
+        sqlite3_bind_int64(stmt, 5, ttl_s);
+        sqlite3_bind_text(stmt, 6, payload.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_step(stmt); // fire-and-forget write; failure = cache miss next time
+        sqlite3_finalize(stmt);
+    }
+    sqlite3_close(db);
 }
 
 std::optional<SavedManga> Store::saved_get(const std::string& plugin, const std::string& slug) {

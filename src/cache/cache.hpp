@@ -53,7 +53,7 @@ public:
 
     /** \brief Hit: return path, bump recency. Miss: fetch -> store -> path.
      *
-     *  kind is the subpool directory ("img", "api"). Optional rel_path (D2,
+     *  kind is the subpool directory ("img"). Optional rel_path (D2,
      *  img only) lands the file at <root>/<kind>/<rel_path> -- caller passes
      *  the full slug-derived subpath incl. filename; empty keeps the v1
      *  <sha><ext> name. The index stays keyed by on-disk path, so a second

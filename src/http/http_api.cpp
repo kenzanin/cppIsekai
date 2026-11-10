@@ -18,6 +18,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <ctime>
 
 namespace http {
 namespace {
@@ -68,7 +69,7 @@ crow::response title_data_response(plugin::Host& plugins, cache::Cache& images, 
     p["id"] = slug; // the slug IS the title key the cache layout and plugins mint
     const std::string params = p.dump();
     crow::response r{on_pool(plugin_pool, [&] {
-        return call_cached(images, plugin, method, params, [&] { return plugins.call(plugin, method, params); });
+        return call_cached(store, plugin, method, params, [&] { return plugins.call(plugin, method, params); });
     })};
     r.set_header("Content-Type", "application/json");
     return r;
@@ -92,7 +93,7 @@ std::vector<std::string> reader_window(Store& store, BS::thread_pool<>& db, BS::
     const std::string chapters_query = query.dump();
 
     const std::string envelope = on_pool(plugin_pool, [&] {
-        return call_cached(images, plugin_id, "chapters", chapters_query,
+        return call_cached(store, plugin_id, "chapters", chapters_query,
                            [&] { return plugins.call(plugin_id, "chapters", chapters_query); });
     });
 
@@ -131,7 +132,7 @@ std::vector<std::string> reader_window(Store& store, BS::thread_pool<>& db, BS::
         q["id"] = chapter_id;
         const std::string pages_query = q.dump();
         const std::string env = on_pool(plugin_pool, [&] {
-            return call_cached(images, plugin_id, "pages", pages_query,
+            return call_cached(store, plugin_id, "pages", pages_query,
                                [&] { return plugins.call(plugin_id, "pages", pages_query); });
         });
         std::vector<std::string> urls;
@@ -245,7 +246,7 @@ void register_api(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, BS:
         const std::string params = p.dump();
         // Stale-serve wrap (design D3): the one call site, opt-in methods only.
         crow::response r{on_pool(plugin_pool, [&] {
-            return call_cached(images, id, action, params, [&] { return plugins.call(id, action, params); });
+            return call_cached(store, id, action, params, [&] { return plugins.call(id, action, params); });
         })};
         r.set_header("Content-Type", "application/json");
         return r;
@@ -357,7 +358,15 @@ void register_api(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, BS:
             }
             for (int i = 0; i < 2; ++i) {
                 const std::string key = stale_key(plugin, methods[i], params);
-                images.store(key, "api", fresh[i]); // same key shape call_cached persists under
+                // Same key shape call_cached persists under; write-through here
+                // keeps refresh and lazy cache consistent. db worker (store is not
+                // thread-safe) — plugin_pool hands back to on_pool(db).
+                const std::string body = fresh[i];
+                on_pool(db, [&] {
+                    store.api_cache_put(plugin, key, params, body,
+                                        static_cast<std::int64_t>(std::time(nullptr)), kApiCacheTtl);
+                    return 0;
+                });
             }
             crow::response r{R"({"ok":true})"};
             r.set_header("Content-Type", "application/json");
@@ -615,7 +624,7 @@ void register_api(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, BS:
         const std::string chs_params = q.dump();
         const std::string body = on_pool(plugin_pool, [&] {
             const std::string chs_env =
-                call_cached(images, plugin, "chapters", chs_params,
+                call_cached(store, plugin, "chapters", chs_params,
                             [&] { return plugins.call(plugin, "chapters", chs_params); });
             // Pre-resolve the chapter id from the list so the pages call
             // targets the right one even when the plugin's list is stale.
@@ -646,7 +655,7 @@ void register_api(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, BS:
             pages_q["id"] = chapter_id;
             const std::string pages_params = pages_q.dump();
             const std::string pages_env =
-                call_cached(images, plugin, "pages", pages_params,
+                call_cached(store, plugin, "pages", pages_params,
                             [&] { return plugins.call(plugin, "pages", pages_params); });
             return build_pages_response(chs_env, pages_env, PagesCtx{plugin, slug, ch}).value_or(std::string{});
         });

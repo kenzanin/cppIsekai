@@ -29,6 +29,15 @@ struct Title {
     std::string plugin;
 };
 
+/** Last-good / fresh read model for plugin API responses: payload is JSONB
+ *  binary (jsonb()/json()), one row per (plugin_id, query_hash). */
+struct ApiCacheRow {
+    std::string params_json; // canonical params, for debugging/inspection
+    std::string payload;     // envelope JSON, decoded via json(payload)
+    std::int64_t fetched_at{};
+    std::int64_t ttl_s{};
+};
+
 /** One user-saved manga (library-save): denormalized name/cover so the grid
  *  never calls plugins at render; keyed unique on (plugin, slug). */
 struct SavedManga {
@@ -87,6 +96,14 @@ public:
     /** \brief Most recently updated position across all manga (the single-user
      *  "live anchor": skip-rerun resumes there). nullopt when none exists. */
     std::optional<ReaderPosition> position_last();
+
+    /** \brief Read one api_cache row; nullopt when absent. ttl/fetched_at are
+     *  returned raw — the caller decides fresh vs stale. */
+    std::optional<ApiCacheRow> api_cache_get(const std::string& plugin_id, const std::string& query_hash);
+    /** \brief Upsert an api_cache row; payload is stored as JSONB binary. */
+    void api_cache_put(const std::string& plugin_id, const std::string& query_hash,
+                       const std::string& params_json, const std::string& payload,
+                       std::int64_t fetched_at, std::int64_t ttl_s);
 
     /** \brief Upsert/unsave one saved manga; the saved list is the Library
      *  grid. added_at is stamped here on save (insert refreshes it). */

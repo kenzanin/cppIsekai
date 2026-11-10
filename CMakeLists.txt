@@ -161,9 +161,9 @@ target_compile_options(test_export PRIVATE -Wall -Wextra)
 add_test(NAME export COMMAND test_export)
 
 # stale layer (2.2): wrapper around the ABI call; cache + glaze, no server
-add_executable(test_stale tests/test_stale.cpp src/cache/cache.cpp)
-target_include_directories(test_stale PRIVATE src ${TP}/glaze)
-target_link_libraries(test_stale PRIVATE spdlog::spdlog PkgConfig::VIPS)
+add_executable(test_stale tests/test_stale.cpp src/store/store.cpp)
+target_include_directories(test_stale PRIVATE src ${TP}/glaze ${TP}/sqlite_orm/include)
+target_link_libraries(test_stale PRIVATE spdlog::spdlog PkgConfig::VIPS sqlite3)
 target_compile_options(test_stale PRIVATE -Wall -Wextra)
 add_test(NAME stale COMMAND test_stale)
 
