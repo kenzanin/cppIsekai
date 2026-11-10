@@ -151,7 +151,8 @@ std::vector<std::string> reader_window(Store& store, BS::thread_pool<>& db, BS::
 } // namespace
 
 void register_api(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool,
-                  plugin::Host& plugins, cache::Cache& images, reader::Worker& prefetch, const std::string& ini_path) {
+                  plugin::Host& plugins, cache::Cache& images, reader::Worker& prefetch, reader::CoverWorker& covers,
+                  const std::string& ini_path) {
     // Dev endpoint: rescan the plugin dir, re-register, no restart.
     CROW_ROUTE(app, "/plugins/reload").methods(crow::HTTPMethod::POST)([&] {
         const int n = on_pool(db, [&] { return plugins.load_all(store); });
@@ -248,6 +249,32 @@ void register_api(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, BS:
         crow::response r{on_pool(plugin_pool, [&] {
             return call_cached(store, id, action, params, [&] { return plugins.call(id, action, params); });
         })};
+        // Search covers also land in the cover pool (cache-first): the browser
+        // grid asks /cache/img?cover=1, and the worker stores in the same v3
+        // layout + [cache] image_format. ponytail: fire-and-forget, no wait.
+        if (action == "search") {
+            // search data shape: {items: [...], total: n} -- not a bare array.
+            glz::generic parsed;
+            if (glz::read_json(parsed, r.body) == glz::error_code{} && parsed.is_object()) {
+                const auto& root = parsed.get_object();
+                const auto d = root.find("data");
+                if (d != root.end() && d->second.is_object()) {
+                    const auto it = d->second.get_object().find("items");
+                    if (it != d->second.get_object().end() && it->second.is_array()) {
+                        std::vector<reader::CoverJob> jobs;
+                        for (const auto& el : it->second.get_array()) {
+                            if (!el.is_object()) continue;
+                            const auto& obj = el.get_object();
+                            const auto c = obj.find("cover");
+                            if (c == obj.end()) continue;
+                            const auto* s = std::get_if<std::string>(&c->second.data);
+                            if (s && !s->empty()) jobs.push_back({*s, id});
+                        }
+                        if (!jobs.empty()) covers.nudge(std::move(jobs));
+                    }
+                }
+            }
+        }
         r.set_header("Content-Type", "application/json");
         return r;
     });

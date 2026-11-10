@@ -17,7 +17,7 @@ crow::json::wvalue layout(const char* active) {
     return ctx;
 }
 
-crow::json::wvalue home_context(Store& store, BS::thread_pool<>& db, const crow::request& req) {
+crow::json::wvalue home_context(Store& store, BS::thread_pool<>& db, const crow::request& req, reader::CoverWorker& covers) {
     const std::string plugin = param(req, "plugin");
     const std::string q = param(req, "q");
     const int page_no = page_of(param(req, "page"));
@@ -59,6 +59,12 @@ crow::json::wvalue home_context(Store& store, BS::thread_pool<>& db, const crow:
     // library-save 4.1: saved entries are the Library — when any are saved,
     // the grid renders them (added_at desc) instead of the search-cache titles.
     std::vector<SavedManga> saved = on_pool(db, [&] { return store.saved_list(); });
+    // Cover prefetch: hand the saved covers to the cover worker; cache-first,
+    // so entries already on disk are not re-fetched.
+    std::vector<reader::CoverJob> jobs;
+    for (const auto& m : saved)
+        if (!m.cover.empty()) jobs.push_back({m.cover, m.plugin});
+    if (!jobs.empty()) covers.nudge(std::move(jobs));
     ctx["saved_mode"] = !saved.empty();
     ctx["empty_saved"] = saved.empty();
     std::vector<crow::json::wvalue> saved_rows;
@@ -92,13 +98,13 @@ crow::response html(const std::string& file, const crow::json::wvalue& ctx) {
 
 } // namespace
 
-void register_pages(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, LogBuffer& logs) {
+void register_pages(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, LogBuffer& logs, reader::CoverWorker& covers) {
     CROW_ROUTE(app, "/")
-    ([&](const crow::request& req) { return html("home.mustache", home_context(store, db, req)); });
+    ([&](const crow::request& req) { return html("home.mustache", home_context(store, db, req, covers)); });
 
     // htmx swaps only the grid; the sidebar and top bar stay put.
     CROW_ROUTE(app, "/library/grid")
-    ([&](const crow::request& req) { return html("grid.mustache", home_context(store, db, req)); });
+    ([&](const crow::request& req) { return html("grid.mustache", home_context(store, db, req, covers)); });
 
     CROW_ROUTE(app, "/search")([&] { return html("search.mustache", layout("search")); });
 

@@ -2,6 +2,7 @@
 #include "http_routes.hpp"
 
 #include "reader/worker.hpp"
+#include "reader/cover_worker.hpp"
 
 #include <cstdio>
 #include <optional>
@@ -48,11 +49,14 @@ void serve(Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool, 
     // Image-cache 3.3: one background prefetcher over the shared img cache;
     // woken only by the two reader endpoints below, stopped at scope exit.
     reader::Worker prefetch{images};
+    // Cover prefetcher: separate worker from the page window; woken by the
+    // library/grid render, cache-first (disk hit = no fetch).
+    reader::CoverWorker covers{images};
 
     // Crow's built-in static handler already serves /static/<path> from ./static.
 
-    http::register_pages(app, store, db, logs);
-    http::register_api(app, store, db, plugin_pool, plugins, images, prefetch, ini_path);
+    http::register_pages(app, store, db, logs, covers);
+    http::register_api(app, store, db, plugin_pool, plugins, images, prefetch, covers, ini_path);
 
     app.port(port).concurrency(4).run();
 }
