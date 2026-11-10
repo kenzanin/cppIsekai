@@ -41,7 +41,7 @@ target_include_directories(sqlite3 PUBLIC ${TP}/libsql/sqlite)
 
 # --- app ---
 add_executable(cppIsekai src/main.cpp src/store/store.cpp src/http/http.cpp src/http/http_pages.cpp src/http/http_api.cpp src/http/http_api_admin.cpp src/http/http_api_library.cpp src/http/http_api_title.cpp src/http/http_api_reader.cpp src/http/http_api_state.cpp src/http/http_api_content.cpp src/http/pages_api.cpp
-                         src/fetch/fetch.cpp src/plugin/plugin.cpp src/plugin/lua/bridge.cpp src/plugin/lua/lua_runtime.cpp src/plugin/http_client.cpp src/plugin/wasm/wasm_rt.cpp src/plugin/wasm/wasm_load.cpp src/plugin/js/js_rt.cpp src/plugin/js/js_bindings.cpp src/plugin/htmltext.cpp src/cache/cache.cpp src/reader/window.cpp
+                         src/fetch/fetch.cpp src/plugin/plugin_core.cpp src/plugin/plugin_load.cpp src/plugin/plugin_call.cpp src/plugin/lua/bridge.cpp src/plugin/lua/lua_runtime.cpp src/plugin/http_client.cpp src/plugin/wasm/wasm_rt.cpp src/plugin/wasm/wasm_load.cpp src/plugin/js/js_rt.cpp src/plugin/js/js_bindings.cpp src/plugin/htmltext.cpp src/cache/cache.cpp src/reader/window.cpp
                          ${TP}/libzippp/libzippp.cpp src/http/export_cbz.cpp)
 target_include_directories(
   cppIsekai
@@ -80,7 +80,7 @@ add_library(lexbor STATIC ${LEXBOR_SOURCES})
 target_include_directories(lexbor PUBLIC ${TP}/lexbor/source)
 target_compile_options(lexbor PRIVATE -w) # C vendor lib; do not gate on -Wall -Wextra
 target_include_directories(cppIsekai PRIVATE ${TP}/glaze ${TP}/sol2/include ${TP}/lexbor/source)
-add_executable(test_plugin tests/test_plugin.cpp src/plugin/plugin.cpp
+add_executable(test_plugin tests/test_plugin.cpp src/plugin/plugin_core.cpp src/plugin/plugin_load.cpp src/plugin/plugin_call.cpp
                            src/plugin/lua/bridge.cpp src/plugin/lua/lua_runtime.cpp src/plugin/http_client.cpp src/plugin/wasm/wasm_rt.cpp src/plugin/wasm/wasm_load.cpp src/plugin/js/js_rt.cpp src/plugin/js/js_bindings.cpp src/plugin/htmltext.cpp src/store/store.cpp src/fetch/fetch.cpp)
 target_include_directories(
   test_plugin
@@ -102,7 +102,7 @@ add_test(NAME plugin COMMAND test_plugin)
 
 # host-helper core + runtime parity (plugin-helper 2.1): htmltext core cases
 # direct; lua/js/wasm parity through the real Host on migrated fixtures.
-add_executable(test_htmltext tests/test_htmltext.cpp src/plugin/plugin.cpp
+add_executable(test_htmltext tests/test_htmltext.cpp src/plugin/plugin_core.cpp src/plugin/plugin_load.cpp src/plugin/plugin_call.cpp
                              src/plugin/lua/bridge.cpp src/plugin/lua/lua_runtime.cpp src/plugin/http_client.cpp src/plugin/wasm/wasm_rt.cpp src/plugin/wasm/wasm_load.cpp src/plugin/js/js_rt.cpp src/plugin/js/js_bindings.cpp src/plugin/htmltext.cpp src/store/store.cpp src/fetch/fetch.cpp)
 target_include_directories(test_htmltext PRIVATE src ${TP}/glaze ${TP}/sol2/include ${TP}/thread_pool/include ${TP}/lexbor/source
                           ${TP}/sqlite_orm/include ${TP}/readerwriterqueue/include)
@@ -202,7 +202,7 @@ find_program(CLANG_FORMAT clang-format)
 add_custom_target(
   tidy
   COMMAND ${CLANG_TIDY} -p ${CMAKE_BINARY_DIR} src/main.cpp src/store/store.cpp
-          src/http/http.cpp src/plugin/plugin.cpp src/cache/cache.cpp src/reader/window.cpp
+          src/http/http.cpp src/plugin/plugin_core.cpp src/plugin/plugin_load.cpp src/plugin/plugin_call.cpp src/cache/cache.cpp src/reader/window.cpp
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 add_custom_target(
   format
@@ -212,5 +212,5 @@ add_custom_target(
 add_custom_target(
     fix
     COMMAND ${CLANG_TIDY} -p ${CMAKE_BINARY_DIR} -fix -fix-errors src/main.cpp src/store/store.cpp
-            src/http/http.cpp src/plugin/plugin.cpp src/cache/cache.cpp src/reader/window.cpp
+            src/http/http.cpp src/plugin/plugin_core.cpp src/plugin/plugin_load.cpp src/plugin/plugin_call.cpp src/cache/cache.cpp src/reader/window.cpp
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

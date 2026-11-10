@@ -1,55 +1,12 @@
-#include "plugin.hpp"
-#include "fs.hpp"
-#include "lua/bridge.hpp"
-#include "http_client.hpp"
-#include "plugin/wasm/wasm_rt.hpp"
-#include "plugin/js/js_rt.hpp"
-
+#include "plugin_internal.hpp"
 #include "store/store.hpp"
 
-#include <algorithm>
-#include <glaze/glaze.hpp>
-#include <sol/sol.hpp>
-
-#include <curl/curl.h>
-#include <lauxlib.h>
-#include <lua.h>
-#include <lualib.h>
-
-#include <spdlog/spdlog.h>
-
-#include <algorithm>
-#include <cctype>
-#include <ctime>
 #include <filesystem>
-#include <fstream>
 #include <functional>
-#include <map>
-#include <memory>
-#include <mutex>
-#include <optional>
-#include <sstream>
-#include <string>
-#include <utility>
-#include <vector>
-#include <variant>
-#include <vector>
 
 namespace fs = std::filesystem;
 
 namespace plugin {
-
-// The lua seam lives in plugin/lua; the shared sync curl client in http_client.
-using lua::json_to_sol;
-using lua::sol_to_json;
-using lua::open_sandbox;
-using lua::install_host_tools;
-
-namespace {
-
-// ---------------------------------------------------------------------------
-// json <-> lua bridges. glz::generic = variant<null,double,string,bool,vec,map>
-// ---------------------------------------------------------------------------
 
 std::string err_json(std::string msg) {
     glz::generic ok;
@@ -63,9 +20,8 @@ std::string err_json(std::string msg) {
     return dump_json(root);
 }
 
-// The wasm env.http_fetch service: the same option names the lua front takes,
-// JSON-encoded; the lua-shaped result ({status, body, headers}) as JSON back.
-// nullopt = fetch failure (the import reports -1).
+// The wasm env.http_fetch service: moved verbatim from the monolith so both
+// load paths (wasm and js) share the same front as the lua host tools.
 wasm::HttpFetch make_wasm_fetch(const std::string& id, const Config& conf, const LiveProfile& live_profile) {
     return [id, timeout_ms = conf.fetch_timeout_ms, live = &live_profile, proxy = conf.proxy](
                const std::string& url, const std::string& opts_json) -> std::optional<std::string> {
@@ -148,162 +104,6 @@ wasm::HttpFetch make_wasm_fetch(const std::string& id, const Config& conf, const
         obj.insert({"headers", std::move(headers)});
         return dump_json(out);
     };
-}
-
-// per-call instruction budget; the hook is process-global per calling thread
-// --------------------------------------------------------------------------- // anonymous namespace
-
-// Per-plugin runtime holder, variant-ready: the loader engages the member
-// matching info.runtime ("lua" today; wasm/js add their state beside it and a
-// dispatch arm in Host::call -- tasks 2.1/3.2). Health bookkeeping, the call
-// mutex, the request envelope and the response-shape rules stay in
-// Host::call, shared by every backend.
-struct Runtime {
-    PluginInfo info;
-    std::mutex mu; // one call at a time per runtime, whatever the backend
-    glz::generic cfg;  // parsed config.json; meaningful only when has_cfg
-    bool has_cfg = false;
-
-    // lua backend (info.runtime == "lua")
-    std::unique_ptr<lua_State, decltype(&lua_close)> lua{nullptr, &lua_close};
-
-    // wasm backend (info.runtime == "wasm"): loaded module + host services.
-    std::unique_ptr<wasm::Instance> wasm;
-
-    // js backend (info.runtime == "js"): quickjs realm + host globals.
-    std::unique_ptr<js::Instance> js;
-};
-
-// Manifest; optional members may be absent, the rest are required by glaze.
-struct Manifest {
-    std::string name, version, runtime;
-    std::optional<std::string> id, entry;
-    std::optional<std::vector<std::string>> capabilities;
-    int api{};
-};
-
-// ---------------------------------------------------------------------------
-// Runtime seams (design D2: JSON envelope in, raw reply out). Host::call owns
-// everything shared -- health, call mutex, envelope, response shape; a seam
-// owns the runtime-specific rest and answers for its own invocation errors.
-// ---------------------------------------------------------------------------
-
-// Raw reply handed back to the core: the plugin's return value marshaled
-// as-is, shape-checked later (plugin::RawReply, runtime_common.hpp). When the
-// entry never produced one, invoked is false and error carries the
-// host-side diagnostic (already logged).
-
-// lua seam: materialize the envelope as lua values, invoke handle, marshal
-// the reply back to JSON. Lua-level failures (exception, budget) are logged
-// here; the reply value itself always reaches the core's shape check.
-thread_local long long t_budget_left = 0;
-
-void count_hook(lua_State* L, lua_Debug* /*unused*/) {
-    if ((t_budget_left -= 1000) <= 0) {
-        luaL_error(L, "plugin instruction budget exhausted");
-    }
-}
-
-RawReply lua_call_entry(const Runtime& rt, const std::string& method, long instruction_budget,
-                        const glz::generic& envelope) {
-    RawReply out;
-    lua_State* L = rt.lua.get();
-    sol::state_view sv(L);
-
-    const sol::object env = json_to_sol(L, envelope);
-    const sol::object h = sv["handle"];
-    if (h.get_type() != sol::type::function) {
-        out.error = "no handle() defined";
-        return out;
-    }
-
-    t_budget_left = instruction_budget;
-    lua_sethook(L, count_hook, LUA_MASKCOUNT, 1000);
-    const sol::protected_function_result res = sol::protected_function(h)(env);
-    lua_sethook(L, nullptr, 0, 0);
-    const bool timed_out = t_budget_left <= 0;
-
-    if (!res.valid()) {
-        const sol::error e = res;
-        if (timed_out) {
-            spdlog::warn("[plugin:{}] {} timed out", rt.info.id, method);
-            out.error = "timeout: instruction budget exhausted";
-            return out;
-        }
-        spdlog::warn("[plugin:{}] {} failed: {}", rt.info.id, method, e.what());
-        out.error = e.what();
-        return out;
-    }
-
-    out.invoked = true;
-    const sol::object r = res;
-    // depth -1: reply members marshal where the data value always has, so the
-    // wrapper level does not eat one rung of the cyclic-table depth budget.
-    out.reply = sol_to_json(r, -1);
-    return out;
-}
-
-// The response-shape gate, shared by every backend: {"ok":bool} plus the
-// ok=true "data" contract, exactly as the core pinned it. Returns the wire
-// response; nullopt with `error` set when the shape is rejected (the warning
-// carries plugin/method context).
-std::optional<std::string> checked_reply(const glz::generic& reply, const std::string& id, const std::string& method,
-                                         std::string& error) {
-    const auto* obj = std::get_if<glz::generic::object_t>(&reply.data);
-    if (obj == nullptr) {
-        spdlog::warn("[plugin:{}] {}: malformed response (non-table)", id, method);
-        error = "malformed response: not a table";
-        return std::nullopt;
-    }
-    const glz::generic* okv = member(obj, "ok");
-    if (okv == nullptr || std::get_if<bool>(&okv->data) == nullptr) {
-        spdlog::warn("[plugin:{}] {}: malformed response (missing ok)", id, method);
-        error = "malformed response: missing ok";
-        return std::nullopt;
-    }
-    if (!*std::get_if<bool>(&okv->data)) {
-        const glz::generic* ev = member(obj, "error");
-        const bool is_str = ev != nullptr && std::get_if<std::string>(&ev->data) != nullptr;
-        const std::string msg = is_str ? std::get<std::string>(ev->data) : std::string("plugin error");
-        spdlog::warn("[plugin:{}] {} returned error: {}", id, method, msg);
-        error = msg;
-        return std::nullopt;
-    }
-    static const glz::generic null_v;
-    const glz::generic* data = member(obj, "data");
-    return R"({"ok":true,"data":)" + dump_json(data ? *data : null_v) + "}";
-}
-} // namespace
-
-struct plugin::Host::Impl {
-    Config conf;
-    LiveProfile live_profile;
-    std::mutex mu;
-    std::map<std::string, std::shared_ptr<Runtime>> plugins;
-    BS::thread_pool<>* db = nullptr; // db-worker gate for storage.*, set via use_db
-    std::map<std::string, CallHealth> health; // last call outcome per plugin id
-};
-
-Host::Host(Config conf) : conf_(conf), impl_(std::make_unique<Host::Impl>()) {
-    impl_->conf = std::move(conf);
-    impl_->live_profile = std::make_shared<const std::string>(conf_.fetch_profile);
-}
-
-Host::~Host() = default;
-
-void Host::use_db(BS::thread_pool<>* db) {
-    impl_->db = db;
-}
-
-void Host::set_default_profile(std::string profile) {
-    impl_->live_profile = std::make_shared<const std::string>(std::move(profile));
-}
-
-std::string Host::default_profile() const {
-    if (auto p = impl_->live_profile.load()) {
-        return *p;
-    }
-    return conf_.fetch_profile;
 }
 
 int Host::load_all(Store& store) {
@@ -414,8 +214,8 @@ int Host::load_all(Store& store) {
                 continue;
             }
             rt.lua = {L, &lua_close};
-            open_sandbox(L);
-            install_host_tools(L, rt.info.id, conf_, rt.cfg, rt.has_cfg, sget, sset, rt.info.dir,
+            lua::open_sandbox(L);
+            lua::install_host_tools(L, rt.info.id, conf_, rt.cfg, rt.has_cfg, sget, sset, rt.info.dir,
                                impl_->live_profile);
             // Entry scripts return nothing; run them, check validity explicitly.
             const sol::protected_function_result script =
@@ -481,101 +281,6 @@ int Host::load_all(Store& store) {
     const std::scoped_lock lock(impl_->mu);
     impl_->plugins = std::move(fresh);
     return kept;
-}
-
-std::string Host::call(const std::string& id, const std::string& method, const std::string& params_json) {
-    std::shared_ptr<Runtime> rt;
-    {
-        const std::scoped_lock lock(impl_->mu);
-        if (const auto it = impl_->plugins.find(id); it != impl_->plugins.end()) {
-            rt = it->second;
-        }
-    }
-    if (!rt) {
-        return err_json("no plugin '" + id + "'");
-    }
-
-    // Health bookkeeping: one entry per finished call (design: in-memory).
-    const auto record = [&](bool ok, std::string err) {
-        const std::scoped_lock lock(impl_->mu);
-        auto& h = impl_->health[id];
-        h.ok = ok;
-        h.error = std::move(err);
-        h.at = std::time(nullptr);
-    };
-    const auto fail = [&](std::string msg) {
-        record(false, msg);
-        return err_json(std::move(msg));
-    };
-
-    const std::scoped_lock call_lock(rt->mu);
-
-    // Runtime-agnostic request envelope; each backend marshals this itself.
-    glz::generic envelope;
-    auto& env = envelope.data.emplace<glz::generic::object_t>();
-    glz::generic api_v;
-    api_v.data = static_cast<double>(kHostApi);
-    env["api"] = std::move(api_v);
-    glz::generic method_v;
-    method_v.data = method;
-    env["method"] = std::move(method_v);
-    if (params_json.empty()) {
-        glz::generic empty_obj;
-        empty_obj.data.emplace<glz::generic::object_t>();
-        env["params"] = std::move(empty_obj);
-    } else {
-        glz::generic params;
-        if (auto ec = glz::read_json(params, params_json)) {
-            return fail("bad params json");
-        }
-        env["params"] = std::move(params);
-    }
-
-    RawReply r;
-    if (rt->lua) {
-        r = lua_call_entry(*rt, method, conf_.instruction_budget, envelope);
-    } else if (rt->wasm) {
-        r = wasm::invoke(*rt->wasm, dump_json(envelope));
-    } else if (rt->js) {
-        r = js::invoke(*rt->js, dump_json(envelope));
-    } else {
-        return fail("runtime '" + rt->info.runtime + "' not supported");
-    }
-    if (!r.invoked) {
-        return fail(r.error);
-    }
-    std::string shape_err;
-    if (std::optional<std::string> res = checked_reply(r.reply, id, method, shape_err)) {
-        record(true, "");
-        return *res;
-    }
-    return fail(std::move(shape_err));
-}
-
-CallHealth Host::health(const std::string& id) const {
-    const std::scoped_lock lock(impl_->mu);
-    const auto it = impl_->health.find(id);
-    return it != impl_->health.end() ? it->second : CallHealth{};
-}
-
-std::string Host::logo_path(const std::string& id) const {
-    std::shared_ptr<Runtime> rt;
-    {
-        const std::scoped_lock lock(impl_->mu);
-        if (const auto it = impl_->plugins.find(id); it != impl_->plugins.end()) {
-            rt = it->second;
-        }
-    }
-    if (!rt) {
-        return "";
-    }
-    for (const char* name : {"logo.png", "logo.svg", "logo.jpg", "logo.jpeg", "logo.avif"}) {
-        const fs::path p = fs::path(rt->info.dir) / name;
-        if (fs::exists(p)) {
-            return p.string();
-        }
-    }
-    return "";
 }
 
 } // namespace plugin
