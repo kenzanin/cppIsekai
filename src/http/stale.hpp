@@ -85,8 +85,16 @@ std::string call_cached(Store& store, const std::string& id, const std::string& 
     // Look-aside: fresh row serves without touching the plugin. ttl_s <= 0
     // means always-expired (test hook).
     if (auto row = store.api_cache_get(id, key))
-        if (row->ttl_s > 0 && row->fetched_at + row->ttl_s > now)
+        if (row->ttl_s > 0 && row->fetched_at + row->ttl_s > now) {
+            spdlog::debug("[plugin:{}] {} api_cache HIT ({} B, age={}s)", id, method,
+                          row->payload.size(), now - row->fetched_at);
             return row->payload;
+        } else {
+            spdlog::debug("[plugin:{}] {} api_cache EXPIRED (age={}s ttl={}s), refreshing", id, method,
+                          now - row->fetched_at, row->ttl_s);
+        }
+    else
+        spdlog::debug("[plugin:{}] {} api_cache MISS", id, method);
 
     std::string res = call();
 
@@ -98,6 +106,8 @@ std::string call_cached(Store& store, const std::string& id, const std::string& 
         store.api_cache_put(id, key, params_json, res, now, kApiCacheTtl);
         return res;
     }
+
+    spdlog::debug("[plugin:{}] {} plugin call FAILED, looking up last-good", id, method);
 
     if (auto row = store.api_cache_get(id, key)) {
         spdlog::debug("[plugin:{}] {} failed -> stale-serve", id, method);

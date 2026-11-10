@@ -255,3 +255,28 @@ TEST_CASE("Store: api_cache JSONB round-trip (write via jsonb(), read via json()
     const auto other = store.api_cache_get("other_" + run, key);
     CHECK_FALSE(other.has_value());
 }
+
+TEST_CASE("Store: api_cache NULL/empty payload is a miss, not a fresh hit") {
+    Store store("test_store.db"); // file persists; unique keys per run
+    const auto run = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+    const std::string plugin = "mdnull_" + run;
+    const std::string key = "isnull_" + run;
+
+    // plant a row shaped like the legacy NULL-payload rows directly via raw SQL
+    sqlite3* db = nullptr;
+    REQUIRE(sqlite3_open("test_store.db", &db) == SQLITE_OK);
+    sqlite3_stmt* st = nullptr;
+    const char* sql = "INSERT INTO api_cache(plugin_id, query_hash, params_json, fetched_at, ttl_s, payload) VALUES(?,?,?,?,?,NULL)";
+    REQUIRE(sqlite3_prepare_v2(db, sql, -1, &st, nullptr) == SQLITE_OK);
+    sqlite3_bind_text(st, 1, plugin.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(st, 2, key.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(st, 3, R"({"q":"x"})", -1, SQLITE_STATIC);
+    sqlite3_bind_int64(st, 4, 1000);
+    sqlite3_bind_int64(st, 5, 86400);
+    REQUIRE(sqlite3_step(st) == SQLITE_DONE);
+    sqlite3_finalize(st);
+    sqlite3_close(db);
+
+    // fresh look-aside must miss despite a row existing
+    CHECK_FALSE(store.api_cache_get(plugin, key).has_value());
+}
