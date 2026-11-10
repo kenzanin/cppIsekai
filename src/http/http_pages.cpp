@@ -3,6 +3,7 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -40,6 +41,14 @@ crow::json::wvalue home_context(Store& store, BS::thread_pool<>& db, const crow:
     ctx["has_next"] = shown < pages;
     ctx["filtered"] = !plugin.empty();
 
+    // Sidebar counts the user's library (saved_manga), not the legacy title
+    // search-cache, which is empty for plugin-supplied results.
+    std::vector<SavedManga> saved = on_pool(db, [&] { return store.saved_list(); });
+    std::map<std::string, int> saved_by_plugin;
+    for (const auto& m : saved) {
+        ++saved_by_plugin[m.plugin];
+    }
+
     std::vector<crow::json::wvalue> plugin_rows;
     for (const auto& item : plugins) {
         if (!item.enabled) {
@@ -47,7 +56,7 @@ crow::json::wvalue home_context(Store& store, BS::thread_pool<>& db, const crow:
         }
         crow::json::wvalue row;
         row["name"] = item.name;
-        row["titles"] = std::to_string(item.titles);
+        row["titles"] = std::to_string(saved_by_plugin[item.plugin_id]); // saved_manga is the Library; title search-cache is empty for plugin results
         row["current"] = item.name == plugin;
         if (!item.plugin_id.empty()) {
             row["logo"] = item.plugin_id; // absent key renders no <img> in the partial
@@ -58,7 +67,6 @@ crow::json::wvalue home_context(Store& store, BS::thread_pool<>& db, const crow:
 
     // library-save 4.1: saved entries are the Library — when any are saved,
     // the grid renders them (added_at desc) instead of the search-cache titles.
-    std::vector<SavedManga> saved = on_pool(db, [&] { return store.saved_list(); });
     // Cover prefetch: hand the saved covers to the cover worker; cache-first,
     // so entries already on disk are not re-fetched.
     std::vector<reader::CoverJob> jobs;
