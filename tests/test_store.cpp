@@ -1,17 +1,64 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest/doctest.h>
+#include <sqlite3.h>
 
 #include <chrono>
+#include <stdexcept>
+#include <string>
 #include <thread>
 
 #include "store/store.hpp"
 
-TEST_CASE("Store: seed, plugins, search, count") {
-    Store store("test_store.db"); // fresh file -> seed path runs
+// Dummy seed plugins (Asura/Flame/Reaper/Void) were removed from the store;
+// this fixture inserts its own rows via raw SQL so tests stay self-contained.
+// Wipe order: title then plugin (FK). Safe to re-run: deletes existing rows first.
+static void seed_fixture(const char* path) {
+    sqlite3* db = nullptr;
+    if (sqlite3_open(path, &db) != SQLITE_OK) throw std::runtime_error("fixture: open failed");
+    sqlite3_exec(db, "DELETE FROM title; DELETE FROM plugin;", nullptr, nullptr, nullptr);
+    for (const char* name : {"Asura", "Flame"}) {
+        sqlite3_stmt* st = nullptr;
+        if (sqlite3_prepare_v2(db,
+                "INSERT INTO plugin(name, plugin_id, version, capabilities, enabled, runtime) VALUES(?,'','','',1,'')",
+                -1, &st, nullptr) == SQLITE_OK) {
+            sqlite3_bind_text(st, 1, name, -1, SQLITE_STATIC);
+            sqlite3_step(st);
+            sqlite3_finalize(st);
+        }
+        for (int n = 1; n <= 12; ++n) {
+            st = nullptr;
+            if (sqlite3_prepare_v2(db,
+                    "INSERT INTO title(plugin_id, name) VALUES((SELECT id FROM plugin WHERE name=?), ?)",
+                    -1, &st, nullptr) == SQLITE_OK) {
+                const std::string title = std::string(name) + " Scans #" + std::to_string(n);
+                sqlite3_bind_text(st, 1, name, -1, SQLITE_STATIC);
+                sqlite3_bind_text(st, 2, title.c_str(), -1, SQLITE_TRANSIENT);
+                sqlite3_step(st);
+                sqlite3_finalize(st);
+            }
+        }
+    }
+    sqlite3_close(db);
+}
 
-    SUBCASE("plugins lists 4 with 12 titles each") {
+struct TestStoreDb {
+    std::string path = "test_store.db";
+    TestStoreDb() {
+        // start from a clean file so plugin/title counts are deterministic
+        std::remove(path.c_str());
+        { Store store(path); } // create schema
+        seed_fixture(path.c_str());
+    }
+    ~TestStoreDb() { std::remove(path.c_str()); }
+};
+
+TEST_CASE("Store: fixture, plugins, search, count") {
+    TestStoreDb fixture;
+    Store store(fixture.path);
+
+    SUBCASE("plugins lists 2 with 12 titles each") {
         auto plugins = store.plugins();
-        REQUIRE(plugins.size() == 4);
+        REQUIRE(plugins.size() == 2);
         for (const auto& p : plugins) {
             CHECK(p.titles == 12);
         }
@@ -19,7 +66,7 @@ TEST_CASE("Store: seed, plugins, search, count") {
     }
 
     SUBCASE("count without filter") {
-        CHECK(store.count("", "") == 48);
+        CHECK(store.count("", "") == 24);
     }
 
     SUBCASE("count with plugin filter") {
@@ -30,7 +77,7 @@ TEST_CASE("Store: seed, plugins, search, count") {
     SUBCASE("count with LIKE escaping: metacharacters stay literal") {
         CHECK(store.count("", "_") == 0);        // no literal underscore in seeds
         CHECK(store.count("", "%") == 0);        // % must not act as wildcard
-        CHECK(store.count("", "Scans #3") == 4); // literal # matches
+        CHECK(store.count("", "Scans #3") == 2); // literal # matches (Asura+Flame)
         CHECK(store.count("", "Asura") == 12);   // plain substring still works
     }
 

@@ -143,17 +143,7 @@ Store::Store(const std::string& path) : impl_(std::make_unique<StoreImpl>(path))
         }
     }
 
-    if (impl_->storage.count<TitleEntity>() == 0) {
-        static constexpr const char* kPlugins[] = {"Asura", "Flame", "Reaper", "Void"};
-        auto guard = impl_->storage.transaction_guard();
-        for (const char* plugin_name : kPlugins) {
-            const auto plugin_id = impl_->storage.insert(PluginEntity{0, plugin_name, "", "", "", 1, ""});
-            for (int n = 1; n <= 12; ++n)
-                impl_->storage.insert(
-                    TitleEntity{0, plugin_id, std::string(plugin_name) + " Scans #" + std::to_string(n)});
-        }
-        guard.commit();
-    }
+
 }
 
 Store::~Store() = default;
