@@ -16,5 +16,5 @@
 
 ## 4. Verification
 
-- [ ] 4.1 `openspec validate --specs` (or `--change detail-enrichment`) green; `ctest` untouched (no new unit targets required unless cheap).
-- [ ] 4.2 Live smoke (Chrome via blueprint): detail page for a known-good manga (e.g. 1389d660-b9b1-4c6a-81af-eab4dbf3f22b) renders synopsis, authors/artists, related covers, and plugin logo; a plugin without logo renders name only; no console errors.
+- [x] 4.1 `openspec validate --specs` (or `--change detail-enrichment`) green; `ctest` untouched (no new unit targets required unless cheap).
+- [x] 4.2 Live smoke (Chrome via blueprint): detail page for a known-good manga (e.g. 1389d660-b9b1-4c6a-81af-eab4dbf3f22b) renders synopsis, authors/artists, related covers, and plugin logo; a plugin without logo renders name only; no console errors.
