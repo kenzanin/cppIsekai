@@ -3,13 +3,16 @@ function settingsPage() {
   const RESTART = new Set(['server.port', 'paths.library', 'paths.log_file', 'paths.data_dir', 'paths.templates_dir',
                            'cache.cache_max_mb', 'cache.image_format', 'cache.cover_max_px', 'log.level']);
   const LIVE = new Set(['plugin.fetch_profile']);
+  // fetch_profile options come from the ini ([plugin] fetch_profiles), surfaced as
+  // j.fetch_profiles; fall back to ENUMS if the server didn't send any.
   const ENUMS = { 'cache.image_format': ['webp', 'avif', 'jxl', 'none'],
                   'log.level': ['trace', 'debug', 'info', 'warning', 'error'] };
   return {
-    knobs: [], dirty: {}, reveal: {}, loading: true, saving: false, err: '', note: '', restarting: false,
+    knobs: [], fetchProfiles: [], dirty: {}, reveal: {}, loading: true, saving: false, err: '', note: '', restarting: false,
     async boot() {
       try {
         const j = await (await fetch('/config')).json();
+        this.fetchProfiles = j.fetch_profiles || [];
         this.knobs = (j.knobs || []).map(k => ({
           ...k,
           fullKey: k.fullKey,
@@ -21,7 +24,7 @@ function settingsPage() {
     },
     sections() { return [...new Set(this.knobs.map(k => k.section))]; },
     sourceOf(k) { return k.source; },
-    enumOf(k) { return ENUMS[k.fullKey] || null; },
+    enumOf(k) { return k.fullKey === 'plugin.fetch_profile' ? this.fetchProfiles : (ENUMS[k.fullKey] || null); },
     readOnly(k) { return k.source === 'env' || k.source === 'flag'; },
     patched() {
       const out = {};

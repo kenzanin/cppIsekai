@@ -30,7 +30,7 @@
                 </select>
               </template>
               <template x-if="!enumOf(k) && k.type !== 'str'">
-                <input type="number" class="bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-sm w-40"
+                <input type="number" min="1" step="256" class="bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-sm w-48"
                        :value="k.value" :disabled="readOnly(k)"
                        @input="dirty[k.fullKey] = $event.target.value">
               </template>

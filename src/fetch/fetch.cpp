@@ -154,8 +154,8 @@ Result sync(const Request& req, const std::string& proxy) {
         if (const CurlApi* ff = firefox_api()) {
             return run_with(*ff, req, profile, proxy);
         }
-        // The lib is absent on this host: run on the chrome engine (the
-        // impersonate call no-ops there) rather than fail the request.
+        // Unsupported: run on the chrome engine (the impersonate call
+        // degrades there) rather than crash in a second TLS stack.
     }
     return run_with(chrome_api(), req, profile, proxy);
 }

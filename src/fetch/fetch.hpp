@@ -60,7 +60,7 @@ inline void applyProxy(CURL* e, const std::string& proxy) {
 inline bool is_known_target(std::string_view t) {
     for (std::string_view k :
          {"chrome99", "chrome100", "chrome101", "chrome104", "chrome107", "chrome110", "chrome116", "edge99",
-          "edge101", "safari15_3", "safari15_5", "ff91esr", "ff95", "ff98", "ff100", "ff102", "ff109", "ff117"}) {
+          "edge101", "safari15_3", "safari15_5"}) {  // ff*: unsupported (NSS vs BoringSSL); see fetch_curl.cpp
         if (t == k) {
             return true;
         }
@@ -68,8 +68,9 @@ inline bool is_known_target(std::string_view t) {
     return false;
 }
 
-/** \brief Which lib family serves the profile: ff / firefox prefixes run on the
- *  firefox sibling lib, everything else on the linked chrome family. */
+/** \brief Which lib family serves the profile. Firefox is unsupported: the
+ *  ff build (NSS) cannot be loaded alongside the linked chrome build (BoringSSL)
+ *  in one process; ff* falls back to the chrome engine. */
 enum class Family { Chrome, Firefox };
 
 inline Family family_of(std::string_view profile) {

@@ -1,4 +1,5 @@
 ## 2026-11-10
+* **Creation**: Documented concept `decisions/curl-impersonate-chrome-only.md` (curl-impersonate: chrome-family only; ini-fed profile dropdown; local-time crow log).
 * **Creation**: Documented concept `decisions/restart-and-cbz-gate.md` (Settings restart button + per-chapter CBZ cache-full gate).
 * **Creation**: Documented concept `architecture/local-first-reads.md` (Library reads are local-first).
 * **Update**: Updated concept `decisions/source-layout-policy.md`.

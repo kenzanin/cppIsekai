@@ -2,6 +2,8 @@
 
 #include "img.hpp"
 
+#include <SimpleIni.h>
+
 #include <fstream>
 #include <map>
 #include <sstream>
@@ -159,6 +161,30 @@ void register_admin(Ctx& c) {
     // Config read (settings page): registry projection with layer provenance.
     // Re-resolves per request (ini may change on disk); no writes.
     CROW_ROUTE(app, "/config").methods(crow::HTTPMethod::GET)([&] {
+        // Profile dropdown feed: [plugin] fetch_profiles = a,b,c in the ini
+        // (not a registry knob, no flag/env -- UI-only list).
+        std::vector<std::string> fetch_profiles;
+        {
+            CSimpleIniA ini;
+            if (ini.LoadFile(ini_path.c_str()) >= 0) {
+                if (const char* v = ini.GetValue("plugin", "fetch_profiles", nullptr)) {
+                    std::string tok;
+                    for (const char c : std::string(v)) {
+                        if (c == ',') { if (!tok.empty()) { fetch_profiles.push_back(tok); tok.clear(); } }
+                        else if (c != ' ' && c != '\t') tok += c;
+                    }
+                    if (!tok.empty()) fetch_profiles.push_back(tok);
+                }
+            }
+        }
+        if (fetch_profiles.empty())
+            fetch_profiles = {"chrome99","chrome100","chrome101","chrome104","chrome107","chrome110","chrome116",
+                              "edge99","edge101","safari15_3","safari15_5",
+                              "ff91esr","ff95","ff98","ff100","ff102","ff109","ff117"};
+        crow::json::wvalue list(crow::json::type::List);
+        int p = 0;
+        for (const auto& x : fetch_profiles) list[p++] = x;
+
         crow::json::wvalue knobs(crow::json::type::List);
         int i = 0;
         for (const auto& d : config::describe(ini_path, overrides_ref)) {
@@ -178,6 +204,7 @@ void register_admin(Ctx& c) {
         crow::json::wvalue out;
         out["ok"] = true;
         out["knobs"] = std::move(knobs);
+        out["fetch_profiles"] = std::move(list);
         crow::response r{out};
         r.set_header("Content-Type", "application/json");
         return r;

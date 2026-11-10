@@ -2,12 +2,7 @@
 
 #include <dlfcn.h>
 #include <mutex>
-
 #include <spdlog/spdlog.h>
-
-#ifndef CPPISEKAI_FETCH_LIB_DIR
-#define CPPISEKAI_FETCH_LIB_DIR "/usr/lib"
-#endif
 
 // curl-impersonate ships the symbol but no header on this host (system curl
 // headers predate it; see knowledge/references/dependency-api.md).
@@ -22,43 +17,12 @@ const CurlApi& chrome_api() {
     return api;
 }
 
-/** \brief Lazy dlopen of the firefox family (NSS build, v0.61 pair of the
- *  vendored chrome lib). nullptr after a failed load; the request then runs
- *  on the chrome engine with a warn-once. */
+/** \brief Firefox profiles are unsupported: loading libcurl-impersonate-ff
+ *  (NSS) alongside the linked chrome build (BoringSSL) in one process faults
+ *  in curl_multi_perform. Chrome-family profiles stay in-process. */
 const CurlApi* firefox_api() {
-    static std::once_flag once;
-    static CurlApi api{};
-    static bool ok = false;
-    std::call_once(once, [] {
-        const std::string base = CPPISEKAI_FETCH_LIB_DIR;
-        void* h = dlopen((base + "/libcurl-impersonate-ff.so.4").c_str(), RTLD_NOW | RTLD_LOCAL);
-        if (!h) {
-            h = dlopen("libcurl-impersonate-ff.so.4", RTLD_NOW | RTLD_LOCAL);
-        }
-        if (!h) {
-            spdlog::warn("[fetch] firefox lib dlopen failed ({}); ff* profiles run on the chrome engine", dlerror());
-            return;
-        }
-        const auto sym = [&h](const char* n) { return dlsym(h, n); };
-        api.easy_init = reinterpret_cast<CURL* (*)()>(sym("curl_easy_init"));
-        api.easy_cleanup = reinterpret_cast<void (*)(CURL*)>(sym("curl_easy_cleanup"));
-        api.easy_setopt = reinterpret_cast<CURLcode (*)(CURL*, CURLoption, ...)>(sym("curl_easy_setopt"));
-        api.easy_perform = reinterpret_cast<CURLcode (*)(CURL*)>(sym("curl_easy_perform"));
-        api.easy_getinfo = reinterpret_cast<CURLcode (*)(CURL*, CURLINFO, ...)>(sym("curl_easy_getinfo"));
-        api.slist_append = reinterpret_cast<curl_slist* (*)(curl_slist*, const char*)>(sym("curl_slist_append"));
-        api.easy_strerror = reinterpret_cast<const char* (*)(CURLcode)>(sym("curl_easy_strerror"));
-        api.easy_impersonate =
-            reinterpret_cast<CURLcode (*)(CURL*, const char*, unsigned)>(sym("curl_easy_impersonate"));
-        if (!api.easy_init || !api.easy_cleanup || !api.easy_setopt || !api.easy_perform || !api.easy_getinfo ||
-            !api.slist_append || !api.easy_strerror || !api.easy_impersonate) {
-            spdlog::warn("[fetch] firefox lib missing symbols; ff* profiles run on the chrome engine");
-            return;
-        }
-        ok = true;
-    });
-    return ok ? &api : nullptr;
+    return nullptr;
 }
-
 /** \brief The system libcurl family: dlopen'd the same way as the ff lib, but
  *  OpenSSL TLS and NO impersonation -- the only stack proven to handshake with
  *  uploads.mangadex.org's CDN (the impersonate builds' TLS dies there, and

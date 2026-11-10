@@ -1,0 +1,10 @@
+---
+type: Decision
+title: "curl-impersonate: chrome-family only; ini-fed profile dropdown; local-time crow log"
+description: "ff* is unsupported in-process (NSS vs BoringSSL fault in curl_multi_perform); chrome-family only, dynamic per request; settings profile dropdown fed from ini fetch_profiles; crow logs in local time."
+tags: [fetch, curl-impersonate, settings, config, logging]
+generated: { by: agent/mcp, at: "2026-11-10T15:54:38Z" }
+status: stable
+---
+
+Root cause of the 2026-11-10 live-server crash: thread (plugin Lua call `http.fetch` -> `fetch::sync`) faulted with general protection in libcurl-impersonate-chrome.so.4.8.0 `multi_runsingle`, entered from `libcurl-impersonate-ff.so.4` `curl_easy_perform` -> `curl_multi_perform`. The host dlopen'd the ff (NSS) sibling alongside the linked chrome (BoringSSL) build; DeepWiki + upstream README both indicate the two builds cannot coexist in one process (two symbol-identical libcurls; LD_PRELOAD/env are per-process, never both). Fix: `firefox_api()` is a no-op returning nullptr; ff* profiles fall back to the chrome engine (degraded, never the ff lib). `is_known_target()` now lists chrome/edge/safari only; ini `[plugin] fetch_profiles` seeds the settings dropdown with chrome-family targets only, default `fetch_profile = chrome116`. Chrome-family targets stay dynamically switchable in-process per request by string (`curl_easy_impersonate`); no per-profile dlopen needed. Full ff support would require an out-of-process fetch helper (documented, not built). Also shipped: `/config` GET now returns `fetch_profiles` parsed from ini `[plugin] fetch_profiles` (comma-separated; fallback to the built-in chrome/edge/safari list when absent); settings UI renders `plugin.fetch_profile` and `cache.image_format` as dropdowns; `cache_max_mb` documented as MiB (2048 = 2 GiB, 4096 = 4 GiB) and input widened; crow log timestamps use local time via `CROW_USE_LOCALTIMEZONE` (UTC was default). Live ini sets `cache_max_mb = 4096` and `image_format = jxl` (jxl path exists via vips_jxlsave_buffer; end-to-end jxl output unverified — cached pages are still webp from before the flip).
