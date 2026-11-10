@@ -59,3 +59,32 @@ TEST_CASE("pages: unknown chapter, empty pages or malformed envelope -> nullopt"
     CHECK(!build_pages_response(chs_env, "not json", {"m", "s", 1}).has_value());
     CHECK(!build_pages_response(R"({"ok":false,"error":"x"})", pages_env, {"m", "s", 1}).has_value());
 }
+
+TEST_CASE("pages: chapter 0 is a valid chapter (falsy-zero regression)") {
+    const std::string chs_with_zero = R"({"ok":true,"data":[)"
+                                      R"({"id":"c0","number":0},)"
+                                      R"({"id":"c1","number":1},)"
+                                      R"({"id":"c2","number":2}]})";
+    const std::string pages_env = R"({"ok":true,"data":["a0","a1"]})";
+    const auto out = build_pages_response(chs_with_zero, pages_env, {"m", "s", 0});
+    REQUIRE(out);
+    CHECK(has(*out, R"("chapter":0)"));
+    CHECK(has(*out, R"("next_ch":1)"));
+    CHECK(!has(*out, "prev_ch"));
+    CHECK(has(*out, "ch=0&page=1")); // fmt_ch: integral 0, not 0.000000
+    CHECK(!has(*out, "ch=0.000000"));
+}
+
+TEST_CASE("pages: fractional chapter kept in out chapter and url") {
+    const std::string chs_frac = R"({"ok":true,"data":[)"
+                                 R"({"id":"c1","number":1},)"
+                                 R"({"id":"c15","number":1.5},)"
+                                 R"({"id":"c2","number":2}]})";
+    const std::string pages_env = R"({"ok":true,"data":["a"]})";
+    const auto out = build_pages_response(chs_frac, pages_env, {"m", "s", 1.5});
+    REQUIRE(out);
+    CHECK(has(*out, R"("chapter":1.5)"));
+    CHECK(has(*out, "ch=1.5&page=1"));
+    CHECK(has(*out, R"("prev_ch":1)"));
+    CHECK(has(*out, R"("next_ch":2)"));
+}
