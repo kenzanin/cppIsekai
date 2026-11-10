@@ -17,11 +17,19 @@
           <span class="text-xs px-2 py-0.5 rounded-full border border-zinc-700 text-zinc-400" x-text="t"></span>
         </template>
       </div>
+      <div class="text-sm text-zinc-400 mb-1" x-show="detail.authors && detail.authors.length" x-cloak>
+        <span class="text-zinc-500">Author:</span> <span x-text="(detail.authors || []).join(', ')"></span>
+      </div>
+      <div class="text-sm text-zinc-400 mb-1" x-show="detail.artists && detail.artists.length" x-cloak>
+        <span class="text-zinc-500">Artist:</span> <span x-text="(detail.artists || []).join(', ')"></span>
+      </div>
       <p class="text-sm text-zinc-400 leading-relaxed" x-show="detail.description" x-text="detail.description"></p>
       <div class="flex gap-2 mt-4">
-        <a v-if="hint" :href="hint.url"
-           class="px-3 py-1.5 text-sm border border-emerald-700 bg-emerald-900/40 text-emerald-300 hover:bg-emerald-900/60 rounded-md">
-          {{ hint.text }}</a>
+        <template x-if="hint">
+        <a :href="hint.url"
+           class="px-3 py-1.5 text-sm border border-emerald-700 bg-emerald-900/40 text-emerald-300 hover:bg-emerald-900/60 rounded-md"
+           x-text="hint.text"></a>
+      </template>
         <button @click="refresh()" :disabled="refreshing"
                 class="px-3 py-1.5 text-sm border border-zinc-700 text-zinc-300 hover:bg-zinc-800 rounded-md disabled:opacity-40"
                 x-text="refreshing ? '…' : '⟳ Update'"></button>
@@ -46,6 +54,25 @@
       </div>
     </template>
   </div>
+  <!-- related (user steer): text-only links to the source site; hidden until data arrives -->
+  <div class="mt-8" x-show="related.length" x-cloak>
+    <h2 class="text-xl font-semibold mb-4">Related</h2>
+    <ul class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
+      <template x-for="m in related" :key="m.id">
+        <li class="text-sm truncate">
+          <a :href="m.url" target="_blank" rel="noopener" class="text-zinc-300 hover:text-emerald-300 hover:underline" x-text="m.name"></a>
+        </li>
+      </template>
+    </ul>
+  </div>
+
+  <!-- attribution (detail-enrichment 3.1): plugin name + logo; @error falls back to name only -->
+  <div class="mt-6 flex items-center gap-2 text-xs text-zinc-500" x-show="pluginName" x-cloak>
+    <template x-if="pluginLogoOk">
+      <img :src="'/plugin/'+encodeURIComponent(plugin)+'/logo'" class="h-5 w-5 object-contain rounded" @error="pluginLogoOk=false" alt="">
+    </template>
+    <span x-text="pluginName"></span>
+  </div>
 </div>
 
 <script>
@@ -54,12 +81,14 @@ function detailPage() {
   return {
     plugin: parts[2] || '', slug: parts.slice(3).join('/') || '',
     detail: {}, chapters: [], cached: false, loading: true, refreshing: false,
-    err: '', coverBroken: false, hint: null,
+    err: '', coverBroken: false, hint: null, related: [], pluginName: '', pluginLogoOk: true,
     async boot() {
+      this.loadPluginMeta();
       await this.load();
     },
     async load() {
       this.loading = true; this.err = '';
+      this.loadRelated(); // fire-and-forget (D4): failure never blocks the page
       try {
         // continue-hint badge (reader-page 2.2): stored position, if any.
         if (this.plugin && this.slug) {
@@ -93,6 +122,23 @@ function detailPage() {
     chLabel(ch) { const n = Number(ch.number); return Number.isFinite(n) ? 'ch ' + String(n).padStart(3, '0') : (ch.title || 'ch'); },
     chSlug(ch) { const n = Number(ch.number); return Number.isFinite(n) && n > 0 ? 'ch' + String(n).padStart(3, '0') : 'chx'; },
     fmtDate(ts) { if (!ts) return ''; const d = new Date(ts * 1000); return isNaN(d) ? '' : d.toISOString().slice(0, 10); },
+    async loadRelated() {
+      try {
+        const r = await fetch(`/api/related/${encodeURIComponent(this.plugin)}/${encodeURIComponent(this.slug)}`);
+        if (r.ok) {
+          const j = await r.json();
+          if (j.ok) this.related = (j.data && j.data.items) || [];
+        }
+      } catch (e) { /* related section stays hidden */ }
+    },
+    async loadPluginMeta() {
+      try {
+        const r = await fetch('/api/plugins');
+        const j = r.ok ? await r.json() : {};
+        const m = (j.plugins || []).find(p => p.key === this.plugin);
+        this.pluginName = (m && m.name) || this.plugin;
+      } catch (e) { this.pluginName = this.plugin; }
+    },
   };
 }
 </script>

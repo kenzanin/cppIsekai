@@ -9,7 +9,7 @@ The manga detail page shows only `{name, cover, status, tags, release_at}` from 
 - Plugin (`plugins_dev/lua/mangadex/main.lua`):
   - `canonical_manga` grows `description`, `authors`, `artists` — `detail` calls with `includes[]=author&includes[]=artist` and maps `attributes.description.en` plus author/artist relationship `attributes.name`.
   - New method `related`: `GET /manga/<id>/recommendation` (returns `manga_recommendation` objects with a `score`; the other type relationship is the candidate), then one batched `GET /manga?ids[]=...&includes[]=cover_art` to materialize candidates into the canonical-manga shape, sorted by score desc. No same-author fallback.
-- Detail page (`templates/detail.mustache`): renders synopsis (`description`), author(s), artist(s), provider footer (plugin name + `/plugin/<id>/logo` logo, linking nowhere), and a Related section (cover thumbnails + titles, `View` links to the detail route; capped at what the API returns).
+- Detail page (`templates/detail.mustache`): renders synopsis (`description`), author(s), artist(s), provider footer (plugin name + `/plugin/<id>/logo` logo, linking nowhere), and a Related section (text-only title links to each entry's source site; capped at what the API returns).
 - JSON: `GET /api/related/<plugin>/<slug>` (stale-serve, same pattern as `/api/pages`) backing the Related section.
 - Stale layer unchanged (detail envelope cache key gains the new fields automatically).
 

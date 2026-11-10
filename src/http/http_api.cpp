@@ -258,6 +258,13 @@ void register_api(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, BS:
         return title_data_response(plugins, images, db, plugin_pool, store, plugin, slug, "detail");
     });
 
+    // detail-enrichment 2.1: related readings; same envelope and stale-serve
+    // rules as /api/detail, plugin method "related".
+    CROW_ROUTE(app, "/api/related/<string>/<string>")
+    ([&](const crow::request& /*req*/, std::string plugin, std::string slug) {
+        return title_data_response(plugins, images, db, plugin_pool, store, plugin, slug, "related");
+    });
+
     CROW_ROUTE(app, "/api/chapters/<string>/<string>")
     ([&](const crow::request& /*req*/, std::string plugin, std::string slug) {
         return title_data_response(plugins, images, db, plugin_pool, store, plugin, slug, "chapters");

@@ -142,6 +142,17 @@ local function canonical_manga(m)
       cover = "https://uploads.mangadex.org/covers/" .. m.id .. "/" .. (fa.fileName or "") .. ".256.jpg"
     end
   end
+  local authors, artists = {}, {}
+  local desc = attrs.description and attrs.description.en or ""
+  for _, rel in ipairs(m.relationships or {}) do
+    if (rel.type == "author" or rel.type == "artist") and rel.attributes then
+      local nm = rel.attributes.name
+      if nm then
+        if rel.type == "author" then authors[#authors + 1] = nm
+        else artists[#artists + 1] = nm end
+      end
+    end
+  end
   return {
     id = m.id,
     name = name,
@@ -149,6 +160,10 @@ local function canonical_manga(m)
     status = attrs.status or "",
     tags = tags,
     release_at = epoch(attrs.createdAt),
+    description = desc,
+    authors = authors,
+    artists = artists,
+    url = "https://mangadex.org/title/" .. (m.id or ""),
   }
 end
 
@@ -204,9 +219,42 @@ methods.genres = function()
 end
 
 methods.detail = function(params)
-  local body, err = get("/manga/" .. (params.id or ""), { ["includes[]"] = "cover_art" })
+  local body, err = get("/manga/" .. (params.id or ""), { ["includes[]"] = { "cover_art", "author", "artist" } })
   if err ~= nil then return { ok = false, error = err } end
   return { ok = true, data = canonical_manga(body.data) }
+end
+
+methods.related = function(params)
+  -- MangaDex related-reading: /manga/<id>/recommendation. Each entry carries a
+  -- `score` (attrs.score) and relationships[] pointing at the candidate manga;
+  -- the OTHER half of each pair (not the asked id) is the candidate.
+  local body, err = get("/manga/" .. (params.id or "") .. "/recommendation")
+  if err ~= nil then return { ok = false, error = err } end
+  local id = params.id or ""
+  local scored = {}
+  for _, entry in ipairs(body.data or {}) do
+    local score = tonumber((entry.attributes or {}).score) or 0
+    for _, rel in ipairs(entry.relationships or {}) do
+      if rel.type == "manga" and rel.id and rel.id ~= id then
+        scored[#scored + 1] = { id = rel.id, score = score }
+        break
+      end
+    end
+  end
+  table.sort(scored, function(a, b) return a.score > b.score end)
+  if #scored == 0 then return { ok = true, data = { items = {} } } end
+  local ids = {}
+  for _, s in ipairs(scored) do ids[#ids + 1] = s.id end
+  local bbody, berr = get("/manga", { ["ids[]"] = ids, ["includes[]"] = "cover_art", limit = #ids })
+  if berr ~= nil then return { ok = false, error = berr } end
+  -- preserve score order from the recommendation call
+  local by_id = {}
+  for _, m in ipairs(bbody.data or {}) do by_id[m.id] = canonical_manga(m) end
+  local items = {}
+  for _, s in ipairs(scored) do
+    if by_id[s.id] then items[#items + 1] = by_id[s.id] end
+  end
+  return { ok = true, data = { items = items } }
 end
 
 methods.chapters = function(params)

@@ -25,11 +25,11 @@ The detail page SHALL display the provider plugin's name and its logo (`/plugin/
 - **THEN** the plugin name renders without an image element
 
 ### Requirement: Related reading section
-`GET /api/related/<plugin>/<slug>` SHALL return a stale-served JSON list of related manga for the title (MangaDex `GET /manga/<id>/recommendation`, candidates resolved in one batched `/manga?ids[]=...&includes[]=cover_art` call, sorted by recommendation score descending). Each entry SHALL carry at least `id`, `name`, `cover`, and a link to the detail route.
+`GET /api/related/<plugin>/<slug>` SHALL return a stale-served JSON list of related manga for the title (MangaDex `GET /manga/<id>/recommendation`, candidates resolved in one batched `/manga?ids[]=...&includes[]=cover_art` call, sorted by recommendation score descending). Each entry SHALL carry at least `id`, `name`, `cover`, and `url` (the title's page on the source site).
 
 #### Scenario: Related list renders
 - **WHEN** the detail page loads and the plugin returns recommendations
-- **THEN** the Related section renders cover thumbnails with titles, each linking to `/view/manga/<plugin>/<related-slug>`
+- **THEN** the Related section renders text-only title links, each opening the entry's `url` on the source site
 
 #### Scenario: Recommendation endpoint failure
 - **WHEN** the plugin `related` call fails (upstream error)
