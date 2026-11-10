@@ -1,4 +1,7 @@
 ## 2026-11-10
+* **Creation**: Documented concept `architecture/settings-page-openspec.md` (settings-page: openspec change drafted (GET /config projection + /settings UI)).
+* **Update**: Updated concept `architecture/cover-prefetch-worker.md`.
+* **Creation**: Documented concept `architecture/cover-prefetch-worker.md` (cover prefetch: dedicated worker, cache-first, library + search hooks).
 * **Creation**: Documented concept `decisions/api-cache-null-payload.md` (api_cache NULL payload served as 200-empty-body).
 * **Creation**: Documented concept `decisions/dummy-seed-removal.md` (dummy seed plugins removed).
 * **Creation**: Documented concept `decisions/search-cache-jsonb.md` (search-cache: api read model as JSONB in sqlite).
