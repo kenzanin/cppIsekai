@@ -126,7 +126,7 @@ function readerPage() {
       }
       this.page = this.firstOf(i);
       this.persist(); // 3.3: debounced position POST on view change
-      this.$nextTick(() => this.preload());
+      this.$nextTick(() => { this.preload(); this._resetScroll(); });
     },
     goto_page(n) {
       if (n < 1 || n > this.pages.length) return;
@@ -134,7 +134,7 @@ function readerPage() {
       this.persist();
       this.$nextTick(() => {
         this.preload();
-        if (this.mode !== 'webtoon') return;
+        if (this.mode !== 'webtoon') { this._resetScroll(); return; }
         const el = this.$root.querySelector(`[data-vi="${this.cur()}"]`);
         if (el) el.scrollIntoView();
       });
@@ -159,6 +159,7 @@ function readerPage() {
     zoomIn() { this.zoomPct = Math.min(200, this.zoomPct + 15); },
     zoomOut() { this.zoomPct = Math.max(50, this.zoomPct - 15); },
     _scrollBy(f) { window.scrollBy({top: f * window.innerHeight, behavior: 'smooth'}); },
+    _resetScroll() { const shell = this.$root.querySelector('[data-shell]'); if (shell) shell.scrollTop = 0; },
     keys(e) {
       if (e.key === 'Escape' && this.done) { this.done = false; return; }
       if (/^(SELECT|INPUT|TEXTAREA)$/.test(e.target.tagName)) return; // form controls first, always

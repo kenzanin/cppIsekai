@@ -7,3 +7,4 @@ plugins_dev/**/config.json
 test_*.db
 test_*.log
 build/
+.serena/

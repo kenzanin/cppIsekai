@@ -1,4 +1,5 @@
 ## 2026-11-10
+* **Creation**: Documented concept `architecture/reader-readahead.md` (reader: read-ahead cross-chapter prefetch (worker + 10-page window)).
 * **Update**: Updated concept `references/reader-page-gaps.md`.
 * **Creation**: Documented concept `architecture/reader-fullscreen.md` (reader-fullscreen: full-screen reader chrome + zoom persistence (implemented, uncommitted)).
 * **Update**: Linked `architecture/reader-page-progress.md` to `references/reader-page-gaps.md` (reader-page decision references the gaps/facts backlog from the same session (zoom unpersisted, skip off-by-skip, legacy cn=0 rows, MangaDex empty at-home data[], main-branch commits).).
