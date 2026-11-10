@@ -60,7 +60,7 @@ pkg_check_modules(SQLITE3 REQUIRED IMPORTED_TARGET sqlite3)
 
 # --- app ---
 add_executable(cppIsekai src/main.cpp src/store/store_core.cpp src/store/store_search.cpp src/store/store_api.cpp src/http/http.cpp src/http/http_pages.cpp src/http/http_api.cpp src/http/http_api_admin.cpp src/http/http_api_library.cpp src/http/http_api_title.cpp src/http/http_api_reader.cpp src/http/http_api_state.cpp src/http/http_api_content.cpp src/http/pages_api.cpp
-                         src/fetch/fetch.cpp src/fetch/fetch_curl.cpp src/plugin/plugin_core.cpp src/plugin/plugin_load.cpp src/plugin/plugin_call.cpp src/plugin/lua/bridge.cpp src/plugin/lua/lua_runtime.cpp src/plugin/http_client.cpp src/plugin/wasm/wasm_rt.cpp src/plugin/wasm/wasm_load.cpp src/plugin/js/js_rt.cpp src/plugin/js/js_bindings.cpp src/plugin/htmltext_re2.cpp src/plugin/htmltext_html.cpp src/cache/cache.cpp src/cache/cache_img.cpp src/reader/window.cpp
+                         src/fetch/fetch.cpp src/fetch/fetch_curl.cpp src/plugin/plugin_core.cpp src/plugin/plugin_load.cpp src/plugin/plugin_call.cpp src/plugin/lua/bridge.cpp src/plugin/lua/lua_runtime.cpp src/plugin/http_client.cpp src/plugin/wasm/wasm_rt.cpp src/plugin/wasm/wasm_load.cpp src/plugin/wasm/wasm_imports.cpp src/plugin/js/js_rt.cpp src/plugin/js/js_bindings.cpp src/plugin/htmltext_re2.cpp src/plugin/htmltext_html.cpp src/cache/cache.cpp src/cache/cache_img.cpp src/reader/window.cpp
                          ${TP}/libzippp/libzippp.cpp src/http/export_cbz.cpp)
 target_include_directories(
   cppIsekai
@@ -102,7 +102,7 @@ target_include_directories(lexbor PUBLIC ${TP}/lexbor/source)
 target_compile_options(lexbor PRIVATE -w) # C vendor lib; do not gate on -Wall -Wextra
 target_include_directories(cppIsekai PRIVATE ${TP}/glaze ${TP}/sol2/include ${TP}/lexbor/source)
 add_executable(test_plugin tests/test_plugin.cpp src/plugin/plugin_core.cpp src/plugin/plugin_load.cpp src/plugin/plugin_call.cpp
-                           src/plugin/lua/bridge.cpp src/plugin/lua/lua_runtime.cpp src/plugin/http_client.cpp src/plugin/wasm/wasm_rt.cpp src/plugin/wasm/wasm_load.cpp src/plugin/js/js_rt.cpp src/plugin/js/js_bindings.cpp src/plugin/htmltext_re2.cpp src/plugin/htmltext_html.cpp src/store/store_core.cpp src/store/store_search.cpp src/store/store_api.cpp src/fetch/fetch.cpp src/fetch/fetch_curl.cpp)
+                           src/plugin/lua/bridge.cpp src/plugin/lua/lua_runtime.cpp src/plugin/http_client.cpp src/plugin/wasm/wasm_rt.cpp src/plugin/wasm/wasm_load.cpp src/plugin/wasm/wasm_imports.cpp src/plugin/js/js_rt.cpp src/plugin/js/js_bindings.cpp src/plugin/htmltext_re2.cpp src/plugin/htmltext_html.cpp src/store/store_core.cpp src/store/store_search.cpp src/store/store_api.cpp src/fetch/fetch.cpp src/fetch/fetch_curl.cpp)
 target_include_directories(
   test_plugin
   PRIVATE src ${TP}/glaze ${TP}/sol2/include ${TP}/thread_pool/include
@@ -126,7 +126,7 @@ _cppisekai_pch(test_plugin)
 # host-helper core + runtime parity (plugin-helper 2.1): htmltext core cases
 # direct; lua/js/wasm parity through the real Host on migrated fixtures.
 add_executable(test_htmltext tests/test_htmltext.cpp src/plugin/plugin_core.cpp src/plugin/plugin_load.cpp src/plugin/plugin_call.cpp
-                             src/plugin/lua/bridge.cpp src/plugin/lua/lua_runtime.cpp src/plugin/http_client.cpp src/plugin/wasm/wasm_rt.cpp src/plugin/wasm/wasm_load.cpp src/plugin/js/js_rt.cpp src/plugin/js/js_bindings.cpp src/plugin/htmltext_re2.cpp src/plugin/htmltext_html.cpp src/store/store_core.cpp src/store/store_search.cpp src/store/store_api.cpp src/fetch/fetch.cpp src/fetch/fetch_curl.cpp)
+                             src/plugin/lua/bridge.cpp src/plugin/lua/lua_runtime.cpp src/plugin/http_client.cpp src/plugin/wasm/wasm_rt.cpp src/plugin/wasm/wasm_load.cpp src/plugin/wasm/wasm_imports.cpp src/plugin/js/js_rt.cpp src/plugin/js/js_bindings.cpp src/plugin/htmltext_re2.cpp src/plugin/htmltext_html.cpp src/store/store_core.cpp src/store/store_search.cpp src/store/store_api.cpp src/fetch/fetch.cpp src/fetch/fetch_curl.cpp)
 target_include_directories(test_htmltext PRIVATE src ${TP}/glaze ${TP}/sol2/include ${TP}/thread_pool/include ${TP}/lexbor/source
                           ${TP}/sqlite_orm/include ${TP}/readerwriterqueue/include)
 target_link_libraries(
