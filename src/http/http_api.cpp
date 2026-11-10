@@ -26,6 +26,7 @@ namespace {
 // the last reader position (the anchor the skip-rerun reads back).
 constexpr const char* kStateHost = "host";
 constexpr const char* kSkipPrefix = "host/skip/";
+constexpr const char* kReadPrefix = "host/read/";
 constexpr const char* kPositionKey = "host/pos";
 
 // Typed readers for request/state JSON: absent or wrong-typed -> default.
@@ -250,6 +251,59 @@ void register_api(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, BS:
         return r;
     });
 
+    // library-save 2.1: JSON routes backing the saved-manga Library grid
+    // and the detail-page toggle. POST-only writes (codebase convention);
+    // GET is membership for the toggle and the grid source.
+    CROW_ROUTE(app, "/api/library")
+    ([&] {
+        const auto rows = on_pool(db, [&] { return store.saved_list(); });
+        crow::json::wvalue list(crow::json::type::List);
+        int idx = 0;
+        for (const auto& r : rows) {
+            crow::json::wvalue row;
+            row["plugin"] = r.plugin;
+            row["slug"] = r.slug;
+            row["name"] = r.name;
+            row["cover"] = r.cover;
+            row["added_at"] = static_cast<double>(r.added_at);
+            list[idx++] = std::move(row);
+        }
+        crow::json::wvalue out;
+        out["ok"] = true;
+        out["data"] = std::move(list);
+        crow::response r{out};
+        r.set_header("Content-Type", "application/json");
+        return r;
+    });
+
+    CROW_ROUTE(app, "/api/library").methods(crow::HTTPMethod::POST)([&](const crow::request& req) -> crow::response {
+        const std::string body = req.body;
+        const auto json = crow::json::load(body);
+        if (!json || !json.has("plugin") || !json.has("slug"))
+            return crow::response{R"({"ok":false,"error":"missing plugin/slug"})"};
+        SavedManga m;
+        m.plugin = json["plugin"].s();
+        m.slug = json["slug"].s();
+        m.name = json.has("name") && json["name"].t() == crow::json::type::String ? json["name"].s() : std::string{json["slug"].s()};
+        m.cover = json.has("cover") && json["cover"].t() == crow::json::type::String ? json["cover"].s() : std::string{};
+        on_pool(db, [&] { store.save_manga(m); return 0; });
+        crow::response r{R"({"ok":true,"saved":true})"};
+        r.set_header("Content-Type", "application/json");
+        return r;
+    });
+
+    CROW_ROUTE(app, "/api/library/remove").methods(crow::HTTPMethod::POST)([&](const crow::request& req) -> crow::response {
+        const auto json = crow::json::load(req.body);
+        if (!json || !json.has("plugin") || !json.has("slug"))
+            return crow::response{R"({"ok":false,"error":"missing plugin/slug"})"};
+        const std::string plugin = json["plugin"].s();
+        const std::string slug = json["slug"].s();
+        on_pool(db, [&] { store.unsave_manga(plugin, slug); return 0; });
+        crow::response r{R"({"ok":true,"saved":false})"};
+        r.set_header("Content-Type", "application/json");
+        return r;
+    });
+
     // manga-detail 1.1: the detail-page data endpoints. Same envelope rules as
     // /plugin/<id>/<method>; keyed by our own slug, which is the title key the
     // cache layout and plugins mint. The page's Alpine layer consumes these.
@@ -378,6 +432,15 @@ void register_api(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, BS:
                         next.page = pos.page > 1 ? pos.page : stored->page;
                 }
                 store.position_set(merge_position(stored, next));
+                // detail-enrichment 1.1 (chapter-list-controls): max pages-read per chapter for the row counter/check.
+                if (!chapter.empty()) {
+                    int prev = 0;
+                    if (const auto s = store.state_get(kStateHost, std::string(kReadPrefix) + chapter); s && !s->empty())
+                        prev = std::atoi(s->c_str()); // state_get returns the stored "N"
+                    const int p = pos.page > 1 ? pos.page : 1;
+                    const int now = std::max(prev, p);
+                    store.state_set(kStateHost, std::string(kReadPrefix) + chapter, std::to_string(now));
+                }
                 spdlog::debug("position {} {} ch={} p={} cn={} mode='{}' dir='{}'", plugin, manga, chapter,
                               next.page, next.chapter_number, next.mode, next.direction);
                 return 0;
@@ -448,6 +511,49 @@ void register_api(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, BS:
             crow::response r{out};
             r.set_header("Content-Type", "application/json");
             return r;
+        });
+
+    // Chapter read progress (chapter-list-controls 1.1): max pages read per
+    // chapter under host/read/<uuid>; page 0 clears the marker.
+    CROW_ROUTE(app, "/chapter/<string>/read")
+        .methods(crow::HTTPMethod::POST)([&](const crow::request& req, std::string id) -> crow::response {
+            const auto body = crow::json::load(req.body);
+            const int page = static_cast<int>(std::max(0L, num_field(body, "page", 0)));
+            on_pool(db, [&] {
+                store.state_set(kStateHost, std::string(kReadPrefix) + id, std::to_string(page));
+                return 0;
+            });
+            crow::json::wvalue out;
+            out["id"] = id;
+            out["read"] = page;
+            crow::response r{out};
+            r.set_header("Content-Type", "application/json");
+            return r;
+        });
+
+    // Batch read/skip state (chapter-list-controls 1.2): one round trip for
+    // the detail page list. Absent keys omit the field.
+    CROW_ROUTE(app, "/chapter/state")
+        .methods(crow::HTTPMethod::POST)([&](const crow::request& req) -> crow::response {
+            const auto body = crow::json::load(req.body);
+            std::vector<std::string> ids;
+            if (body && body.has("ids") && body["ids"].t() == crow::json::type::List)
+                for (const auto& v : body["ids"])
+                    if (v.t() == crow::json::type::String)
+                        ids.push_back(v.s());
+            crow::json::wvalue out;
+            on_pool(db, [&] {
+                for (const auto& id : ids) {
+                    if (const auto s = store.state_get(kStateHost, std::string(kSkipPrefix) + id); s && *s == "1")
+                        out[id]["skip"] = true;
+                    if (const auto r = store.state_get(kStateHost, std::string(kReadPrefix) + id); r && !r->empty() && *r != "0")
+                        out[id]["read"] = std::atoi(r->c_str());
+                }
+                return 0;
+            });
+            crow::response res{out};
+            res.set_header("Content-Type", "application/json");
+            return res;
         });
 
     // Config save (D5): validation-first merge, comments/ordering survive.
