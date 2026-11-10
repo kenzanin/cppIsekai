@@ -316,3 +316,59 @@ TEST_CASE("cache v3: cover_serve is extension-free; absent -> nullopt") {
     REQUIRE(cache.cover_serve("mangadex", "http://x/cv.jpg").has_value());
     CHECK(!cache.cover_serve("mangadex", "http://x/other.jpg").has_value());
 }
+
+TEST_CASE("cache v3: stale index entry after manual wipe falls through to refetch") {
+    // Feature lock (offline-first invariant): a hit must serve the DISK file.
+    // When the file is deleted under a running daemon (manual cache wipe), the
+    // in-memory boot-scan index still knows the path; without the fs::exists
+    // guard img_ensure returned it and serve_cached_image read an empty body ->
+    // 200-blank. Guarded behavior: stale entry dropped, fetch reruns, file is
+    // re-stored at the same landing path. Online-only consequence: a miss now
+    // reaches fetch_ -- but a PRESENT file never triggers a refetch, so a
+    // fully cached library still serves offline without any network call.
+    TempRoot root;
+    auto state = std::make_shared<FakeState>();
+    state->bodies = {{"http://x/p1.jpg", forty('a')}, {"http://x/plain.gif", forty('c')}};
+    cache::Cache cache(cache::Config{root.path.string(), 1 << 20},
+                       [state](const std::string& k) { return state->get(k); });
+
+    cache::Cache::PageCtx pg{.plugin = "mangadex", .slug = "solo", .chapter = 1, .page = 1};
+
+    // --- page ctx path: delete file, request refetches and re-lands same spot
+    REQUIRE(ok(cache.img_ensure("http://x/p1.jpg", {}, pg)));
+    const auto first = cache.img_ensure("http://x/p1.jpg", {}, pg); // warm hit
+    REQUIRE(first.has_value());
+    CHECK(state->calls == 1); // present file: no refetch (offline-first lock)
+    const auto landed = *first;
+    fs::remove(landed);
+    state->calls = 0;
+    const auto again = cache.img_ensure("http://x/p1.jpg", {}, pg);
+    REQUIRE(again.has_value());
+    CHECK(state->calls == 1);                    // stale hit fell through to fetch
+    CHECK(*again == landed);                     // re-landed at the exact v3 spot
+    CHECK(fs::file_size(*again) == 40);          // body re-stored, not blank
+
+    // --- sha fallback path: same guard without context
+    REQUIRE(ok(cache.img_ensure("http://x/plain.gif", {}, {})));
+    const auto fb = cache.img_ensure("http://x/plain.gif", {}, {});
+    REQUIRE(fb.has_value());
+    fs::remove(*fb);
+    const auto fb2 = cache.img_ensure("http://x/plain.gif", {}, {});
+    // stale entry dropped, refetch succeeds (body present) -> re-stored
+    REQUIRE(fb2.has_value());
+    CHECK(*fb2 == *fb);
+    CHECK(fs::file_size(*fb2) == 40);
+
+    // --- cover path: cover_serve hit on a deleted file refetches
+    state->bodies["http://x/cv.jpg"] = forty('b');
+    cache::Cache::CoverCtx cv{.url = "http://x/cv.jpg", .plugin = "mangadex",
+                              .w = 100, .h = 200, .cover = true};
+    REQUIRE(ok(cache.img_store("http://x/cv.jpg", "H", cv, {})));
+    const auto c1 = cache.img_ensure("http://x/cv.jpg", cv, {});
+    REQUIRE(c1.has_value());
+    fs::remove(*c1);
+    const auto c2 = cache.img_ensure("http://x/cv.jpg", cv, {});
+    REQUIRE(c2.has_value());
+    CHECK(*c2 == *c1);
+    CHECK(fs::file_size(*c2) == 40);
+}
