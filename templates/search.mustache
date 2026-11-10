@@ -3,7 +3,7 @@
   <!-- plugin + query row -->
   <div class="flex items-center gap-3 mb-4">
     <select x-model="plugin" @change="pick()" class="bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-sm">
-      <option value="" disabled>pilih plugin</option>
+      <option value="" disabled>select a plugin</option>
       <template x-for="p in plugins" :key="p.key">
         <option :value="p.key" x-text="p.name"></option>
       </template>
@@ -14,7 +14,7 @@
       </span>
     </template>
     <input x-model="q" @keydown.enter="search()"
-           placeholder="Cari manga…" class="flex-1 bg-zinc-900 border border-zinc-700 rounded px-3 py-1.5">
+           placeholder="Search manga…" class="focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:border-transparent transition flex-1 bg-zinc-900 border border-zinc-700 rounded px-3 py-1.5">
     <button @click="search()" :disabled="!plugin || loading"
             class="px-4 py-1.5 text-sm bg-zinc-800 rounded hover:bg-zinc-700 disabled:opacity-40">Search</button>
   </div>
@@ -78,7 +78,7 @@
 
   <!-- empty -->
   <div x-show="!loading && total===0" class="text-zinc-500 text-sm py-8 text-center" x-cloak>
-    No results for this search — coba kata kunci lain atau kurangi filter.
+    No results for this search — try different keywords or fewer filters.
   </div>
 
   <!-- bottom pager -->

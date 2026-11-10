@@ -9,13 +9,13 @@
 </head>
 <body class="bg-zinc-950 text-zinc-100 min-h-screen">
   <header class="flex items-center gap-1 border-b border-zinc-800 px-4 h-12">
-    <a href="/" class="px-3 py-1 rounded {{#active_library}}bg-zinc-800{{/active_library}}">Library</a>
-    <a href="/search" class="px-3 py-1 rounded {{#active_search}}bg-zinc-800{{/active_search}}">Search</a>
-    <a href="/history" class="px-3 py-1 rounded {{#active_history}}bg-zinc-800{{/active_history}}">History</a>
-    <a href="/plugins" class="px-3 py-1 rounded {{#active_plugins}}bg-zinc-800{{/active_plugins}}">Plugins</a>
+    <a href="/" class="px-3 py-1 rounded hover:bg-zinc-800/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 transition-colors {{#active_library}}bg-zinc-800{{/active_library}}">Library</a>
+    <a href="/search" class="px-3 py-1 rounded hover:bg-zinc-800/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 transition-colors {{#active_search}}bg-zinc-800{{/active_search}}">Search</a>
+    <a href="/history" class="px-3 py-1 rounded hover:bg-zinc-800/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 transition-colors {{#active_history}}bg-zinc-800{{/active_history}}">History</a>
+    <a href="/plugins" class="px-3 py-1 rounded hover:bg-zinc-800/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 transition-colors {{#active_plugins}}bg-zinc-800{{/active_plugins}}">Plugins</a>
     <span class="flex-1"></span>
-    <a href="/logs" class="px-3 py-1 rounded {{#active_logs}}bg-zinc-800{{/active_logs}}">Logs</a>
-    <a href="/about" class="px-3 py-1 rounded {{#active_about}}bg-zinc-800{{/active_about}}">About</a>
+    <a href="/logs" class="px-3 py-1 rounded hover:bg-zinc-800/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 transition-colors {{#active_logs}}bg-zinc-800{{/active_logs}}">Logs</a>
+    <a href="/about" class="px-3 py-1 rounded hover:bg-zinc-800/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 transition-colors {{#active_about}}bg-zinc-800{{/active_about}}">About</a>
   </header>
   <main class="p-4">
     {{>body}}

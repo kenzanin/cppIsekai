@@ -5,12 +5,12 @@
     <a href="{{url}}" class="group block min-w-0">
       {{#cover}}
         <img src="/cache/img?url={{cover}}&cover=1&plugin={{plugin}}&slug={{slug}}"
-             class="w-full aspect-[2/3] object-cover rounded-lg" alt="{{name}}" loading="lazy"
+             class="w-full aspect-[2/3] object-cover rounded-lg border border-zinc-800 transition duration-150 group-hover:border-zinc-700" alt="{{name}}" loading="lazy"
              onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
       {{/cover}}
       <div class="aspect-[2/3] w-full rounded-lg flex items-center justify-center text-center text-xs text-zinc-400 bg-zinc-800"
            style="{{#cover}}display:none{{/cover}}">{{name}}</div>
-      <p class="mt-1 text-sm truncate group-hover:text-zinc-200">{{name}}</p>
+      <p class="mt-1 text-sm truncate text-zinc-300 group-hover:text-zinc-100 transition-colors">{{name}}</p>
       <p class="text-xs text-zinc-500">{{plugin}}</p>
     </a>
   </li>

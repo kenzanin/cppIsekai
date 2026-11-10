@@ -24,7 +24,7 @@
             hx-get="/library/grid" hx-target="#grid" hx-push-url="true">
         {{#filtered}}<input type="hidden" name="plugin" value="{{plugin}}">{{/filtered}}
         <input name="q" value="{{q}}" placeholder="Search library"
-               class="flex-1 bg-zinc-900 border border-zinc-700 rounded px-3 py-1.5">
+               class="focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:border-transparent transition flex-1 bg-zinc-900 border border-zinc-700 rounded px-3 py-1.5">
       </form>
       <div id="grid">
         {{>grid_body.mustache}}

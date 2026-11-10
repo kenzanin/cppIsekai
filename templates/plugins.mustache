@@ -2,7 +2,7 @@
 <div x-data="pluginsPage" x-init="load()">
   <div class="flex items-center gap-3 mb-4">
     <input x-model="q" placeholder="Filter name / capability"
-           class="bg-zinc-900 border border-zinc-700 rounded px-3 py-1.5 text-sm w-72">
+           class="focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:border-transparent transition bg-zinc-900 border border-zinc-700 rounded px-3 py-1.5 text-sm w-72">
     <button @click="reload()" class="px-3 py-1.5 text-sm bg-zinc-800 rounded hover:bg-zinc-700">Reload all</button>
     <span class="text-sm text-zinc-500" x-show="busy">…</span>
   </div>
