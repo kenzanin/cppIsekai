@@ -454,14 +454,15 @@ void register_api(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, BS:
             // The chapter NUMBER rides along (the reader knows it from ?ch/the
             // pages list); absent keeps the stored one. Feeds the resume hint
             // and the prefetch worker's v3 placement.
-            double chapter_number = 0;
+            // ch 0 is valid; absence is signaled by the optional, not by 0.
+            std::optional<double> chapter_number;
             if (body && body.has("chapter_number") && body["chapter_number"].t() == crow::json::type::Number)
                 chapter_number = body["chapter_number"].d();
             on_pool(db, [&] {
                 const auto stored = store.position_get(plugin, manga);
-                ReaderPosition next{plugin, manga, chapter, chapter_number, pos.page, mode, direction, zoom, 0};
+                ReaderPosition next{plugin, manga, chapter, chapter_number.value_or(0), pos.page, mode, direction, zoom, 0};
                 if (stored) {
-                    if (next.chapter_number <= 0)
+                    if (!chapter_number) // absent: keep the stored number (0 included)
                         next.chapter_number = stored->chapter_number;
                     // same chapter, no page sent -> keep the page
                     if (chapter == stored->chapter_id)
@@ -488,10 +489,10 @@ void register_api(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, BS:
             for (const auto& url : found)
                 window.emplace_back(url);
             if (!found.empty()) {
-                if (chapter_number > 0) { // v3 placement; else the sha fallback
+                if (chapter_number) { // v3 placement; else the sha fallback
                     spdlog::debug("nudge {} urls, ctx {}.{} ch{} base-p{}", found.size(), plugin, manga,
-                                  int(chapter_number), pos.page + 1);
-                    prefetch.nudge(found, {plugin, manga, int(chapter_number), pos.page + 1});
+                                  *chapter_number, pos.page + 1);
+                    prefetch.nudge(found, {plugin, manga, int(*chapter_number), pos.page + 1});
                 } else {
                     spdlog::debug("nudge {} urls, no chapter number -> sha fallback", found.size());
                     prefetch.nudge(found); // background delta fetch (3.3)

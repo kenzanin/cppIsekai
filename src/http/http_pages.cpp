@@ -119,7 +119,7 @@ void register_pages(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, L
         int ch = 1, page = 1;
         std::string mode, dir, zoom;
         if (pos) {
-            ch = std::max(1, static_cast<int>(pos->chapter_number));
+            ch = std::max(0, static_cast<int>(pos->chapter_number)); // ch 0 is valid
             page = std::max(1, pos->page);
             mode = std::move(pos->mode);
             dir = std::move(pos->direction);

@@ -57,16 +57,19 @@ function readerPage() {
       const q = new URLSearchParams(location.search);
       // seed: stored position ({{resume_ch}}/{{resume_page}}/{{resume_mode}}/{{resume_dir}}),
       // then ?ch and ?page override, then JS defaults (ch 1, paged rtl).
-      this.ch = Number('{{resume_ch}}') || 1;
+      const resumeCh = Number('{{resume_ch}}');
+      this.ch = Number.isFinite(resumeCh) ? Math.max(0, resumeCh) : 1;
       this.page = Number('{{resume_page}}') || 1;
       // jump-to-ch always starts at page 1; only the same-chapter resume keeps a page
-      const qCh = Number(q.get('ch'));
+      const qChRaw = q.get('ch');
+      const qCh = qChRaw === null || qChRaw === '' ? NaN : Number(qChRaw);
       if ('{{resume_mode}}') this.mode = '{{resume_mode}}';
       if ('{{resume_dir}}') this.dir = '{{resume_dir}}';
       if ('{{resume_zoom}}') this.zoom = '{{resume_zoom}}';
-      if (qCh) {
-        this.ch = qCh;
-        if (!q.get('page') && qCh !== Number('{{resume_ch}}')) this.page = 1; // different chapter => restart at p1
+      if (Number.isFinite(qCh)) {
+        this.ch = Math.max(0, qCh);
+        const resume = Number('{{resume_ch}}');
+        if (!q.get('page') && this.ch !== resume) this.page = 1; // different chapter => restart at p1
       }
       if (q.get('mode')) this.mode = q.get('mode');
       if (q.get('dir')) this.dir = q.get('dir');
