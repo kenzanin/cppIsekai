@@ -23,7 +23,15 @@ endif()
 # template-heavy TUs (cache/http_api/plugin) stop paying the preprocess price per-file.
 function(_cppisekai_pch target)
   target_precompile_headers(${target} PRIVATE
-    <memory> <vector> <string> <optional> <map> <unordered_map> <algorithm> <utility> <filesystem> <mutex> <span> <cstring> <cstdint> <ctime> <array> <variant>)
+    <memory> <vector> <string> <optional> <map> <unordered_map> <algorithm> <utility> <filesystem> <mutex> <span> <cstring> <cstdint> <ctime> <array> <variant>
+    <string_view> <stdexcept> <functional> <chrono> <fstream> <sstream> <cstddef> <cctype>
+    <spdlog/spdlog.h> <spdlog/sinks/stdout_color_sinks.h>)
+endfunction()
+
+# vendor-heavy PCH only for the daemon target: test targets lack glaze/BS include dirs
+function(_cppisekai_pch_vendor target)
+  _cppisekai_pch(${target})
+  target_precompile_headers(${target} PRIVATE <glaze/glaze.hpp> <BS_thread_pool.hpp>)
 endfunction()
 
 
@@ -36,9 +44,7 @@ pkg_check_modules(LIBZIP REQUIRED IMPORTED_TARGET libzip) # system shared (pacma
 
 set(TP ${PROJECT_SOURCE_DIR}/third_party)
 
-# --- vendored static: wasm3 (C) & libsql sqlite amalgamation ---
-# ponytail: in-tree static amalgamation; switch to system-shared libsql once
-# pacman/AUR libsql lands
+# system sqlite (3.54.0): full JSONB (jsonb_extract/jsonb_each/jsonb(...)); libsql fork dropped
 file(GLOB WASM3_SRC CONFIGURE_DEPENDS ${TP}/wasm3/src/*.c)
 add_library(wasm3 STATIC ${WASM3_SRC})
 target_include_directories(wasm3 PUBLIC ${TP}/wasm3/src)
@@ -50,8 +56,7 @@ target_include_directories(quickjs PUBLIC ${TP}/quickjs)
 target_compile_definitions(quickjs PRIVATE _GNU_SOURCE)
 target_link_libraries(quickjs PUBLIC m ${CMAKE_DL_LIBS} pthread)
 
-add_library(sqlite3 STATIC ${TP}/libsql/sqlite/sqlite3.c)
-target_include_directories(sqlite3 PUBLIC ${TP}/libsql/sqlite)
+pkg_check_modules(SQLITE3 REQUIRED IMPORTED_TARGET sqlite3)
 
 # --- app ---
 add_executable(cppIsekai src/main.cpp src/store/store_core.cpp src/store/store_search.cpp src/store/store_api.cpp src/http/http.cpp src/http/http_pages.cpp src/http/http_api.cpp src/http/http_api_admin.cpp src/http/http_api_library.cpp src/http/http_api_title.cpp src/http/http_api_reader.cpp src/http/http_api_state.cpp src/http/http_api_content.cpp src/http/pages_api.cpp
@@ -69,14 +74,14 @@ target_include_directories(
           ${TP}/libzippp)
 target_link_libraries(
   cppIsekai
-  PRIVATE wasm3 quickjs sqlite3 PkgConfig::VIPS PkgConfig::LUA re2 lexbor
+  PRIVATE wasm3 quickjs PkgConfig::SQLITE3 PkgConfig::VIPS PkgConfig::LUA re2 lexbor
           ${TP}/curl-impersonate/lib/libcurl-impersonate-chrome.so.4.8.0
           spdlog::spdlog PkgConfig::LIBZIP)
 target_compile_definitions(cppIsekai PRIVATE CPPISEKAI_FETCH_LIB_DIR="${CMAKE_SOURCE_DIR}/third_party/curl-impersonate/lib")
 target_compile_options(cppIsekai PRIVATE -Wall -Wextra)
 set_target_properties(cppIsekai PROPERTIES BUILD_RPATH
                                            "${TP}/curl-impersonate/lib")
-_cppisekai_pch(cppIsekai)
+_cppisekai_pch_vendor(cppIsekai)
 
 
 # --- tests (doctest, system package) ---
@@ -84,7 +89,7 @@ _cppisekai_pch(cppIsekai)
 # file
 add_executable(test_store tests/test_store.cpp src/store/store_core.cpp src/store/store_search.cpp src/store/store_api.cpp)
 target_include_directories(test_store PRIVATE src ${TP}/sqlite_orm/include)
-target_link_libraries(test_store PRIVATE sqlite3)
+target_link_libraries(test_store PRIVATE PkgConfig::SQLITE3)
 target_compile_options(test_store PRIVATE -Wall -Wextra)
 enable_testing()
 add_test(NAME store COMMAND test_store)
@@ -105,7 +110,7 @@ target_include_directories(
           ${TP}/sqlite_orm/include ${TP}/readerwriterqueue/include)
 target_link_libraries(
   test_plugin
-  PRIVATE wasm3 quickjs sqlite3 PkgConfig::LUA re2
+  PRIVATE wasm3 quickjs PkgConfig::SQLITE3 PkgConfig::LUA re2
           ${TP}/curl-impersonate/lib/libcurl-impersonate-chrome.so.4.8.0
           spdlog::spdlog lexbor)
 target_compile_options(test_plugin PRIVATE -Wall -Wextra)
@@ -126,7 +131,7 @@ target_include_directories(test_htmltext PRIVATE src ${TP}/glaze ${TP}/sol2/incl
                           ${TP}/sqlite_orm/include ${TP}/readerwriterqueue/include)
 target_link_libraries(
   test_htmltext
-  PRIVATE wasm3 quickjs sqlite3 PkgConfig::LUA re2 lexbor
+  PRIVATE wasm3 quickjs PkgConfig::SQLITE3 PkgConfig::LUA re2 lexbor
           ${TP}/curl-impersonate/lib/libcurl-impersonate-chrome.so.4.8.0
           spdlog::spdlog)
 target_compile_options(test_htmltext PRIVATE -Wall -Wextra)
@@ -187,7 +192,7 @@ add_test(NAME export COMMAND test_export)
 # stale layer (2.2): wrapper around the ABI call; cache + glaze, no server
 add_executable(test_stale tests/test_stale.cpp src/store/store_core.cpp src/store/store_search.cpp src/store/store_api.cpp)
 target_include_directories(test_stale PRIVATE src ${TP}/glaze ${TP}/sqlite_orm/include)
-target_link_libraries(test_stale PRIVATE spdlog::spdlog PkgConfig::VIPS sqlite3)
+target_link_libraries(test_stale PRIVATE spdlog::spdlog PkgConfig::VIPS PkgConfig::SQLITE3)
 target_compile_options(test_stale PRIVATE -Wall -Wextra)
 add_test(NAME stale COMMAND test_stale)
 _cppisekai_pch(test_stale)
