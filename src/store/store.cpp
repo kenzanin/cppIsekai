@@ -45,6 +45,14 @@ struct ReaderPositionEntity {
     std::int64_t updated_at{};
 };
 
+struct SavedMangaEntity {
+    std::string plugin;     // composite PK with slug: one row per saved manga
+    std::string slug;
+    std::string name;
+    std::string cover;
+    std::int64_t added_at{};
+};
+
 inline auto create_storage(const std::string& path) {
     return make_storage(
         path,
@@ -68,7 +76,11 @@ inline auto create_storage(const std::string& path) {
                    make_column("direction", &ReaderPositionEntity::direction),
                    make_column("zoom", &ReaderPositionEntity::zoom, default_value("")),
                    make_column("updated_at", &ReaderPositionEntity::updated_at),
-                   primary_key(&ReaderPositionEntity::plugin, &ReaderPositionEntity::slug)));
+                   primary_key(&ReaderPositionEntity::plugin, &ReaderPositionEntity::slug)),
+        make_table("saved_manga", make_column("plugin", &SavedMangaEntity::plugin), make_column("slug", &SavedMangaEntity::slug),
+                   make_column("name", &SavedMangaEntity::name), make_column("cover", &SavedMangaEntity::cover),
+                   make_column("added_at", &SavedMangaEntity::added_at),
+                   primary_key(&SavedMangaEntity::plugin, &SavedMangaEntity::slug)));
 }
 
 using StorageType = decltype(create_storage(""));
@@ -248,4 +260,36 @@ std::optional<ReaderPosition> Store::position_last() {
         return std::nullopt;
     const auto& r = rows[0];
     return ReaderPosition{r.plugin, r.slug, r.chapter_id, r.chapter_number, r.page, r.mode, r.direction, r.zoom, r.updated_at};
+}
+
+void Store::save_manga(const SavedManga& m) {
+    // REPLACE on the (plugin, slug) PK: refreshes name/cover/added_at on re-save.
+    impl_->storage.replace(SavedMangaEntity{m.plugin, m.slug, m.name, m.cover,
+                                            static_cast<std::int64_t>(std::time(nullptr))});
+}
+
+void Store::unsave_manga(const std::string& plugin, const std::string& slug) {
+    impl_->storage.remove_all<SavedMangaEntity>(
+        where(c(&SavedMangaEntity::plugin) == plugin && c(&SavedMangaEntity::slug) == slug));
+}
+
+std::vector<SavedManga> Store::saved_list() {
+    // added_at has second resolution, and REPLACE re-stamps it on re-save, so
+    // newest-first by added_at alone is stable enough for the single-user grid.
+    auto rows = impl_->storage.get_all<SavedMangaEntity>(
+        order_by(&SavedMangaEntity::added_at).desc());
+    std::vector<SavedManga> out;
+    out.reserve(rows.size());
+    for (const auto& r : rows)
+        out.push_back(SavedManga{r.plugin, r.slug, r.name, r.cover, r.added_at});
+    return out;
+}
+
+std::optional<SavedManga> Store::saved_get(const std::string& plugin, const std::string& slug) {
+    auto rows = impl_->storage.get_all<SavedMangaEntity>(
+        where(c(&SavedMangaEntity::plugin) == plugin && c(&SavedMangaEntity::slug) == slug));
+    if (rows.empty())
+        return std::nullopt;
+    const auto& r = rows[0];
+    return SavedManga{r.plugin, r.slug, r.name, r.cover, r.added_at};
 }

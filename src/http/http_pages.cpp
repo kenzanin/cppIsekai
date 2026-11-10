@@ -56,6 +56,23 @@ crow::json::wvalue home_context(Store& store, BS::thread_pool<>& db, const crow:
     }
     ctx["plugins"] = std::move(plugin_rows);
 
+    // library-save 4.1: saved entries are the Library — when any are saved,
+    // the grid renders them (added_at desc) instead of the search-cache titles.
+    std::vector<SavedManga> saved = on_pool(db, [&] { return store.saved_list(); });
+    ctx["saved_mode"] = !saved.empty();
+    ctx["empty_saved"] = saved.empty();
+    std::vector<crow::json::wvalue> saved_rows;
+    for (const auto& m : saved) {
+        crow::json::wvalue row;
+        row["name"] = m.name;
+        row["slug"] = m.slug;
+        row["plugin"] = m.plugin;
+        row["cover"] = m.cover;
+        row["url"] = std::string("/view/manga/") + m.plugin + "/" + m.slug;
+        saved_rows.push_back(std::move(row));
+    }
+    ctx["saved_list"] = std::move(saved_rows);
+
     std::vector<crow::json::wvalue> cards;
     for (const auto& title : titles) {
         crow::json::wvalue card;

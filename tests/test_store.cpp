@@ -2,6 +2,7 @@
 #include <doctest/doctest.h>
 
 #include <chrono>
+#include <thread>
 
 #include "store/store.hpp"
 
@@ -123,5 +124,50 @@ TEST_CASE("Store: seed, plugins, search, count") {
                 CHECK(p.enabled);
             }
         }
+    }
+}
+
+TEST_CASE("Store: saved_manga save/unsave/list (library-save 1.2)") {
+    Store store("test_store.db");
+
+    SUBCASE("save upserts: re-save refreshes name/cover, rows never duplicate") {
+        store.unsave_manga("md", "abc-slug-1");
+        store.save_manga({"md", "abc-slug-1", "Name One", "https://cover/one.jpg", 0});
+        store.save_manga({"md", "abc-slug-1", "Name One v2", "https://cover/one-v2.jpg", 0});
+        auto list = store.saved_list();
+        int hits = 0;
+        for (const auto& s : list) if (s.plugin == "md" && s.slug == "abc-slug-1") ++hits;
+        CHECK(hits == 1);
+        auto got = store.saved_get("md", "abc-slug-1");
+        REQUIRE(got.has_value());
+        CHECK(got->name == "Name One v2");
+        CHECK(got->cover == "https://cover/one-v2.jpg");
+    }
+
+    SUBCASE("list orders by added_at desc (newest first)") {
+        store.unsave_manga("md", "abc-slug-old");
+        store.unsave_manga("md", "abc-slug-new");
+        store.save_manga({"md", "abc-slug-old", "Old", "", 0});
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        // force strictly newer added_at on the second row
+        store.unsave_manga("md", "abc-slug-new");
+        store.save_manga({"md", "abc-slug-new", "New", "", 0});
+        auto list = store.saved_list();
+        int idx_old = -1, idx_new = -1;
+        for (std::size_t i = 0; i < list.size(); ++i) {
+            if (list[i].slug == "abc-slug-old") idx_old = static_cast<int>(i);
+            if (list[i].slug == "abc-slug-new") idx_new = static_cast<int>(i);
+        }
+        REQUIRE(idx_old >= 0);
+        REQUIRE(idx_new >= 0);
+        CHECK(idx_new < idx_old);
+    }
+
+    SUBCASE("unsave deletes; saved_get returns nullopt") {
+        store.save_manga({"md", "abc-slug-del", "Del", "", 0});
+        REQUIRE(store.saved_get("md", "abc-slug-del").has_value());
+        store.unsave_manga("md", "abc-slug-del");
+        CHECK_FALSE(store.saved_get("md", "abc-slug-del").has_value());
+        store.unsave_manga("md", "abc-slug-del"); // idempotent remove
     }
 }

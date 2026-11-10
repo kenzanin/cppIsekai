@@ -1,23 +1,22 @@
-<nav class="flex gap-3 text-sm">
-  {{#has_prev}}<a href="/?plugin={{plugin}}&q={{q}}&page={{prev}}"
-    hx-get="/library/grid?plugin={{plugin}}&q={{q}}&page={{prev}}" hx-target="#grid" hx-push-url="true">Prev</a>{{/has_prev}}
-  <span class="text-zinc-400">{{page}} / {{pages}}</span>
-  {{#has_next}}<a href="/?plugin={{plugin}}&q={{q}}&page={{next}}"
-    hx-get="/library/grid?plugin={{plugin}}&q={{q}}&page={{next}}" hx-target="#grid" hx-push-url="true">Next</a>{{/has_next}}
-</nav>
+{{#saved_mode}}
 <ul class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-  {{#titles}}
+  {{#saved_list}}
   <li>
-    <div class="aspect-[3/4] rounded" style="background:hsl({{hue}} 40% 28%)"></div>
-    <p class="mt-1 text-sm truncate">{{name}}</p>
-    <p class="text-xs text-zinc-500">{{plugin}}</p>
+    <a href="{{url}}" class="group block min-w-0">
+      {{#cover}}
+        <img src="/cache/img?url={{cover}}&cover=1&plugin={{plugin}}&slug={{slug}}"
+             class="w-full aspect-[2/3] object-cover rounded-lg" alt="{{name}}" loading="lazy"
+             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+      {{/cover}}
+      <div class="aspect-[2/3] w-full rounded-lg flex items-center justify-center text-center text-xs text-zinc-400 bg-zinc-800"
+           style="{{#cover}}display:none{{/cover}}">{{name}}</div>
+      <p class="mt-1 text-sm truncate group-hover:text-zinc-200">{{name}}</p>
+      <p class="text-xs text-zinc-500">{{plugin}}</p>
+    </a>
   </li>
-  {{/titles}}
+  {{/saved_list}}
 </ul>
-<nav class="flex gap-3 text-sm">
-  {{#has_prev}}<a href="/?plugin={{plugin}}&q={{q}}&page={{prev}}"
-    hx-get="/library/grid?plugin={{plugin}}&q={{q}}&page={{prev}}" hx-target="#grid" hx-push-url="true">Prev</a>{{/has_prev}}
-  <span class="text-zinc-400">{{page}} / {{pages}}</span>
-  {{#has_next}}<a href="/?plugin={{plugin}}&q={{q}}&page={{next}}"
-    hx-get="/library/grid?plugin={{plugin}}&q={{q}}&page={{next}}" hx-target="#grid" hx-push-url="true">Next</a>{{/has_next}}
-</nav>
+{{/saved_mode}}
+{{^saved_mode}}
+<div class="py-16 text-center text-zinc-500 text-sm">No saved manga — open a detail page and click Add to library</div>
+{{/saved_mode}}

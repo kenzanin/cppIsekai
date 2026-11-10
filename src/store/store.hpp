@@ -29,6 +29,16 @@ struct Title {
     std::string plugin;
 };
 
+/** One user-saved manga (library-save): denormalized name/cover so the grid
+ *  never calls plugins at render; keyed unique on (plugin, slug). */
+struct SavedManga {
+    std::string plugin;
+    std::string slug;
+    std::string name;
+    std::string cover;       // remote uploads URL as served by the plugin
+    std::int64_t added_at{}; // unix seconds; stamped by the store on upsert
+};
+
 /** Last-read position of one manga (reader-page): resume point + continue
  *  hint. Keyed by (plugin, slug). */
 struct ReaderPosition {
@@ -77,6 +87,13 @@ public:
     /** \brief Most recently updated position across all manga (the single-user
      *  "live anchor": skip-rerun resumes there). nullopt when none exists. */
     std::optional<ReaderPosition> position_last();
+
+    /** \brief Upsert/unsave one saved manga; the saved list is the Library
+     *  grid. added_at is stamped here on save (insert refreshes it). */
+    void save_manga(const SavedManga& m);
+    void unsave_manga(const std::string& plugin, const std::string& slug);
+    std::vector<SavedManga> saved_list(); // added_at desc
+    std::optional<SavedManga> saved_get(const std::string& plugin, const std::string& slug);
 
 private:
     std::unique_ptr<StoreImpl> impl_;
