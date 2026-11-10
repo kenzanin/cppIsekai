@@ -51,30 +51,30 @@
               @click="chPage--">‹</button>
       <span class="text-xs text-zinc-500" x-text="(chPage+1)+' / '+pageCount"></span>
       <button class="px-2 border border-zinc-700 rounded disabled:opacity-30" :disabled="chPage >= pageCount-1"
-              @click="chPage++">›</button>
+              @click="chPage++">›</button><button x-show="hiddenCount() > 0" @click="showHidden = !showHidden" class="px-1.5 border border-zinc-700 rounded text-xs" :class="showHidden ? 'text-emerald-400 border-emerald-700' : ''" x-cloak x-text="(showHidden ? 'hide' : 'show') + ' ' + hiddenCount()" title="toggle hidden chapters"></button>
     </span>
   </h2>
   <p class="text-sm text-zinc-500 mb-3" x-show="!loading && !chapters.length && !err" x-cloak>No chapters.</p>
   <div class="divide-y divide-zinc-800 border border-zinc-800 rounded-lg" x-show="chapters.length" x-cloak>
     <template x-for="ch in chPageRows()" :key="ch.id">
       <div class="flex items-center gap-3 px-4 py-2.5 hover:bg-zinc-900/50">
-        <!-- eye: mark read manually; page 0 clears -->
-        <button @click="toggleRead(ch)" class="shrink-0" :class="readMax(ch) > 0 ? 'text-emerald-400' : 'text-zinc-600 hover:text-zinc-400'"
-                :title="readMax(ch) > 0 ? 'marked read' : 'mark read'">
-          <svg x-show="readMax(ch) > 0" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M10 3C5 3 1.7 7 1 10c.7 3 4 7 9 7s8.3-4 9-7c-.7-3-4-7-9-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-2a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/></svg>
-          <svg x-show="readMax(ch) <= 0" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 20 20"><path d="M2 10c.7-3 4-7 8-7s7.3 4 8 7c-.7 3-4 7-8 7s-7.3-4-8-7Zm8 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" stroke-linecap="round"/><path d="M3 17 17 3" stroke-linecap="round"/></svg>
+        <!-- eye: hide/show chapter row (skip flag feeds reader window) -->
+        <button @click="toggleDone(ch)" class="shrink-0" :class="ch.done ? 'text-emerald-400' : 'text-zinc-600 hover:text-zinc-400'"
+                :title="ch.done ? 'unhide chapter' : 'hide chapter'">
+          <svg x-show="!ch.done" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M10 3C5 3 1.7 7 1 10c.7 3 4 7 9 7s8.3-4 9-7c-.7-3-4-7-9-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-2a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/></svg>
+          <svg x-show="ch.done" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 20 20"><path d="M2 10c.7-3 4-7 8-7s7.3 4 8 7c-.7 3-4 7-8 7s-7.3-4-8-7Zm8 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" stroke-linecap="round"/><path d="M3 17 17 3" stroke-linecap="round"/></svg>
         </button>
         <a :href="'/read/'+encodeURIComponent(plugin)+'/'+encodeURIComponent(slug)+'?ch='+(Number(ch.number) || ch.number)"
            class="text-sm font-medium w-20 shrink-0 hover:text-emerald-300" x-text="chLabel(ch)"></a>
         <span class="text-xs text-zinc-500 flex-1 truncate" x-text="ch.title"></span>
         <span class="text-xs text-zinc-500" x-text="fmtDate(ch.release_at)"></span>
         <!-- read/total counter; total when the plugin reports it -->
-        <span class="text-xs text-zinc-500 tabular-nums" x-show="readMax(ch) > 0" x-text="readMax(ch)+(ch.total ? '/'+ch.total : '')"></span>
-        <!-- double-check: done flag -->
-        <button @click="toggleDone(ch)" class="shrink-0" :class="ch.done ? 'text-emerald-400' : 'text-zinc-600 hover:text-zinc-400'"
-                title="mark done">
-          <svg x-show="ch.done" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M10 1 2.5 3.5v5c0 4.5 3.2 8.7 7.5 10 4.3-1.3 7.5-5.5 7.5-10v-5L10 1Zm-1 12-3-3 1.4-1.4L9 10.2l4.6-4.6L15 7l-6 6Z"/></svg>
-          <svg x-show="!ch.done" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 20 20"><path d="M10 2 3.5 4.2v4.3c0 4 2.9 7.8 6.5 9 3.6-1.2 6.5-5 6.5-9V4.2L10 2Z" stroke-linejoin="round"/><path d="m7 10 2.2 2.2L13.5 8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="text-xs text-zinc-500 tabular-nums" x-show="readMax(ch) > 0" x-text="readMax(ch)+(ch.pages ? '/'+ch.pages : '')"></span>
+        <!-- check: read state, lit when fully read -->
+        <button @click="toggleRead(ch)" class="shrink-0" :class="isRead(ch) ? 'text-emerald-400' : 'text-zinc-600 hover:text-zinc-400'"
+                :title="isRead(ch) ? 'unread' : 'mark read'">
+          <svg x-show="isRead(ch)" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M10 1 2.5 3.5v5c0 4.5 3.2 8.7 7.5 10 4.3-1.3 7.5-5.5 7.5-10v-5L10 1Zm-1 12-3-3 1.4-1.4L9 10.2l4.6-4.6L15 7l-6 6Z"/></svg>
+          <svg x-show="!isRead(ch)" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 20 20"><path d="M10 2 3.5 4.2v4.3c0 4 2.9 7.8 6.5 9 3.6-1.2 6.5-5 6.5-9V4.2L10 2Z" stroke-linejoin="round"/><path d="m7 10 2.2 2.2L13.5 8" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
         <a :href="'/export/cbz?plugin='+plugin+'&slug='+encodeURIComponent(slug+'/'+chSlug(ch))"
            class="text-xs h-7 px-2 inline-flex items-center rounded border border-zinc-700 text-zinc-300 hover:bg-zinc-800">⬇ cbz</a>
@@ -110,10 +110,13 @@ function detailPage() {
     detail: {}, chapters: [], cached: false, loading: true, refreshing: false,
     err: '', coverBroken: false, hint: null, related: [], pluginName: '', pluginLogoOk: true,
     inLibrary: false, libraryBusy: false,
-    chPage: 0, readState: {}, // id -> {skip, read} (chapter-list-controls 1.2)
-    get pageCount() { return Math.max(1, Math.ceil(this.chapters.length / 20)); },
-    chPageRows() { return this.chapters.slice(this.chPage * 20, this.chPage * 20 + 20); },
+    chPage: 0, showHidden: false, readState: {}, // id -> {skip, read} (chapter-list-controls 1.2)
+    get pageCount() { return Math.max(1, Math.ceil(this.visibleChapters().length / 20)); },
+    visibleChapters() { return this.showHidden ? this.chapters : this.chapters.filter(c => !c.done); },
+    chPageRows() { return this.visibleChapters().slice(this.chPage * 20, this.chPage * 20 + 20); },
+    hiddenCount() { return this.chapters.length - this.visibleChapters().length; },
     readMax(ch) { return (this.readState[ch.id] && this.readState[ch.id].read) || 0; },
+    isRead(ch) { return ch.pages ? this.readMax(ch) >= ch.pages : this.readMax(ch) > 0; },
     async loadChapterState() {
       if (!this.chapters.length) return;
       try {
@@ -123,7 +126,7 @@ function detailPage() {
       } catch (e) { /* list renders without state */ }
     },
     async toggleRead(ch) {
-      const to = this.readMax(ch) > 0 ? 0 : (ch.total || 1);
+      const to = this.isRead(ch) ? 0 : (ch.pages || 1);
       this.readState[ch.id] = {...(this.readState[ch.id] || {}), read: to || undefined};
       if (!to) delete this.readState[ch.id].read;
       try { await fetch(`/chapter/${encodeURIComponent(ch.id)}/read`, {method: 'POST',
