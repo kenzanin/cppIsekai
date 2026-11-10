@@ -25,17 +25,19 @@
     <option value="rtl">rtl</option>
   </select>
   <div class="flex items-center gap-1" role="group" aria-label="Image zoom">
-    <button @click="zoomOut()" :disabled="zoomPct <= 50" aria-label="Zoom out"
+    <button @click="zoomOut()" :disabled="zoom === 'custom' && zoomPct <= 25" aria-label="Zoom out"
             class="w-9 h-9 rounded border border-zinc-700 text-lg leading-none text-zinc-100 hover:bg-zinc-800 disabled:opacity-30">&#8722;</button>
-    <span class="w-12 text-center text-xs tabular-nums text-zinc-400 select-none" x-text="zoomPct + '%'"></span>
-    <button @click="zoomIn()" :disabled="zoomPct >= 200" aria-label="Zoom in"
+    <span class="w-12 text-center text-xs tabular-nums text-zinc-400 select-none" x-show="zoom === 'custom'" x-cloak x-text="zoomPct + '%'"></span>
+    <span class="w-12 text-center text-xs tabular-nums text-zinc-600 select-none" x-show="zoom !== 'custom'" x-cloak x-text="'—'"></span>
+    <button @click="zoomIn()" :disabled="zoom === 'custom' && zoomPct >= 400" aria-label="Zoom in"
             class="w-9 h-9 rounded border border-zinc-700 text-lg leading-none text-zinc-100 hover:bg-zinc-800 disabled:opacity-30">+</button>
   </div>
-  <select x-model="zoom" @change="persist()" aria-label="Zoom"
+  <select x-model="zoom" @change="zoomPresetChanged()" aria-label="Zoom"
           class="bg-zinc-900 border border-zinc-700 rounded px-2 py-2 text-sm">
     <option value="fit-h">fit H</option>
     <option value="fit-w">fit W</option>
     <option value="1:1">1:1</option>
+    <option value="custom">custom</option>
   </select>
   <span class="flex-1"></span>
   <span class="text-xs text-zinc-500 tabular-nums pr-1" x-text="label()"></span>
