@@ -12,6 +12,20 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_COMPILER_LAUNCHER ccache)
 set(CMAKE_C_COMPILER_LAUNCHER ccache)
 
+# mold: 5-10x faster links than GNU ld when available; zero cost when not.
+find_program(MOLD_LINKER mold)
+if(MOLD_LINKER)
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fuse-ld=mold")
+  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fuse-ld=mold")
+endif()
+
+# PCH for the daemon's two heavy header clusters: stdlib + glaze/json so
+# template-heavy TUs (cache/http_api/plugin) stop paying the preprocess price per-file.
+function(_cppisekai_pch target)
+  target_precompile_headers(${target} PRIVATE
+    <memory> <vector> <string> <optional> <map> <unordered_map> <algorithm> <utility> <filesystem> <mutex> <span> <cstring> <cstdint> <ctime> <array> <variant>)
+endfunction()
+
 
 # --- system shared libs ---
 find_package(PkgConfig REQUIRED)
@@ -62,6 +76,8 @@ target_compile_definitions(cppIsekai PRIVATE CPPISEKAI_FETCH_LIB_DIR="${CMAKE_SO
 target_compile_options(cppIsekai PRIVATE -Wall -Wextra)
 set_target_properties(cppIsekai PROPERTIES BUILD_RPATH
                                            "${TP}/curl-impersonate/lib")
+_cppisekai_pch(cppIsekai)
+
 
 # --- tests (doctest, system package) ---
 # ponytail: single test binary; split per-module when the suite outgrows one
@@ -99,6 +115,8 @@ target_compile_definitions(
 set_target_properties(test_plugin PROPERTIES BUILD_RPATH
                                              "${TP}/curl-impersonate/lib")
 add_test(NAME plugin COMMAND test_plugin)
+_cppisekai_pch(test_plugin)
+
 
 # host-helper core + runtime parity (plugin-helper 2.1): htmltext core cases
 # direct; lua/js/wasm parity through the real Host on migrated fixtures.
@@ -118,6 +136,8 @@ target_compile_definitions(
 set_target_properties(test_htmltext PROPERTIES BUILD_RPATH
                                                "${TP}/curl-impersonate/lib")
 add_test(NAME htmltext COMMAND test_htmltext)
+_cppisekai_pch(test_htmltext)
+
 
 # cache core: disk LRU store; fetcher injected -> network-free tests
 add_executable(test_cache tests/test_cache.cpp src/cache/cache.cpp src/cache/cache_img.cpp)
@@ -125,6 +145,8 @@ target_include_directories(test_cache PRIVATE src)
 target_link_libraries(test_cache PRIVATE spdlog::spdlog PkgConfig::VIPS)
 target_compile_options(test_cache PRIVATE -Wall -Wextra)
 add_test(NAME cache COMMAND test_cache)
+_cppisekai_pch(test_cache)
+
 
 # transcode core (cache-layout-v3 1.2): header-only vips buffer in/out
 add_executable(test_transcode tests/test_transcode.cpp)
@@ -152,6 +174,8 @@ target_include_directories(test_http_img PRIVATE src)
 target_link_libraries(test_http_img PRIVATE spdlog::spdlog PkgConfig::VIPS)
 target_compile_options(test_http_img PRIVATE -Wall -Wextra)
 add_test(NAME http_img COMMAND test_http_img)
+_cppisekai_pch(test_http_img)
+
 
 # CBZ export core: in-memory zip of the cached tree, crow-free
 add_executable(test_export tests/test_export.cpp src/http/export_cbz.cpp ${TP}/libzippp/libzippp.cpp)
@@ -166,6 +190,8 @@ target_include_directories(test_stale PRIVATE src ${TP}/glaze ${TP}/sqlite_orm/i
 target_link_libraries(test_stale PRIVATE spdlog::spdlog PkgConfig::VIPS sqlite3)
 target_compile_options(test_stale PRIVATE -Wall -Wextra)
 add_test(NAME stale COMMAND test_stale)
+_cppisekai_pch(test_stale)
+
 
 # pages api core (reader-page 1.1): pure builder, envelopes faked; crow
 # confined to the TU under test
@@ -193,6 +219,8 @@ target_include_directories(test_worker PRIVATE src)
 target_link_libraries(test_worker PRIVATE spdlog::spdlog PkgConfig::VIPS)
 target_compile_options(test_worker PRIVATE -Wall -Wextra)
 add_test(NAME worker COMMAND test_worker)
+_cppisekai_pch(test_worker)
+
 
 # ponytail: no CPack/install yet -- add when packaging matters
 
