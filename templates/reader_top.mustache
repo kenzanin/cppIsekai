@@ -1,6 +1,6 @@
-<!-- top overlay: back + chapter jump + page jump. Shown only while navShown. -->
+<!-- top overlay: back + chapter dropdown (synced) + mode/dir/zoom. Shown only while navShown. -->
 <div x-show="navShown && !done" x-cloak
-     class="fixed top-0 inset-x-0 z-30 flex items-center gap-2 px-2 py-2 bg-zinc-950/90 border-b border-zinc-800 backdrop-blur">
+     class="fixed top-0 inset-x-0 z-30 flex items-center gap-2 px-2 py-2 flex-wrap bg-zinc-950/90 border-b border-zinc-800 backdrop-blur">
   <a :href="'/view/manga/'+encodeURIComponent(plugin)+'/'+encodeURIComponent(slug)"
      class="flex items-center gap-1.5 px-2 py-2 rounded border border-zinc-700 text-zinc-100 hover:bg-zinc-800" aria-label="Back to detail">
     <svg class="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 19l-7-7 7-7"/><path d="M3.5 12H14"/><path d="M14 4h4a2 2 0 012 2v12a2 2 0 01-2 2h-4"/></svg>
@@ -9,14 +9,33 @@
   <select :value="ch" @change="gotoChapter($event.target.value)" aria-label="Chapter"
           class="bg-zinc-900 border border-zinc-700 rounded px-2 py-2 text-sm max-w-[35vw]">
     <template x-for="c in chaptersList" :key="c.id">
-      <option :value="c.number" :selected="Number(c.number) === this.ch" x-text="'ch ' + c.number + (c.title ? ' — ' + c.title : '')"></option>
+      <option :value="c.number" :selected="Number(c.number) === ch" x-text="'ch ' + c.number + (c.title ? ' — ' + c.title : '')"></option>
     </template>
   </select>
-  <select :value="page" @change="goto_page(Number($event.target.value))" aria-label="Page"
+  <select x-model="mode" @change="modeChanged()" aria-label="Reading mode"
           class="bg-zinc-900 border border-zinc-700 rounded px-2 py-2 text-sm">
-    <template x-for="n in pages.length" :key="n">
-      <option :value="n" :selected="n === this.page" x-text="'p ' + n"></option>
-    </template>
+    <option value="webtoon">webtoon</option>
+    <option value="paged">paged</option>
+    <option value="spread-h">spread h</option>
+    <option value="spread-v">spread v</option>
+  </select>
+  <select x-model="dir" x-show="mode !== 'webtoon'" @change="persist()" aria-label="Direction"
+          class="bg-zinc-900 border border-zinc-700 rounded px-2 py-2 text-sm">
+    <option value="ltr">ltr</option>
+    <option value="rtl">rtl</option>
+  </select>
+  <div class="flex items-center gap-1" role="group" aria-label="Image zoom">
+    <button @click="zoomOut()" :disabled="zoomPct <= 50" aria-label="Zoom out"
+            class="w-9 h-9 rounded border border-zinc-700 text-lg leading-none text-zinc-100 hover:bg-zinc-800 disabled:opacity-30">&#8722;</button>
+    <span class="w-12 text-center text-xs tabular-nums text-zinc-400 select-none" x-text="zoomPct + '%'"></span>
+    <button @click="zoomIn()" :disabled="zoomPct >= 200" aria-label="Zoom in"
+            class="w-9 h-9 rounded border border-zinc-700 text-lg leading-none text-zinc-100 hover:bg-zinc-800 disabled:opacity-30">+</button>
+  </div>
+  <select x-model="zoom" @change="persist()" aria-label="Zoom"
+          class="bg-zinc-900 border border-zinc-700 rounded px-2 py-2 text-sm">
+    <option value="fit-h">fit H</option>
+    <option value="fit-w">fit W</option>
+    <option value="1:1">1:1</option>
   </select>
   <span class="flex-1"></span>
   <span class="text-xs text-zinc-500 tabular-nums pr-1" x-text="label()"></span>

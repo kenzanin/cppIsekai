@@ -15,7 +15,7 @@
 struct PagesCtx {
     std::string plugin;
     std::string slug;
-    int ch{};
+    double ch{}; // chapter numbers are fractional in the wild (1, 1.5, ...)
 };
 
 /** Reader page-list JSON from the chapters envelope and the target chapter's

@@ -59,10 +59,15 @@ function readerPage() {
       // then ?ch and ?page override, then JS defaults (ch 1, paged rtl).
       this.ch = Number('{{resume_ch}}') || 1;
       this.page = Number('{{resume_page}}') || 1;
+      // jump-to-ch always starts at page 1; only the same-chapter resume keeps a page
+      const qCh = Number(q.get('ch'));
       if ('{{resume_mode}}') this.mode = '{{resume_mode}}';
       if ('{{resume_dir}}') this.dir = '{{resume_dir}}';
       if ('{{resume_zoom}}') this.zoom = '{{resume_zoom}}';
-      if (q.get('ch')) this.ch = Number(q.get('ch')) || 1;
+      if (qCh) {
+        this.ch = qCh;
+        if (!q.get('page') && qCh !== Number('{{resume_ch}}')) this.page = 1; // different chapter => restart at p1
+      }
       if (q.get('mode')) this.mode = q.get('mode');
       if (q.get('dir')) this.dir = q.get('dir');
       if (q.get('page')) this.page = Number(q.get('page')) || 1;
@@ -140,7 +145,6 @@ function readerPage() {
       });
     },
     gotoChapter(n) { window.location = this.chUrl(Number(n)); },
-    focusPageJump() { this.navShown = true; this.$nextTick(() => { const el = this.$root.querySelector('[aria-label="Page"]'); if (el) el.focus(); }); },
     wheel(e) {
       const shell = this.$root.querySelector('[data-shell]');
       if (shell && shell.scrollHeight > shell.clientHeight + 2) {

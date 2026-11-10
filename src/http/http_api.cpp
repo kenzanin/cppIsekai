@@ -662,8 +662,8 @@ void register_api(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, BS:
 // list. Each entry is a host-rendered /cache/img URL (client never
 // builds cache paths -- design D1: ratio suffixes, v3 rel_path and
 // host-side transforms stay host-owned).
-    CROW_ROUTE(app, "/api/pages/<string>/<string>/<int>")
-    ([&](const crow::request& /*req*/, std::string plugin, std::string slug, int ch) -> crow::response {
+    CROW_ROUTE(app, "/api/pages/<string>/<string>/<double>")
+    ([&](const crow::request& /*req*/, std::string plugin, std::string slug, double chd) -> crow::response {
         if (!valid_title_pair(plugin, slug)) {
             return crow::response{404, R"({"ok":false,"error":"unknown title"})"};
         }
@@ -692,7 +692,7 @@ void register_api(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, BS:
                     if (num == entry.end())
                         continue;
                     const auto* d = std::get_if<double>(&num->second.data);
-                    if (!d || *d != ch)
+                    if (!d || *d != chd)
                         continue;
                     const auto idf = entry.find("id");
                     if (idf != entry.end()) {
@@ -711,7 +711,7 @@ void register_api(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, BS:
             const std::string pages_env =
                 call_cached(store, plugin, "pages", pages_params,
                             [&] { return plugins.call(plugin, "pages", pages_params); });
-            return build_pages_response(chs_env, pages_env, PagesCtx{plugin, slug, ch}).value_or(std::string{});
+            return build_pages_response(chs_env, pages_env, PagesCtx{plugin, slug, chd}).value_or(std::string{});
         });
         crow::response r;
         if (body.empty()) {

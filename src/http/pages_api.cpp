@@ -37,7 +37,15 @@ std::optional<std::string> build_pages_response(const std::string& chs_env, cons
     // Chapter list is number-ascending: last strictly-less = closest prev,
     // first strictly-greater = closest next.
     std::string target_id;
-    int prev = 0, next = 0;
+    double prev = 0, next = 0;
+    const auto fmt_ch = [](double v) {
+        const long long t = static_cast<long long>(v);
+        if (v == static_cast<double>(t)) return std::to_string(t); // integral: "2"
+        std::string s = std::to_string(v);                          // "1.500000"
+        s.erase(s.find_last_not_of('0') + 1);
+        if (s.back() == '.') s.pop_back();
+        return s;
+    };
     bool have_prev = false, have_next = false;
     if (const auto chs = envelope_data(chs_env)) {
         for (const auto& item : *chs) {
@@ -57,10 +65,10 @@ std::optional<std::string> build_pages_response(const std::string& chs_env, cons
                         target_id = *s;
                 }
             } else if (*d < ctx.ch) {
-                prev = static_cast<int>(*d);
+                prev = *d;
                 have_prev = true;
             } else if (*d > ctx.ch && !have_next) {
-                next = static_cast<int>(*d);
+                next = *d;
                 have_next = true;
             }
         }
@@ -82,7 +90,7 @@ std::optional<std::string> build_pages_response(const std::string& chs_env, cons
         if (const auto* s = std::get_if<std::string>(&el.data)) {
             ++page; // 1-based page number, index stays 0-based
             page_urls.emplace_back("/cache/img?url=" + url_encode(*s) + "&plugin=" + url_encode(ctx.plugin) +
-                                   "&slug=" + url_encode(ctx.slug) + "&ch=" + std::to_string(ctx.ch) +
+                                   "&slug=" + url_encode(ctx.slug) + "&ch=" + fmt_ch(ctx.ch) +
                                    "&page=" + std::to_string(page));
         }
     }
