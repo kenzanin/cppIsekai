@@ -1,4 +1,5 @@
 ## 2026-11-10
+* **Creation**: Documented concept `decisions/dummy-seed-removal.md` (dummy seed plugins removed).
 * **Creation**: Documented concept `decisions/search-cache-jsonb.md` (search-cache: api read model as JSONB in sqlite).
 * **Creation**: Documented concept `decisions/browser-smoke-tooling.md` (browser smoke tooling: blueprint-mcp free mode).
 * **Creation**: Documented concept `decisions/cache-stale-hit-guard.md` (cache stale-hit guard: wipe no longer serves 200-blank).
