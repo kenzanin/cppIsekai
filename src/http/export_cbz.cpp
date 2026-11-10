@@ -80,18 +80,20 @@ std::optional<std::string> build(const std::string& cache_root, const std::strin
                                  const std::string& slug) {
     std::map<std::string, fs::path> entries; // map = lexicographic entry order
     if (!plugin.empty() && !slug.empty()) {
-        const fs::path root = fs::path(cache_root) / "img" / plugin;
+        // Layout v3 pages: <root>/manga/<manga>/<ch-dir>/pNNN.ext. Slug carries
+        // an optional "/chNNN" suffix exporting a single chapter; prefix match
+        // keeps cache.cpp's "-id8" collision variant visible. Cover omitted:
+        // v3 cover files are content-hash named, no slug mapping at fs level.
+        const auto slash = slug.find('/');
+        const std::string manga = slash == std::string::npos ? slug : slug.substr(0, slash);
+        const std::string ch_filter = slash == std::string::npos ? "" : slug.substr(slash + 1);
+        const fs::path base = fs::path(cache_root) / "img" / plugin / "manga" / manga;
         std::error_code ec;
-        for (const auto& e : fs::directory_iterator(root / "covers", ec)) {
-            if (ec) break;
-            const auto name = e.path().filename().string();
-            if (e.is_regular_file(ec) && name.starts_with(slug + "."))
-                entries.emplace("cover" + name.substr(slug.size()), e.path());
-        }
-        ec.clear();
-        for (const auto& ch : fs::directory_iterator(root / slug, ec)) {
+        for (const auto& ch : fs::directory_iterator(base, ec)) {
             if (ec) break;
             if (!ch.is_directory(ec)) continue;
+            const auto name = ch.path().filename().string();
+            if (!ch_filter.empty() && name.rfind(ch_filter, 0) != 0) continue;
             for (const auto& page : fs::directory_iterator(ch.path(), ec)) {
                 if (!ec && page.is_regular_file(ec))
                     entries.emplace((ch.path().filename() / page.path().filename()).generic_string(),
