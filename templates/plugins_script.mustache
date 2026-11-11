@@ -1,12 +1,14 @@
 <script>
 function pluginsPage() {
   return {
-    rows: [], q: '', busy: false,
+    rows: [], enrich: [], q: '', busy: false,
     broken: {},
     async load() {
       this.busy = true
       const j = await (await fetch('/api/plugins')).json()
       this.rows = j.plugins || []
+      const e = await (await fetch('/api/enrichment')).json()
+      this.enrich = e.sources || []
       this.busy = false
     },
     get view() {
@@ -14,6 +16,11 @@ function pluginsPage() {
       if (!q) return this.rows
       return this.rows.filter(r =>
         r.name.toLowerCase().includes(q) || (r.caps || '').toLowerCase().includes(q))
+    },
+    get enrichView() {
+      const q = this.q.trim().toLowerCase()
+      if (!q) return this.enrich
+      return this.enrich.filter(e => e.name.toLowerCase().includes(q))
     },
     caps(r) { return (r.caps || '').split(',').filter(Boolean) },
     stateText(r) { return !r.enabled ? '○ disabled' : (r.state === 'error' ? '⚠ error' : '● active') },
