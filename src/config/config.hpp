@@ -38,6 +38,7 @@ struct Config {
     std::string data_dir;
     std::string log_level; // [log] level: trace|debug|info|warning|error
     std::string templates_dir; // [paths] templates_dir: mustache template root
+    std::string enrichment_dir; // [paths] enrichment_dir: metadata-only enrichment plugins (NOT scraper plugins)
 };
 
 // Per-knob CLI state. Explicit = opt->count() > 0 (D7), never value comparison;
@@ -90,8 +91,9 @@ inline Config to_config(const std::array<std::string, kEntryCount>& v) {
     c.db = v[9];
     c.log_file = v[10];
     c.data_dir = v[11];
-    c.log_level = v[12];
-    c.templates_dir = v[13];
+    c.templates_dir = v[12];
+    c.enrichment_dir = v[13];
+    c.log_level = v[14];
     if (c.port <= 0) {
         c.port = num_or<int>(kEntries[0].def, kEntries[0].def); // design ceiling: port > 0
     }

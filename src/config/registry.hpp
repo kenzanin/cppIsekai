@@ -24,7 +24,7 @@ struct Entry {
 };
 
 // Order is the projection order consumed by config.hpp -- do not reorder.
-inline constexpr std::array<Entry, 14>
+inline constexpr std::array<Entry, 15>
     kEntries{
         {
             // section      key                   flag                 alias          env def doc
@@ -132,6 +132,14 @@ inline constexpr std::array<Entry, 14>
              .env = "CPPISEKAI_TEMPLATES_DIR",
              .def = "templates",
              .doc = "Template directory (mustache partials read from disk per request)",
+             .type = Type::Str},
+            {.section = "paths",
+             .key = "enrichment",
+             .flag = "enrichment-dir",
+             .alias = "",
+             .env = "CPPISEKAI_ENRICHMENT_DIR",
+             .def = "data/enrichment",
+             .doc = "Enrichment plugin directory (metadata-only sources; NOT scraper plugins)",
              .type = Type::Str},
             {.section = "log",
              .key = "level",
