@@ -1,0 +1,8 @@
+{
+  "name": "MangaDex Enrichment",
+  "id": "mangadex-enrichment",
+  "version": "1.0.0",
+  "runtime": "lua",
+  "capabilities": ["enrichment"],
+  "api": 1
+}
