@@ -121,12 +121,34 @@ local function author_names(data)
   return out
 end
 
+-- Title Case like MangaDex tags ("Slice of Life", "Sci-Fi").
+-- Preserve all-caps words (Sci-Fi, ISEKAI handled via hyphen rules) and known acronyms.
+local function title_case(s)
+  local LOWER = { ["of"] = true, ["the"] = true, ["and"] = true, ["a"] = true, ["an"] = true, ["in"] = true, ["on"] = true, ["for"] = true, ["to"] = true }
+  local KEEP = { ["sci-fi"] = "Sci-Fi" }
+  local lower = s:lower()
+  if KEEP[lower] then return KEEP[lower] end
+  local function cap_word(w)
+    if w == "" then return w end
+    return (w:gsub("([a-zA-Z])([a-zA-Z]*)", function(a, b) return a:upper() .. b:lower() end))
+  end
+  local out = {}
+  for part in lower:gmatch("%S+") do
+    if #out > 0 and LOWER[part] then out[#out + 1] = part else out[#out + 1] = cap_word(part) end
+  end
+  return table.concat(out, " ")
+end
+
 local function genre_names(data)
   local out = {}
   local seen = {}
   for _, g in ipairs(data.genres or {}) do
     local name = g.genre
-    if name and name ~= "" and not seen[name] then seen[name] = true; out[#out + 1] = name end
+    if name and name ~= "" then
+      name = title_case(name)
+      local key = name:lower()
+      if not seen[key] then seen[key] = true; out[#out + 1] = name end
+    end
   end
   return out
 end

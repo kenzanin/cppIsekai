@@ -23,9 +23,15 @@ end
 
 local function get(url)
   local res, err = host.http.fetch(url, {
-    ["Accept"] = "application/json",
+    accept = "application/json",
+    headers = { ["User-Agent"] = "cppIsekai-Enrichment/1.0 (mangadex enrichment)" },
   })
-  if err ~= nil then return nil end
+  if err ~= nil then
+    host.log.debug("GET " .. url .. " -> fetch error: " .. tostring(err))
+    return nil
+  end
+  local ct = (res.headers and res.headers["content-type"]) or "?"
+  host.log.debug("GET " .. url .. " -> " .. tostring(res.status) .. " len=" .. #(res.body or "") .. " ct=" .. ct)
   if not res or res.status ~= 200 then return nil end
   local ok, body = pcall(json.decode, res.body)
   if not ok or type(body) ~= "table" then return nil end
@@ -85,13 +91,12 @@ end
 
 local function extract_tags(rec)
   local out, seen = {}, {}
-  for _, rel in ipairs(rec.relationships or {}) do
-    if rel.type == "tag" then
-      local attrs = rel.attributes or {}
-      if attrs.group == "genre" or attrs.group == "theme" or attrs.group == "format" then
-        local name = pick(attrs.name)
-        if name ~= "" and not seen[name] then seen[name] = true; out[#out + 1] = name end
-      end
+  for _, t in ipairs((rec.attributes and rec.attributes.tags) or {}) do
+    local attrs = t.attributes or {}
+    local grp = attrs.group
+    if grp == "genre" or grp == "theme" or grp == "format" then
+      local name = pick(attrs.name)
+      if name ~= "" and not seen[name] then seen[name] = true; out[#out + 1] = name end
     end
   end
   return out

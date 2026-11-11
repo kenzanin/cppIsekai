@@ -44,6 +44,7 @@ void install_host_tools(lua_State* L, const std::string& id, const Config& conf,
     sol::table log = sv.create_table();
     log["info"] = [id](const std::string& msg) { spdlog::info("[plugin:{}] {}", id, msg); };
     log["error"] = [id](const std::string& msg) { spdlog::error("[plugin:{}] {}", id, msg); };
+    log["debug"] = [id](const std::string& msg) { spdlog::debug("[plugin:{}] {}", id, msg); };
     fs_tab["log"] = log;
 
     fs_tab["now"] = sol::as_function([] { return static_cast<long long>(std::time(nullptr)); });
