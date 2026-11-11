@@ -1,9 +1,9 @@
 ---
 type: decision
 title: "Library page design (status, progress, done/new badges)"
-description: "Design locked: title-level status/total/read/has_update, badges done/new, sidebar filter, mark_read+clear_update, placeholder covers; implementation deferred to user-driven openspec"
+description: "Design locked: title-level status/total/read/has_update, badges done/new, sidebar filter, mark_read+clear_update, placeholder covers; store+sync layer SHIPPED via library-grid-stats 2026-11-11 (16/16 tests), badge UI lands with library-grid-controls."
 tags: [library, ui, schema]
-generated: { by: agent/mcp, at: "2026-11-06T14:20:19Z" }
+generated: { by: agent/mcp, at: "2026-11-11T16:59:41Z" }
 status: stable
 ---
 

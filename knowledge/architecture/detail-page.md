@@ -1,9 +1,9 @@
 ---
 type: Fact
 title: Detail page design + enrichment plugin (alt cover/alt info)
-description: "Detail page + enrichment (shipped 2026-11-11, openspec complete 26/26): recommendations kind (MangaDex/MangaUpdates, cap 5) merged into Related; fetched entries keyed (source,kind); chosen cover overlays library grid + /api/library; covers cap 5 (MangaDex catalogue/MangaUpdates 1); tags attributes.tags; MU Title-Case; host.log.debug; combined alt-titles picker (MangaDex alTitles + MangaUpdates associated, unicode-aware dedupe; single picker from picker modal); detail template layout restructured (unclosed header/meta divs fixed 607ea9e -> chapters were nested in meta col, 2102px header; golden regen 2d91dcf); golden-file render lock in place (decisions/template-golden-test). Daemon :8090."
+description: "Detail page + enrichment (shipped 2026-11-11, 26/26 tasks): recommendations kind (MangaDex/MangaUpdates, cap 5) merged into Related; fetched keyed (source,kind); chosen cover overlays library grid + /api/library; covers cap 5; tags attributes.tags; MU Title-Case; combined alt-titles picker (unicode-aware dedupe); layout restructured (unclosed header/meta divs fixed 607ea9e; golden regen 2d91dcf); golden-file render lock (decisions/template-golden-test). Attribution row under title = ONE flex line (merged 2026-11-11): plugin logo + pluginName + status + release date + cached badge; logo guarded x-if=\"pluginName && pluginLogoOk\"; container x-show = pluginName || detail.status || detail.release_at || cached. Chapter pager 20/page client-side, single-root x-for button — see decisions/chapter-list-controls. Daemon :8090."
 tags: [detail, enrichment, cover, wizard, cache, plugin]
-generated: { by: agent/mcp, at: "2026-11-11T08:14:38Z" }
+generated: { by: agent/mcp, at: "2026-11-11T15:18:43Z" }
 status: stable
 ---
 

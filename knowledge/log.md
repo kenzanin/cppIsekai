@@ -1,4 +1,10 @@
 ## 2026-11-11
+* **Update**: Updated concept `architecture/library-dedup.md`.
+* **Creation**: Documented concept `architecture/library-dedup.md` (library-dedup: signal columns on saved_manga; site plugins carry description, not synopsis).
+* **Update**: Updated concept `architecture/library-page.md`.
+* **Creation**: Documented concept `architecture/http-layer-gotchas.md` (src/http compile gotchas: global-scope helpers in api_ctx.hpp; crow::response is move-only).
+* **Creation**: Documented concept `architecture/library-grid-stats.md` (library-grid-stats: saved_manga stat columns + envelope-derived sync).
+* **Creation**: Documented concept `decisions/db-read-parallel.md` (DB read-parallel deferred: keep single-writer db_pool; read-only scans on demand).
 * **Update**: Updated concept `decisions/chapter-list-controls.md`.
 * **Update**: Updated concept `architecture/atsumaru-plugin.md`.
 * **Update**: Updated concept `decisions/api-cache-lock-miss-regression.md`.
