@@ -42,3 +42,6 @@
 - [x] 6.1 `cmake --build build -j` zero warnings; full `ctest` pass.
 - [x] 6.2 `openspec validate --change detail-enrichment-fields` errors=0.
 - [x] 6.3 okf: persist enrichment architecture facts; `okf_validate --strict --drift` errors=0; record `decisions/detail-enrichment-fields-contract`? — update `architecture/detail-page` body with D1–D10 highlights.
+
+## 7. Post-apply amendments (2026-11-11)
+- [x] 7.1 Combined alt-titles picker: MangaDex `alt_titles` (title + altTitles, lang-tagged) merged with MangaUpdates `associated[]` titles; normalized dedupe (lowercase, strip non-alphanumerics) across sources, MangaDex wins on collision; pick sets `chosen.title` (user decision: no separate alt-title field). UI `altTitleCandidates()` in `detail_script.mustache`; single list at top of the detail picker. Verified live: 13 merged candidates, dedupe hides normalized matches, pick applied to `<h1>`.
