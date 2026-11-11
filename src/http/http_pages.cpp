@@ -60,8 +60,9 @@ crow::json::wvalue home_context(Store& store, BS::thread_pool<>& db, const crow:
         }
         crow::json::wvalue row;
         row["name"] = item.name;
+        row["id"] = item.plugin_id; // client grid filter + ?plugin= deep-link key off plugin_id
         row["titles"] = std::to_string(saved_by_plugin[item.plugin_id]); // saved_manga is the Library; title search-cache is empty for plugin results
-        row["current"] = item.name == plugin;
+        row["current"] = item.plugin_id == plugin;
         if (!item.plugin_id.empty()) {
             row["logo"] = item.plugin_id; // absent key renders no <img> in the partial
         }

@@ -13,11 +13,11 @@
            onclick="{{#saved_mode}}event.preventDefault();window.dispatchEvent(new CustomEvent('grid:plugin',{detail:''})){{/saved_mode}}"
            {{^saved_mode}}hx-get="/library/grid" hx-target="#grid" hx-push-url="/"{{/saved_mode}}>All plugins</a>
         {{#plugins}}
-        <a href="/?plugin={{name}}"
-           data-grid-plugin="{{name}}"
+        <a href="/?plugin={{id}}"
+           data-grid-plugin="{{id}}"
            class="flex justify-between px-2 py-1 rounded {{#current}}bg-zinc-800{{/current}}"
-           onclick="{{#saved_mode}}event.preventDefault();window.dispatchEvent(new CustomEvent('grid:plugin',{detail:'{{name}}'})){{/saved_mode}}"
-           {{^saved_mode}}hx-get="/library/grid?plugin={{name}}" hx-target="#grid" hx-push-url="/?plugin={{name}}"{{/saved_mode}}>
+           onclick="{{#saved_mode}}event.preventDefault();window.dispatchEvent(new CustomEvent('grid:plugin',{detail:'{{id}}'})){{/saved_mode}}"
+           {{^saved_mode}}hx-get="/library/grid?plugin={{id}}" hx-target="#grid" hx-push-url="/?plugin={{id}}"{{/saved_mode}}>
           <span class="flex items-center gap-1.5">
             {{#logo}}<img src="/plugin/{{logo}}/logo" alt="" class="w-4 h-4 rounded-sm">{{/logo}}
             <span>{{name}}</span>
