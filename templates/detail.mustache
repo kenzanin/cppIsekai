@@ -63,66 +63,59 @@
           <span class="text-xs text-red-400" x-show="enrichErr" x-text="enrichErr"></span>
         </div>
         <p class="text-xs text-zinc-600 mb-2">Pick per field; nothing is applied until you choose it. Tags can be toggled; the detail page hides any tag in “hidden tags”.</p>
+<!-- combined detail candidates from BOTH enrichment sources; normalized dedupe, MangaDex wins; one block, md/mu badges -->
+        <div class="space-y-1" x-show="enrichKind !== 'covers' && (candFor('mangadex-enrichment', 'detail') || candFor('mangaupdates-enrichment', 'detail'))">
+          <div class="mb-2" x-show="altTitleCandidates().length">
+            <span class="text-[10px] text-zinc-600 mr-1">alt titles</span>
+            <div class="flex items-center gap-1 flex-wrap mt-1">
+              <template x-for="t in altTitleCandidates()" :key="t.lang + '|' + t.title">
+                <button @click="pickField('title', t.title)" class="text-xs px-2 py-0.5 rounded-full border" :class="chosenNow().title === t.title ? 'border-emerald-600 text-emerald-300' : 'border-zinc-700 text-zinc-500 hover:text-zinc-300'" :title="((t.lang ? t.lang + ' — ' : '') + (t.main ? 'main' : 'alt'))"><span class="text-[9px] text-zinc-700 mr-1" x-text="t.lang || ''"></span><span x-text="t.title"></span><span class="text-[8px] text-zinc-700 ml-1 align-middle" x-text="t.source === 'mangadex-enrichment' ? 'MD' : 'MU'"></span></button>
+              </template>
+            </div>
+          </div>
+          <template x-for="row in mergedSynopses()" :key="row.src">
+            <p class="leading-snug mb-1">
+              <button @click="pickField('synopsis', row.text)" class="text-xs px-2 py-0.5 rounded border border-zinc-700 text-zinc-400 hover:bg-zinc-800 mr-1" x-text="'use synopsis (' + (row.src === 'mangadex-enrichment' ? 'MD' : 'MU') + ')'"></button>
+              <span class="text-xs text-zinc-500" x-text="row.text"></span>
+            </p>
+          </template>
+          <p x-show="mergedList('authors').length" class="flex items-center gap-1 flex-wrap">
+            <span class="text-[10px] text-zinc-600 mr-1">authors</span>
+            <template x-for="a in mergedList('authors')" :key="a.name">
+              <button @click="toggleName('author', a.name)" class="text-xs px-2 py-0.5 rounded-full border" :class="(chosenNow().author || []).includes(a.name) ? 'border-emerald-600 text-emerald-300' : 'border-zinc-700 text-zinc-500 hover:text-zinc-300'"><span x-text="a.name"></span><span class="text-[8px] text-zinc-700 ml-1 align-middle" x-text="a.source === 'mangadex-enrichment' ? 'MD' : 'MU'"></span></button>
+            </template>
+          </p>
+          <p x-show="mergedList('artists').length" class="flex items-center gap-1 flex-wrap">
+            <span class="text-[10px] text-zinc-600 mr-1">artists</span>
+            <template x-for="a in mergedList('artists')" :key="a.name">
+              <button @click="toggleName('artist', a.name)" class="text-xs px-2 py-0.5 rounded-full border" :class="(chosenNow().artist || []).includes(a.name) ? 'border-emerald-600 text-emerald-300' : 'border-zinc-700 text-zinc-500 hover:text-zinc-300'"><span x-text="a.name"></span><span class="text-[8px] text-zinc-700 ml-1 align-middle" x-text="a.source === 'mangadex-enrichment' ? 'MD' : 'MU'"></span></button>
+            </template>
+          </p>
+          <p x-show="mergedList('tags').length" class="flex items-center gap-1 flex-wrap">
+            <span class="text-[10px] text-zinc-600 mr-1">tags</span>
+            <template x-for="t in mergedList('tags')" :key="t.name">
+              <button @click="toggleTag(t.name)" class="text-xs px-2 py-0.5 rounded-full border" :class="(chosenNow().tags_add || []).includes(t.name) ? 'border-emerald-600 text-emerald-300' : 'border-zinc-700 text-zinc-500 hover:text-zinc-300'"><span x-text="t.name"></span><span class="text-[8px] text-zinc-700 ml-1 align-middle" x-text="t.source === 'mangadex-enrichment' ? 'MD' : 'MU'"></span></button>
+            </template>
+          </p>
+        </div>
+        <!-- per-source errors (covers keep their own grid below) -->
+        <template x-for="src in enrichSources" :key="'err-' + src.id">
+          <p class="text-xs text-red-400" x-show="candFor(src.id, enrichKind) && !candFor(src.id, enrichKind).ok" x-text="(candFor(src.id, enrichKind) || {}).error"></p>
+        </template>
         <template x-for="src in enrichSources" :key="src.id">
-          <div class="mb-3" x-show="candFor(src.id, enrichKind)">
+          <div class="mb-3" x-show="enrichKind === 'covers' && candFor(src.id, 'covers') && candFor(src.id, 'covers').ok">
             <div class="flex items-center gap-2 mb-1">
               <span class="text-xs uppercase tracking-wide text-zinc-500" x-text="src.name || src.id"></span>
               <span class="text-[10px] text-zinc-700" x-show="busySources[src.id]">fetching…</span>
               <span class="text-[10px] text-zinc-700" x-show="!busySources[src.id] && candFor(src.id, enrichKind) && candFor(src.id, enrichKind).cached">(cached)</span>
             </div>
-            <template x-if="candFor(src.id, enrichKind) && candFor(src.id, enrichKind).ok">
-              <div>
-                <template x-if="enrichKind === 'covers'">
-                  <div class="flex flex-wrap gap-2">
-                    <template x-for="u in (candFor(src.id, 'covers').data && candFor(src.id, 'covers').data.covers) || []" :key="u">
-                      <button @click="pickField('cover', u)" class="w-20 border rounded overflow-hidden hover:ring-2 hover:ring-emerald-600" :class="chosenNow().cover === u ? 'ring-2 ring-emerald-600' : ''">
-                        <img :src="'/cache/img?url='+encodeURIComponent(u)+'&cover=1&plugin='+encodeURIComponent(plugin)+'&slug='+encodeURIComponent(slug)" class="w-full aspect-[2/3] object-cover" loading="lazy" alt="">
-                      </button>
-                    </template>
-                  </div>
-                </template>
-                <template x-if="enrichKind !== 'covers'">
-                  <div class="space-y-1">
-                    <!-- alt titles: one combined candidate list across all sources (normalized dedupe; MangaDex row wins on collision); only rendered once (first source) -->
-                    <div class="mb-2" x-show="src === enrichSources[0] && altTitleCandidates().length">
-                      <span class="text-[10px] text-zinc-600 mr-1">alt titles</span>
-                      <div class="flex items-center gap-1 flex-wrap mt-1">
-                        <template x-for="t in altTitleCandidates()" :key="t.lang + '|' + t.title">
-                          <button @click="pickField('title', t.title)" class="text-xs px-2 py-0.5 rounded-full border" :class="chosenNow().title === t.title ? 'border-emerald-600 text-emerald-300' : 'border-zinc-700 text-zinc-500 hover:text-zinc-300'" :title="((t.lang ? t.lang + ' — ' : '') + (t.main ? 'main' : 'alt'))"><span class="text-[9px] text-zinc-700 mr-1" x-text="t.lang || ''"></span><span x-text="t.title"></span></button>
-                        </template>
-                      </div>
-                    </div>
-                    <p x-show="candFor(src.id, 'detail').data && candFor(src.id, 'detail').data.title" class="flex items-center gap-2">
-                      <button @click="pickField('title', candFor(src.id, 'detail').data.title)" class="text-xs px-2 py-0.5 rounded border border-zinc-700 text-zinc-400 hover:bg-zinc-800">use title</button>
-                      <span class="text-xs text-zinc-300" x-text="candFor(src.id, 'detail').data.title"></span>
-                    </p>
-                    <p x-show="candFor(src.id, 'detail').data && candFor(src.id, 'detail').data.synopsis" class="leading-snug">
-                      <button @click="pickField('synopsis', candFor(src.id, 'detail').data.synopsis)" class="text-xs px-2 py-0.5 rounded border border-zinc-700 text-zinc-400 hover:bg-zinc-800 mr-1">use synopsis</button>
-                      <span class="text-xs text-zinc-500" x-text="candFor(src.id, 'detail').data.synopsis"></span>
-                    </p>
-                    <p x-show="candFor(src.id, 'detail').data && (candFor(src.id, 'detail').data.authors || []).length" class="flex items-center gap-1 flex-wrap">
-                      <span class="text-[10px] text-zinc-600 mr-1">authors</span>
-                      <template x-for="a in candFor(src.id, 'detail').data.authors" :key="a">
-                        <button @click="toggleName('author', a)" class="text-xs px-2 py-0.5 rounded-full border" :class="(chosenNow().author || []).includes(a) ? 'border-emerald-600 text-emerald-300' : 'border-zinc-700 text-zinc-500 hover:text-zinc-300'" x-text="a"></button>
-                      </template>
-                    </p>
-                    <p x-show="candFor(src.id, 'detail').data && (candFor(src.id, 'detail').data.artists || []).length" class="flex items-center gap-1 flex-wrap">
-                      <span class="text-[10px] text-zinc-600 mr-1">artists</span>
-                      <template x-for="a in candFor(src.id, 'detail').data.artists" :key="a">
-                        <button @click="toggleName('artist', a)" class="text-xs px-2 py-0.5 rounded-full border" :class="(chosenNow().artist || []).includes(a) ? 'border-emerald-600 text-emerald-300' : 'border-zinc-700 text-zinc-500 hover:text-zinc-300'" x-text="a"></button>
-                      </template>
-                    </p>
-                    <p x-show="candFor(src.id, 'detail').data && (candFor(src.id, 'detail').data.tags || []).length" class="flex items-center gap-1 flex-wrap">
-                      <span class="text-[10px] text-zinc-600 mr-1">tags</span>
-                      <template x-for="t in candFor(src.id, 'detail').data.tags" :key="t">
-                        <button @click="toggleTag(t)" class="text-xs px-2 py-0.5 rounded-full border" :class="(chosenNow().tags_add || []).includes(t) ? 'border-emerald-600 text-emerald-300' : 'border-zinc-700 text-zinc-500 hover:text-zinc-300'" x-text="t"></button>
-                      </template>
-                    </p>
-                  </div>
-                </template>
-              </div>
-            </template>
-            <p class="text-xs text-red-400" x-show="candFor(src.id, enrichKind) && !candFor(src.id, enrichKind).ok" x-text="(candFor(src.id, enrichKind) || {}).error"></p>
+            <div class="flex flex-wrap gap-2">
+              <template x-for="u in (candFor(src.id, 'covers').data && candFor(src.id, 'covers').data.covers) || []" :key="u">
+                <button @click="pickField('cover', u)" class="w-20 border rounded overflow-hidden hover:ring-2 hover:ring-emerald-600" :class="chosenNow().cover === u ? 'ring-2 ring-emerald-600' : ''">
+                  <img :src="'/cache/img?url='+encodeURIComponent(u)+'&cover=1&plugin='+encodeURIComponent(plugin)+'&slug='+encodeURIComponent(slug)" class="w-full aspect-[2/3] object-cover" loading="lazy" alt="">
+                </button>
+              </template>
+            </div>
           </div>
         </template>
         <p class="text-xs text-zinc-600" x-show="!enrichSources.length">No enrichment sources loaded. Dev copies: symlink <code>~/tmp/goIsekai</code>… → see README “Enrichment plugins”.</p>

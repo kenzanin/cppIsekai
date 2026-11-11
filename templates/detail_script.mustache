@@ -43,7 +43,7 @@ function detailPage() {
       await this.load();
       this.loadChapterState();
     },
-    normAltTitle(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff\u3040-\u30ff]+/g, ' ').trim(); },
+    normAltTitle(s) { return String(s || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim(); },
     altTitleCandidates() {
       // merge main title + altTitles from all sources; normalized dedupe; MangaDex wins on collision
       const seen = new Map();
@@ -63,6 +63,24 @@ function detailPage() {
       const arr = [...seen.values()];
       arr.sort((a, b) => (b.main ? 1 : 0) - (a.main ? 1 : 0)); // main titles first
       return arr;
+    },
+    srcData(id) { const c = this.candFor(id, 'detail'); return (c && c.data) || {}; },
+    mergedList(field) { // MD first; MU shown only when no normalized collision
+      const md = this.srcData('mangadex-enrichment')[field];
+      const mu = this.srcData('mangaupdates-enrichment')[field];
+      const out = []; const seen = new Set();
+      const push = (v, source) => { const raw = String(v || '').trim(); const k = this.normAltTitle(raw); if (k && !seen.has(k)) { seen.add(k); out.push({ name: raw, source }); } };
+      (Array.isArray(md) ? md : []).forEach(v => push(v, 'mangadex-enrichment'));
+      (Array.isArray(mu) ? mu : []).forEach(v => push(v, 'mangaupdates-enrichment'));
+      return out;
+    },
+    mergedSynopses() {
+      const md = this.srcData('mangadex-enrichment').synopsis;
+      const mu = this.srcData('mangaupdates-enrichment').synopsis;
+      const out = [];
+      if (md) out.push({ src: 'mangadex-enrichment', text: md, key: this.normAltTitle(md) });
+      if (mu) { const k = this.normAltTitle(mu); if (!out.length || out[0].key !== k) out.push({ src: 'mangaupdates-enrichment', text: mu, key: k }); }
+      return out;
     },
     async loadEnrichSources() { // loaded enrichment plugins (picker needs the list)
       try {
