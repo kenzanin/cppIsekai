@@ -56,15 +56,35 @@ void register_enrich(Ctx& c) {
         if (!valid_title_pair(plugin, slug)) {
             return crow::response{404, R"({"ok":false,"error":"unknown title"})"};
         }
-        crow::json::wvalue chosen_out;
         const auto& ch = json["chosen"];
-        if (ch.has("title")) chosen_out["title"] = ch["title"];
-        if (ch.has("synopsis")) chosen_out["synopsis"] = ch["synopsis"];
-        if (ch.has("artist")) chosen_out["artist"] = ch["artist"];
-        if (ch.has("author")) chosen_out["author"] = ch["author"];
-        if (ch.has("cover")) chosen_out["cover"] = ch["cover"];
-        if (ch.has("tags_add")) chosen_out["tags_add"] = ch["tags_add"];
-        if (ch.has("tags_hidden")) chosen_out["tags_hidden"] = ch["tags_hidden"];
+        if (ch.t() != crow::json::type::Object)
+            return crow::response{400, R"({"ok":false,"error":"chosen must be an object"})"};
+        // exact key whitelist: unknown keys reject the whole write (task 3.2)
+        for (const auto& member : ch) { // crow rvalue: range-for yields rvalue&, keys come from .key()
+            const std::string k = std::string(member.key());
+            static const char* allowed[] = {"title", "synopsis", "artist", "author", "cover", "tags_add", "tags_hidden"};
+            bool ok_key = false;
+            for (const char* a : allowed) if (k == a) { ok_key = true; break; }
+            if (!ok_key)
+                return crow::response{400, R"({"ok":false,"error":"unknown chosen key"})"};
+        }
+        crow::json::wvalue chosen_out;
+        for (const char* key : {"title", "synopsis", "artist", "author", "cover"})
+            if (ch.has(key) && ch[key].t() == crow::json::type::String) chosen_out[key] = ch[key];
+        for (const char* key : {"tags_add", "tags_hidden"}) {
+            if (!ch.has(key)) continue;
+            const auto& arr = ch[key];
+            if (arr.t() != crow::json::type::List)
+                return crow::response{400, R"({"ok":false,"error":"tags_add/tags_hidden must be an array of strings"})"};
+            crow::json::wvalue out_arr(crow::json::type::List);
+            int n = 0;
+            for (const auto& item : arr) {
+                if (item.t() != crow::json::type::String)
+                    return crow::response{400, R"({"ok":false,"error":"tags_add/tags_hidden must be an array of strings"})"};
+                out_arr[n++] = item;
+            }
+            chosen_out[key] = std::move(out_arr);
+        }
         on_pool(db, [&] { store.title_meta_put_chosen(plugin, slug, chosen_out.dump()); return 0; });
         crow::response r{R"({"ok":true})"};
         r.set_header("Content-Type", "application/json");
