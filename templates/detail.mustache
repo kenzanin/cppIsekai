@@ -2,9 +2,12 @@
 <div x-data="detailPage" x-init="boot()">
   <!-- header: cover + meta -->
   <div class="flex gap-5 mb-6">
-    <template x-if="detail.cover">
-      <img :src="'/cache/img?url='+encodeURIComponent(detail.cover)+'&cover=1&plugin='+encodeURIComponent(plugin)+'&slug='+encodeURIComponent(slug)" class="w-40 h-56 object-cover rounded-lg shrink-0" @error="coverBroken=true" x-show="!coverBroken" alt="">
-    </template>
+    <div class="relative shrink-0">
+      <template x-if="detail.cover">
+        <img :src="'/cache/img?url='+encodeURIComponent(detail.cover)+'&cover=1&plugin='+encodeURIComponent(plugin)+'&slug='+encodeURIComponent(slug)" class="w-40 h-56 object-cover rounded-lg" @error="coverBroken=true" x-show="!coverBroken" alt="">
+      </template>
+      <button @click="resetCover()" :disabled="enrichBusy" x-show="inLibrary && enrichment && enrichment.chosen && enrichment.chosen.cover" x-cloak class="absolute bottom-1 right-1 text-[10px] px-1.5 py-0.5 rounded bg-black/70 text-zinc-300 hover:text-white" title="drop chosen cover, restore the library cover">Reset cover</button>
+    </div>
     <div class="flex-1 min-w-0">
       <h1 class="text-2xl font-semibold mb-2 leading-tight" x-text="detail.name || '…'"></h1>
       <div class="flex flex-wrap gap-1.5 mb-2" x-show="detail.status || detail.release_at" x-cloak>
@@ -46,12 +49,12 @@
         <button @click="openEnrich('covers', false)" :disabled="enrichBusy" class="px-3 py-1.5 text-xs border border-zinc-700 rounded-md text-zinc-300 hover:bg-zinc-800 disabled:opacity-40">Fetch covers</button>
         <button @click="openEnrich('covers', true)" :disabled="enrichBusy" class="px-3 py-1.5 text-xs border border-zinc-800 rounded-md text-zinc-500 hover:bg-zinc-800 disabled:opacity-40" title="always refetch candidate covers">⟳ force</button>
         <button @click="resetDetail()" :disabled="enrichBusy" class="px-3 py-1.5 text-xs border border-zinc-800 rounded-md text-zinc-500 hover:bg-zinc-800 disabled:opacity-40" title="clear chosen title/synopsis/artist/author/tags (keeps cover)">Reset detail</button>
-        <button @click="resetCover()" :disabled="enrichBusy" class="px-3 py-1.5 text-xs border border-zinc-800 rounded-md text-zinc-500 hover:bg-zinc-800 disabled:opacity-40" title="drop chosen cover, restore the library cover">Reset cover</button>
         <span class="text-[11px] text-zinc-600" x-show="enrichLastFetched" x-text="'last fetched ' + fmtEnrichDate(enrichLastFetched)"></span>
         <span class="text-[11px] text-zinc-600" x-show="enrichBusy">fetching…</span>
       </div>
       <!-- picker panel: candidates grouped per source, user picks; nothing auto-applied -->
-      <div class="mt-3 border border-zinc-800 rounded-lg p-3 text-sm" x-show="enrichOpen" x-cloak>
+      <div :class="enrichKind === 'covers' ? 'fixed inset-0 z-50 bg-black/80 backdrop-blur-sm overflow-y-auto p-6' : 'mt-3 border border-zinc-800 rounded-lg p-3 text-sm'" x-show="enrichOpen" x-cloak @keydown.escape.window="enrichOpen = false">
+        <div :class="enrichKind === 'covers' ? 'max-w-4xl mx-auto bg-zinc-950 border border-zinc-800 rounded-xl p-4 text-sm' : ''">
         <div class="flex items-center gap-2 mb-2">
           <strong class="text-zinc-300" x-text="enrichKind === 'covers' ? 'Cover candidates' : 'Detail candidates'"></strong>
           <button class="text-xs text-zinc-500 underline" @click="enrichOpen = false">close</button>
@@ -113,6 +116,7 @@
           </div>
         </template>
         <p class="text-xs text-zinc-600" x-show="!enrichSources.length">No enrichment sources loaded. Dev copies: symlink <code>~/tmp/goIsekai</code>… → see README “Enrichment plugins”.</p>
+        </div>
       </div>
 
   <!-- chapters (chapter-list-controls 2.1): eye/check toggles, read/total counter,
