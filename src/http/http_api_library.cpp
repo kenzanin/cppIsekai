@@ -1,4 +1,5 @@
 #include "api_ctx.hpp"
+#include "enrich_internal.hpp"
 
 namespace http {
 namespace api {
@@ -21,7 +22,8 @@ void register_library(Ctx& c) {
             row["plugin"] = r.plugin;
             row["slug"] = r.slug;
             row["name"] = r.name;
-            row["cover"] = r.cover;
+            const auto ov = chosen_cover(store, db, r.plugin, r.slug);
+            row["cover"] = ov.value_or(r.cover);
             row["added_at"] = static_cast<double>(r.added_at);
             list[idx++] = std::move(row);
         }

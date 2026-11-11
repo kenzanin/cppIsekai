@@ -1,4 +1,5 @@
 #include "http_routes.hpp"
+#include "enrich_internal.hpp"
 
 #include <fstream>
 #include <sstream>
@@ -72,19 +73,26 @@ crow::json::wvalue home_context(Store& store, BS::thread_pool<>& db, const crow:
     // the grid renders them (added_at desc) instead of the search-cache titles.
     // Cover prefetch: hand the saved covers to the cover worker; cache-first,
     // so entries already on disk are not re-fetched.
+    // overlay chosen enrichment covers so the grid matches the detail page
+    std::vector<std::optional<std::string>> ovl;
+    ovl.reserve(saved.size());
+    for (const auto& m : saved) ovl.push_back(http::api::chosen_cover(store, db, m.plugin, m.slug));
     std::vector<reader::CoverJob> jobs;
-    for (const auto& m : saved)
-        if (!m.cover.empty()) jobs.push_back({m.cover, m.plugin});
+    for (std::size_t i = 0; i < saved.size(); ++i) {
+        const std::string& c = ovl[i].has_value() ? *ovl[i] : saved[i].cover;
+        if (!c.empty()) jobs.push_back({c, saved[i].plugin});
+    }
     if (!jobs.empty()) covers.nudge(std::move(jobs));
     ctx["saved_mode"] = !saved.empty();
     ctx["empty_saved"] = saved.empty();
     std::vector<crow::json::wvalue> saved_rows;
-    for (const auto& m : saved) {
+    for (std::size_t i = 0; i < saved.size(); ++i) {
+        const auto& m = saved[i];
         crow::json::wvalue row;
         row["name"] = m.name;
         row["slug"] = m.slug;
         row["plugin"] = m.plugin;
-        row["cover"] = m.cover;
+        row["cover"] = ovl[i].value_or(m.cover);
         row["url"] = std::string("/view/manga/") + m.plugin + "/" + m.slug;
         saved_rows.push_back(std::move(row));
     }
