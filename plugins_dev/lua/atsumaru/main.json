@@ -1,0 +1,9 @@
+{
+  "name": "Atsumaru",
+  "id": "atsumaru",
+  "version": "1.0.0",
+  "website": "https://atsu.moe",
+  "runtime": "lua",
+  "capabilities": ["search", "detail", "chapters"],
+  "api": 1
+}
