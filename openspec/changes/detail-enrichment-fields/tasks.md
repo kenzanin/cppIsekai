@@ -24,10 +24,10 @@
 
 ## 4. Detail page UI
 
-- [ ] 4.1 `templates/detail.mustache` / `detail_script.mustache`: add to saved-only view — Fetch detail / Force fetch buttons + "last fetched <date>" label; Fetch covers / Force covers. Buttons disabled in-flight. Show fetched candidates grouped per source in a picker panel (title/synopsis/artist/author radio-per-field, tags checkbox-list, covers image grid).
-- [ ] 4.2 Cover wizard: modal overlay listing candidate covers (thumbnails via `/cache/img?url=...&cover=1`), pick → POST chosen → replace main cover immediately; Reset cover button next to cover.
-- [ ] 4.3 Reset detail button: clears title/synopsis/artist/author + tags_add/tags_hidden (keeps chosen.cover if any), re-renders from source.
-- [ ] 4.4 Merge application client-side from the `/api/detail` response (`chosen` block) — same shape SSR and Alpine hydration; no full page reload.
+- [x] 4.1 `templates/detail.mustache` / `detail_script.mustache`: add to saved-only view — Fetch detail / Force fetch buttons + "last fetched <date>" label; Fetch covers / Force covers. Buttons disabled in-flight. Show fetched candidates grouped per source in a picker panel (title/synopsis/artist/author radio-per-field, tags checkbox-list, covers image grid).
+- [x] 4.2 Cover wizard: modal overlay listing candidate covers (thumbnails via `/cache/img?url=...&cover=1`), pick → POST chosen → replace main cover immediately; Reset cover button next to cover.
+- [x] 4.3 Reset detail button: clears title/synopsis/artist/author + tags_add/tags_hidden (keeps chosen.cover if any), re-renders from source.
+- [x] 4.4 Merge application client-side from the `/api/detail` response (`chosen` block) — same shape SSR and Alpine hydration; no full page reload.
 
 ## 5. Tests & docs
 
