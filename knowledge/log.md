@@ -1,3 +1,6 @@
+## 2026-11-11
+* **Update**: Updated concept `architecture/detail-page.md`.
+
 ## 2026-11-10
 * **Creation**: Documented concept `decisions/static-assets-br.md` (Static assets: vendored, precompressed brotli-only via explicit routes).
 * **Creation**: Documented concept `decisions/curl-impersonate-chrome-only.md` (curl-impersonate: chrome-family only; ini-fed profile dropdown; local-time crow log).
