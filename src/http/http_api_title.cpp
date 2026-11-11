@@ -1,4 +1,5 @@
 #include "api_ctx.hpp"
+#include "enrich_internal.hpp"
 
 #include <ctime>
 
@@ -24,9 +25,13 @@ crow::response title_data_response(plugin::Host& plugins, BS::thread_pool<>& db,
     crow::json::wvalue p;
     p["id"] = slug; // the slug IS the title key the cache layout and plugins mint
     const std::string params = p.dump();
-    crow::response r{on_pool(plugin_pool, [&] {
+    std::string body = on_pool(plugin_pool, [&] {
         return call_cached(store, plugin, method, params, [&] { return plugins.call(plugin, method, params); });
-    })};
+    });
+    if (method == "detail") {
+        body = apply_chosen(store, db, plugin, slug, body); // chosen rides after stale-serve merge (3.4)
+    }
+    crow::response r{std::move(body)};
     r.set_header("Content-Type", "application/json");
     return r;
 }
