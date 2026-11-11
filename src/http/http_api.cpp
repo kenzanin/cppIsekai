@@ -18,6 +18,7 @@ void register_api(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, BS:
     api::register_reader(c);
     api::register_state(c);
     api::register_content(c);
+    api::register_enrich(c);
 }
 
 } // namespace http

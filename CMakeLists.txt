@@ -59,7 +59,7 @@ target_link_libraries(quickjs PUBLIC m ${CMAKE_DL_LIBS} pthread)
 pkg_check_modules(SQLITE3 REQUIRED IMPORTED_TARGET sqlite3)
 
 # --- app ---
-add_executable(cppIsekai src/main.cpp src/store/store_core.cpp src/store/store_search.cpp src/store/store_api.cpp src/store/store_enrichment.cpp src/http/http.cpp src/http/http_pages.cpp src/http/http_api.cpp src/http/http_api_admin.cpp src/http/http_api_library.cpp src/http/http_api_title.cpp src/http/http_api_reader.cpp src/http/http_api_state.cpp src/http/http_api_content.cpp src/http/pages_api.cpp
+add_executable(cppIsekai src/main.cpp src/store/store_core.cpp src/store/store_search.cpp src/store/store_api.cpp src/store/store_enrichment.cpp src/http/http.cpp src/http/http_pages.cpp src/http/http_api_enrich.cpp src/http/http_api.cpp src/http/http_api_admin.cpp src/http/http_api_library.cpp src/http/http_api_title.cpp src/http/http_api_reader.cpp src/http/http_api_state.cpp src/http/http_api_content.cpp src/http/pages_api.cpp
                          src/fetch/fetch.cpp src/fetch/fetch_curl.cpp src/plugin/plugin_core.cpp src/plugin/plugin_load.cpp src/plugin/plugin_call.cpp src/plugin/lua/bridge.cpp src/plugin/lua/lua_runtime.cpp src/plugin/http_client.cpp src/plugin/wasm/wasm_rt.cpp src/plugin/wasm/wasm_load.cpp src/plugin/wasm/wasm_imports.cpp src/plugin/js/js_rt.cpp src/plugin/js/js_bindings.cpp src/plugin/htmltext_re2.cpp src/plugin/htmltext_html.cpp src/cache/cache.cpp src/cache/cache_img.cpp src/reader/window.cpp
                          ${TP}/libzippp/libzippp.cpp src/http/export_cbz.cpp)
 target_include_directories(

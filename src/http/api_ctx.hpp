@@ -86,6 +86,7 @@ void register_title(Ctx&);   // detail/related/chapters/refresh envelopes
 void register_reader(Ctx&);  // reader window + position routes
 void register_state(Ctx&);   // chapter skip/read/state flags
 void register_content(Ctx&); // reader pages, image cache, cbz export
+void register_enrich(Ctx&);  // enrichment fetch/chosen/reset
 
 } // namespace api
 } // namespace http
