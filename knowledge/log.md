@@ -1,4 +1,6 @@
 ## 2026-11-11
+* **Update**: Updated concept `architecture/atsumaru-plugin.md`.
+* **Update**: Updated concept `decisions/api-cache-lock-miss-regression.md`.
 * **Update**: Linked `architecture/atsumaru-plugin.md` to `references/goisekai-plugin-examples.md` (Atsumaru was ported from the goIsekai reference corpus (example plugin + HAR)).
 * **Update**: Linked `decisions/api-cache-lock-miss-regression.md` to `architecture/local-first-reads.md` (The db-lock-as-cache-miss bug violates the local-first read contract).
 * **Creation**: Documented concept `decisions/api-cache-lock-miss-regression.md` (api_cache db-lock treated as cache miss: local-first regression (UNFIXED)).
