@@ -198,6 +198,14 @@ target_compile_options(test_stale PRIVATE -Wall -Wextra)
 add_test(NAME stale COMMAND test_stale)
 _cppisekai_pch(test_stale)
 
+# enrichment route helpers (5.2): stored_source/normalize_chosen/apply_chosen; no server
+add_executable(test_http_enrich tests/test_http_enrich.cpp src/store/store_core.cpp src/store/store_search.cpp src/store/store_api.cpp src/store/store_enrichment.cpp)
+target_include_directories(test_http_enrich PRIVATE src ${TP}/glaze ${TP}/sqlite_orm/include ${TP}/thread_pool/include ${TP}/simpleini ${TP}/readerwriterqueue/include)
+target_link_libraries(test_http_enrich PRIVATE spdlog::spdlog PkgConfig::VIPS PkgConfig::SQLITE3)
+target_compile_options(test_http_enrich PRIVATE -Wall -Wextra)
+add_test(NAME http_enrich COMMAND test_http_enrich)
+_cppisekai_pch(test_http_enrich)
+
 
 # pages api core (reader-page 1.1): pure builder, envelopes faked; crow
 # confined to the TU under test
