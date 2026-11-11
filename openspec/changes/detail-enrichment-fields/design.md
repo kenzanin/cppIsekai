@@ -118,6 +118,17 @@ See proposal.md. Constraints from the existing codebase:
   force/another source. Cold path: no match → empty `data` → page shows "no candidates
   found" and the buttons stay available.
 
+## Post-apply amendments (2026-11-11 implementation)
+
+- **D2 update**: kind is now `detail` | `covers` | `recommendations` (not per-kind round trips in D2's sense; still one ABI call per kind).
+  Recommendations come from the matched record: MangaDex `/manga/<id>/recommendation` scored pairs (cap 5); MangaUpdates reads `recommendations` weight list on the `/series/<id>` payload (cap 5). UI merges scraper related + both enrichment sources into one "Related" section, dedupe by URL. MangaUpdates exposes no art-gallery endpoint on the key-free v1 API — covers stay single (`image.url.original`).
+- **D3 update**: `fetched` array entries are keyed `(source, kind)` (`kind` missing = legacy detail entry; served for `detail` only). Detail and covers no longer overwrite each other's stored payload.
+- **D6 update**: MangaDex cover catalogue capped at 5 candidates (primary first, then locale-preferred en, ja, rest). MangaUpdates v1 exposes exactly one cover per series.
+- **New — chosen cover overlay**: `chosen.cover` is now merged everywhere saved covers render (home/library grid SSR + `/api/library`), not just the detail page. Helper: `http::api::chosen_cover()` in `enrich_internal.hpp`.
+- **New — tags**: MangaDex tags come from `attributes.tags` (not relationships); MangaUpdates genres are Title-Cased like MangaDex ("Slice of Life", "Sci-Fi"), connector words lowercase.
+- **New — `host.log.debug`**: Lua host log gained `debug` level (default runtime level stays `info`; daemon may run with `--log-level debug`). Enrichment fetch logs emit at debug.
+- **New — `normalize_chosen`**: chosen validation/normalization extracted from the route into `enrich_internal.hpp` (`normalize_chosen`) so the shape rules are unit-tested (test_http_enrich).
+
 ## Risks / Trade-offs
 
 - [Spam-tapping force fetch hammers the upstream API] → force is user-triggered only;

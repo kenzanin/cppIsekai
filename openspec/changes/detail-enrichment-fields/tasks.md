@@ -35,10 +35,10 @@
 - [x] 5.2 `tests/test_http_enrich.cpp` (new target `test_http_enrich` or extend `test_http_img`): GET detail cache-hit vs miss vs force; POST chosen validation; reset modes; verify `saved_manga`/`api_cache` untouched byte-wise after enrichment writes.
 - [x] 5.3 Update `openspec/specs/detail-enrichment/` only via the change's delta (no direct main-spec edit unless apply-sync is invoked).
 - [x] 5.4 `openspec validate detail-enrichment-fields --strict` passes; `ctest` all green; zero warnings on build.
-- [ ] 5.5 Live smoke (browser): add a manga to library, fetch detail from MangaDex + MangaUpdates, pick a tag and a cover, reset cover, reset detail; repeat tap shows cached (no network); force re-fetches.
+- [x] 5.5 Live smoke (browser): add a manga to library, fetch detail from MangaDex + MangaUpdates, pick a tag and a cover, reset cover, reset detail; repeat tap shows cached (no network); force re-fetches.
 
 ## 6. Verification gates
 
-- [ ] 6.1 `cmake --build build -j` zero warnings; full `ctest` pass.
-- [ ] 6.2 `openspec validate --change detail-enrichment-fields` errors=0.
-- [ ] 6.3 okf: persist enrichment architecture facts; `okf_validate --strict --drift` errors=0; record `decisions/detail-enrichment-fields-contract`? — update `architecture/detail-page` body with D1–D10 highlights.
+- [x] 6.1 `cmake --build build -j` zero warnings; full `ctest` pass.
+- [x] 6.2 `openspec validate --change detail-enrichment-fields` errors=0.
+- [x] 6.3 okf: persist enrichment architecture facts; `okf_validate --strict --drift` errors=0; record `decisions/detail-enrichment-fields-contract`? — update `architecture/detail-page` body with D1–D10 highlights.
