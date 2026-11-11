@@ -103,6 +103,17 @@ public:
     /** \brief Loaded enrichment sources (id + display name), for the detail-page picker. */
     std::vector<std::pair<std::string, std::string>> enrichment_sources() const;
 
+    /** \brief Loaded enrichment sources with full display info (name, version,
+     *  runtime, caps, website, last-call health), rendered identically to scraper
+     *  plugin rows on the /plugins page. Never in the Store registry. */
+    struct EnrichmentRow {
+        std::string id, name, version, runtime, caps, website;
+        bool ok{true};
+        std::string error;
+        std::int64_t checked_at{};
+    };
+    std::vector<EnrichmentRow> enrichment_rows() const;
+
     /** \brief Website URL from the plugin manifest; empty when unknown id or absent. */
     std::string website(const std::string& id) const;
 

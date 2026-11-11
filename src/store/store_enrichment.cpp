@@ -75,7 +75,7 @@ void Store::title_meta_reset_detail(const std::string& plugin, const std::string
         where(c(&store_detail::TitleMetaEntity::plugin) == plugin && c(&store_detail::TitleMetaEntity::slug) == slug));
     if (rows.empty()) return;
     glz::generic chosen;
-    if (glz::read_json(chosen, rows[0].chosen) || !chosen_clear(chosen, {"title", "synopsis", "artist", "author", "tags_add", "tags_hidden"})) return;
+    if (glz::read_json(chosen, rows[0].chosen) || !chosen_clear(chosen, {"title", "synopsis", "artist", "author", "tags_add", "tags_hidden", "related_add"})) return;
     if (auto out = glz::write_json(chosen)) {
         rows[0].chosen = std::move(*out);
         impl_->storage.replace(rows[0]);

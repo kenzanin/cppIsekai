@@ -1,26 +1,26 @@
 <script>
 function pluginsPage() {
   return {
-    rows: [], enrich: [], q: '', busy: false,
+    plugins: [], enrich: [], q: '', busy: false,
     broken: {},
     async load() {
       this.busy = true
       const j = await (await fetch('/api/plugins')).json()
-      this.rows = j.plugins || []
-      const e = await (await fetch('/api/enrichment')).json()
-      this.enrich = e.sources || []
+      this.plugins = j.plugins || []
+      this.enrich = j.enrichment || []
       this.busy = false
     },
     get view() {
       const q = this.q.trim().toLowerCase()
-      if (!q) return this.rows
-      return this.rows.filter(r =>
+      if (!q) return this.plugins
+      return this.plugins.filter(r =>
         r.name.toLowerCase().includes(q) || (r.caps || '').toLowerCase().includes(q))
     },
     get enrichView() {
       const q = this.q.trim().toLowerCase()
       if (!q) return this.enrich
-      return this.enrich.filter(e => e.name.toLowerCase().includes(q))
+      return this.enrich.filter(e =>
+        e.name.toLowerCase().includes(q) || (e.caps || '').toLowerCase().includes(q))
     },
     caps(r) { return (r.caps || '').split(',').filter(Boolean) },
     stateText(r) { return !r.enabled ? '○ disabled' : (r.state === 'error' ? '⚠ error' : '● active') },

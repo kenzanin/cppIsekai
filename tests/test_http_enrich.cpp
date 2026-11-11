@@ -168,3 +168,24 @@ TEST_CASE("enrich: valid_title_pair accepts plugin-minted case, rejects traversa
     CHECK(!valid_title_pair("mangadex", "a b"));
     CHECK(!valid_title_pair("mangadex", std::string(200, 'a')));
 }
+
+TEST_CASE("enrich: normalize_chosen related_add validation") {
+    const auto good = crow::json::load(R"({"related_add":[{"name":"Solo Leveling","url":"https://x/y","id":"a1"}]})");
+    REQUIRE(good);
+    const auto out = normalize_chosen(good);
+    REQUIRE(out.has_value());
+    CHECK(has(*out, R"("name":"Solo Leveling")"));
+    CHECK(has(*out, R"("url":"https://x/y")"));
+
+    const auto missing_url = crow::json::load(R"({"related_add":[{"name":"x"}]})");
+    CHECK_FALSE(normalize_chosen(missing_url).has_value());
+
+    const auto empty_name = crow::json::load(R"({"related_add":[{"name":"","url":"u"}]})");
+    CHECK_FALSE(normalize_chosen(empty_name).has_value());
+
+    const auto unknown_key = crow::json::load(R"({"related_add":[{"name":"x","url":"u","bogus":1}]})");
+    CHECK_FALSE(normalize_chosen(unknown_key).has_value());
+
+    const auto not_array = crow::json::load(R"({"related_add":"u"})");
+    CHECK_FALSE(normalize_chosen(not_array).has_value());
+}

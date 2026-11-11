@@ -73,6 +73,35 @@ std::vector<std::pair<std::string, std::string>> Host::enrichment_sources() cons
     return out;
 }
 
+std::vector<Host::EnrichmentRow> Host::enrichment_rows() const {
+    const std::scoped_lock lock(impl_->mu);
+    std::vector<EnrichmentRow> out;
+    for (const auto& [id, rt] : impl_->plugins) {
+        const auto& info = rt->info;
+        bool is_enr = false;
+        std::string caps;
+        for (size_t i = 0; i < info.capabilities.size(); ++i) {
+            if (info.capabilities[i] == "enrichment") is_enr = true;
+            caps += (i != 0 ? "," : "") + info.capabilities[i];
+        }
+        if (!is_enr) continue;
+        EnrichmentRow row;
+        row.id = info.id;
+        row.name = info.name;
+        row.version = info.version;
+        row.runtime = info.runtime;
+        row.caps = caps;
+        row.website = info.website;
+        if (const auto it = impl_->health.find(id); it != impl_->health.end()) {
+            row.ok = it->second.ok;
+            row.error = it->second.error;
+            row.checked_at = it->second.at;
+        }
+        out.push_back(std::move(row));
+    }
+    return out;
+}
+
 bool Host::is_enrichment(const std::string& id) const {
     const std::scoped_lock lock(impl_->mu);
     const auto it = impl_->plugins.find(id);

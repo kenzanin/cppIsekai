@@ -16,6 +16,18 @@ namespace {
 
 constexpr int kPageSize = 12;
 
+// [1 2 3 ... max-2 max-1 max] window: 1, last, current±1, always show edges; gap marker via n==0.
+std::vector<int> page_window(int shown, int pages) {
+    std::vector<int> out;
+    auto add = [&](int n) { if (n >= 1 && n <= pages && (out.empty() || out.back() != n)) out.push_back(n); };
+    add(1);
+    if (shown > 3) add(0); // leading gap
+    for (int n = shown - 1; n <= shown + 1; ++n) add(n);
+    if (shown < pages - 2) add(0); // trailing gap
+    add(pages);
+    return out;
+}
+
 crow::json::wvalue layout(const char* active) {
     crow::json::wvalue ctx;
     ctx["active_" + std::string(active)] = true;
@@ -71,12 +83,19 @@ crow::json::wvalue home_context(Store& store, BS::thread_pool<>& db, const crow:
 
     // library-save 4.1: saved entries are the Library — when any are saved,
     // the grid renders them (added_at desc) instead of the search-cache titles.
+    const int saved_total_all = static_cast<int>(saved.size());
+    const int saved_pages = std::max(1, (saved_total_all + kPageSize - 1) / kPageSize);
+    const int saved_shown = std::min(page_no, saved_pages);
     // Cover prefetch: hand the saved covers to the cover worker; cache-first,
     // so entries already on disk are not re-fetched.
     // overlay chosen enrichment covers so the grid matches the detail page
     std::vector<std::optional<std::string>> ovl;
     ovl.reserve(saved.size());
-    for (const auto& m : saved) ovl.push_back(http::api::chosen_cover(store, db, m.plugin, m.slug));
+    std::vector<std::optional<std::string>> ovl_title;
+    for (const auto& m : saved) {
+        ovl.push_back(http::api::chosen_cover(store, db, m.plugin, m.slug));
+        ovl_title.push_back(http::api::chosen_title(store, db, m.plugin, m.slug));
+    }
     std::vector<reader::CoverJob> jobs;
     for (std::size_t i = 0; i < saved.size(); ++i) {
         const std::string& c = ovl[i].has_value() ? *ovl[i] : saved[i].cover;
@@ -85,11 +104,12 @@ crow::json::wvalue home_context(Store& store, BS::thread_pool<>& db, const crow:
     if (!jobs.empty()) covers.nudge(std::move(jobs));
     ctx["saved_mode"] = !saved.empty();
     ctx["empty_saved"] = saved.empty();
+    const std::size_t saved_off = static_cast<std::size_t>(saved_shown - 1) * kPageSize;
     std::vector<crow::json::wvalue> saved_rows;
-    for (std::size_t i = 0; i < saved.size(); ++i) {
+    for (std::size_t i = saved_off; i < saved.size() && saved_rows.size() < static_cast<std::size_t>(kPageSize); ++i) {
         const auto& m = saved[i];
         crow::json::wvalue row;
-        row["name"] = m.name;
+        row["name"] = ovl_title[i].value_or(m.name);
         row["slug"] = m.slug;
         row["plugin"] = m.plugin;
         row["cover"] = ovl[i].value_or(m.cover);
@@ -97,6 +117,22 @@ crow::json::wvalue home_context(Store& store, BS::thread_pool<>& db, const crow:
         saved_rows.push_back(std::move(row));
     }
     ctx["saved_list"] = std::move(saved_rows);
+    ctx["saved_total"] = std::to_string(saved.size());
+    ctx["saved_pages"] = std::to_string(saved_pages);
+    ctx["saved_page"] = std::to_string(saved_shown);
+    ctx["saved_has_prev"] = saved_shown > 1;
+    ctx["saved_has_next"] = saved_shown < saved_pages;
+    ctx["saved_prev"] = std::to_string(saved_shown > 1 ? saved_shown - 1 : 1);
+    ctx["saved_next"] = std::to_string(saved_shown < saved_pages ? saved_shown + 1 : saved_pages);
+    std::vector<crow::json::wvalue> saved_window;
+    for (int n : page_window(saved_shown, saved_pages)) {
+        crow::json::wvalue e;
+        e["n"] = std::to_string(n);
+        e["gap"] = n == 0;
+        e["current"] = n == saved_shown;
+        saved_window.push_back(std::move(e));
+    }
+    ctx["saved_window"] = std::move(saved_window);
 
     std::vector<crow::json::wvalue> cards;
     for (const auto& title : titles) {

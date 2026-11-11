@@ -1,9 +1,11 @@
 {
-  "name": "MangaUpdates Enrichment",
+  "name": "MangaUpdates",
   "id": "mangaupdates-enrichment",
   "version": "1.0.0",
   "website": "https://www.mangaupdates.com",
   "runtime": "lua",
-  "capabilities": ["enrichment"],
+  "capabilities": [
+    "enrichment"
+  ],
   "api": 1
 }

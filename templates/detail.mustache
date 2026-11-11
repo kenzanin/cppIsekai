@@ -98,6 +98,18 @@
               <button @click="toggleName('artist', a.name)" class="text-xs px-2 py-0.5 rounded-full border" :class="(chosenNow().artist || []).includes(a.name) ? 'border-emerald-600 text-emerald-300' : 'border-zinc-700 text-zinc-500 hover:text-zinc-300'"><span x-text="a.name"></span><span class="text-[8px] text-zinc-700 ml-1 align-middle" x-text="a.source === 'mangadex-enrichment' ? 'MD' : 'MU'"></span></button>
             </template>
           </p>
+          <div x-show="mergedRelated().length" class="mb-2">
+            <p class="flex items-center gap-1 flex-wrap">
+              <span class="text-[10px] text-zinc-600 mr-1">Related reading:</span>
+              <button @click="addAllRelated()" class="text-xs px-2 py-0.5 rounded border border-zinc-700 text-zinc-400 hover:text-emerald-300 hover:border-emerald-700">Add all</button>
+              <button @click="removeAllRelated()" class="text-xs px-2 py-0.5 rounded border border-zinc-700 text-zinc-400 hover:text-zinc-200">Remove all</button>
+            </p>
+            <div class="flex items-center gap-1 flex-wrap mt-1">
+              <template x-for="r in mergedRelated()" :key="r.url">
+                <a :href="r.url" target="_blank" rel="noopener" class="text-xs px-2 py-0.5 rounded-full border border-zinc-700 text-zinc-400 hover:text-emerald-300"><span x-text="r.name"></span><span class="text-[8px] text-zinc-700 ml-1 align-middle" x-text="r.source === 'mangadex-enrichment' ? 'MD' : 'MU'"></span></a>
+              </template>
+            </div>
+          </div>
           <p x-show="mergedList('tags').length" class="flex items-center gap-1 flex-wrap">
             <span class="text-[10px] text-zinc-600 mr-1">tags</span>
             <template x-for="t in mergedList('tags')" :key="t.name">
@@ -133,13 +145,18 @@
 
   <!-- chapters (chapter-list-controls 2.1): eye/check toggles, read/total counter,
        client-side pager 20/page -->
-  <h2 class="text-xl font-semibold mb-4 flex items-center justify-between">
+  <h2 class="text-xl font-semibold mb-4 flex flex-nowrap items-center justify-between gap-2 whitespace-nowrap">
     <span>Chapters</span>
-    <span class="flex items-center gap-2 text-sm font-normal" x-show="pageCount > 1" x-cloak>
-      <button class="px-2 border border-zinc-700 rounded disabled:opacity-30" :disabled="chPage <= 0"
+    <!-- top chapters pager (right-aligned on the Chapters line) -->
+    <span class="flex flex-nowrap items-center gap-2 text-sm font-normal text-zinc-400 whitespace-nowrap" x-show="pageCount > 1" x-cloak>
+      <button class="px-2 border border-zinc-700 rounded hover:bg-zinc-800 disabled:opacity-30" :disabled="chPage <= 0"
               @click="chPage--">‹</button>
-      <span class="text-xs text-zinc-500" x-text="(chPage+1)+' / '+pageCount"></span>
-      <button class="px-2 border border-zinc-700 rounded disabled:opacity-30" :disabled="chPage >= pageCount-1"
+      <template x-for="n in chWindow()" :key="'ct'+n">
+        <span x-show="n === 0" class="px-1 text-zinc-600">…</span>
+        <button x-show="n !== 0" class="px-2 border rounded" :class="n === chPage + 1 ? 'border-zinc-600 bg-zinc-700 text-zinc-100' : 'border-zinc-700 hover:bg-zinc-800'"
+                @click="chPage = n - 1" x-text="n"></button>
+      </template>
+      <button class="px-2 border border-zinc-700 rounded hover:bg-zinc-800 disabled:opacity-30" :disabled="chPage >= pageCount-1"
               @click="chPage++">›</button><button x-show="hiddenCount() > 0" @click="showHidden = !showHidden" class="px-1.5 border border-zinc-700 rounded text-xs" :class="showHidden ? 'text-emerald-400 border-emerald-700' : ''" x-cloak x-text="(showHidden ? 'hide' : 'show') + ' ' + hiddenCount()" title="toggle hidden chapters"></button>
     </span>
   </h2>
@@ -170,6 +187,20 @@
         <span x-show="!cbzReady[ch.id]" class="text-xs h-7 px-2 inline-flex items-center rounded border border-zinc-800 text-zinc-600 cursor-not-allowed" title="chapter not fully cached yet">⬇ cbz</span>
       </div>
     </template>
+  </div>
+  <!-- bottom chapters pager (same format/location/font as top) -->
+  <div class="flex flex-nowrap justify-end mt-3 mb-2 whitespace-nowrap" x-show="pageCount > 1" x-cloak>
+    <span class="flex items-center gap-2 text-sm text-zinc-400">
+      <button class="px-2 border border-zinc-700 rounded hover:bg-zinc-800 disabled:opacity-30" :disabled="chPage <= 0"
+              @click="chPage--">‹</button>
+      <template x-for="n in chWindow()" :key="'cb'+n">
+        <span x-show="n === 0" class="px-1 text-zinc-600">…</span>
+        <button x-show="n !== 0" class="px-2 border rounded" :class="n === chPage + 1 ? 'border-zinc-600 bg-zinc-700 text-zinc-100' : 'border-zinc-700 hover:bg-zinc-800'"
+                @click="chPage = n - 1" x-text="n"></button>
+      </template>
+      <button class="px-2 border border-zinc-700 rounded hover:bg-zinc-800 disabled:opacity-30" :disabled="chPage >= pageCount-1"
+              @click="chPage++">›</button>
+    </span>
   </div>
   <!-- related (user steer): text-only links to the source site; hidden until data arrives -->
   <div class="mt-8" x-show="related.length" x-cloak>

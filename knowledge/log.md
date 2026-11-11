@@ -1,4 +1,5 @@
 ## 2026-11-11
+* **Update**: Updated concept `decisions/chapter-list-controls.md`.
 * **Update**: Updated concept `architecture/atsumaru-plugin.md`.
 * **Update**: Updated concept `decisions/api-cache-lock-miss-regression.md`.
 * **Update**: Linked `architecture/atsumaru-plugin.md` to `references/goisekai-plugin-examples.md` (Atsumaru was ported from the goIsekai reference corpus (example plugin + HAR)).

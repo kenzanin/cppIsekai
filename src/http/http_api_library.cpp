@@ -21,7 +21,8 @@ void register_library(Ctx& c) {
             crow::json::wvalue row;
             row["plugin"] = r.plugin;
             row["slug"] = r.slug;
-            row["name"] = r.name;
+            const auto ot = chosen_title(store, db, r.plugin, r.slug);
+            row["name"] = ot.value_or(r.name);
             const auto ov = chosen_cover(store, db, r.plugin, r.slug);
             row["cover"] = ov.value_or(r.cover);
             row["added_at"] = static_cast<double>(r.added_at);

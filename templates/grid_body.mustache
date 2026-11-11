@@ -1,4 +1,14 @@
 {{#saved_mode}}
+<div class="flex justify-end mb-3" x-cloak>
+  <nav class="flex gap-1 items-center text-sm text-zinc-400">
+  {{#saved_has_prev}}<a href="?page={{saved_prev}}" hx-get="/library/grid?page={{saved_prev}}" hx-target="#grid" hx-push-url="true" class="px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700">‹</a>{{/saved_has_prev}}
+  {{#saved_window}}
+    {{#gap}}<span class="px-2 text-zinc-600">…</span>{{/gap}}
+    {{^gap}}<a href="?page={{n}}" hx-get="/library/grid?page={{n}}" hx-target="#grid" hx-push-url="true" class="px-2 py-1 rounded {{#current}}bg-zinc-700 text-zinc-100{{/current}}{{^current}}bg-zinc-800 hover:bg-zinc-700{{/current}}">{{n}}</a>{{/gap}}
+  {{/saved_window}}
+  {{#saved_has_next}}<a href="?page={{saved_next}}" hx-get="/library/grid?page={{saved_next}}" hx-target="#grid" hx-push-url="true" class="px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700">›</a>{{/saved_has_next}}
+  </nav>
+</div>
 <ul class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
   {{#saved_list}}
   <li>
@@ -16,6 +26,16 @@
   </li>
   {{/saved_list}}
 </ul>
+<div class="flex justify-end mt-4" x-cloak>
+  <nav class="flex gap-1 items-center text-sm text-zinc-400">
+  {{#saved_has_prev}}<a href="?page={{saved_prev}}" hx-get="/library/grid?page={{saved_prev}}" hx-target="#grid" hx-push-url="true" class="px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700">‹</a>{{/saved_has_prev}}
+  {{#saved_window}}
+    {{#gap}}<span class="px-2 text-zinc-600">…</span>{{/gap}}
+    {{^gap}}<a href="?page={{n}}" hx-get="/library/grid?page={{n}}" hx-target="#grid" hx-push-url="true" class="px-2 py-1 rounded {{#current}}bg-zinc-700 text-zinc-100{{/current}}{{^current}}bg-zinc-800 hover:bg-zinc-700{{/current}}">{{n}}</a>{{/gap}}
+  {{/saved_window}}
+  {{#saved_has_next}}<a href="?page={{saved_next}}" hx-get="/library/grid?page={{saved_next}}" hx-target="#grid" hx-push-url="true" class="px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700">›</a>{{/saved_has_next}}
+  </nav>
+</div>
 {{/saved_mode}}
 {{^saved_mode}}
 <div class="py-16 text-center text-zinc-500 text-sm">No saved manga — open a detail page and click Add to library</div>

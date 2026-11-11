@@ -212,7 +212,7 @@ function handle(req)
       end
     end
     table.sort(recs, function(a, b) return a.weight > b.weight end)
-    while #recs > 5 do recs[#recs] = nil end
+    while #recs > 10 do recs[#recs] = nil end
     for _, r in ipairs(recs) do r.weight = nil end
     return { ok = true, data = { items = recs } }
   end

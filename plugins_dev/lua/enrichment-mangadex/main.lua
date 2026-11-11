@@ -172,12 +172,12 @@ local function build_recommendations(rec)
     end
   end
   table.sort(scored, function(a, b) return a.score > b.score end)
-  while #scored > 5 do scored[#scored] = nil end
+  while #scored > 10 do scored[#scored] = nil end
   if #scored == 0 then return { ok = true, data = { items = {} } } end
   local ids = {}
   for _, s in ipairs(scored) do ids[#ids + 1] = s.id end
   local ids_q = table.concat(ids, "&ids[]=")
-  local bbody = get(string.format("%s/manga?limit=5&ids[]=%s&includes[]=cover_art", API, ids_q))
+  local bbody = get(string.format("%s/manga?limit=10&ids[]=%s&includes[]=cover_art", API, ids_q))
   local by_id = {}
   if bbody and type(bbody.data) == "table" then
     for _, m in ipairs(bbody.data) do by_id[m.id] = m end

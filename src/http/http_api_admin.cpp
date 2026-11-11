@@ -69,8 +69,29 @@ void register_admin(Ctx& c) {
             }
             list[idx++] = std::move(row);
         }
+        // Enrichment sources: same shape as registry rows (minus Store id), so
+        // the /plugins page renders them with identical markup; never toggleable.
+        crow::json::wvalue enr_list(crow::json::type::List);
+        int eidx = 0;
+        for (const auto& e : plugins.enrichment_rows()) {
+            crow::json::wvalue row;
+            row["id"] = eidx; // synthetic, stable within this payload
+            row["key"] = e.id;
+            row["name"] = e.name;
+            row["version"] = e.version;
+            row["runtime"] = e.runtime;
+            row["enabled"] = true;
+            row["enrichment"] = true;
+            row["caps"] = e.caps;
+            row["website"] = e.website;
+            row["state"] = e.ok ? "active" : "error";
+            row["error"] = e.error;
+            row["checked_at"] = e.checked_at;
+            enr_list[eidx++] = std::move(row);
+        }
         crow::json::wvalue out;
         out["plugins"] = std::move(list);
+        out["enrichment"] = std::move(enr_list);
         crow::response r{out};
         r.set_header("Content-Type", "application/json");
         return r;

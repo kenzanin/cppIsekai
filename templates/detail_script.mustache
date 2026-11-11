@@ -4,13 +4,22 @@ function detailPage() {
   return {
     plugin: parts[2] || '', slug: parts.slice(3).join('/') || '',
     detail: {}, chapters: [], cached: false, loading: true, refreshing: false,
-    err: '', coverBroken: false, hint: null, related: [], pluginName: '', pluginLogoOk: true,
+    err: '', coverBroken: false, hint: null, related: [], pluginName: '', pluginLogoOk: true, pluginCaps: '',
     inLibrary: false, libraryBusy: false,
     enrichment: null, enrichLastFetched: 0, enrichSources: [],
     enrichOpen: false, enrichKind: 'detail', enrichBusy: false, busySources: {}, cand: {}, enrichErr: '',
     hiddenTags: [],
     chPage: 0, showHidden: false, readState: {}, cbzReady: {}, // id -> {skip, read} (chapter-list-controls 1.2); cbzReady: chapter fully cached
     get pageCount() { return Math.max(1, Math.ceil(this.visibleChapters().length / 20)); },
+    // [1 2 3 ... max-2 max-1 max] window; 0 marks the ellipsis gap
+    chWindow() {
+      const p = this.chPage + 1, max = this.pageCount, out = [1]
+      if (p > 3) out.push(0)
+      for (let n = p - 1; n <= p + 1; n++) if (n > 1 && n < max) out.push(n)
+      if (p < max - 2) out.push(0)
+      if (max > 1) out.push(max)
+      return out.filter(n => n === 0 || (n >= 1 && n <= max)).filter((n, i, a) => n === 0 || a.indexOf(n) === i)
+    },
     visibleChapters() { return this.showHidden ? this.chapters : this.chapters.filter(c => !c.done); },
     chPageRows() { return this.visibleChapters().slice(this.chPage * 20, this.chPage * 20 + 20); },
     hiddenCount() { return this.chapters.length - this.visibleChapters().length; },
@@ -37,7 +46,7 @@ function detailPage() {
         body: JSON.stringify({skipped: ch.done})}); } catch (e) {}
     },
     async boot() {
-      this.loadPluginMeta();
+      await this.loadPluginMeta(); // caps gate related fetch inside load()
       this.loadLibrary();
       this.loadEnrichSources();
       await this.load();
@@ -63,6 +72,43 @@ function detailPage() {
       const arr = [...seen.values()];
       arr.sort((a, b) => (b.main ? 1 : 0) - (a.main ? 1 : 0)); // main titles first
       return arr;
+    },
+    relKey(it) { return String((it && (it.url || it.id || it.name)) || '').toLowerCase(); },
+    mergedRelated() { // wizard list: MD first, MU only on non-collision; normalized key url->id->name
+      const out = []; const seen = new Set();
+      const push = (it, source) => {
+        if (!it) return;
+        const name = String(it.name || '').trim(); const url = String(it.url || '').trim(); const id = String(it.id || '').trim();
+        if (!name || !url) return;
+        const k = this.relKey({ url, id, name });
+        if (seen.has(k)) return;
+        seen.add(k);
+        out.push({ name, url, id: id || undefined, source });
+      };
+      for (const src of ['mangadex-enrichment', 'mangaupdates-enrichment']) {
+        const c = this.candFor(src, 'recommendations');
+        const items = (c && c.ok && c.data && Array.isArray(c.data.items)) ? c.data.items : [];
+        for (const it of items) push(it, src);
+      }
+      return out;
+    },
+    async addAllRelated() {
+      const merged = this.mergedRelated();
+      const chosen = { ...this.chosenNow() };
+      if (merged.length) chosen.related_add = merged.map(({ name, url, id }) => id ? { name, url, id } : { name, url });
+      else delete chosen.related_add;
+      const r = await fetch('/api/enrichment/chosen', {method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ plugin: this.plugin, slug: this.slug, chosen })});
+      if (!r.ok) { this.enrichErr = 'save failed'; return; }
+      await this.load();
+    },
+    async removeAllRelated() {
+      const chosen = { ...this.chosenNow() };
+      delete chosen.related_add;
+      const r = await fetch('/api/enrichment/chosen', {method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ plugin: this.plugin, slug: this.slug, chosen })});
+      if (!r.ok) { this.enrichErr = 'save failed'; return; }
+      await this.load();
     },
     srcData(id) { const c = this.candFor(id, 'detail'); return (c && c.data) || {}; },
     mergedList(field) { // MD first; MU shown only when no normalized collision
@@ -97,6 +143,12 @@ function detailPage() {
           const j = await r.json();
           this.cand = { ...this.cand, [src.id + ':' + kind]: j };
           if (j && j.fetched_at) this.enrichLastFetched = Math.max(this.enrichLastFetched || 0, j.fetched_at);
+          if (kind === 'detail') { // wizard also needs recommendations for the related-readings segment
+            try {
+              const rr = await fetch(`/api/enrichment/${encodeURIComponent(src.id)}/recommendations?plugin=${encodeURIComponent(this.plugin)}&slug=${encodeURIComponent(this.slug)}&force=${force ? 1 : 0}`);
+              this.cand = { ...this.cand, [src.id + ':recommendations']: await rr.json() };
+            } catch (e) { this.cand = { ...this.cand, [src.id + ':recommendations']: { ok: false, error: String(e) } }; }
+          }
         } catch (e) { this.cand = { ...this.cand, [src.id + ':' + kind]: { ok: false, error: String(e) } }; }
         this.busySources = { ...this.busySources, [src.id]: false };
       }
@@ -168,6 +220,7 @@ function detailPage() {
         this.enrichLastFetched = Math.max(this.enrichLastFetched || 0, (this.enrichment && this.enrichment.fetched_at) || 0);
         this.hiddenTags = (this.enrichment && this.enrichment.chosen && this.enrichment.chosen.tags_hidden) || [];
         this.chapters = (c.data || []).slice().sort((a, b) => (b.number ?? 0) - (a.number ?? 0));
+        this.mergeSavedRelated(); // re-merge chosen.related_add now that /api/detail is in
         this.checkCbz();
       } catch (e) { this.err = String(e); }
       this.loading = false;
@@ -196,22 +249,23 @@ function detailPage() {
       }
     },
     fmtDate(ts) { if (!ts) return ''; const d = new Date(ts * 1000); return isNaN(d) ? '' : d.toISOString().slice(0, 10); },
+    scraperRelated: [], // base list from the scraper plugin; chosen.related_add is merged on top
+    mergeSavedRelated() {
+      const seen = new Set(); const merged = [];
+      const push = (it) => { const k = this.relKey(it); if (k && !seen.has(k)) { seen.add(k); merged.push(it); } };
+      for (const it of this.scraperRelated) push(it);
+      const saved = this.enrichment && this.enrichment.chosen && this.enrichment.chosen.related_add;
+      for (const it of (Array.isArray(saved) ? saved : [])) push(it);
+      this.related = merged;
+    },
     async loadRelated() {
-      // merge scraper related + enrichment recommendations (MangaDex/MangaUpdates); dedupe by URL
+      // scraper related only (cap-gated); enrichment recommendations render only via Add all (chosen.related_add)
       const grab = (url) => fetch(url).then(r => r.ok ? r.json() : null).catch(() => null);
       try {
-        const [scraper, md, mu] = await Promise.all([
-          grab(`/api/related/${encodeURIComponent(this.plugin)}/${encodeURIComponent(this.slug)}`),
-          grab(`/api/enrichment/mangadex-enrichment/recommendations?plugin=${encodeURIComponent(this.plugin)}&slug=${encodeURIComponent(this.slug)}`),
-          grab(`/api/enrichment/mangaupdates-enrichment/recommendations?plugin=${encodeURIComponent(this.plugin)}&slug=${encodeURIComponent(this.slug)}`),
-        ]);
-        const seen = new Set();
-        const merged = [];
-        const push = (it) => { const key = (it && (it.url || it.id || it.name)) || ''; if (key && !seen.has(key)) { seen.add(key); merged.push(it); } };
-        if (scraper && scraper.ok) ((scraper.data && scraper.data.items) || []).forEach(push);
-        if (md && md.ok) ((md.data && md.data.items) || []).forEach(push);
-        if (mu && mu.ok) ((mu.data && mu.data.items) || []).forEach(push);
-        this.related = merged;
+        const wantsRelated = (this.pluginCaps || '').split(',').map(s => s.trim()).includes('related');
+        const scraper = wantsRelated ? await grab(`/api/related/${encodeURIComponent(this.plugin)}/${encodeURIComponent(this.slug)}`) : null;
+        this.scraperRelated = (scraper && scraper.ok && scraper.data && Array.isArray(scraper.data.items)) ? scraper.data.items : [];
+        this.mergeSavedRelated();
       } catch (e) { /* related section stays hidden */ }
     },
     async toggleLibrary() {
@@ -241,7 +295,8 @@ function detailPage() {
       try {
         const r = await fetch('/api/plugins');
         const j = r.ok ? await r.json() : {};
-        const m = (j.plugins || []).find(p => p.key === this.plugin);
+        const m = [...(j.plugins || []), ...(j.enrichment || [])].find(p => p.key === this.plugin);
+        this.pluginCaps = (m && m.caps) || '';
         this.pluginName = (m && m.name) || this.plugin;
       } catch (e) { this.pluginName = this.plugin; }
     },

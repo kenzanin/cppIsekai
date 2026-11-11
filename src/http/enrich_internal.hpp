@@ -69,7 +69,7 @@ inline std::optional<crow::json::wvalue> stored_source(const std::string& fetche
 // artist/author accept String or List<String> and normalize to array.
 inline std::optional<std::string> normalize_chosen(const crow::json::rvalue& ch) {
     if (ch.t() != crow::json::type::Object) return std::nullopt;
-    static const char* allowed[] = {"title", "synopsis", "artist", "author", "cover", "tags_add", "tags_hidden"};
+    static const char* allowed[] = {"title", "synopsis", "artist", "author", "cover", "tags_add", "tags_hidden", "related_add"};
     for (const auto& member : ch) {
         const std::string k = std::string(member.key());
         bool ok = false;
@@ -94,6 +94,31 @@ inline std::optional<std::string> normalize_chosen(const crow::json::rvalue& ch)
             }
             out[key] = std::move(arr);
         } else return std::nullopt;
+    }
+    if (ch.has("related_add")) {
+        const auto& arr = ch["related_add"];
+        if (arr.t() != crow::json::type::List) return std::nullopt;
+        crow::json::wvalue out_arr(crow::json::type::List);
+        int n = 0;
+        for (const auto& item : arr) {
+            if (item.t() != crow::json::type::Object) return std::nullopt;
+            // extra keys rejected; name/url required non-empty, id optional non-empty string
+            for (const auto& member : item) {
+                const std::string k = std::string(member.key());
+                if (k != "name" && k != "url" && k != "id") return std::nullopt;
+            }
+            if (!item.has("name") || !item.has("url")) return std::nullopt;
+            crow::json::wvalue row;
+            for (const char* key : {"name", "url", "id"}) {
+                if (!item.has(key)) continue;
+                if (item[key].t() != crow::json::type::String) return std::nullopt;
+                const std::string v = item[key].s();
+                if (v.empty() || v.size() > 512) return std::nullopt;
+                row[key] = v;
+            }
+            out_arr[n++] = std::move(row);
+        }
+        out["related_add"] = std::move(out_arr);
     }
     for (const char* key : {"tags_add", "tags_hidden"}) {
         if (!ch.has(key)) continue;
@@ -229,6 +254,19 @@ inline crow::response enrichment_source_response(plugin::Host& plugins, BS::thre
 
 namespace http {
 namespace api {
+
+// Chosen display title from title_meta.chosen; nullopt when unset/empty.
+inline std::optional<std::string> chosen_title(Store& store, BS::thread_pool<>& db,
+                                               const std::string& plugin, const std::string& slug) {
+    const auto row = on_pool(db, [&] { return store.title_meta_get(plugin, slug); });
+    if (!row) return std::nullopt;
+    glz::generic chosen;
+    if (glz::read_json(chosen, row->chosen) || !chosen.is_object()) return std::nullopt;
+    const auto it = chosen.get_object().find("title");
+    if (it == chosen.get_object().end()) return std::nullopt;
+    if (const auto* s = std::get_if<std::string>(&it->second.data); s != nullptr && !s->empty()) return *s;
+    return std::nullopt;
+}
 
 inline std::optional<std::string> chosen_cover(Store& store, BS::thread_pool<>& db,
                                                const std::string& plugin, const std::string& slug) {
