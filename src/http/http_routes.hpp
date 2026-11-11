@@ -67,7 +67,7 @@ inline int page_of(const std::string& text) {
 }
 
 /** \brief HTML pages + the log websocket: /, /library/grid, /search,
- *  /history, /plugins, /about, /logs, ws /log. */
+ *  /plugins, /about, /logs, ws /log. */
 void register_pages(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, LogBuffer& logs, reader::CoverWorker& covers);
 
 /** \brief JSON API: plugin registry/call routes, reader position/skip,

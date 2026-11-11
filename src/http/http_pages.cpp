@@ -160,7 +160,6 @@ void register_pages(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, L
         return html("detail.mustache", layout("library"));
     });
 
-    CROW_ROUTE(app, "/history")([] { return html("blank.mustache", layout("history")); });
     CROW_ROUTE(app, "/plugins")([&] { return html("plugins.mustache", layout("plugins")); });
     CROW_ROUTE(app, "/settings")([] { return html("settings.mustache", layout("settings")); });
     CROW_ROUTE(app, "/about")([] { return html("blank.mustache", layout("about")); });

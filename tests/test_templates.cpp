@@ -133,7 +133,7 @@ TEST_CASE("templates: each top-level page renders to its golden file") {
     check_golden("search.mustache", active("search"));
     check_golden("reader.mustache", reader_ctx());
     check_golden("detail.mustache", active("library"));
-    check_golden("blank.mustache", active("history"));
+    check_golden("blank.mustache", active("about"));
     check_golden("plugins.mustache", active("plugins"));
     check_golden("settings.mustache", active("settings"));
     check_golden("logs.mustache", logs_ctx());
