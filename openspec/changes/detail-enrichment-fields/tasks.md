@@ -6,7 +6,7 @@
 - [x] 1.2 `src/plugin/plugin_load.cpp`: scan `data/enrichment/*` as a second, separate source; tag loaded plugins with capability `enrichment` from their manifest (`enrichment_providers`); skip them on the scraper `/plugins` page registry; keep `plugins_dev` symlink behavior identical for both dirs.
 - [x] 1.3 Enrichment ABI wiring: one new method `enrich(title, kind)` where kind ∈ `detail` | `covers`; validate the envelope; envelope is glaze-compatible; on failure/unknown source return `{ok:false,error}` with no store writes; reuse `http.fetch` + proxy + cookie (non-plain) from the scraper path (D1, D2).
 - [x] 1.4 Enrichment plugins: `plugins_dev/lua/enrichment-mangadex/` and `plugins_dev/lua/enrichment-mangaupdates/` (dir name == enrichment id is NOT required; keep `-mangadex` suffix style of scraper dev plugins but normal manifests declare `"capabilities": "enrichment"`). Port the goIsekai reference logic (`~/tmp/goIsekai/examples/info/{mangadex,mangaupdates}/main.lua`) into our ABI (`{title, kind}` in, `{value,url}`... no — one full slice per kind, see D2). MangaDex: `?includes[]=author&artist&tag&cover_art` for detail, `/cover?manga[]=<id>` catalogue for covers. MangaUpdates: `POST /v1/series/search`, then `GET /v1/series/<id>`. No JS, no login, key-free public endpoints.
-- [ ] 1.5 `data/enrichment/` (committed symlink farm or dev note in README): document that dev enrichment sources live in `plugins_dev/` and are symlinked into `data/enrichment/`. Do not commit payloads or fetched caches.
+- [x] 1.5 `data/enrichment/` (committed symlink farm or dev note in README): document that dev enrichment sources live in `plugins_dev/` and are symlinked into `data/enrichment/`. Do not commit payloads or fetched caches.
 
 ## 2. Persistence
 
