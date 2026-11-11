@@ -24,5 +24,5 @@
 - [x] 5.1 `tests/test_http_enrich.cpp`: chosen round-trip with `related_add`; 400 on missing url/name; reset detail clears related_add; reset cover preserves it.
 - [x] 5.2 Golden templates re-baked (`CPPISEKAI_UPDATE_GOLDEN=1 ctest -R templates`).
 - [x] 5.3 `ctest` all green; zero warnings on build.
-- [ ] 5.4 Live smoke (browser): fetch detail on atsumaru title → Add all → Related section appears → reload → persists → Remove all → hidden; no `/api/related/atsumaru/...` request when plugin lacks the cap.
-- [ ] 5.5 `openspec validate related-reading-wizard --strict` passes.
+- [x] 5.4 Live smoke (browser, atsumaru H6P2Z): fetch detail → Add all → Related shows 5 entries → reload persists → Remove all → hidden; network log: zero `/api/related/atsumaru/...` requests (atsumaru has no `related` cap; scraper call correctly gated off).
+- [x] 5.5 `openspec validate related-reading-wizard --strict` passes (valid: true).
