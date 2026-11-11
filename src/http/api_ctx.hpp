@@ -53,13 +53,13 @@ inline long num_field(const crow::json::rvalue& j, const char* key, long def) {
 }
 
 // manga-detail 1.1: the {plugin, slug} path pair guard. Slugs are our own
-// cache-layout keys (fs-safe lowercase); anything carrying separators or dot
+// cache-layout keys (fs-safe, case-preserving; plugin ids like atsumaru's H6P2Z carry uppercase); anything carrying separators or dot
 // segments is not a slug we minted -> 404 before any plugin or fs touch
 // (design D5). Returns false when the pair needs the not-found response.
 inline bool valid_title_pair(const std::string& plugin, const std::string& slug) {
     const auto ok = [](const std::string& s) {
         if (s.empty() || s.size() > 128 ||
-            s != s.substr(0, s.find_first_not_of("abcdefghijklmnopqrstuvwxyz0123456789-_."))) {
+            s != s.substr(0, s.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_."))) {
             return false;
         }
         if (s.find("..") != std::string::npos) {

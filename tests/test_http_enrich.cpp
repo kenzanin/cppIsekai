@@ -18,6 +18,7 @@ namespace fs = std::filesystem;
 using http::api::apply_chosen;
 using http::api::normalize_chosen;
 using http::api::stored_source;
+using http::api::valid_title_pair;
 
 namespace {
 
@@ -153,4 +154,17 @@ TEST_CASE("enrich: enrichment writes never touch saved_manga / api_cache") {
     REQUIRE(cache_after.has_value());
     CHECK(cache_after->payload == payload_before);
     CHECK(cache_after->fetched_at == 1234);
+}
+
+TEST_CASE("enrich: valid_title_pair accepts plugin-minted case, rejects traversal") {
+    // atsumaru regression: its ids carry uppercase (H6P2Z) and were 404-rejected.
+    CHECK(valid_title_pair("atsumaru", "H6P2Z"));
+    CHECK(valid_title_pair("mangadex", "a4304d3b-191d-471f-8c78-353d403a35d0"));
+    CHECK(valid_title_pair("mangadex", "ch.1-5"));
+    CHECK(!valid_title_pair("mangadex", ""));
+    CHECK(!valid_title_pair("mangadex", "a/b"));
+    CHECK(!valid_title_pair("mangadex", ".."));
+    CHECK(!valid_title_pair("mangadex", "a..b"));
+    CHECK(!valid_title_pair("mangadex", "a b"));
+    CHECK(!valid_title_pair("mangadex", std::string(200, 'a')));
 }
