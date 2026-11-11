@@ -195,6 +195,24 @@ local function build_recommendations(rec)
   return { ok = true, data = { items = items } }
 end
 
+-- main title + localized alTitles, one {title, lang} entry each; no de-dupe here (host merges)
+local function alt_titles(rec)
+  local out = {}
+  local attrs = rec.attributes or {}
+  local main = attrs.title or {}
+  if type(main) == "table" then
+    for lang, v in pairs(main) do
+      if type(v) == "string" and v ~= "" then out[#out + 1] = { title = v, lang = tostring(lang), main = true } end
+    end
+  end
+  for _, m in ipairs(attrs.altTitles or {}) do
+    for lang, v in pairs(m) do
+      if type(v) == "string" and v ~= "" then out[#out + 1] = { title = v, lang = tostring(lang), main = false } end
+    end
+  end
+  return out
+end
+
 local function build_detail(rec)
   local attrs = rec.attributes or {}
   return {
@@ -205,6 +223,7 @@ local function build_detail(rec)
     authors = extract_names(rec, "author"),
     artists = extract_names(rec, "artist"),
     tags = extract_tags(rec),
+    alt_titles = alt_titles(rec),
     source_url = SITE .. "/title/" .. tostring(rec.id or ""),
   }
 end

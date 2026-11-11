@@ -140,6 +140,20 @@ local function title_case(s)
   return table.concat(out, " ")
 end
 
+-- alt title candidates from the associated-title list; MangaUpdates exposes no language tag,
+-- so lang is empty. Host de-dupes against MangaDex by normalized string compare.
+local function alt_titles(data)
+  local out = {}
+  local seen = {}
+  local title = tostring(data.title or "")
+  if title ~= "" and not seen[title] then seen[title] = true; out[#out + 1] = { title = title, lang = "", main = true } end
+  for _, a in ipairs(data.associated or {}) do
+    local t = tostring(a.title or "")
+    if t ~= "" and not seen[t] then seen[t] = true; out[#out + 1] = { title = t, lang = "", main = false } end
+  end
+  return out
+end
+
 local function genre_names(data)
   local out = {}
   local seen = {}
@@ -210,6 +224,7 @@ function handle(req)
       synopsis = clean_text(data.description),
       authors = author_names(data),
       tags = genre_names(data),
+      alt_titles = alt_titles(data),
       source_url = data.url,
     },
   }

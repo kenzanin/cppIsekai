@@ -43,6 +43,27 @@ function detailPage() {
       await this.load();
       this.loadChapterState();
     },
+    normAltTitle(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff\u3040-\u30ff]+/g, ' ').trim(); },
+    altTitleCandidates() {
+      // merge main title + altTitles from all sources; normalized dedupe; MangaDex wins on collision
+      const seen = new Map();
+      for (const src of this.enrichSources) {
+        const c = this.candFor(src.id, 'detail');
+        const alts = c && c.data && Array.isArray(c.data.alt_titles) ? c.data.alt_titles : [];
+        for (const t of alts) {
+          const raw = String(t && t.title || '').trim();
+          if (!raw) continue;
+          const key = this.normAltTitle(raw);
+          if (!key) continue;
+          if (!seen.has(key)) {
+            seen.set(key, { title: raw, lang: String(t.lang || ''), main: !!t.main, source: src.id });
+          }
+        }
+      }
+      const arr = [...seen.values()];
+      arr.sort((a, b) => (b.main ? 1 : 0) - (a.main ? 1 : 0)); // main titles first
+      return arr;
+    },
     async loadEnrichSources() { // loaded enrichment plugins (picker needs the list)
       try {
         const j = await (await fetch('/api/enrichment')).json();

@@ -83,6 +83,15 @@
                 </template>
                 <template x-if="enrichKind !== 'covers'">
                   <div class="space-y-1">
+                    <!-- alt titles: one combined candidate list across all sources (normalized dedupe; MangaDex row wins on collision); only rendered once (first source) -->
+                    <div class="mb-2" x-show="src === enrichSources[0] && altTitleCandidates().length">
+                      <span class="text-[10px] text-zinc-600 mr-1">alt titles</span>
+                      <div class="flex items-center gap-1 flex-wrap mt-1">
+                        <template x-for="t in altTitleCandidates()" :key="t.lang + '|' + t.title">
+                          <button @click="pickField('title', t.title)" class="text-xs px-2 py-0.5 rounded-full border" :class="chosenNow().title === t.title ? 'border-emerald-600 text-emerald-300' : 'border-zinc-700 text-zinc-500 hover:text-zinc-300'" :title="((t.lang ? t.lang + ' — ' : '') + (t.main ? 'main' : 'alt'))"><span class="text-[9px] text-zinc-700 mr-1" x-text="t.lang || ''"></span><span x-text="t.title"></span></button>
+                        </template>
+                      </div>
+                    </div>
                     <p x-show="candFor(src.id, 'detail').data && candFor(src.id, 'detail').data.title" class="flex items-center gap-2">
                       <button @click="pickField('title', candFor(src.id, 'detail').data.title)" class="text-xs px-2 py-0.5 rounded border border-zinc-700 text-zinc-400 hover:bg-zinc-800">use title</button>
                       <span class="text-xs text-zinc-300" x-text="candFor(src.id, 'detail').data.title"></span>
