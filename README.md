@@ -43,3 +43,23 @@ System prerequisites (Arch): `sudo pacman -S libvips lua54 curl crow asio ninja`
 - `curl-impersonate` links as a shared lib; `BUILD_RPATH` points at `third_party/curl-impersonate/lib`; TLS fingerprinting via BoringSSL + nghttp2.
 - Pin hashes = `git rev-parse --short HEAD` at vendoring time; the clone scratch lived in `tmp/vendor/` (gitignored).
 - Port precedence: `--port` > `$PORT` > `[server] port` in `data/cppisekai.ini` (comments survive rewrites via SimpleIni) > 8090.
+
+## Enrichment plugins
+
+`data/enrichment/` holds metadata-only enrichment sources (MangaDex, MangaUpdates first); it is NOT `data/plugins/` and these plugins never appear as manga/scraper plugins
+— they are not rendered on the Plugins page, are not stale-served on the scraper
+path, and cannot request chapters/pages.
+
+Dev copies live in `plugins_dev/lua/enrichment-*/` and are symlinked in the same
+way `data/plugins/mangadex` points to `plugins_dev/lua/mangadex/`, e.g.:
+
+```bash
+cd data/enrichment
+ln -sfn ../../plugins_dev/lua/enrichment-mangadex mangadex-enrichment
+ln -sfn ../../plugins_dev/lua/enrichment-mangaupdates mangaupdates-enrichment
+```
+
+Do not commit fetched enrichment payloads; they are user data and are stored via
+`title_meta` once the detail page feature ships. The daemon logs loaded
+enrichment sources on boot. See `openspec/changes/detail-enrichment-fields/` for
+the feature contract.
