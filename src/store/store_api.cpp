@@ -67,5 +67,7 @@ std::optional<SavedManga> Store::saved_get(const std::string& plugin, const std:
     if (rows.empty())
         return std::nullopt;
     const auto& r = rows[0];
-    return SavedManga{r.plugin, r.slug, r.name, r.cover, r.added_at};
+    return SavedManga{r.plugin, r.slug, r.name, r.cover, r.added_at,
+                      r.status, r.total_ch, r.read_ch, r.has_update, r.last_read_at, r.updated_at,
+                      r.synopsis, r.alt_titles, r.dup_group};
 }

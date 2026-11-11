@@ -141,6 +141,7 @@ void register_content(Ctx& c) {
         crow::response res;
         res.code = r.code;
         res.body = std::move(r.body);
+        res.compressed = false; // images are already compressed bytes
         res.set_header("Content-Type", std::string(r.mime));
         if (r.ratio_header) res.set_header("X-Image-Ratio", *r.ratio_header);
         return res;
@@ -176,6 +177,7 @@ void register_content(Ctx& c) {
             return res;
         }
         res.body = std::move(*zip);
+        res.compressed = false; // zip container, already deflate-packed
         res.set_header("Content-Type", "application/zip");
         res.set_header("Content-Disposition",
                        "attachment; filename=\"" + param(req, "slug") + ".cbz\"");

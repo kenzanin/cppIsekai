@@ -57,6 +57,7 @@ target_compile_definitions(quickjs PRIVATE _GNU_SOURCE)
 target_link_libraries(quickjs PUBLIC m ${CMAKE_DL_LIBS} pthread)
 
 pkg_check_modules(SQLITE3 REQUIRED IMPORTED_TARGET sqlite3)
+pkg_check_modules(ZLIB REQUIRED IMPORTED_TARGET zlib) # crow deflate/gzip; libz from zlib-ng-compat
 
 # --- app ---
 add_executable(cppIsekai src/main.cpp src/store/store_core.cpp src/store/store_search.cpp src/store/store_api.cpp src/store/store_enrichment.cpp src/http/http.cpp src/http/http_pages.cpp src/http/http_api_enrich.cpp src/http/http_api.cpp src/http/http_api_admin.cpp src/http/http_api_library.cpp src/http/http_api_title.cpp src/http/http_api_reader.cpp src/http/http_api_state.cpp src/http/http_api_content.cpp src/http/pages_api.cpp
@@ -76,9 +77,9 @@ target_link_libraries(
   cppIsekai
   PRIVATE wasm3 quickjs PkgConfig::SQLITE3 PkgConfig::VIPS PkgConfig::LUA re2 lexbor
           ${TP}/curl-impersonate/lib/libcurl-impersonate-chrome.so.4.8.0
-          spdlog::spdlog PkgConfig::LIBZIP)
+          spdlog::spdlog PkgConfig::LIBZIP PkgConfig::ZLIB)
 target_compile_definitions(cppIsekai PRIVATE CPPISEKAI_FETCH_LIB_DIR="${CMAKE_SOURCE_DIR}/third_party/curl-impersonate/lib"
-                                        CROW_USE_LOCALTIMEZONE)
+                                        CROW_USE_LOCALTIMEZONE CROW_ENABLE_COMPRESSION)
 target_compile_options(cppIsekai PRIVATE -Wall -Wextra)
 set_target_properties(cppIsekai PROPERTIES BUILD_RPATH
                                            "${TP}/curl-impersonate/lib")

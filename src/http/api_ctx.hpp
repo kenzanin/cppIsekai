@@ -16,6 +16,7 @@
 #include "reader/window.hpp"
 #include "position_api.hpp"
 
+#include <cstdlib>
 #include <string>
 #include <vector>
 
@@ -90,3 +91,68 @@ void register_enrich(Ctx&);  // enrichment fetch/chosen/reset
 
 } // namespace api
 } // namespace http
+
+// --- saved-manga stats sync (library-grid-stats 2.x) ---
+namespace detail {
+inline std::optional<glz::generic::object_t> envelope_object(const std::string& env) {
+    glz::generic parsed;
+    if (glz::read_json(parsed, env) || !envelope_ok(parsed) || !parsed.is_object()) return std::nullopt;
+    const auto data = parsed.get_object().find("data");
+    if (data == parsed.get_object().end() || !data->second.is_object()) return std::nullopt;
+    return data->second.get_object();
+}
+inline std::string envelope_str(const glz::generic::object_t& obj, const char* key) {
+    const auto it = obj.find(key);
+    if (it == obj.end()) return {};
+    if (const auto* s = std::get_if<std::string>(&it->second.data)) return *s;
+    return {};
+}
+// library-dedup 1.2: alt_titles re-serialized verbatim (source envelope only)
+inline std::string envelope_raw_json(const glz::generic::object_t& obj, const char* key) {
+    const auto it = obj.find(key);
+    if (it == obj.end() || it->second.is_null()) return {};
+    return glz::write_json(it->second).value_or(std::string{});
+}
+} // namespace detail
+
+/** \brief Derive status + chapter totals/read counts from the plugin's own
+ *  detail+chapters envelopes and persist them on the saved-manga row.
+ *  Reader position POST / continue-read call `saved_clear_update` directly. */
+inline void sync_saved_stats(Store& store, BS::thread_pool<>& db, const std::string& plugin,
+                              const std::string& slug, const std::string& detail_env,
+                              const std::string& chapters_env) {
+    // detail envelope -> status + updated_at on save
+    if (const auto d = detail::envelope_object(detail_env)) {
+        const std::string status = detail::envelope_str(*d, "status");
+        int total = 0;
+        if (const auto chs = envelope_data(chapters_env)) total = static_cast<int>(chs->size());
+        // library-dedup 1.2: synopsis (or 'description') + alt_titles from the SOURCE envelope
+        std::string syn = detail::envelope_str(*d, "synopsis");
+        if (syn.empty()) syn = detail::envelope_str(*d, "description");
+        const std::string alts = detail::envelope_raw_json(*d, "alt_titles");
+        http::on_pool(db, [&] { store.saved_stats_update(plugin, slug, status, total); return 0; });
+        http::on_pool(db, [&] { store.saved_signal_update(plugin, slug, syn, alts); return 0; });
+        // library-dedup 2.3: re-cluster after the signals changed
+        http::on_pool(db, [&] { store.recompute_dup_groups(); return 0; });
+    }
+    // chapters envelope -> total_ch + read_ch rollup
+    const auto chs = envelope_data(chapters_env);
+    if (!chs) return;
+    int completed = 0;
+    for (const auto& item : *chs) {
+        if (!item.is_object()) continue;
+        const auto& entry = item.get_object();
+        const auto id_it = entry.find("id");
+        if (id_it == entry.end()) continue;
+        const auto* id_s = std::get_if<std::string>(&id_it->second.data);
+        if (!id_s) continue;
+        int pages = 0;
+        if (const auto p = entry.find("pages"); p != entry.end())
+            if (const auto* d = std::get_if<double>(&p->second.data)) pages = static_cast<int>(*d);
+        const auto stored = http::on_pool(db, [&] { return store.state_get(http::api::kStateHost, std::string(http::api::kReadPrefix) + *id_s); });
+        if (!stored || stored->empty()) continue;
+        const int read = std::atoi(stored->c_str());
+        if (pages > 0 ? read >= pages : read > 0) ++completed;
+    }
+    http::on_pool(db, [&] { store.saved_read_rollup(plugin, slug, completed, 0); return 0; });
+}

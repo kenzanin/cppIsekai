@@ -1,8 +1,11 @@
 #include "store.hpp"
 #include "store_internal.hpp"
 
+#include <spdlog/spdlog.h>
 #include <ctime>
 #include <stdexcept>
+#include <string_view>
+#include <unordered_set>
 #include <utility>
 using namespace sqlite_orm;
 
@@ -42,8 +45,51 @@ Store::Store(const std::string& path) : impl_(std::make_unique<StoreImpl>(path))
             sqlite3_close(db); // one-shot migration alongside the ORM connection
         }
     }
-
-
+    // ponytail: sqlite_orm sync_schema won't ALTER an existing table; add the saved-manga stat columns additively here.
+    {
+        const auto cols = impl_->storage.pragma.table_info("saved_manga");
+        std::unordered_set<std::string> have;
+        for (const auto& c : cols) have.insert(c.name);
+        sqlite3* db = nullptr;
+        if (sqlite3_open(path.c_str(), &db) == SQLITE_OK) {
+            constexpr std::string_view stmts[] = {
+                "ALTER TABLE saved_manga ADD COLUMN status TEXT NOT NULL DEFAULT 'ongoing'",
+                "ALTER TABLE saved_manga ADD COLUMN total_ch INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE saved_manga ADD COLUMN read_ch INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE saved_manga ADD COLUMN has_update INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE saved_manga ADD COLUMN last_read_at INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE saved_manga ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE saved_manga ADD COLUMN synopsis TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE saved_manga ADD COLUMN alt_titles TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE saved_manga ADD COLUMN dup_group INTEGER NOT NULL DEFAULT 0",
+            };
+            constexpr std::string_view names[] = {"status", "total_ch", "read_ch", "has_update", "last_read_at", "updated_at", "synopsis", "alt_titles", "dup_group"};
+            for (std::size_t i = 0; i < std::size(stmts); ++i)
+                if (have.find(std::string(names[i])) == have.end())
+                    sqlite3_exec(db, stmts[i].data(), nullptr, nullptr, nullptr);
+            sqlite3_close(db); // one-shot migration alongside the ORM connection
+        }
+    }
+    // library-dedup 1.3: standalone FTS5 index (content not needed; small N).
+    // Amalgamation without FTS5 -> warn once, dedup stays disabled (dup_group=0).
+    {
+        sqlite3* db = nullptr;
+        if (sqlite3_open(path.c_str(), &db) == SQLITE_OK) {
+            sqlite3_busy_timeout(db, 3000);
+            const char* ddl = "CREATE VIRTUAL TABLE IF NOT EXISTS library_fts"
+                              " USING fts5(plugin UNINDEXED, slug UNINDEXED, name, alt_titles, synopsis)";
+            char* err = nullptr;
+            if (sqlite3_exec(db, ddl, nullptr, nullptr, &err) == SQLITE_OK) {
+                impl_->fts5_ok = true;
+            } else {
+                spdlog::warn("[store] FTS5 unavailable ({}); library dedup disabled, dup_group stays 0", err ? err : "unknown error");
+                sqlite3_free(err);
+            }
+            sqlite3_close(db);
+        } else {
+            spdlog::warn("[store] cannot open {} for FTS5 probe; library dedup disabled", path);
+        }
+    }
 }
 
 Store::~Store() = default;

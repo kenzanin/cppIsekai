@@ -219,6 +219,114 @@ TEST_CASE("Store: saved_manga save/unsave/list (library-save 1.2)") {
     }
 }
 
+TEST_CASE("Store: dup_group clustering (library-dedup 4.1)") {
+    Store store("test_store.db");
+    const auto run = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+    const std::string p1 = "md_" + run;
+    const std::string p2 = "at_" + run;
+    const std::string s1 = "dup-a-" + run, s2 = "dup-b-" + run, s3 = "dup-c-" + run;
+
+    // same work: same title tokens across plugins, slightly different synopses
+    store.save_manga({p1, s1, "Re:Zero Starting Life in Another World", "", 0});
+    store.save_manga({p2, s2, "Re Zero Starting Life in Another World", "", 0});
+    store.saved_signal_update(p1, s1, "Subaru Natsuki gets isekai'd into a fantasy world", "[\"Re:Zero\", \"Re Zero\"]");
+    store.saved_signal_update(p2, s2, "Subaru Natsuki is reincarnated into a fantasy world", "[\"Re Zero\"]");
+    // unrelated work with distinct tokens
+    store.save_manga({p1, s3, "One Piece", "", 0});
+    store.saved_signal_update(p1, s3, "Pirates explore the Grand Line", "[\"One Piece\"]");
+    store.recompute_dup_groups();
+
+    const auto a = store.saved_get(p1, s1);
+    const auto b = store.saved_get(p2, s2);
+    const auto c = store.saved_get(p1, s3);
+    REQUIRE(a.has_value()); REQUIRE(b.has_value()); REQUIRE(c.has_value());
+    // pair shares all title tokens -> same group; c does not
+    CHECK(a->dup_group != 0);
+    CHECK(a->dup_group == b->dup_group);
+    CHECK(c->dup_group == 0);
+
+    // unsave one member -> remaining member becomes unique
+    store.unsave_manga(p2, s2);
+    store.recompute_dup_groups();
+    CHECK(store.saved_get(p1, s1)->dup_group == 0);
+}
+
+TEST_CASE("Store: saved manga stats roundtrip (library-grid-stats 1.3/1.4)") {
+    Store store("test_store.db");
+    const auto run = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+    const std::string plugin = "md";
+    const std::string slug = "stats-slug-" + run;
+
+    SUBCASE("fresh save carries schema defaults") {
+        store.save_manga({plugin, slug, "Stats", "", 0});
+        const auto row = store.saved_get(plugin, slug);
+        REQUIRE(row.has_value());
+        CHECK(row->status == "ongoing");
+        CHECK(row->total_ch == 0);
+        CHECK(row->read_ch == 0);
+        CHECK(row->has_update == 0);
+        CHECK(row->last_read_at == 0);
+        CHECK(row->updated_at == 0);
+    }
+
+    SUBCASE("stats_update / read_rollup / clear_update lifecycle") {
+        store.save_manga({plugin, slug, "Stats", "", 0});
+        store.saved_stats_update(plugin, slug, "complete", 12);
+        auto row = store.saved_get(plugin, slug);
+        REQUIRE(row.has_value());
+        CHECK(row->status == "complete");
+        CHECK(row->total_ch == 12);
+        CHECK(row->has_update == 1); // 12 > 0 -> growth marks New
+        CHECK(row->updated_at > 0);
+
+        store.saved_read_rollup(plugin, slug, 7, 0); // ts 0 = leave last_read alone
+        row = store.saved_get(plugin, slug);
+        REQUIRE(row.has_value());
+        CHECK(row->read_ch == 7);
+        CHECK(row->last_read_at == 0);
+
+        const std::int64_t ts = 1'700'000'000;
+        store.saved_read_rollup(plugin, slug, 8, ts);
+        row = store.saved_get(plugin, slug);
+        REQUIRE(row.has_value());
+        CHECK(row->read_ch == 8);
+        CHECK(row->last_read_at == ts);
+
+        store.saved_clear_update(plugin, slug); // reader touch: clears flag, stamps now
+        row = store.saved_get(plugin, slug);
+        REQUIRE(row.has_value());
+        CHECK(row->has_update == 0);
+        CHECK(row->last_read_at > ts);
+
+        const auto before = row->last_read_at;
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        store.saved_clear_update(plugin, slug); // flag-less touch still stamps
+        row = store.saved_get(plugin, slug);
+        REQUIRE(row.has_value());
+        CHECK(row->last_read_at > before);
+    }
+
+    SUBCASE("saved_list carries stats; absent rows are no-ops") {
+        store.save_manga({plugin, slug, "Stats", "", 0});
+        store.saved_stats_update(plugin, slug, "hiatus", 3);
+        const auto list = store.saved_list();
+        bool seen = false;
+        for (const auto& m : list)
+            if (m.slug == slug) {
+                seen = true;
+                CHECK(m.status == "hiatus");
+                CHECK(m.total_ch == 3);
+                CHECK(m.has_update == 1);
+            }
+        CHECK(seen);
+
+        const std::string absent = "stats-absent-" + run;
+        store.saved_stats_update(plugin, absent, "x", 1); // quiet no-ops
+        store.saved_read_rollup(plugin, absent, 1, 1);
+        store.saved_clear_update(plugin, absent);
+    }
+}
+
 TEST_CASE("Store: api_cache JSONB round-trip (write via jsonb(), read via json())") {
     Store store("test_store.db"); // same file as above; unique keys per run
     const auto run = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());

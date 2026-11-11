@@ -1,10 +1,267 @@
 #include "store.hpp"
 #include "store_internal.hpp"
 
+#include <sqlite3.h>
+#include <algorithm>
+#include <cstdint>
 #include <ctime>
+#include <map>
 #include <stdexcept>
 #include <utility>
 using namespace sqlite_orm;
+
+namespace {
+// library-dedup 1.4: keep library_fts in sync. Delete+insert is the spec's
+// "same transaction" requirement in effect: save path is synchronous on the
+// db thread, one writer (db_pool=1). tsv-style doubled column = FTS5 escape.
+void fts_sync(StoreImpl& impl, const std::string& plugin, const std::string& slug,
+              const std::string& name, const std::string& alt_titles, const std::string& synopsis) {
+    if (!impl.fts5_ok) return;
+    sqlite3* db = nullptr;
+    if (sqlite3_open_v2(impl.path.c_str(), &db, SQLITE_OPEN_READWRITE, nullptr) != SQLITE_OK)
+        { if (db) sqlite3_close(db); return; }
+    sqlite3_busy_timeout(db, 3000);
+    {   // tokenized text: name + alt titles (raw JSON) + synopsis; FTS5 tokenizes free text
+        sqlite3_stmt* del = nullptr;
+        const char* dsql = "DELETE FROM library_fts WHERE plugin=? AND slug=?";
+        if (sqlite3_prepare_v2(db, dsql, -1, &del, nullptr) == SQLITE_OK) {
+            sqlite3_bind_text(del, 1, plugin.c_str(), -1, SQLITE_TRANSIENT);
+            sqlite3_bind_text(del, 2, slug.c_str(), -1, SQLITE_TRANSIENT);
+            sqlite3_step(del);
+            sqlite3_finalize(del);
+        }
+        sqlite3_stmt* ins = nullptr;
+        const char* isql = "INSERT INTO library_fts(plugin, slug, name, alt_titles, synopsis) VALUES(?,?,?,?,?)";
+        if (sqlite3_prepare_v2(db, isql, -1, &ins, nullptr) == SQLITE_OK) {
+            sqlite3_bind_text(ins, 1, plugin.c_str(), -1, SQLITE_TRANSIENT);
+            sqlite3_bind_text(ins, 2, slug.c_str(), -1, SQLITE_TRANSIENT);
+            sqlite3_bind_text(ins, 3, name.c_str(), -1, SQLITE_TRANSIENT);
+            sqlite3_bind_text(ins, 4, alt_titles.c_str(), -1, SQLITE_TRANSIENT);
+            sqlite3_bind_text(ins, 5, synopsis.c_str(), -1, SQLITE_TRANSIENT);
+            sqlite3_step(ins);
+            sqlite3_finalize(ins);
+        }
+    }
+    sqlite3_close(db);
+}
+void fts_delete(StoreImpl& impl, const std::string& plugin, const std::string& slug) {
+    if (!impl.fts5_ok) return;
+    sqlite3* db = nullptr;
+    if (sqlite3_open_v2(impl.path.c_str(), &db, SQLITE_OPEN_READWRITE, nullptr) != SQLITE_OK)
+        { if (db) sqlite3_close(db); return; }
+    sqlite3_busy_timeout(db, 3000);
+    sqlite3_stmt* del = nullptr;
+    if (sqlite3_prepare_v2(db, "DELETE FROM library_fts WHERE plugin=? AND slug=?", -1, &del, nullptr) == SQLITE_OK) {
+        sqlite3_bind_text(del, 1, plugin.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(del, 2, slug.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_step(del);
+        sqlite3_finalize(del);
+    }
+    sqlite3_close(db);
+}
+// --- library-dedup 2.1: tokeniser (design D5) -----------------------
+// unicode-aware lowercase + mark strip + punctuation strip, collapse runs.
+// No new dep (design D5): covers ASCII + Latin Ext A/B folding + kana folding.
+// ponytail: full NFKD needs ICU — if arbitrary combining classes become an
+// issue, swap fold_codepoint for ICU. Mark strip covers Mn ranges we care about.
+uint32_t decode_utf8(const char*& p, const char* end) {
+    const auto b0 = static_cast<unsigned char>(*p++);
+    if (b0 < 0x80) return b0;
+    if ((b0 & 0xE0) == 0xC0 && p < end) return ((b0 & 0x1F) << 6) | (static_cast<unsigned char>(*p++) & 0x3F);
+    if ((b0 & 0xF0) == 0xE0 && end - p >= 2) { uint32_t cp = (b0 & 0x0F) << 12; cp |= (static_cast<unsigned char>(*p++) & 0x3F) << 6; cp |= static_cast<unsigned char>(*p++) & 0x3F; return cp; }
+    if ((b0 & 0xF8) == 0xF0 && end - p >= 3) { uint32_t cp = (b0 & 0x07) << 18; cp |= (static_cast<unsigned char>(*p++) & 0x3F) << 12; cp |= (static_cast<unsigned char>(*p++) & 0x3F) << 6; cp |= static_cast<unsigned char>(*p++) & 0x3F; return cp; }
+    return 0xFFFD; // replacement char: token boundary
+}
+void encode_utf8(uint32_t cp, std::string& out) {
+    if (cp < 0x80) out.push_back(static_cast<char>(cp));
+    else if (cp < 0x800) { out.push_back(static_cast<char>(0xC0 | (cp >> 6))); out.push_back(static_cast<char>(0x80 | (cp & 0x3F))); }
+    else if (cp < 0x10000) { out.push_back(static_cast<char>(0xE0 | (cp >> 12))); out.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F))); out.push_back(static_cast<char>(0x80 | (cp & 0x3F))); }
+    else { out.push_back(static_cast<char>(0xF0 | (cp >> 18))); out.push_back(static_cast<char>(0x80 | ((cp >> 12) & 0x3F))); out.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F))); out.push_back(static_cast<char>(0x80 | (cp & 0x3F))); }
+}
+bool is_mark(uint32_t cp) { // Mn ranges: combining diacritics + kana dakuten/handakuten
+    return (cp >= 0x0300 && cp <= 0x036F) || (cp == 0x3099 || cp == 0x309A) ||
+           (cp >= 0x20D0 && cp <= 0x20FF) || (cp >= 0xFE20 && cp <= 0xFE2F);
+}
+bool is_separator(uint32_t cp) {
+    if (cp < 0x21) return true;                    // C0 controls + space
+    if (cp >= 0x2000 && cp <= 0x206F) return true;  // general punctuation
+    if (cp >= 0x2E00 && cp <= 0x2E7F) return true;
+    if (cp >= 0x3000 && cp <= 0x303F) return true;   // CJK symbols & punctuation
+    if (cp == 0xFF01) return true;
+    return cp == 0xFF0C || cp == 0xFF0E || cp == 0xFF1A || cp == 0xFF1B ||
+           cp == 0xFF08 || cp == 0xFF09 || cp == 0xFF5B || cp == 0xFF5D;
+}
+// Latin letters with diacritics -> ASCII base (lowercase input only).
+uint32_t fold_latin(uint32_t cp) {
+    struct Pair { uint32_t from, to; };
+    static constexpr Pair kTable[] = {
+        {0xE1,'a'},{0xE0,'a'},{0xE2,'a'},{0xE4,'a'},{0xE3,'a'},{0xE5,'a'},{0x0101,'a'},{0x0103,'a'},{0x0105,'a'},
+        {0xE9,'e'},{0xE8,'e'},{0xEA,'e'},{0xEB,'e'},{0x0113,'e'},{0x0115,'e'},{0x0117,'e'},{0x0119,'e'},{0x011B,'e'},
+        {0xED,'i'},{0xEC,'i'},{0xEE,'i'},{0xEF,'i'},{0x012B,'i'},{0x012D,'i'},{0x012F,'i'},{0x0131,'i'},
+        {0xF3,'o'},{0xF2,'o'},{0xF4,'o'},{0xF6,'o'},{0xF5,'o'},{0xF8,'o'},{0x014D,'o'},{0x014F,'o'},{0x0151,'o'},
+        {0xFA,'u'},{0xF9,'u'},{0xFB,'u'},{0xFC,'u'},{0x016B,'u'},{0x016D,'u'},{0x016F,'u'},{0x0171,'u'},
+        {0xF1,'n'},{0x0144,'n'},{0x0146,'n'},{0x0148,'n'},{0x014A,'n'},
+        {0xE7,'c'},{0x0107,'c'},{0x0109,'c'},{0x010B,'c'},{0x010D,'c'},
+        {0x015B,'s'},{0x015D,'s'},{0x015F,'s'},{0x0161,'s'},{0x017F,'s'},{0x00DF,'s'},
+        {0x017A,'z'},{0x017C,'z'},{0x017E,'z'},
+        {0xFD,'y'},{0xFF,'y'},{0x0177,'y'},{0x00FD,'y'},
+        {0x00E6,'a'},{0x0153,'o'},{0x00FE,'t'},
+        {0x0111,'d'},{0x0139,'l'},{0x013E,'l'},{0x0142,'l'},{0x0154,'r'},{0x0156,'r'},{0x0158,'r'},{0x0162,'t'},{0x0164,'t'},{0x0165,'t'},
+    };
+    for (const auto& p : kTable) if (p.from == cp) return p.to;
+    return cp;
+}
+uint32_t fold_codepoint(uint32_t cp) {
+    if (cp < 0x80) return (cp >= 'A' && cp <= 'Z') ? cp + 32 : cp;
+    cp = fold_latin(cp);
+    if (cp >= 0x30A1 && cp <= 0x30F6) return cp - 0x60; // katakana -> hiragana
+    return cp;
+}
+using TokenMultiset = std::map<std::string, int>;
+TokenMultiset tokenize(const std::string& s) {
+    TokenMultiset out;
+    std::string cur;
+    auto flush = [&] {
+        if (cur.empty()) return;
+        out[std::move(cur)] += 1;
+        cur.clear();
+    };
+    const char* p = s.data();
+    const char* end = p + s.size();
+    while (p < end) {
+        const uint32_t cp = decode_utf8(p, end);
+        if (is_separator(cp)) { flush(); continue; }
+        if (is_mark(cp)) continue; // NFKD + strip marks (drop dakuten-class marks)
+        const uint32_t folded = fold_codepoint(cp);
+        if ((folded >= 'a' && folded <= 'z') || (folded >= '0' && folded <= '9')) cur.push_back(static_cast<char>(folded));
+        else if (folded >= 0x1100) encode_utf8(folded, cur); // CJK/kana/etc: verbatim
+        else flush();
+    }
+    flush();
+    return out;
+}
+// Dice coefficient over two multisets: 2*Σmin(a,b) / (Σa + Σb)
+double dice(const TokenMultiset& a, const TokenMultiset& b) {
+    if (a.empty() || b.empty()) return 0.0;
+    long sum = 0, inter = 0;
+    for (const auto& [k, v] : a) sum += v;
+    for (const auto& [k, v] : b) {
+        sum += v;
+        auto it = a.find(k);
+        if (it != a.end()) inter += std::min(static_cast<long>(v), static_cast<long>(it->second));
+    }
+    return (sum == 0) ? 0.0 : (2.0 * static_cast<double>(inter)) / static_cast<double>(sum);
+}
+
+} // namespace
+
+void Store::recompute_dup_groups() {
+    // library-dedup 2.2 (design D3): FTS5 MATCH candidates, bm25-ordered, Dice
+    // similarity >= 0.6, union-find components. All writes in ONE txn.
+    auto rows = impl_->storage.get_all<store_detail::SavedMangaEntity>(
+        order_by(&store_detail::SavedMangaEntity::added_at));
+    if (rows.empty()) return;
+    if (!impl_->fts5_ok || rows.size() < 2) {
+        // degraded mode: everything unique, one txn clears any stale values
+        sqlite3* db = nullptr;
+        if (sqlite3_open_v2(impl_->path.c_str(), &db, SQLITE_OPEN_READWRITE, nullptr) != SQLITE_OK)
+            { if (db) sqlite3_close(db); return; }
+        sqlite3_busy_timeout(db, 3000);
+        sqlite3_exec(db, "BEGIN IMMEDIATE", nullptr, nullptr, nullptr);
+        for (const auto& r : rows)
+            if (r.dup_group != 0) {
+                sqlite3_stmt* st = nullptr;
+                if (sqlite3_prepare_v2(db, "UPDATE saved_manga SET dup_group=0 WHERE plugin=? AND slug=?", -1, &st, nullptr) == SQLITE_OK) {
+                    sqlite3_bind_text(st, 1, r.plugin.c_str(), -1, SQLITE_TRANSIENT);
+                    sqlite3_bind_text(st, 2, r.slug.c_str(), -1, SQLITE_TRANSIENT);
+                    sqlite3_step(st);
+                    sqlite3_finalize(st);
+                }
+            }
+        sqlite3_exec(db, "COMMIT", nullptr, nullptr, nullptr);
+        sqlite3_close(db);
+        return;
+    }
+    const std::size_t n = rows.size();
+    std::vector<TokenMultiset> titles(n), syms(n);
+    for (std::size_t i = 0; i < n; ++i) {
+        titles[i] = tokenize(rows[i].name + " " + rows[i].alt_titles);
+        syms[i] = tokenize(rows[i].synopsis);
+    }
+    // union-find over indices
+    std::vector<int> parent(n);
+    for (std::size_t i = 0; i < n; ++i) parent[i] = static_cast<int>(i);
+    auto find = [&](int x) { while (parent[x] != x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+    auto unite = [&](int a, int b) { a = find(a); b = find(b); if (a != b) parent[a] = b; };
+    sqlite3* db = nullptr;
+    if (sqlite3_open_v2(impl_->path.c_str(), &db, SQLITE_OPEN_READWRITE, nullptr) != SQLITE_OK)
+        { if (db) sqlite3_close(db); return; }
+    sqlite3_busy_timeout(db, 3000);
+    for (std::size_t i = 0; i < n; ++i) {
+        // candidate set: title tokens, OR-joined (alnum so MATCH-safe); skip pure-stopword noise
+        std::string match;
+        for (const auto& [tok, _] : titles[i]) {
+            if (!match.empty()) match += " OR ";
+            match += tok;
+            if (match.size() > 400) break; // cap the query; MATCH accepts longer but keep it cheap
+        }
+        if (match.empty()) continue;
+        const std::string sql = "SELECT plugin, slug, bm25(library_fts) FROM library_fts WHERE library_fts MATCH '{name alt_titles} : (" + match + ")' ORDER BY bm25(library_fts) LIMIT 20";
+        sqlite3_stmt* st = nullptr;
+        if (sqlite3_prepare_v2(db, sql.c_str(), -1, &st, nullptr) != SQLITE_OK) continue;
+        while (sqlite3_step(st) == SQLITE_ROW) {
+            const char* cp = reinterpret_cast<const char*>(sqlite3_column_text(st, 0));
+            const char* cs = reinterpret_cast<const char*>(sqlite3_column_text(st, 1));
+            if (!cp || !cs) continue;
+            for (std::size_t j = 0; j < n; ++j) {
+                if (j == i) continue;
+                if (rows[j].plugin != cp || rows[j].slug != cs) continue;
+                const double td = dice(titles[i], titles[j]);
+                const double sd = dice(syms[i], syms[j]);
+                // synopsis Dice counts double-ish as corroboration (design D3)
+                const double sim = std::max(td, 0.5 * td + 0.5 * sd);
+                if (sim >= 0.6) unite(static_cast<int>(i), static_cast<int>(j));
+            }
+        }
+        sqlite3_finalize(st);
+    }
+    // assign group ids: singletons -> 0; components of size >= 2 -> sequential ids starting at 1
+    std::map<int, int> comp_id;
+    std::vector<int> out(n, 0);
+    for (std::size_t i = 0; i < n; ++i) {
+        int root = find(static_cast<int>(i));
+        auto it = comp_id.find(root);
+        if (it != comp_id.end()) out[i] = it->second;
+        // provisional marker: decide after counting component sizes
+        else comp_id[root] = -1;
+    }
+    std::map<int, int> counts;
+    for (std::size_t i = 0; i < n; ++i) ++counts[find(static_cast<int>(i))];
+    int gid = 0;
+    comp_id.clear();
+    for (std::size_t i = 0; i < n; ++i) {
+        int root = find(static_cast<int>(i));
+        if (counts[root] < 2) { out[i] = 0; continue; }
+        auto it = comp_id.find(root);
+        if (it == comp_id.end()) it = comp_id.emplace(root, ++gid).first;
+        out[i] = it->second;
+    }
+    // write all rows in one txn (singletons too, so stale groups clear)
+    sqlite3_exec(db, "BEGIN IMMEDIATE", nullptr, nullptr, nullptr);
+    for (std::size_t i = 0; i < n; ++i) {
+        if (rows[i].dup_group == out[i]) continue;
+        sqlite3_stmt* st = nullptr;
+        if (sqlite3_prepare_v2(db, "UPDATE saved_manga SET dup_group=? WHERE plugin=? AND slug=?", -1, &st, nullptr) == SQLITE_OK) {
+            sqlite3_bind_int(st, 1, out[i]);
+            sqlite3_bind_text(st, 2, rows[i].plugin.c_str(), -1, SQLITE_TRANSIENT);
+            sqlite3_bind_text(st, 3, rows[i].slug.c_str(), -1, SQLITE_TRANSIENT);
+            sqlite3_step(st);
+            sqlite3_finalize(st);
+        }
+    }
+    sqlite3_exec(db, "COMMIT", nullptr, nullptr, nullptr);
+    sqlite3_close(db);
+}
 
 std::vector<Plugin> Store::plugins() {
     auto rows = impl_->storage.select(
@@ -143,15 +400,95 @@ std::optional<ReaderPosition> Store::position_last() {
     return ReaderPosition{r.plugin, r.slug, r.chapter_id, r.chapter_number, r.page, r.mode, r.direction, r.zoom, r.updated_at};
 }
 
+static store_detail::SavedMangaEntity saved_row(const SavedManga& m, std::int64_t added_at) {
+    return store_detail::SavedMangaEntity{m.plugin, m.slug, m.name, m.cover, added_at,
+                                          m.status.empty() ? std::string{"ongoing"} : m.status,
+                                          m.total_ch, m.read_ch, m.has_update, m.last_read_at, m.updated_at,
+                                          m.synopsis, m.alt_titles, m.dup_group};
+}
+
 void Store::save_manga(const SavedManga& m) {
     // REPLACE on the (plugin, slug) PK: refreshes name/cover/added_at on re-save.
-    impl_->storage.replace(store_detail::SavedMangaEntity{m.plugin, m.slug, m.name, m.cover,
-                                            static_cast<std::int64_t>(std::time(nullptr))});
+    // Preserve any existing stat columns so a plain re-save never resets progress.
+    auto rows = impl_->storage.get_all<store_detail::SavedMangaEntity>(
+        where(c(&store_detail::SavedMangaEntity::plugin) == m.plugin && c(&store_detail::SavedMangaEntity::slug) == m.slug));
+    store_detail::SavedMangaEntity e = saved_row(m, static_cast<std::int64_t>(std::time(nullptr)));
+    if (!rows.empty()) {
+        e.status = rows[0].status;
+        e.total_ch = rows[0].total_ch;
+        e.read_ch = rows[0].read_ch;
+        e.has_update = rows[0].has_update;
+        e.last_read_at = rows[0].last_read_at;
+        e.updated_at = rows[0].updated_at;
+        // library-dedup 1.2: preserve signal columns (envelope sync owns them)
+        e.synopsis = rows[0].synopsis;
+        e.alt_titles = rows[0].alt_titles;
+        e.dup_group = rows[0].dup_group;
+    }
+    impl_->storage.replace(e);
+    fts_sync(*impl_, e.plugin, e.slug, e.name, e.alt_titles, e.synopsis); // library-dedup 1.4
+}
+
+void Store::saved_stats_update(const std::string& plugin, const std::string& slug,
+                               const std::string& status, int total_ch) {
+    auto rows = impl_->storage.get_all<store_detail::SavedMangaEntity>(
+        where(c(&store_detail::SavedMangaEntity::plugin) == plugin && c(&store_detail::SavedMangaEntity::slug) == slug));
+    if (rows.empty()) return;
+    auto& e = rows[0];
+    const bool changed = (!status.empty() && e.status != status) || e.total_ch != total_ch;
+    if (!status.empty()) e.status = status;
+    const std::int64_t now = static_cast<std::int64_t>(std::time(nullptr));
+    if (total_ch > e.total_ch) e.has_update = 1;      // growth → mark New
+    e.total_ch = total_ch;
+    if (changed) e.updated_at = now;
+    // FTS NOT re-synced here (library-dedup 1.4): stats path touches no indexed column (name/alt_titles/synopsis).
+    impl_->storage.replace(e);
+}
+
+void Store::saved_signal_update(const std::string& plugin, const std::string& slug,
+                                const std::string& synopsis, const std::string& alt_titles_json) {
+    auto rows = impl_->storage.get_all<store_detail::SavedMangaEntity>(
+        where(c(&store_detail::SavedMangaEntity::plugin) == plugin && c(&store_detail::SavedMangaEntity::slug) == slug));
+    if (rows.empty()) return;
+    auto& e = rows[0];
+    bool changed = false;
+    if (!synopsis.empty() && e.synopsis != synopsis) { e.synopsis = synopsis; changed = true; }
+    if (!alt_titles_json.empty() && e.alt_titles != alt_titles_json) { e.alt_titles = alt_titles_json; changed = true; }
+    if (changed) {
+        e.updated_at = static_cast<std::int64_t>(std::time(nullptr));
+        impl_->storage.replace(e);
+        fts_sync(*impl_, e.plugin, e.slug, e.name, e.alt_titles, e.synopsis); // library-dedup 1.4
+    }
+}
+
+void Store::saved_read_rollup(const std::string& plugin, const std::string& slug, int read_ch, std::int64_t last_read_at) {
+    auto rows = impl_->storage.get_all<store_detail::SavedMangaEntity>(
+        where(c(&store_detail::SavedMangaEntity::plugin) == plugin && c(&store_detail::SavedMangaEntity::slug) == slug));
+    if (rows.empty()) return;
+    auto& e = rows[0];
+    e.read_ch = read_ch;
+    if (last_read_at > 0) e.last_read_at = last_read_at;
+    impl_->storage.replace(e);
+}
+
+void Store::saved_clear_update(const std::string& plugin, const std::string& slug) {
+    auto rows = impl_->storage.get_all<store_detail::SavedMangaEntity>(
+        where(c(&store_detail::SavedMangaEntity::plugin) == plugin && c(&store_detail::SavedMangaEntity::slug) == slug));
+    if (rows.empty()) return;
+    auto& e = rows[0];
+    const auto now = static_cast<std::int64_t>(std::time(nullptr));
+    e.last_read_at = now; // reader touch (library-grid-stats 2.4), flag or not
+    if (e.has_update) {
+        e.has_update = 0;
+        e.updated_at = now;
+    }
+    impl_->storage.replace(e);
 }
 
 void Store::unsave_manga(const std::string& plugin, const std::string& slug) {
     impl_->storage.remove_all<store_detail::SavedMangaEntity>(
         where(c(&store_detail::SavedMangaEntity::plugin) == plugin && c(&store_detail::SavedMangaEntity::slug) == slug));
+    fts_delete(*impl_, plugin, slug); // library-dedup 1.4
 }
 
 std::vector<SavedManga> Store::saved_list() {
@@ -162,7 +499,9 @@ std::vector<SavedManga> Store::saved_list() {
     std::vector<SavedManga> out;
     out.reserve(rows.size());
     for (const auto& r : rows)
-        out.push_back(SavedManga{r.plugin, r.slug, r.name, r.cover, r.added_at});
+        out.push_back(SavedManga{r.plugin, r.slug, r.name, r.cover, r.added_at,
+                                 r.status, r.total_ch, r.read_ch, r.has_update, r.last_read_at, r.updated_at,
+                                 r.synopsis, r.alt_titles, r.dup_group});
     return out;
 }
 

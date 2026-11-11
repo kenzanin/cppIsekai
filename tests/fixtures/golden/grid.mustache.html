@@ -1,36 +1,141 @@
-<div class="flex justify-end mb-3" x-cloak>
-  <nav class="flex gap-1 items-center text-sm text-zinc-400">
-  
-  
-  </nav>
+<div x-data="gridPage" x-init="init()">
+<script>
+function gridPage() {
+  return {
+    q: '', plugin: '', sort: 'added', filters: [], page: 1, perPage: 12,
+    pages: 1, count: 0, total: 0, hasDup: false, hasStats: false,
+    init() {
+      this.rescan();
+      const p = new URLSearchParams(location.search).get('plugin');
+      if (p) this.plugin = p;
+      window.addEventListener('grid:reset', () => this.reset());
+      window.addEventListener('grid:plugin', (e) => { this.plugin = e.detail || ''; this.page = 1; this.apply(); });
+      document.body.addEventListener('htmx:afterSwap', () => { this.rescan(); this.apply(); });
+      this.apply();
+    },
+    syncSidebar() { document.querySelectorAll('[data-grid-plugin]').forEach(el => el.classList.toggle('bg-zinc-800', (el.dataset.gridPlugin || '') === this.plugin)); },
+    rescan() {
+      this.cards = typeof document !== 'undefined'
+        ? Array.from(document.querySelectorAll('#saved-cards > li'))
+        : [];
+      this.total = this.cards.length;
+      this.hasDup = this.cards.some(c => (+c.dataset.dup || 0) > 0);
+      this.hasStats = this.cards.some(c => (+c.dataset.total || 0) > 0);
+    },
+    toggleFilter(f) {
+      const i = this.filters.indexOf(f);
+      if (i < 0) {
+        this.filters.push(f);
+        if (f === 'dup') this.sort = 'dup'; // auto-engage cluster order (library-dedup spec)
+      } else {
+        this.filters.splice(i, 1);
+        if (f === 'dup') this.sort = 'added';
+      }
+      this.page = 1; this.apply();
+    },
+    setPlugin(p) { this.plugin = (this.plugin === p ? '' : p); this.page = 1; this.apply(); },
+    setSort(s) { this.sort = s; this.page = 1; this.apply(); },
+    reset() { this.q = ''; this.plugin = ''; this.sort = 'added'; this.filters = []; this.page = 1; this.apply(); },
+    ratio(c) { const t = +c.dataset.total || 0; return t > 0 ? (+c.dataset.read || 0) / t : -1; },
+    matches(c) {
+      if (this.plugin && c.dataset.plugin !== this.plugin) return false;
+      const q = this.q.trim().toLowerCase();
+      if (q && !c.dataset.name.toLowerCase().includes(q)) return false;
+      if (this.filters.includes('dup') && !((+c.dataset.dup || 0) > 0)) return false;
+      if (this.filters.includes('new') && !((+c.dataset.update || 0) > 0)) return false;
+      if (this.filters.includes('done') && !((+c.dataset.total || 0) > 0 && (+c.dataset.read || 0) >= (+c.dataset.total || 0))) return false;
+      if (this.filters.includes('complete') && c.dataset.status !== 'complete') return false;
+      return true;
+    },
+    apply() {
+      const ul = document.getElementById('saved-cards');
+      if (!ul) return;
+      let vis = this.cards.filter(c => this.matches(c));
+      if (this.sort === 'title') vis.sort((a, b) => a.dataset.name.localeCompare(b.dataset.name));
+      else if (this.sort === 'progress') vis.sort((a, b) => this.ratio(b) - this.ratio(a));
+      else if (this.sort === 'read') vis.sort((a, b) => (+b.dataset.lastread || 0) - (+a.dataset.lastread || 0));
+      else if (this.sort === 'update') vis.sort((a, b) => (+b.dataset.updated || 0) - (+a.dataset.updated || 0));
+      else if (this.sort === 'dup') vis.sort((a, b) => {
+        const da = +a.dataset.dup || 0, db = +b.dataset.dup || 0;
+        return (da === 0) - (db === 0) || da - db || a.dataset.name.localeCompare(b.dataset.name);
+      });
+      else vis.sort((a, b) => (+b.dataset.added || 0) - (+a.dataset.added || 0)); // 'added'
+      this.count = vis.length;
+      const pages = Math.max(1, Math.ceil(vis.length / this.perPage));
+      this.pages = pages;
+      if (this.page > pages) this.page = pages;
+      for (const c of vis) ul.appendChild(c);
+      const start = (this.page - 1) * this.perPage, end = this.page * this.perPage;
+      const shown = new Set(vis.slice(start, end));
+      for (const c of this.cards) c.style.display = shown.has(c) ? '' : 'none';
+      this.syncSidebar();
+    },
+  };
+}
+</script>
+<div class="flex flex-wrap items-center gap-2 mb-3">
+  <button x-show="hasDup" @click="toggleFilter('dup')" class="px-2.5 py-1 text-xs rounded-full border" :class="filters.includes('dup') ? 'border-violet-500 bg-violet-900/40 text-violet-300' : 'border-zinc-700 text-zinc-400 hover:bg-zinc-800'">Duplicates</button>
+  <button x-show="hasStats" @click="toggleFilter('new')" class="px-2.5 py-1 text-xs rounded-full border" :class="filters.includes('new') ? 'border-red-500 bg-red-900/40 text-red-300' : 'border-zinc-700 text-zinc-400 hover:bg-zinc-800'">New</button>
+  <button x-show="hasStats" @click="toggleFilter('done')" class="px-2.5 py-1 text-xs rounded-full border" :class="filters.includes('done') ? 'border-emerald-500 bg-emerald-900/40 text-emerald-300' : 'border-zinc-700 text-zinc-400 hover:bg-zinc-800'">Done</button>
+  <button x-show="hasStats" @click="toggleFilter('complete')" class="px-2.5 py-1 text-xs rounded-full border" :class="filters.includes('complete') ? 'border-green-500 bg-green-900/40 text-green-300' : 'border-zinc-700 text-zinc-400 hover:bg-zinc-800'">Complete</button>
+  <select x-model="sort" @change="apply()" class="text-xs bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-zinc-300">
+    <option value="added">Sort: recently added</option>
+    <option value="title">Sort: title</option>
+    <option value="progress">Sort: progress</option>
+    <option value="read">Sort: recent read</option>
+    <option value="update">Sort: recent update</option>
+    <option value="dup" x-show="hasDup">Sort: duplicate group</option>
+  </select>
+  <button @click="reset()" class="px-2.5 py-1 text-xs rounded-full border border-zinc-700 text-zinc-400 hover:bg-zinc-800">Reset</button>
+  <span class="text-xs text-zinc-500" x-text="count + ' / ' + total + ' shown'"></span>
 </div>
-<ul class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-  <li>
+<div x-show="count === 0 && total > 0" class="py-16 text-center text-zinc-500 text-sm">
+  No manga matches
+  <button @click="reset()" class="underline underline-offset-2 hover:text-zinc-300">Reset filters</button>
+</div>
+<ul id="saved-cards" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+  <li data-name="One Piece" data-plugin="mangadex" data-status="" data-total="" data-read="" data-update="" data-added="" data-lastread="" data-updated="" data-dup="3">
     <a href="&#x2F;view&#x2F;manga&#x2F;mangadex&#x2F;one-piece" class="group block min-w-0">
-        <img src="/cache/img?url=http:&#x2F;&#x2F;example&#x2F;cover.jpg&cover=1&plugin=mangadex&slug=one-piece"
-             class="w-full aspect-[2/3] object-cover rounded-lg border border-zinc-800 transition duration-150 group-hover:border-zinc-700" alt="One Piece" loading="lazy"
-             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-      <div class="aspect-[2/3] w-full rounded-lg flex items-center justify-center text-center text-xs text-zinc-400 bg-zinc-800"
-           style="display:none">One Piece</div>
+      <div class="relative">
+          <img src="/cache/img?url=http:&#x2F;&#x2F;example&#x2F;cover.jpg&cover=1&plugin=mangadex&slug=one-piece"
+               class="w-full aspect-[2/3] object-cover rounded-lg border border-zinc-800 transition duration-150 group-hover:border-zinc-700" alt="One Piece" loading="lazy"
+               onerror="this.style.display='none';this.parentNode.querySelector('[data-fallback]').style.display='flex'">
+        <div class="aspect-[2/3] w-full rounded-lg flex items-center justify-center text-center text-xs text-zinc-400 bg-zinc-800" data-fallback
+             style="display:none;">One Piece</div>
+        <span x-show="(+$el.closest('li').dataset.update) > 0" class="absolute left-1.5 top-1.5 rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">New</span>
+        <span x-show="!((+$el.closest('li').dataset.update) > 0) && (+$el.closest('li').dataset.total || 0) > 0 && (+$el.closest('li').dataset.read || 0) >= (+$el.closest('li').dataset.total || 0)" class="absolute left-1.5 top-1.5 rounded bg-emerald-600 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">Done</span>
+        <span x-show="$el.closest('li').dataset.status" class="absolute left-1.5 top-7 rounded bg-zinc-900/85 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-300" x-text="$el.closest('li').dataset.status"></span>
+        <button class="absolute left-1.5 bottom-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[10px] text-zinc-200 hover:bg-black/85" @click.prevent="setPlugin('mangadex')">mangadex</button>
+      </div>
       <p class="mt-1 text-sm truncate text-zinc-300 group-hover:text-zinc-100 transition-colors">One Piece</p>
-      <p class="text-xs text-zinc-500">mangadex</p>
+      <p class="text-xs text-zinc-500" x-show="(+$el.closest('li').dataset.total || 0) > 0"><span x-text="$el.closest('li').dataset.read"></span> / <span x-text="$el.closest('li').dataset.total"></span> read</p>
     </a>
   </li>
-  <li>
+  <li data-name="No Cover" data-plugin="baka" data-status="" data-total="" data-read="" data-update="" data-added="" data-lastread="" data-updated="" data-dup="0">
     <a href="&#x2F;view&#x2F;manga&#x2F;baka&#x2F;no-cover" class="group block min-w-0">
-        <img src="/cache/img?url=&cover=1&plugin=baka&slug=no-cover"
-             class="w-full aspect-[2/3] object-cover rounded-lg border border-zinc-800 transition duration-150 group-hover:border-zinc-700" alt="No Cover" loading="lazy"
-             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-      <div class="aspect-[2/3] w-full rounded-lg flex items-center justify-center text-center text-xs text-zinc-400 bg-zinc-800"
-           style="display:none">No Cover</div>
+      <div class="relative">
+          <img src="/cache/img?url=&cover=1&plugin=baka&slug=no-cover"
+               class="w-full aspect-[2/3] object-cover rounded-lg border border-zinc-800 transition duration-150 group-hover:border-zinc-700" alt="No Cover" loading="lazy"
+               onerror="this.style.display='none';this.parentNode.querySelector('[data-fallback]').style.display='flex'">
+        <div class="aspect-[2/3] w-full rounded-lg flex items-center justify-center text-center text-xs text-zinc-400 bg-zinc-800" data-fallback
+             style="display:none;">No Cover</div>
+        <span x-show="(+$el.closest('li').dataset.update) > 0" class="absolute left-1.5 top-1.5 rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">New</span>
+        <span x-show="!((+$el.closest('li').dataset.update) > 0) && (+$el.closest('li').dataset.total || 0) > 0 && (+$el.closest('li').dataset.read || 0) >= (+$el.closest('li').dataset.total || 0)" class="absolute left-1.5 top-1.5 rounded bg-emerald-600 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">Done</span>
+        <span x-show="$el.closest('li').dataset.status" class="absolute left-1.5 top-7 rounded bg-zinc-900/85 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-300" x-text="$el.closest('li').dataset.status"></span>
+        <button class="absolute left-1.5 bottom-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[10px] text-zinc-200 hover:bg-black/85" @click.prevent="setPlugin('baka')">baka</button>
+      </div>
       <p class="mt-1 text-sm truncate text-zinc-300 group-hover:text-zinc-100 transition-colors">No Cover</p>
-      <p class="text-xs text-zinc-500">baka</p>
+      <p class="text-xs text-zinc-500" x-show="(+$el.closest('li').dataset.total || 0) > 0"><span x-text="$el.closest('li').dataset.read"></span> / <span x-text="$el.closest('li').dataset.total"></span> read</p>
     </a>
   </li>
 </ul>
-<div class="flex justify-end mt-4" x-cloak>
+<div class="flex justify-end mt-4" x-show="count > 0 && pages > 1" x-cloak>
   <nav class="flex gap-1 items-center text-sm text-zinc-400">
-  
-  
+    <button @click="page = Math.max(1, page - 1); apply()" :disabled="page <= 1" class="px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 disabled:opacity-30">‹</button>
+    <template x-for="n in Array.from({length: pages}, (_, i) => i + 1)" :key="n">
+      <button @click="page = n; apply()" class="px-2 py-1 rounded" :class="n === page ? 'bg-zinc-700 text-zinc-100' : 'bg-zinc-800 hover:bg-zinc-700'" x-text="n"></button>
+    </template>
+    <button @click="page = Math.min(pages, page + 1); apply()" :disabled="page >= pages" class="px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 disabled:opacity-30">›</button>
   </nav>
+</div>
 </div>

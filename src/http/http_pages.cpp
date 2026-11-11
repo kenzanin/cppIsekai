@@ -84,8 +84,6 @@ crow::json::wvalue home_context(Store& store, BS::thread_pool<>& db, const crow:
     // library-save 4.1: saved entries are the Library — when any are saved,
     // the grid renders them (added_at desc) instead of the search-cache titles.
     const int saved_total_all = static_cast<int>(saved.size());
-    const int saved_pages = std::max(1, (saved_total_all + kPageSize - 1) / kPageSize);
-    const int saved_shown = std::min(page_no, saved_pages);
     // Cover prefetch: hand the saved covers to the cover worker; cache-first,
     // so entries already on disk are not re-fetched.
     // overlay chosen enrichment covers so the grid matches the detail page
@@ -104,9 +102,8 @@ crow::json::wvalue home_context(Store& store, BS::thread_pool<>& db, const crow:
     if (!jobs.empty()) covers.nudge(std::move(jobs));
     ctx["saved_mode"] = !saved.empty();
     ctx["empty_saved"] = saved.empty();
-    const std::size_t saved_off = static_cast<std::size_t>(saved_shown - 1) * kPageSize;
     std::vector<crow::json::wvalue> saved_rows;
-    for (std::size_t i = saved_off; i < saved.size() && saved_rows.size() < static_cast<std::size_t>(kPageSize); ++i) {
+    for (std::size_t i = 0; i < saved.size(); ++i) {
         const auto& m = saved[i];
         crow::json::wvalue row;
         row["name"] = ovl_title[i].value_or(m.name);
@@ -114,25 +111,21 @@ crow::json::wvalue home_context(Store& store, BS::thread_pool<>& db, const crow:
         row["plugin"] = m.plugin;
         row["cover"] = ovl[i].value_or(m.cover);
         row["url"] = std::string("/view/manga/") + m.plugin + "/" + m.slug;
+        // library-grid-stats 3.1: stat fields for grid badges/filters
+        // (library-grid-controls 1.1 renders them; keys mirror /api/library).
+        row["status"] = m.status;
+        row["total_ch"] = m.total_ch;
+        row["read_ch"] = m.read_ch;
+        row["has_update"] = m.has_update;
+        row["last_read_at"] = static_cast<double>(m.last_read_at);
+        row["added_at"] = static_cast<double>(m.added_at);
+        row["dup"] = m.dup_group; // library-dedup 3.1: grid duplicate filter/sort marker
+        row["updated_at"] = static_cast<double>(m.updated_at);
         saved_rows.push_back(std::move(row));
     }
     ctx["saved_list"] = std::move(saved_rows);
     ctx["saved_total"] = std::to_string(saved.size());
-    ctx["saved_pages"] = std::to_string(saved_pages);
-    ctx["saved_page"] = std::to_string(saved_shown);
-    ctx["saved_has_prev"] = saved_shown > 1;
-    ctx["saved_has_next"] = saved_shown < saved_pages;
-    ctx["saved_prev"] = std::to_string(saved_shown > 1 ? saved_shown - 1 : 1);
-    ctx["saved_next"] = std::to_string(saved_shown < saved_pages ? saved_shown + 1 : saved_pages);
-    std::vector<crow::json::wvalue> saved_window;
-    for (int n : page_window(saved_shown, saved_pages)) {
-        crow::json::wvalue e;
-        e["n"] = std::to_string(n);
-        e["gap"] = n == 0;
-        e["current"] = n == saved_shown;
-        saved_window.push_back(std::move(e));
-    }
-    ctx["saved_window"] = std::move(saved_window);
+    ctx["saved_total_all"] = std::to_string(saved_total_all); // controls 2.1: sidebar total card
 
     std::vector<crow::json::wvalue> cards;
     for (const auto& title : titles) {
@@ -246,6 +239,7 @@ crow::response br_asset(const crow::request& req, const char* path, const char* 
     std::stringstream ss;
     ss << f.rdbuf();
     crow::response r{ss.str()};
+    r.compressed = false; // precompressed (br or plain bytes) — never re-deflate
     r.set_header("Content-Type", mime);
     if (served_br) r.set_header("Content-Encoding", "br");
     r.set_header("Cache-Control", "public, max-age=31536000, immutable");

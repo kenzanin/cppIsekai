@@ -52,7 +52,21 @@ void register_title(Ctx& c) {
     // cache layout and plugins mint. The page's Alpine layer consumes these.
     CROW_ROUTE(app, "/api/detail/<string>/<string>")
     ([&](const crow::request& /*req*/, std::string plugin, std::string slug) {
-        return title_data_response(plugins, db, plugin_pool, store, plugin, slug, "detail");
+        crow::response r = title_data_response(plugins, db, plugin_pool, store, plugin, slug, "detail");
+        if (r.code == 200) {
+            // library-grid-stats 2.2: saved-manga stat sync on detail open.
+            // Reuse the stale-served envelopes already in api_cache (no extra
+            // network); failures leave the last-known stats untouched.
+            const std::string params = std::string("{\"id\":\"") + slug + "\"}";
+            const std::string chs_body = on_pool(db, [&] {
+                if (auto row = store.api_cache_get(plugin, stale_key(plugin, "chapters", params)))
+                    return row->payload;
+                return std::string{};
+            });
+            // detail body is r.body; chapters may be absent (not cached) — skip then
+            sync_saved_stats(store, db, plugin, slug, r.body, chs_body);
+        }
+        return r;
     });
 
     // detail-enrichment 2.1: related readings; same envelope and stale-serve
@@ -110,6 +124,7 @@ void register_title(Ctx& c) {
                     return 0;
                 });
             }
+            sync_saved_stats(store, db, plugin, slug, fresh[0], fresh[1]);
             crow::response r{R"({"ok":true})"};
             r.set_header("Content-Type", "application/json");
             return r;

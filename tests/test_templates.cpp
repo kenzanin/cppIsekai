@@ -96,6 +96,7 @@ crow::json::wvalue home_ctx() {
         row["plugin"] = "mangadex";
         row["cover"] = "http://example/cover.jpg";
         row["url"] = "/view/manga/mangadex/one-piece";
+        row["dup"] = 3; // library-dedup 3.1: data-dup attrs exercised in golden
         saved.push_back(std::move(row));
         crow::json::wvalue bare;
         bare["name"] = "No Cover";
@@ -103,6 +104,7 @@ crow::json::wvalue home_ctx() {
         bare["plugin"] = "baka";
         bare["cover"] = ""; // {{#cover}} false -> placeholder div
         bare["url"] = "/view/manga/baka/no-cover";
+        bare["dup"] = 0;
         saved.push_back(std::move(bare));
     }
     c["saved_list"] = std::move(saved);

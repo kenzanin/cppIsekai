@@ -10,17 +10,15 @@
     </div>
     <div class="flex-1 min-w-0">
       <h1 class="text-2xl font-semibold mb-2 leading-tight" x-text="detail.name || '…'"></h1>
-      <!-- attribution (detail-enrichment 3.1): plugin name + logo under title; @error falls back to name only -->
-      <div class="flex items-center gap-2 text-xs text-zinc-500 mb-2" x-show="pluginName" x-cloak>
-        <template x-if="pluginLogoOk">
+      <!-- attribution (detail-enrichment 3.1): plugin name + logo + status/date/cached badges on one line under title; @error falls back to name only -->
+      <div class="flex items-center flex-wrap gap-2 text-xs text-zinc-500 mb-2" x-show="pluginName || detail.status || detail.release_at || cached" x-cloak>
+        <template x-if="pluginName && pluginLogoOk">
           <img :src="'/plugin/'+encodeURIComponent(plugin)+'/logo'" class="h-5 w-5 object-contain rounded" @error="pluginLogoOk=false" alt="">
         </template>
-        <span x-text="pluginName"></span>
-      </div>
-      <div class="flex flex-wrap gap-1.5 mb-2" x-show="detail.status || detail.release_at" x-cloak>
-        <span class="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300" x-show="detail.status" x-text="detail.status"></span>
-        <span class="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400" x-show="detail.release_at" x-text="fmtDate(detail.release_at)"></span>
-        <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-900/40 text-emerald-300 border border-emerald-800" x-show="cached">cached</span>
+        <span x-show="pluginName" x-text="pluginName"></span>
+        <span class="px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300" x-show="detail.status" x-text="detail.status"></span>
+        <span class="px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400" x-show="detail.release_at" x-text="fmtDate(detail.release_at)"></span>
+        <span class="px-2 py-0.5 rounded-full bg-emerald-900/40 text-emerald-300 border border-emerald-800" x-show="cached">cached</span>
       </div>
       <div class="flex flex-wrap gap-1.5 mb-3" x-show="detail.tags && detail.tags.length" x-cloak>
         <template x-for="t in detail.tags" :key="t">
@@ -148,15 +146,14 @@
   <h2 class="text-xl font-semibold mb-4 flex flex-nowrap items-center justify-between gap-2 whitespace-nowrap">
     <span>Chapters</span>
     <!-- top chapters pager (right-aligned on the Chapters line) -->
-    <span class="flex flex-nowrap items-center gap-2 text-sm font-normal text-zinc-400 whitespace-nowrap" x-show="pageCount > 1" x-cloak>
-      <button class="px-2 border border-zinc-700 rounded hover:bg-zinc-800 disabled:opacity-30" :disabled="chPage <= 0"
+    <span class="flex flex-nowrap items-center gap-1.5 text-base font-medium text-zinc-300 whitespace-nowrap" x-show="pageCount > 1" x-cloak>
+      <button class="px-2.5 py-0.5 border border-zinc-700 rounded hover:bg-zinc-800 disabled:opacity-30" :disabled="chPage <= 0"
               @click="chPage--">‹</button>
       <template x-for="n in chWindow()" :key="'ct'+n">
-        <span x-show="n === 0" class="px-1 text-zinc-600">…</span>
-        <button x-show="n !== 0" class="px-2 border rounded" :class="n === chPage + 1 ? 'border-zinc-600 bg-zinc-700 text-zinc-100' : 'border-zinc-700 hover:bg-zinc-800'"
-                @click="chPage = n - 1" x-text="n"></button>
+        <button class="px-2.5 py-0.5 rounded" :class="n === 0 ? 'cursor-default text-zinc-500' : (n === chPage + 1 ? 'border border-zinc-500 bg-zinc-700 text-zinc-100' : 'border border-zinc-700 hover:bg-zinc-800')"
+                :disabled="n === 0" @click="n !== 0 && (chPage = n - 1)" x-text="n === 0 ? '…' : n"></button>
       </template>
-      <button class="px-2 border border-zinc-700 rounded hover:bg-zinc-800 disabled:opacity-30" :disabled="chPage >= pageCount-1"
+      <button class="px-2.5 py-0.5 border border-zinc-700 rounded hover:bg-zinc-800 disabled:opacity-30" :disabled="chPage >= pageCount-1"
               @click="chPage++">›</button><button x-show="hiddenCount() > 0" @click="showHidden = !showHidden" class="px-1.5 border border-zinc-700 rounded text-xs" :class="showHidden ? 'text-emerald-400 border-emerald-700' : ''" x-cloak x-text="(showHidden ? 'hide' : 'show') + ' ' + hiddenCount()" title="toggle hidden chapters"></button>
     </span>
   </h2>
@@ -190,15 +187,14 @@
   </div>
   <!-- bottom chapters pager (same format/location/font as top) -->
   <div class="flex flex-nowrap justify-end mt-3 mb-2 whitespace-nowrap" x-show="pageCount > 1" x-cloak>
-    <span class="flex items-center gap-2 text-sm text-zinc-400">
-      <button class="px-2 border border-zinc-700 rounded hover:bg-zinc-800 disabled:opacity-30" :disabled="chPage <= 0"
+    <span class="flex items-center gap-1.5 text-base font-medium text-zinc-300">
+      <button class="px-2.5 py-0.5 border border-zinc-700 rounded hover:bg-zinc-800 disabled:opacity-30" :disabled="chPage <= 0"
               @click="chPage--">‹</button>
       <template x-for="n in chWindow()" :key="'cb'+n">
-        <span x-show="n === 0" class="px-1 text-zinc-600">…</span>
-        <button x-show="n !== 0" class="px-2 border rounded" :class="n === chPage + 1 ? 'border-zinc-600 bg-zinc-700 text-zinc-100' : 'border-zinc-700 hover:bg-zinc-800'"
-                @click="chPage = n - 1" x-text="n"></button>
+        <button class="px-2.5 py-0.5 rounded" :class="n === 0 ? 'cursor-default text-zinc-500' : (n === chPage + 1 ? 'border border-zinc-500 bg-zinc-700 text-zinc-100' : 'border border-zinc-700 hover:bg-zinc-800')"
+                :disabled="n === 0" @click="n !== 0 && (chPage = n - 1)" x-text="n === 0 ? '…' : n"></button>
       </template>
-      <button class="px-2 border border-zinc-700 rounded hover:bg-zinc-800 disabled:opacity-30" :disabled="chPage >= pageCount-1"
+      <button class="px-2.5 py-0.5 border border-zinc-700 rounded hover:bg-zinc-800 disabled:opacity-30" :disabled="chPage >= pageCount-1"
               @click="chPage++">›</button>
     </span>
   </div>

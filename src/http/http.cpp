@@ -45,6 +45,11 @@ void serve(Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool, 
            cache::Cache& images, int port, const std::string& ini_path, const config::Overrides& overrides,
            const std::string& templates_dir) {
     crow::SimpleApp app;
+    // ponytail: crow deflate/gzip on dynamic text bodies (HTML/JSON/WS-less);
+    // static .br assets set res.compressed=false themselves via br_asset, and
+    // binary/image/zip bodies opt out per-route. Compression of already-
+    // compressed bytes would waste CPU and bloat.
+    app.use_compression(crow::compression::GZIP);
     crow::mustache::set_base(templates_dir);
 
     // Image-cache 3.3: one background prefetcher over the shared img cache;

@@ -11,14 +11,15 @@ function detailPage() {
     hiddenTags: [],
     chPage: 0, showHidden: false, readState: {}, cbzReady: {}, // id -> {skip, read} (chapter-list-controls 1.2); cbzReady: chapter fully cached
     get pageCount() { return Math.max(1, Math.ceil(this.visibleChapters().length / 20)); },
-    // [1 2 3 ... max-2 max-1 max] window; 0 marks the ellipsis gap
+    // [1 2 3 ... p-1 p p+1 ... max-2 max-1 max] window; 0 marks the ellipsis gap
     chWindow() {
-      const p = this.chPage + 1, max = this.pageCount, out = [1]
-      if (p > 3) out.push(0)
-      for (let n = p - 1; n <= p + 1; n++) if (n > 1 && n < max) out.push(n)
-      if (p < max - 2) out.push(0)
-      if (max > 1) out.push(max)
-      return out.filter(n => n === 0 || (n >= 1 && n <= max)).filter((n, i, a) => n === 0 || a.indexOf(n) === i)
+      const p = this.chPage + 1, max = this.pageCount
+      const nums = [...new Set([1, 2, 3, p - 1, p, p + 1, max - 2, max - 1, max])]
+        .filter(n => n >= 1 && n <= max).sort((a, b) => a - b)
+      const out = []
+      let prev = 0
+      for (const n of nums) { if (n - prev > 1) out.push(0); out.push(n); prev = n }
+      return out
     },
     visibleChapters() { return this.showHidden ? this.chapters : this.chapters.filter(c => !c.done); },
     chPageRows() { return this.visibleChapters().slice(this.chPage * 20, this.chPage * 20 + 20); },

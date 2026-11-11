@@ -131,6 +131,7 @@ void register_admin(Ctx& c) {
             std::stringstream ss;
             ss << f.rdbuf();
             crow::response r{ss.str()};
+            r.compressed = false; // logo bytes (png/jpeg/webp) already compressed
             r.set_header("Content-Type", image_mime(path));
             return r;
         }

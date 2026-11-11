@@ -26,6 +26,12 @@ void register_library(Ctx& c) {
             const auto ov = chosen_cover(store, db, r.plugin, r.slug);
             row["cover"] = ov.value_or(r.cover);
             row["added_at"] = static_cast<double>(r.added_at);
+            row["status"] = r.status;
+            row["total_ch"] = r.total_ch;
+            row["read_ch"] = r.read_ch;
+            row["has_update"] = r.has_update;
+            row["last_read_at"] = static_cast<double>(r.last_read_at);
+            row["updated_at"] = static_cast<double>(r.updated_at);
             list[idx++] = std::move(row);
         }
         crow::json::wvalue out;
@@ -46,7 +52,7 @@ void register_library(Ctx& c) {
         m.slug = json["slug"].s();
         m.name = json.has("name") && json["name"].t() == crow::json::type::String ? json["name"].s() : std::string{json["slug"].s()};
         m.cover = json.has("cover") && json["cover"].t() == crow::json::type::String ? json["cover"].s() : std::string{};
-        on_pool(db, [&] { store.save_manga(m); return 0; });
+        on_pool(db, [&] { store.save_manga(m); store.recompute_dup_groups(); return 0; }); // dedup 2.3
         crow::response r{R"({"ok":true,"saved":true})"};
         r.set_header("Content-Type", "application/json");
         return r;
@@ -58,7 +64,7 @@ void register_library(Ctx& c) {
             return crow::response{R"({"ok":false,"error":"missing plugin/slug"})"};
         const std::string plugin = json["plugin"].s();
         const std::string slug = json["slug"].s();
-        on_pool(db, [&] { store.unsave_manga(plugin, slug); return 0; });
+        on_pool(db, [&] { store.unsave_manga(plugin, slug); store.recompute_dup_groups(); return 0; }); // dedup 2.3
         crow::response r{R"({"ok":true,"saved":false})"};
         r.set_header("Content-Type", "application/json");
         return r;

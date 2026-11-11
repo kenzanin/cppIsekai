@@ -46,6 +46,15 @@ struct SavedManga {
     std::string name;
     std::string cover;       // remote uploads URL as served by the plugin
     std::int64_t added_at{}; // unix seconds; stamped by the store on upsert
+    std::string status{"ongoing"}; // plugin source envelope, verbatim; unknown values stored as-is
+    int total_ch{};             // chapters reported by the source envelope; 0 = unknown
+    int read_ch{};              // chapters fully read at the last rollup
+    int has_update{};           // 1 when a refresh observed growth beyond stored total_ch
+    std::int64_t last_read_at{}; // reader position timestamp; 0 = never opened
+    std::int64_t updated_at{};   // unix seconds of last envelope-derived change; 0 = never synced
+    std::string synopsis;        // plugin-source detail envelope synopsis (or 'description'; NOT enrichment)
+    std::string alt_titles;      // plugin-source detail envelope alt titles, JSON array verbatim
+    int dup_group{};             // 0 = unique; recomputed from FTS5 + Dice similarity (library-dedup 2.2)
 };
 
 /** Last-read position of one manga (reader-page): resume point + continue
@@ -104,6 +113,19 @@ public:
     void api_cache_put(const std::string& plugin_id, const std::string& query_hash,
                        const std::string& params_json, const std::string& payload,
                        std::int64_t fetched_at, std::int64_t ttl_s);
+
+    /** \brief Envelope-derived stat update (status, total_ch, has_update, updated_at). Only changed fields bump updated_at. */
+    void saved_stats_update(const std::string& plugin, const std::string& slug,
+                            const std::string& status, int total_ch);
+    /** \brief Library-dedup 2.2: FTS5 candidate + Dice similarity clustering; writes dup_group for ALL saved rows in one txn. No-op (all 0) when FTS5 unavailable or library tiny. */
+    void recompute_dup_groups();
+    /** \brief Envelope-derived dedup signals (library-dedup 1.2): synopsis (or 'description' fallback) + alt_titles JSON array, verbatim. Empty args = leave untouched. */
+    void saved_signal_update(const std::string& plugin, const std::string& slug,
+                             const std::string& synopsis, const std::string& alt_titles_json);
+    /** \brief Rollup of fully-read chapters + last-read timestamp (0 = leave untouched). */
+    void saved_read_rollup(const std::string& plugin, const std::string& slug, int read_ch, std::int64_t last_read_at);
+    /** \brief Reader touch: stamp last_read_at=now, clear has_update when set. */
+    void saved_clear_update(const std::string& plugin, const std::string& slug);
 
     /** \brief Upsert/unsave one saved manga; the saved list is the Library
      *  grid. added_at is stamped here on save (insert refreshes it). */

@@ -1,13 +1,23 @@
 {{>top.mustache}}
   <div class="flex gap-6">
     <aside class="w-52 shrink-0 space-y-4">
+      {{#saved_mode}}
+      <button onclick="window.dispatchEvent(new CustomEvent('grid:reset'))"
+              class="block w-full text-left px-3 py-2 rounded border border-zinc-700 bg-zinc-900 hover:bg-zinc-800">
+        <span class="block text-lg font-semibold text-zinc-100">{{saved_total_all}}</span>
+        <span class="block text-xs text-zinc-500">titles · reset filters</span>
+      </button>
+      {{/saved_mode}}
       <nav class="space-y-1">
-        <a href="/" class="block px-2 py-1 rounded {{^filtered}}bg-zinc-800{{/filtered}}"
-           hx-get="/library/grid" hx-target="#grid" hx-push-url="/">All plugins</a>
+        <a href="/" data-grid-plugin="" class="block px-2 py-1 rounded {{^filtered}}bg-zinc-800{{/filtered}}"
+           onclick="{{#saved_mode}}event.preventDefault();window.dispatchEvent(new CustomEvent('grid:plugin',{detail:''})){{/saved_mode}}"
+           {{^saved_mode}}hx-get="/library/grid" hx-target="#grid" hx-push-url="/"{{/saved_mode}}>All plugins</a>
         {{#plugins}}
         <a href="/?plugin={{name}}"
+           data-grid-plugin="{{name}}"
            class="flex justify-between px-2 py-1 rounded {{#current}}bg-zinc-800{{/current}}"
-           hx-get="/library/grid?plugin={{name}}" hx-target="#grid" hx-push-url="/?plugin={{name}}">
+           onclick="{{#saved_mode}}event.preventDefault();window.dispatchEvent(new CustomEvent('grid:plugin',{detail:'{{name}}'})){{/saved_mode}}"
+           {{^saved_mode}}hx-get="/library/grid?plugin={{name}}" hx-target="#grid" hx-push-url="/?plugin={{name}}"{{/saved_mode}}>
           <span class="flex items-center gap-1.5">
             {{#logo}}<img src="/plugin/{{logo}}/logo" alt="" class="w-4 h-4 rounded-sm">{{/logo}}
             <span>{{name}}</span>
@@ -16,8 +26,7 @@
         </a>
         {{/plugins}}
       </nav>
-      <p class="px-2 text-sm text-zinc-400">{{total}} titles</p>
-      <p class="px-2 text-sm text-zinc-600">more later</p>
+
     </aside>
     <section class="flex-1 space-y-4">
       <form action="/" method="get" class="flex gap-2"

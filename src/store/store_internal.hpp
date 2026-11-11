@@ -49,6 +49,15 @@ struct SavedMangaEntity {
     std::string name;
     std::string cover;
     std::int64_t added_at{};
+    std::string status;       // ongoing|hiatus|complete|canceled (plugin source; stored verbatim)
+    int total_ch{};           // chapters reported by the source envelope; 0 = unknown
+    int read_ch{};            // chapters fully read (host/read >= pages) at last rollup
+    int has_update{};         // 1 when a refresh/detail-open saw newer chapters than stored
+    std::int64_t last_read_at{}; // reader position POST timestamp; 0 = never opened
+    std::int64_t updated_at{}; // unix seconds of last envelope-derived change; 0 = never synced
+    std::string synopsis;      // plugin-source detail envelope synopsis (NOT enrichment)
+    std::string alt_titles;    // plugin-source detail envelope alt titles, JSON array verbatim
+    int dup_group{};           // 0 = unique; elsewhere groups same work (recomputed, never trusted across boots)
 };
 
 struct TitleMetaEntity {
@@ -96,6 +105,15 @@ inline auto create_storage(const std::string& path) {
         make_table("saved_manga", make_column("plugin", &SavedMangaEntity::plugin), make_column("slug", &SavedMangaEntity::slug),
                    make_column("name", &SavedMangaEntity::name), make_column("cover", &SavedMangaEntity::cover),
                    make_column("added_at", &SavedMangaEntity::added_at),
+                   make_column("status", &SavedMangaEntity::status, default_value("ongoing")),
+                   make_column("total_ch", &SavedMangaEntity::total_ch, default_value(0)),
+                   make_column("read_ch", &SavedMangaEntity::read_ch, default_value(0)),
+                   make_column("has_update", &SavedMangaEntity::has_update, default_value(0)),
+                   make_column("last_read_at", &SavedMangaEntity::last_read_at, default_value(0)),
+                   make_column("updated_at", &SavedMangaEntity::updated_at, default_value(0)),
+                   make_column("synopsis", &SavedMangaEntity::synopsis, default_value("")),
+                   make_column("alt_titles", &SavedMangaEntity::alt_titles, default_value("")),
+                   make_column("dup_group", &SavedMangaEntity::dup_group, default_value(0)),
                    primary_key(&SavedMangaEntity::plugin, &SavedMangaEntity::slug)),
         make_table("title_meta", make_column("plugin", &TitleMetaEntity::plugin), make_column("slug", &TitleMetaEntity::slug),
                    make_column("fetched", &TitleMetaEntity::fetched),
@@ -117,5 +135,6 @@ using StorageType = decltype(create_storage(""));
 struct StoreImpl {
     std::string path; // kept for the raw api_cache JSONB connection
     store_detail::StorageType storage;
+    bool fts5_ok = false; // library-dedup 1.3: false when the amalgamation lacks FTS5 (dedup disabled)
     explicit StoreImpl(const std::string& p) : path(p), storage(store_detail::create_storage(p)) {}
 };
