@@ -16,18 +16,6 @@ namespace {
 
 constexpr int kPageSize = 12;
 
-// [1 2 3 ... max-2 max-1 max] window: 1, last, current±1, always show edges; gap marker via n==0.
-std::vector<int> page_window(int shown, int pages) {
-    std::vector<int> out;
-    auto add = [&](int n) { if (n >= 1 && n <= pages && (out.empty() || out.back() != n)) out.push_back(n); };
-    add(1);
-    if (shown > 3) add(0); // leading gap
-    for (int n = shown - 1; n <= shown + 1; ++n) add(n);
-    if (shown < pages - 2) add(0); // trailing gap
-    add(pages);
-    return out;
-}
-
 crow::json::wvalue layout(const char* active) {
     crow::json::wvalue ctx;
     ctx["active_" + std::string(active)] = true;

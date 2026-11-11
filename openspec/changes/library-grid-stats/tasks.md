@@ -20,4 +20,4 @@
 
 ## 4. Verification
 
-- [ ] 4.1 `ctest --test-dir build -R store --output-on-failure`; manual smoke: save → refresh with plugin that reports growth → badge appears; open reader → badge clears.
+- [x] 4.1 `ctest --test-dir build -R store --output-on-failure`; manual smoke: save → refresh with plugin that reports growth → badge appears; open reader → badge clears.

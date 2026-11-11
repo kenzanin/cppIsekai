@@ -14,9 +14,9 @@
 ## 3. Grid feed
 
 - [x] 3.1 `http_pages.cpp` saved rows: emit `data-dup=<dup_group>` (and synopsis/alt_titles NOT rendered into HTML — data attrs only where needed; dup only).
-- [ ] 3.2 `library-grid-controls`: duplicate chip becomes visible (any row `data-dup != 0`) and auto-engages `dup_group` sort.
+- [x] 3.2 `library-grid-controls`: duplicate chip becomes visible (any row `data-dup != 0`) and auto-engages `dup_group` sort.
 
 ## 4. Verification
 
 - [x] 4.1 Store test: save two entries with same normalized title/alt tokens (fixtures) → same dup_group; unrelated pair → 0.
-- [ ] 4.2 Manual smoke on `:8090`: chip clusters duplicates adjacently.
+- [x] 4.2 Manual smoke on `:8090`: chip clusters duplicates adjacently.

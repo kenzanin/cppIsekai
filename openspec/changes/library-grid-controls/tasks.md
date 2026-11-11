@@ -14,4 +14,4 @@
 ## 3. Verification
 
 - [x] 3.1 `ctest --test-dir build -R templates --output-on-failure`; regenerate goldens if grid_body/home changed.
-- [ ] 3.2 Manual smoke on `:8090` with saved library: filter/sort/reset/badges render; verify no console errors.
+- [x] 3.2 Manual smoke on `:8090` with saved library: filter/sort/reset/badges render; verify no console errors.

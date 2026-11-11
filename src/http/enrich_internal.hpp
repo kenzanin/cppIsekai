@@ -229,6 +229,37 @@ inline crow::response enrichment_source_response(plugin::Host& plugins, BS::thre
     arr.push_back(entry);
     const std::string fetched_json = glz::write_json(fetched).value_or("[]");
     on_pool(db, [&] { store.title_meta_put_fetched(plugin, slug, fetched_json, now); return 0; });
+    // library-dedup 1.2 (enrichment path): feed enrichment alt_titles into
+    // saved_manga when a detail envelope lands. Shape: [{title, lang, main}].
+    if (kind == "detail") {
+        if (const auto* o = std::get_if<glz::generic::object_t>(&env.data)) {
+            if (auto it = o->find("data"); it != o->end() && it->second.is_object()) {
+                const auto& d = it->second.get_object();
+                if (auto jt = d.find("alt_titles"); jt != d.end() && jt->second.is_array()) {
+                    glz::generic::array_t titles;
+                    for (const auto& t : jt->second.get_array()) {
+                        // accept plain strings or {title: ...} entries
+                        if (const auto* s = std::get_if<std::string>(&t.data)) {
+                            if (!s->empty()) { glz::generic v; v.data = *s; titles.push_back(std::move(v)); }
+                        } else if (t.is_object()) {
+                            if (auto tt = t.get_object().find("title"); tt != t.get_object().end())
+                                if (const auto* s = std::get_if<std::string>(&tt->second.data); s != nullptr && !s->empty()) {
+                                    glz::generic v; v.data = *s; titles.push_back(std::move(v));
+                                }
+                        }
+                    }
+                    if (!titles.empty()) {
+                        glz::generic arr_out;
+                        arr_out.data = std::move(titles);
+                        const std::string alts_json = glz::write_json(arr_out).value_or(std::string{});
+                        // synopsis left empty → saved_signal_update leaves it untouched
+                        on_pool(db, [&, alts_json] { store.saved_signal_update(plugin, slug, {}, alts_json); return 0; });
+                        on_pool(db, [&] { store.recompute_dup_groups(); return 0; });
+                    }
+                }
+            }
+        }
+    }
 
     crow::json::wvalue out;
     out["ok"] = true;
