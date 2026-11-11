@@ -8,6 +8,9 @@ using namespace sqlite_orm;
 
 Store::Store(const std::string& path) : impl_(std::make_unique<StoreImpl>(path)) {
     impl_->storage.pragma.journal_mode(journal_mode::WAL);
+    // wait on writers instead of failing instantly: raw api_cache opens and this
+    // ORM connection are concurrent writers (db-lock regression).
+    impl_->storage.pragma.busy_timeout(3000);
     // FK: pragma_t has no foreign_keys setter in v1.9.1; make_storage enables it
     // automatically because the schema declares a foreign_key.
     impl_->storage.sync_schema();

@@ -10,6 +10,7 @@ std::optional<ApiCacheRow> Store::api_cache_get(const std::string& plugin_id, co
     // Raw connection: payload is JSONB binary — sqlite_orm has no mapping for it.
     sqlite3* db = nullptr;
     if (sqlite3_open(impl_->path.c_str(), &db) != SQLITE_OK) return std::nullopt;
+    sqlite3_busy_timeout(db, 3000);
     sqlite3_stmt* stmt = nullptr;
     std::optional<ApiCacheRow> row;
     const char* sql = "SELECT params_json, json(payload), fetched_at, ttl_s FROM api_cache "
@@ -39,6 +40,7 @@ void Store::api_cache_put(const std::string& plugin_id, const std::string& query
                           std::int64_t fetched_at, std::int64_t ttl_s) {
     sqlite3* db = nullptr;
     if (sqlite3_open(impl_->path.c_str(), &db) != SQLITE_OK) return;
+    sqlite3_busy_timeout(db, 3000);
     sqlite3_stmt* stmt = nullptr;
     // jsonb(?) rejects malformed JSON -> the write fails loudly, never stores garbage.
     const char* sql = "INSERT INTO api_cache(plugin_id, query_hash, params_json, fetched_at, ttl_s, payload) "
