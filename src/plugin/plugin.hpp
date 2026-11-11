@@ -41,6 +41,12 @@ struct Config {
     // Host-wide outbound proxy (ini [server] proxy); the fetch gate applies
     // it to every handle; empty = direct.
     std::string proxy;
+
+    // Second scan root for metadata-only enrichment plugins (ini [paths]
+    // enrichment_dir). Same runtimes and host tools as scraper plugins; their
+    // capability is tagged `enrichment` and they never enter the scraper
+    // registry (/plugins). Empty disables the enrichment scan.
+    std::string enrichment_dir = "data/enrichment";
 };
 
 struct PluginInfo {

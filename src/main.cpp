@@ -93,6 +93,7 @@ int main(int argc, char** argv) {
     plugin_conf.fetch_profile = cfg.fetch_profile;
     plugin_conf.instruction_budget = cfg.plugin_timeout_ops;
     plugin_conf.proxy = cfg.proxy;
+    plugin_conf.enrichment_dir = cfg.enrichment_dir;
     spdlog::info("plugins dir={} fetch_timeout_ms={} fetch_profile={} ops={}", //
                  plugin_conf.dir, plugin_conf.fetch_timeout_ms, plugin_conf.fetch_profile,
                  plugin_conf.instruction_budget);
