@@ -27,6 +27,7 @@ namespace api {
 // enrichment envelope; nullopt when this source has nothing stored.
 inline std::optional<crow::json::wvalue> stored_source(const std::string& fetched_json,
                                                       const std::string& id,
+                                                      const std::string& kind,
                                                       std::int64_t& out_fetched_at) {
     glz::generic fetched;
     if (glz::read_json(fetched, fetched_json) || !fetched.is_array()) {
@@ -39,6 +40,10 @@ inline std::optional<crow::json::wvalue> stored_source(const std::string& fetche
         if (src == obj.end()) continue;
         const auto* s = std::get_if<std::string>(&src->second.data);
         if (s == nullptr || *s != id) continue;
+        // entries are keyed (source, kind); a missing kind is a legacy detail entry
+        const auto k = obj.find("kind");
+        const auto* ks = k != obj.end() ? std::get_if<std::string>(&k->second.data) : nullptr;
+        if ((ks ? *ks : std::string("detail")) != kind) continue;
         crow::json::wvalue out;
         out["ok"] = true;
         out["cached"] = true;
@@ -125,7 +130,7 @@ inline crow::response enrichment_source_response(plugin::Host& plugins, BS::thre
     const auto existing = on_pool(db, [&] { return store.title_meta_get(plugin, slug); });
     if (!force && existing) {
         std::int64_t fetched_at = existing->fetched_at;
-        if (auto cached = stored_source(existing->fetched, id, fetched_at)) {
+        if (auto cached = stored_source(existing->fetched, id, kind, fetched_at)) {
             crow::response r{*cached};
             r.set_header("Content-Type", "application/json");
             return r;
@@ -137,7 +142,7 @@ inline crow::response enrichment_source_response(plugin::Host& plugins, BS::thre
     if (glz::read_json(env, raw) || !envelope_ok(env)) {
         if (existing) {
             std::int64_t fetched_at = existing->fetched_at;
-            if (auto cached = stored_source(existing->fetched, id, fetched_at)) {
+            if (auto cached = stored_source(existing->fetched, id, kind, fetched_at)) {
                 crow::response r{*cached};
                 r.set_header("Content-Type", "application/json");
                 return r;
@@ -177,14 +182,20 @@ inline crow::response enrichment_source_response(plugin::Host& plugins, BS::thre
     for (std::size_t i = 0; i < arr.size();) {
         const auto& obj = arr[i];
         if (!obj.is_object()) { ++i; continue; }
-        const auto src = obj.get_object().find("source");
-        const auto* s = src != obj.get_object().end() ? std::get_if<std::string>(&src->second.data) : nullptr;
-        if (s != nullptr && *s == id) arr.erase(arr.begin() + i); else ++i;
+        const auto& o = obj.get_object();
+        const auto src = o.find("source");
+        const auto* s = src != o.end() ? std::get_if<std::string>(&src->second.data) : nullptr;
+        const auto kk = o.find("kind");
+        const auto* ks = kk != o.end() ? std::get_if<std::string>(&kk->second.data) : nullptr;
+        const std::string entry_kind = ks ? *ks : "detail"; // legacy entries are detail
+        if (s != nullptr && *s == id && entry_kind == kind) arr.erase(arr.begin() + i); else ++i;
     }
     glz::generic entry;
     auto& obj = entry.data.emplace<glz::generic::object_t>();
     obj["source"] = glz::generic{};
     obj["source"].data = id;
+    obj["kind"] = glz::generic{};
+    obj["kind"].data = kind;
     obj["fetched_at"] = glz::generic{};
     obj["fetched_at"].data = static_cast<double>(now);
     if (const auto* o = std::get_if<glz::generic::object_t>(&env.data)) {

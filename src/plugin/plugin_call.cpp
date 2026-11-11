@@ -157,8 +157,8 @@ std::string Host::call(const std::string& id, const std::string& method, const s
 }
 
 std::string Host::enrich(const std::string& id, const std::string& title, const std::string& kind) {
-    if (kind != "detail" && kind != "covers") {
-        return err_json("enrich: kind must be 'detail' or 'covers'");
+    if (kind != "detail" && kind != "covers" && kind != "recommendations") {
+        return err_json("enrich: kind must be 'detail', 'covers' or 'recommendations'");
     }
     std::shared_ptr<Runtime> rt;
     {

@@ -37,6 +37,14 @@ void register_enrich(Ctx& c) {
         return enrichment_source_response(plugins, db, plugin_pool, store, id, "detail", plugin, slug, force);
     });
 
+    CROW_ROUTE(app, "/api/enrichment/<string>/recommendations")
+    ([&](const crow::request& req, std::string id) -> crow::response {
+        const std::string plugin = param(req, "plugin");
+        const std::string slug = param(req, "slug");
+        const bool force = param(req, "force") == "1";
+        return enrichment_source_response(plugins, db, plugin_pool, store, id, "recommendations", plugin, slug, force);
+    });
+
     CROW_ROUTE(app, "/api/enrichment/<string>/covers")
     ([&](const crow::request& req, std::string id) -> crow::response {
         const std::string plugin = param(req, "plugin");

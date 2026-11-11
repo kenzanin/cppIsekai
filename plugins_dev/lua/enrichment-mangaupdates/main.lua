@@ -99,6 +99,7 @@ local function best_series(query)
   if not data.description or data.description == "" then
     data.description = record.description
   end
+  data.recommendations = data.recommendations or record.recommendations or {}
   return data
 end
 
@@ -165,7 +166,7 @@ function handle(req)
   local title = tostring(p.title or "")
   local kind = tostring(p.kind or "detail")
   if title == "" then return { ok = false, error = "missing title" } end
-  if kind ~= "detail" and kind ~= "covers" then return { ok = false, error = "kind must be detail|covers" } end
+  if kind ~= "detail" and kind ~= "covers" and kind ~= "recommendations" then return { ok = false, error = "kind must be detail|covers|recommendations" } end
   if #title > 512 then return { ok = false, error = "title too long" } end
 
   local data = best_series(title)
@@ -180,6 +181,26 @@ function handle(req)
         covers = url and { url } or {},
       },
     }
+  end
+
+  if kind == "recommendations" then
+    -- weight-ordered, cap 5; series_image thumburl only (full art not exposed by v1)
+    local recs = {}
+    for _, r in ipairs(data.recommendations or {}) do
+      local name = tostring(r.series_name or "")
+      if name ~= "" then
+        recs[#recs + 1] = {
+          name = name,
+          url = tostring(r.series_url or SITE),
+          id = tostring(r.series_id or ""),
+          weight = tonumber(r.weight) or 0,
+        }
+      end
+    end
+    table.sort(recs, function(a, b) return a.weight > b.weight end)
+    while #recs > 5 do recs[#recs] = nil end
+    for _, r in ipairs(recs) do r.weight = nil end
+    return { ok = true, data = { items = recs } }
   end
 
   return {

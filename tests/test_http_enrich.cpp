@@ -47,18 +47,26 @@ void seed_saved(Store& store, const std::string& plugin, const std::string& slug
 
 TEST_CASE("enrich: stored_source finds the right source entry and reports fetched_at") {
     const std::string fetched = R"([
-        {"source":"mangadex","fetched_at":1000,"data":{"title":"MD"}},
+        {"source":"mangadex","kind":"detail","fetched_at":1000,"data":{"title":"MD"}},
+        {"source":"mangadex","kind":"covers","fetched_at":1500,"data":{"covers":["c1"]}},
         {"source":"mangaupdates","fetched_at":2000,"data":{"title":"MU"}}
     ])";
     std::int64_t at = 0;
-    const auto md = stored_source(fetched, "mangadex", at);
+    const auto md = stored_source(fetched, "mangadex", "detail", at);
     REQUIRE(md.has_value());
     CHECK(at == 1000);
     const std::string md_json = md->dump();
     CHECK(has(md_json, "MD"));
-    const auto none = stored_source(fetched, "nope", at);
+    const auto cov = stored_source(fetched, "mangadex", "covers", at);
+    REQUIRE(cov.has_value());
+    CHECK(at == 1500);
+    const auto none = stored_source(fetched, "nope", "detail", at);
     CHECK_FALSE(none.has_value());
-    const auto garbage = stored_source("not json{{", "mangadex", at);
+    // legacy detail entry (no kind) is served for "detail" but not "covers"
+    const auto legacy = stored_source(fetched, "mangaupdates", "detail", at);
+    CHECK(legacy.has_value());
+    CHECK_FALSE(stored_source(fetched, "mangaupdates", "covers", at).has_value());
+    const auto garbage = stored_source("not json{{", "mangadex", "detail", at);
     CHECK_FALSE(garbage.has_value());
 }
 

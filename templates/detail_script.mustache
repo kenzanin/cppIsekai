@@ -158,12 +158,21 @@ function detailPage() {
     },
     fmtDate(ts) { if (!ts) return ''; const d = new Date(ts * 1000); return isNaN(d) ? '' : d.toISOString().slice(0, 10); },
     async loadRelated() {
+      // merge scraper related + enrichment recommendations (MangaDex/MangaUpdates); dedupe by URL
+      const grab = (url) => fetch(url).then(r => r.ok ? r.json() : null).catch(() => null);
       try {
-        const r = await fetch(`/api/related/${encodeURIComponent(this.plugin)}/${encodeURIComponent(this.slug)}`);
-        if (r.ok) {
-          const j = await r.json();
-          if (j.ok) this.related = (j.data && j.data.items) || [];
-        }
+        const [scraper, md, mu] = await Promise.all([
+          grab(`/api/related/${encodeURIComponent(this.plugin)}/${encodeURIComponent(this.slug)}`),
+          grab(`/api/enrichment/mangadex-enrichment/recommendations?plugin=${encodeURIComponent(this.plugin)}&slug=${encodeURIComponent(this.slug)}`),
+          grab(`/api/enrichment/mangaupdates-enrichment/recommendations?plugin=${encodeURIComponent(this.plugin)}&slug=${encodeURIComponent(this.slug)}`),
+        ]);
+        const seen = new Set();
+        const merged = [];
+        const push = (it) => { const key = (it && (it.url || it.id || it.name)) || ''; if (key && !seen.has(key)) { seen.add(key); merged.push(it); } };
+        if (scraper && scraper.ok) ((scraper.data && scraper.data.items) || []).forEach(push);
+        if (md && md.ok) ((md.data && md.data.items) || []).forEach(push);
+        if (mu && mu.ok) ((mu.data && mu.data.items) || []).forEach(push);
+        this.related = merged;
       } catch (e) { /* related section stays hidden */ }
     },
     async toggleLibrary() {

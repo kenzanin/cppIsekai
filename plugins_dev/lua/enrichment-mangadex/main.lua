@@ -148,7 +148,51 @@ local function cover_urls(rec)
     for _, u in ipairs(ja) do out[#out + 1] = u end
     for _, u in ipairs(rest) do out[#out + 1] = u end
   end
+  -- cap at 5 candidates: primary cover first, then locale-preferred catalogue
+  while #out > 5 do out[#out] = nil end
   return out
+end
+
+-- recommendations: reuse the source plugin's approach on the matched record:
+-- MangaDex recommendation endpoint gives scored pairs; the OTHER manga is the candidate.
+local function build_recommendations(rec)
+  local id = rec.id or ""
+  local body, err = get(string.format("%s/manga/%s/recommendation", API, id))
+  if err ~= nil or not body or type(body.data) ~= "table" then
+    return { ok = false, error = err or "recommendation failed" }
+  end
+  local scored = {}
+  for _, entry in ipairs(body.data) do
+    local score = tonumber((entry.attributes or {}).score) or 0
+    for _, rel in ipairs(entry.relationships or {}) do
+      if rel.type == "manga" and rel.id and rel.id ~= id then
+        scored[#scored + 1] = { id = rel.id, score = score }
+        break
+      end
+    end
+  end
+  table.sort(scored, function(a, b) return a.score > b.score end)
+  while #scored > 5 do scored[#scored] = nil end
+  if #scored == 0 then return { ok = true, data = { items = {} } } end
+  local ids = {}
+  for _, s in ipairs(scored) do ids[#ids + 1] = s.id end
+  local ids_q = table.concat(ids, "&ids[]=")
+  local bbody = get(string.format("%s/manga?limit=5&ids[]=%s&includes[]=cover_art", API, ids_q))
+  local by_id = {}
+  if bbody and type(bbody.data) == "table" then
+    for _, m in ipairs(bbody.data) do by_id[m.id] = m end
+  end
+  local items = {}
+  for _, s in ipairs(scored) do
+    local m = by_id[s.id]
+    if m then
+      local name = pick((m.attributes or {}).title)
+      if name ~= "" then
+        items[#items + 1] = { id = m.id, name = name, url = SITE .. "/title/" .. m.id }
+      end
+    end
+  end
+  return { ok = true, data = { items = items } }
 end
 
 local function build_detail(rec)
@@ -177,12 +221,15 @@ function handle(req)
   local title = tostring(p.title or "")
   local kind = tostring(p.kind or "detail")
   if title == "" then return { ok = false, error = "missing title" } end
-  if kind ~= "detail" and kind ~= "covers" then return { ok = false, error = "kind must be detail|covers" } end
+  if kind ~= "detail" and kind ~= "covers" and kind ~= "recommendations" then return { ok = false, error = "kind must be detail|covers|recommendations" } end
   if #title > 512 then return { ok = false, error = "title too long" } end
 
   local rec = best_record(title)
   if not rec then return { ok = false, error = "no match found" } end
 
+  if kind == "recommendations" then
+    return build_recommendations(rec)
+  end
   local data = kind == "covers" and build_covers(rec) or build_detail(rec)
   return { ok = true, data = data }
 end
