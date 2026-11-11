@@ -52,4 +52,29 @@ std::string Host::logo_path(const std::string& id) const {
     return "";
 }
 
+std::vector<std::pair<std::string, std::string>> Host::enrichment_sources() const {
+    const std::scoped_lock lock(impl_->mu);
+    std::vector<std::pair<std::string, std::string>> out;
+    for (const auto& [id, rt] : impl_->plugins) {
+        const auto& caps = rt->info.capabilities;
+        for (const auto& c : caps) {
+            if (c == "enrichment") {
+                out.emplace_back(id, rt->info.name);
+                break;
+            }
+        }
+    }
+    return out;
+}
+
+bool Host::is_enrichment(const std::string& id) const {
+    const std::scoped_lock lock(impl_->mu);
+    const auto it = impl_->plugins.find(id);
+    if (it == impl_->plugins.end()) return false;
+    for (const auto& c : it->second->info.capabilities) {
+        if (c == "enrichment") return true;
+    }
+    return false;
+}
+
 } // namespace plugin

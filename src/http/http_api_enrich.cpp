@@ -10,6 +10,25 @@ void register_enrich(Ctx& c) {
     auto& plugin_pool = c.plugin_pool;
     auto& plugins = c.plugins;
 
+    // GET /api/enrichment — loaded enrichment sources (id, name). Picker needs the list.
+    CROW_ROUTE(app, "/api/enrichment")
+    ([&] {
+        crow::json::wvalue list(crow::json::type::List);
+        int i = 0;
+        for (const auto& [id, name] : plugins.enrichment_sources()) {
+            crow::json::wvalue row;
+            row["id"] = id;
+            row["name"] = name;
+            list[i++] = std::move(row);
+        }
+        crow::json::wvalue out;
+        out["ok"] = true;
+        out["sources"] = std::move(list);
+        crow::response r{out};
+        r.set_header("Content-Type", "application/json");
+        return r;
+    });
+
     CROW_ROUTE(app, "/api/enrichment/<string>/detail")
     ([&](const crow::request& req, std::string id) -> crow::response {
         const std::string plugin = param(req, "plugin");
