@@ -30,6 +30,13 @@
     </div>
     <div class="flex-1 min-w-0">
       <h1 class="text-2xl font-semibold mb-2 leading-tight" x-text="detail.name || '…'"></h1>
+      <!-- attribution (detail-enrichment 3.1): plugin name + logo under title; @error falls back to name only -->
+      <div class="flex items-center gap-2 text-xs text-zinc-500 mb-2" x-show="pluginName" x-cloak>
+        <template x-if="pluginLogoOk">
+          <img :src="'/plugin/'+encodeURIComponent(plugin)+'/logo'" class="h-5 w-5 object-contain rounded" @error="pluginLogoOk=false" alt="">
+        </template>
+        <span x-text="pluginName"></span>
+      </div>
       <div class="flex flex-wrap gap-1.5 mb-2" x-show="detail.status || detail.release_at" x-cloak>
         <span class="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300" x-show="detail.status" x-text="detail.status"></span>
         <span class="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400" x-show="detail.release_at" x-text="fmtDate(detail.release_at)"></span>
@@ -187,22 +194,13 @@
   <!-- related (user steer): text-only links to the source site; hidden until data arrives -->
   <div class="mt-8" x-show="related.length" x-cloak>
     <h2 class="text-xl font-semibold mb-4">Related</h2>
-    <ul class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
+    <div class="flex flex-wrap gap-1.5">
       <template x-for="m in related" :key="m.id">
-        <li class="text-sm truncate">
-          <a :href="m.url" target="_blank" rel="noopener" class="text-zinc-300 hover:text-emerald-300 hover:underline" x-text="m.name"></a>
-        </li>
+        <a :href="m.url" target="_blank" rel="noopener" class="text-xs px-2 py-0.5 rounded-full border border-zinc-700 text-zinc-400 hover:text-emerald-300 hover:border-emerald-700" x-text="m.name"></a>
       </template>
-    </ul>
+    </div>
   </div>
 
-  <!-- attribution (detail-enrichment 3.1): plugin name + logo; @error falls back to name only -->
-  <div class="mt-6 flex items-center gap-2 text-xs text-zinc-500" x-show="pluginName" x-cloak>
-    <template x-if="pluginLogoOk">
-      <img :src="'/plugin/'+encodeURIComponent(plugin)+'/logo'" class="h-5 w-5 object-contain rounded" @error="pluginLogoOk=false" alt="">
-    </template>
-    <span x-text="pluginName"></span>
-  </div>
 </div>
 
 <script>
