@@ -59,6 +59,52 @@ inline std::optional<crow::json::wvalue> stored_source(const std::string& fetche
     return std::nullopt;
 }
 
+// Validate + normalize the POST chosen member into a compact JSON string.
+// nullopt on any shape violation (caller returns 400). Exact key whitelist;
+// artist/author accept String or List<String> and normalize to array.
+inline std::optional<std::string> normalize_chosen(const crow::json::rvalue& ch) {
+    if (ch.t() != crow::json::type::Object) return std::nullopt;
+    static const char* allowed[] = {"title", "synopsis", "artist", "author", "cover", "tags_add", "tags_hidden"};
+    for (const auto& member : ch) {
+        const std::string k = std::string(member.key());
+        bool ok = false;
+        for (const char* a : allowed) if (k == a) { ok = true; break; }
+        if (!ok) return std::nullopt;
+    }
+    crow::json::wvalue out;
+    for (const char* key : {"title", "synopsis", "cover"})
+        if (ch.has(key) && ch[key].t() == crow::json::type::String) out[key] = ch[key];
+    for (const char* key : {"artist", "author"}) {
+        if (!ch.has(key)) continue;
+        if (ch[key].t() == crow::json::type::String) {
+            crow::json::wvalue one(crow::json::type::List);
+            one[0] = ch[key];
+            out[key] = std::move(one);
+        } else if (ch[key].t() == crow::json::type::List) {
+            crow::json::wvalue arr(crow::json::type::List);
+            int n = 0;
+            for (const auto& item : ch[key]) {
+                if (item.t() != crow::json::type::String) return std::nullopt;
+                arr[n++] = item;
+            }
+            out[key] = std::move(arr);
+        } else return std::nullopt;
+    }
+    for (const char* key : {"tags_add", "tags_hidden"}) {
+        if (!ch.has(key)) continue;
+        const auto& arr = ch[key];
+        if (arr.t() != crow::json::type::List) return std::nullopt;
+        crow::json::wvalue out_arr(crow::json::type::List);
+        int n = 0;
+        for (const auto& item : arr) {
+            if (item.t() != crow::json::type::String) return std::nullopt;
+            out_arr[n++] = item;
+        }
+        out[key] = std::move(out_arr);
+    }
+    return std::string(out.dump());
+}
+
 // GET /api/enrichment/<id>/<detail|covers>?plugin=&slug=&force=0|1
 // cached-or-fetch / force per source. Never writes saved_manga / api_cache.
 inline crow::response enrichment_source_response(plugin::Host& plugins, BS::thread_pool<>& db,
