@@ -30,24 +30,22 @@ void Store::title_meta_put_fetched(const std::string& plugin, const std::string&
                                    const std::string& fetched_json, std::int64_t fetched_at) {
     auto rows = impl_->storage.get_all<store_detail::TitleMetaEntity>(
         where(c(&store_detail::TitleMetaEntity::plugin) == plugin && c(&store_detail::TitleMetaEntity::slug) == slug));
+    store_detail::TitleMetaEntity row{plugin, slug, fetched_json, "{}", fetched_at};
     if (!rows.empty()) {
-        rows[0].fetched = fetched_json;
-        rows[0].fetched_at = fetched_at;
-        impl_->storage.update(rows[0]);
-        return;
+        row.chosen = rows[0].chosen; // chosen survives a re-fetch
     }
-    impl_->storage.insert(store_detail::TitleMetaEntity{plugin, slug, fetched_json, "{}", fetched_at});
+    impl_->storage.replace(row); // vendored sqlite_orm: insert() is broken here; replace is the write path (saved_manga precedent)
 }
 
 void Store::title_meta_put_chosen(const std::string& plugin, const std::string& slug, const std::string& chosen_json) {
     auto rows = impl_->storage.get_all<store_detail::TitleMetaEntity>(
         where(c(&store_detail::TitleMetaEntity::plugin) == plugin && c(&store_detail::TitleMetaEntity::slug) == slug));
+    store_detail::TitleMetaEntity row{plugin, slug, "[]", chosen_json, 0};
     if (!rows.empty()) {
-        rows[0].chosen = chosen_json;
-        impl_->storage.update(rows[0]);
-        return;
+        row.fetched = rows[0].fetched; // fetched survives a chosen save
+        row.fetched_at = rows[0].fetched_at;
     }
-    impl_->storage.insert(store_detail::TitleMetaEntity{plugin, slug, "[]", chosen_json, 0});
+    impl_->storage.replace(row);
 }
 
 namespace {
@@ -68,7 +66,7 @@ void Store::title_meta_reset_cover(const std::string& plugin, const std::string&
     if (glz::read_json(chosen, rows[0].chosen) || !chosen_clear(chosen, {"cover"})) return;
     if (auto out = glz::write_json(chosen)) {
         rows[0].chosen = std::move(*out);
-        impl_->storage.update(rows[0]);
+        impl_->storage.replace(rows[0]);
     }
 }
 
@@ -80,6 +78,6 @@ void Store::title_meta_reset_detail(const std::string& plugin, const std::string
     if (glz::read_json(chosen, rows[0].chosen) || !chosen_clear(chosen, {"title", "synopsis", "artist", "author", "tags_add", "tags_hidden"})) return;
     if (auto out = glz::write_json(chosen)) {
         rows[0].chosen = std::move(*out);
-        impl_->storage.update(rows[0]);
+        impl_->storage.replace(rows[0]);
     }
 }

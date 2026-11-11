@@ -280,3 +280,69 @@ TEST_CASE("Store: api_cache NULL/empty payload is a miss, not a fresh hit") {
     // fresh look-aside must miss despite a row existing
     CHECK_FALSE(store.api_cache_get(plugin, key).has_value());
 }
+
+TEST_CASE("Store: title_meta round-trip and corrupt-row tolerance (enrichment 2.1-2.3)") {
+    Store store("test_store.db");
+    const std::string plugin = "enrich_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+    const std::string slug = "slug-" + plugin;
+
+    CHECK_FALSE(store.title_meta_get(plugin, slug).has_value());
+
+    store.title_meta_put_fetched(plugin, slug, R"([{"source":"mangadex","fetched_at":1000,"data":{"title":"A"}}])", 1000);
+    {
+        const auto row = store.title_meta_get(plugin, slug);
+        REQUIRE(row.has_value());
+        CHECK(row->fetched_at == 1000);
+        CHECK(row->chosen == "{}");
+    }
+
+    store.title_meta_put_chosen(plugin, slug, R"({"title":"B","tags_add":["Isekai"],"tags_hidden":["Ecchi"],"cover":"https://x/c.jpg"})");
+    {
+        const auto row = store.title_meta_get(plugin, slug);
+        REQUIRE(row.has_value());
+        CHECK(row->chosen.find("\"title\":\"B\"") != std::string::npos);
+        CHECK(row->chosen.find("tags_hidden") != std::string::npos);
+        CHECK(row->fetched.find("mangadex") != std::string::npos);
+    }
+
+    store.title_meta_reset_cover(plugin, slug);
+    {
+        const auto row = store.title_meta_get(plugin, slug);
+        REQUIRE(row.has_value());
+        CHECK(row->chosen.find("cover") == std::string::npos);
+        CHECK(row->chosen.find("\"title\":\"B\"") != std::string::npos);
+        CHECK(row->fetched.find("mangadex") != std::string::npos); // fetched kept
+    }
+
+    store.title_meta_reset_detail(plugin, slug);
+    {
+        const auto row = store.title_meta_get(plugin, slug);
+        REQUIRE(row.has_value());
+        CHECK(row->chosen.find("\"title\"") == std::string::npos);
+        CHECK(row->chosen.find("tags_add") == std::string::npos);
+        CHECK(row->chosen.find("tags_hidden") == std::string::npos);
+        CHECK(row->fetched.find("mangadex") != std::string::npos); // fetched kept across detail reset
+    }
+
+    // corrupt fetched row -> read as absent, never crash
+    sqlite3* db = nullptr;
+    REQUIRE(sqlite3_open("test_store.db", &db) == SQLITE_OK);
+    sqlite3_stmt* st = nullptr;
+    REQUIRE(sqlite3_prepare_v2(db, "UPDATE title_meta SET fetched = 'not json{{' WHERE plugin = ? AND slug = ?", -1, &st, nullptr) == SQLITE_OK);
+    sqlite3_bind_text(st, 1, plugin.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(st, 2, slug.c_str(), -1, SQLITE_TRANSIENT);
+    REQUIRE(sqlite3_step(st) == SQLITE_DONE);
+    sqlite3_finalize(st);
+    sqlite3_close(db);
+    CHECK_FALSE(store.title_meta_get(plugin, slug).has_value());
+
+    // corrupt chosen row -> read as absent too
+    REQUIRE(sqlite3_open("test_store.db", &db) == SQLITE_OK);
+    REQUIRE(sqlite3_prepare_v2(db, "UPDATE title_meta SET fetched = '[]', chosen = '{' WHERE plugin = ? AND slug = ?", -1, &st, nullptr) == SQLITE_OK);
+    sqlite3_bind_text(st, 1, plugin.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(st, 2, slug.c_str(), -1, SQLITE_TRANSIENT);
+    REQUIRE(sqlite3_step(st) == SQLITE_DONE);
+    sqlite3_finalize(st);
+    sqlite3_close(db);
+    CHECK_FALSE(store.title_meta_get(plugin, slug).has_value());
+}

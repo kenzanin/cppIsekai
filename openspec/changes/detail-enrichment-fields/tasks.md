@@ -10,9 +10,9 @@
 
 ## 2. Persistence
 
-- [ ] 2.1 `src/store/store_internal.hpp`: add `TitleMetaEntity{ plugin, slug, fetched (TEXT), chosen (TEXT), fetched_at (INTEGER) }` + table `title_meta` with `primary_key(plugin, slug)`. No new deps. `create_storage` extended; a `title_meta_ensure` called at boot (CREATE TABLE IF NOT EXISTS semantics of `sync_schema`).
-- [ ] 2.2 `src/store/store_api.cpp` (or `store_enrichment.cpp` if split): raw-connection read/write helpers `title_meta_get(plugin, slug) -> optional<TitleMetaRow>`, `title_meta_put_fetched(...)`, `title_meta_put_chosen(...)`, `title_meta_reset_cover(...)`, `title_meta_reset_detail(...)` (clear chosen keys selectively, keep `fetched`). All writes are additive overwrites; `saved_manga` and `api_cache` are never written here.
-- [ ] 2.3 `title_meta` JSON shape validated on read with glaze; corrupt row = warn + treat as absent (never crash). Test: insert garbage, read returns nullopt.
+- [x] 2.1 `src/store/store_internal.hpp`: add `TitleMetaEntity{ plugin, slug, fetched (TEXT), chosen (TEXT), fetched_at (INTEGER) }` + table `title_meta` with `primary_key(plugin, slug)`. No new deps. `create_storage` extended; a `title_meta_ensure` called at boot (CREATE TABLE IF NOT EXISTS semantics of `sync_schema`).
+- [x] 2.2 `src/store/store_api.cpp` (or `store_enrichment.cpp` if split): raw-connection read/write helpers `title_meta_get(plugin, slug) -> optional<TitleMetaRow>`, `title_meta_put_fetched(...)`, `title_meta_put_chosen(...)`, `title_meta_reset_cover(...)`, `title_meta_reset_detail(...)` (clear chosen keys selectively, keep `fetched`). All writes are additive overwrites; `saved_manga` and `api_cache` are never written here.
+- [x] 2.3 `title_meta` JSON shape validated on read with glaze; corrupt row = warn + treat as absent (never crash). Test: insert garbage, read returns nullopt.
 
 ## 3. HTTP API
 
