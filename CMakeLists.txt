@@ -59,7 +59,7 @@ target_link_libraries(quickjs PUBLIC m ${CMAKE_DL_LIBS} pthread)
 pkg_check_modules(SQLITE3 REQUIRED IMPORTED_TARGET sqlite3)
 
 # --- app ---
-add_executable(cppIsekai src/main.cpp src/store/store_core.cpp src/store/store_search.cpp src/store/store_api.cpp src/http/http.cpp src/http/http_pages.cpp src/http/http_api.cpp src/http/http_api_admin.cpp src/http/http_api_library.cpp src/http/http_api_title.cpp src/http/http_api_reader.cpp src/http/http_api_state.cpp src/http/http_api_content.cpp src/http/pages_api.cpp
+add_executable(cppIsekai src/main.cpp src/store/store_core.cpp src/store/store_search.cpp src/store/store_api.cpp src/store/store_enrichment.cpp src/http/http.cpp src/http/http_pages.cpp src/http/http_api.cpp src/http/http_api_admin.cpp src/http/http_api_library.cpp src/http/http_api_title.cpp src/http/http_api_reader.cpp src/http/http_api_state.cpp src/http/http_api_content.cpp src/http/pages_api.cpp
                          src/fetch/fetch.cpp src/fetch/fetch_curl.cpp src/plugin/plugin_core.cpp src/plugin/plugin_load.cpp src/plugin/plugin_call.cpp src/plugin/lua/bridge.cpp src/plugin/lua/lua_runtime.cpp src/plugin/http_client.cpp src/plugin/wasm/wasm_rt.cpp src/plugin/wasm/wasm_load.cpp src/plugin/wasm/wasm_imports.cpp src/plugin/js/js_rt.cpp src/plugin/js/js_bindings.cpp src/plugin/htmltext_re2.cpp src/plugin/htmltext_html.cpp src/cache/cache.cpp src/cache/cache_img.cpp src/reader/window.cpp
                          ${TP}/libzippp/libzippp.cpp src/http/export_cbz.cpp)
 target_include_directories(
@@ -88,9 +88,9 @@ _cppisekai_pch_vendor(cppIsekai)
 # --- tests (doctest, system package) ---
 # ponytail: single test binary; split per-module when the suite outgrows one
 # file
-add_executable(test_store tests/test_store.cpp src/store/store_core.cpp src/store/store_search.cpp src/store/store_api.cpp)
-target_include_directories(test_store PRIVATE src ${TP}/sqlite_orm/include)
-target_link_libraries(test_store PRIVATE PkgConfig::SQLITE3)
+add_executable(test_store tests/test_store.cpp src/store/store_core.cpp src/store/store_search.cpp src/store/store_api.cpp src/store/store_enrichment.cpp)
+target_include_directories(test_store PRIVATE src ${TP}/sqlite_orm/include ${TP}/glaze)
+target_link_libraries(test_store PRIVATE spdlog::spdlog PkgConfig::SQLITE3)
 target_compile_options(test_store PRIVATE -Wall -Wextra)
 enable_testing()
 add_test(NAME store COMMAND test_store)
@@ -103,7 +103,7 @@ target_include_directories(lexbor PUBLIC ${TP}/lexbor/source)
 target_compile_options(lexbor PRIVATE -w) # C vendor lib; do not gate on -Wall -Wextra
 target_include_directories(cppIsekai PRIVATE ${TP}/glaze ${TP}/sol2/include ${TP}/lexbor/source)
 add_executable(test_plugin tests/test_plugin.cpp src/plugin/plugin_core.cpp src/plugin/plugin_load.cpp src/plugin/plugin_call.cpp
-                           src/plugin/lua/bridge.cpp src/plugin/lua/lua_runtime.cpp src/plugin/http_client.cpp src/plugin/wasm/wasm_rt.cpp src/plugin/wasm/wasm_load.cpp src/plugin/wasm/wasm_imports.cpp src/plugin/js/js_rt.cpp src/plugin/js/js_bindings.cpp src/plugin/htmltext_re2.cpp src/plugin/htmltext_html.cpp src/store/store_core.cpp src/store/store_search.cpp src/store/store_api.cpp src/fetch/fetch.cpp src/fetch/fetch_curl.cpp)
+                           src/plugin/lua/bridge.cpp src/plugin/lua/lua_runtime.cpp src/plugin/http_client.cpp src/plugin/wasm/wasm_rt.cpp src/plugin/wasm/wasm_load.cpp src/plugin/wasm/wasm_imports.cpp src/plugin/js/js_rt.cpp src/plugin/js/js_bindings.cpp src/plugin/htmltext_re2.cpp src/plugin/htmltext_html.cpp src/store/store_core.cpp src/store/store_search.cpp src/store/store_api.cpp src/store/store_enrichment.cpp src/fetch/fetch.cpp src/fetch/fetch_curl.cpp)
 target_include_directories(
   test_plugin
   PRIVATE src ${TP}/glaze ${TP}/sol2/include ${TP}/thread_pool/include
@@ -127,7 +127,7 @@ _cppisekai_pch(test_plugin)
 # host-helper core + runtime parity (plugin-helper 2.1): htmltext core cases
 # direct; lua/js/wasm parity through the real Host on migrated fixtures.
 add_executable(test_htmltext tests/test_htmltext.cpp src/plugin/plugin_core.cpp src/plugin/plugin_load.cpp src/plugin/plugin_call.cpp
-                             src/plugin/lua/bridge.cpp src/plugin/lua/lua_runtime.cpp src/plugin/http_client.cpp src/plugin/wasm/wasm_rt.cpp src/plugin/wasm/wasm_load.cpp src/plugin/wasm/wasm_imports.cpp src/plugin/js/js_rt.cpp src/plugin/js/js_bindings.cpp src/plugin/htmltext_re2.cpp src/plugin/htmltext_html.cpp src/store/store_core.cpp src/store/store_search.cpp src/store/store_api.cpp src/fetch/fetch.cpp src/fetch/fetch_curl.cpp)
+                             src/plugin/lua/bridge.cpp src/plugin/lua/lua_runtime.cpp src/plugin/http_client.cpp src/plugin/wasm/wasm_rt.cpp src/plugin/wasm/wasm_load.cpp src/plugin/wasm/wasm_imports.cpp src/plugin/js/js_rt.cpp src/plugin/js/js_bindings.cpp src/plugin/htmltext_re2.cpp src/plugin/htmltext_html.cpp src/store/store_core.cpp src/store/store_search.cpp src/store/store_api.cpp src/store/store_enrichment.cpp src/fetch/fetch.cpp src/fetch/fetch_curl.cpp)
 target_include_directories(test_htmltext PRIVATE src ${TP}/glaze ${TP}/sol2/include ${TP}/thread_pool/include ${TP}/lexbor/source
                           ${TP}/sqlite_orm/include ${TP}/readerwriterqueue/include)
 target_link_libraries(
@@ -191,7 +191,7 @@ target_compile_options(test_export PRIVATE -Wall -Wextra)
 add_test(NAME export COMMAND test_export)
 
 # stale layer (2.2): wrapper around the ABI call; cache + glaze, no server
-add_executable(test_stale tests/test_stale.cpp src/store/store_core.cpp src/store/store_search.cpp src/store/store_api.cpp)
+add_executable(test_stale tests/test_stale.cpp src/store/store_core.cpp src/store/store_search.cpp src/store/store_api.cpp src/store/store_enrichment.cpp)
 target_include_directories(test_stale PRIVATE src ${TP}/glaze ${TP}/sqlite_orm/include)
 target_link_libraries(test_stale PRIVATE spdlog::spdlog PkgConfig::VIPS PkgConfig::SQLITE3)
 target_compile_options(test_stale PRIVATE -Wall -Wextra)
@@ -235,7 +235,7 @@ find_program(CLANG_FORMAT clang-format)
 # optional targets: cmake --build build --target tidy / format
 add_custom_target(
   tidy
-  COMMAND ${CLANG_TIDY} -p ${CMAKE_BINARY_DIR} src/main.cpp src/store/store_core.cpp src/store/store_search.cpp src/store/store_api.cpp
+  COMMAND ${CLANG_TIDY} -p ${CMAKE_BINARY_DIR} src/main.cpp src/store/store_core.cpp src/store/store_search.cpp src/store/store_api.cpp src/store/store_enrichment.cpp
           src/http/http.cpp src/plugin/plugin_core.cpp src/plugin/plugin_load.cpp src/plugin/plugin_call.cpp src/cache/cache.cpp src/cache/cache_img.cpp src/reader/window.cpp
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 add_custom_target(
@@ -245,6 +245,6 @@ add_custom_target(
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 add_custom_target(
     fix
-    COMMAND ${CLANG_TIDY} -p ${CMAKE_BINARY_DIR} -fix -fix-errors src/main.cpp src/store/store_core.cpp src/store/store_search.cpp src/store/store_api.cpp
+    COMMAND ${CLANG_TIDY} -p ${CMAKE_BINARY_DIR} -fix -fix-errors src/main.cpp src/store/store_core.cpp src/store/store_search.cpp src/store/store_api.cpp src/store/store_enrichment.cpp
             src/http/http.cpp src/plugin/plugin_core.cpp src/plugin/plugin_load.cpp src/plugin/plugin_call.cpp src/cache/cache.cpp src/cache/cache_img.cpp src/reader/window.cpp
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

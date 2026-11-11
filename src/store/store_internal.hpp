@@ -51,6 +51,14 @@ struct SavedMangaEntity {
     std::int64_t added_at{};
 };
 
+struct TitleMetaEntity {
+    std::string plugin;      // composite PK with slug: one row per saved manga
+    std::string slug;
+    std::string fetched;     // JSON array: [{source, fetched_at, data}]; never expires
+    std::string chosen;      // JSON object: {title?, synopsis?, artist?, author?, cover?, tags_add[], tags_hidden[]}
+    std::int64_t fetched_at{}; // last fetch watermark (unix seconds)
+};
+
 struct ApiCacheEntity {
     std::string plugin_id;   // composite PK with query_hash
     std::string query_hash;
@@ -89,6 +97,11 @@ inline auto create_storage(const std::string& path) {
                    make_column("name", &SavedMangaEntity::name), make_column("cover", &SavedMangaEntity::cover),
                    make_column("added_at", &SavedMangaEntity::added_at),
                    primary_key(&SavedMangaEntity::plugin, &SavedMangaEntity::slug)),
+        make_table("title_meta", make_column("plugin", &TitleMetaEntity::plugin), make_column("slug", &TitleMetaEntity::slug),
+                   make_column("fetched", &TitleMetaEntity::fetched),
+                   make_column("chosen", &TitleMetaEntity::chosen),
+                   make_column("fetched_at", &TitleMetaEntity::fetched_at),
+                   primary_key(&TitleMetaEntity::plugin, &TitleMetaEntity::slug)),
         make_table("api_cache", make_column("plugin_id", &ApiCacheEntity::plugin_id),
                    make_column("query_hash", &ApiCacheEntity::query_hash),
                    make_column("params_json", &ApiCacheEntity::params_json),

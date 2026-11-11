@@ -112,6 +112,23 @@ public:
     std::vector<SavedManga> saved_list(); // added_at desc
     std::optional<SavedManga> saved_get(const std::string& plugin, const std::string& slug);
 
+    /** \brief One enrichment row for a saved manga; fetched/chosen are raw JSON text. */
+    struct TitleMetaRow {
+        std::string plugin;
+        std::string slug;
+        std::string fetched;    // JSON array, one entry per source; never expires
+        std::string chosen;     // JSON object {title?, synopsis?, artist?, author?, cover?, tags_add[], tags_hidden[]}
+        std::int64_t fetched_at{}; // last fetch watermark (unix seconds)
+    };
+
+    /** \brief nullopt when the manga never fetched; corrupt JSON reads as nullopt too (2.3). */
+    std::optional<TitleMetaRow> title_meta_get(const std::string& plugin, const std::string& slug);
+    void title_meta_put_fetched(const std::string& plugin, const std::string& slug,
+                                const std::string& fetched_json, std::int64_t fetched_at);
+    void title_meta_put_chosen(const std::string& plugin, const std::string& slug, const std::string& chosen_json);
+    void title_meta_reset_cover(const std::string& plugin, const std::string& slug);
+    void title_meta_reset_detail(const std::string& plugin, const std::string& slug);
+
 private:
     std::unique_ptr<StoreImpl> impl_;
 };
