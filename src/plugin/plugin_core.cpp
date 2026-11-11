@@ -32,6 +32,12 @@ CallHealth Host::health(const std::string& id) const {
     return it != impl_->health.end() ? it->second : CallHealth{};
 }
 
+std::string Host::website(const std::string& id) const {
+    const std::scoped_lock lock(impl_->mu);
+    const auto it = impl_->plugins.find(id);
+    return it != impl_->plugins.end() ? it->second->info.website : std::string{};
+}
+
 std::string Host::logo_path(const std::string& id) const {
     std::shared_ptr<Runtime> rt;
     {

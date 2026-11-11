@@ -50,7 +50,7 @@ struct Config {
 };
 
 struct PluginInfo {
-    std::string id, name, version, runtime, entry;
+    std::string id, name, version, runtime, entry, website;
     std::vector<std::string> capabilities;
     int api{};
     std::string dir;
@@ -102,6 +102,9 @@ public:
 
     /** \brief Loaded enrichment sources (id + display name), for the detail-page picker. */
     std::vector<std::pair<std::string, std::string>> enrichment_sources() const;
+
+    /** \brief Website URL from the plugin manifest; empty when unknown id or absent. */
+    std::string website(const std::string& id) const;
 
     /** \brief Last-call outcome for id; ok-when-unknown when never called. */
     [[nodiscard]] CallHealth health(const std::string& id) const;

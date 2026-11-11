@@ -58,6 +58,7 @@ void register_admin(Ctx& c) {
             row["enabled"] = p.enabled;
             row["titles"] = p.titles;
             row["caps"] = p.caps;
+            row["website"] = plugins.website(p.plugin_id);
             if (!p.enabled) {
                 row["state"] = "disabled";
             } else {

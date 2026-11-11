@@ -57,7 +57,7 @@ struct Runtime {
 // Manifest; optional members may be absent, the rest are required by glaze.
 struct Manifest {
     std::string name, version, runtime;
-    std::optional<std::string> id, entry;
+    std::optional<std::string> id, entry, website;
     std::optional<std::vector<std::string>> capabilities;
     int api{};
 };

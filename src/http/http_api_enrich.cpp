@@ -19,6 +19,7 @@ void register_enrich(Ctx& c) {
             crow::json::wvalue row;
             row["id"] = id;
             row["name"] = name;
+            row["website"] = plugins.website(id);
             list[i++] = std::move(row);
         }
         crow::json::wvalue out;

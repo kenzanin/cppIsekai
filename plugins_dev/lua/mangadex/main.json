@@ -2,6 +2,7 @@
   "name": "MangaDex",
   "id": "mangadex",
   "version": "1.0.0",
+  "website": "https://mangadex.org",
   "runtime": "lua",
   "capabilities": ["search", "detail", "chapters"],
   "api": 1
