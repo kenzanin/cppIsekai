@@ -2,7 +2,7 @@
 <div x-data="detailPage" x-init="boot()">
   <!-- header: cover + meta -->
   <div class="flex gap-5 mb-6">
-    <div class="relative shrink-0">
+    <div style="position: relative; align-self: flex-start" class="shrink-0">
       <template x-if="detail.cover">
         <img :src="'/cache/img?url='+encodeURIComponent(detail.cover)+'&cover=1&plugin='+encodeURIComponent(plugin)+'&slug='+encodeURIComponent(slug)" class="w-40 h-56 object-cover rounded-lg" @error="coverBroken=true" x-show="!coverBroken" alt="">
       </template>
@@ -57,7 +57,8 @@
         <div :class="enrichKind === 'covers' ? 'max-w-4xl mx-auto bg-zinc-950 border border-zinc-800 rounded-xl p-4 text-sm' : ''">
         <div class="flex items-center gap-2 mb-2">
           <strong class="text-zinc-300" x-text="enrichKind === 'covers' ? 'Cover candidates' : 'Detail candidates'"></strong>
-          <button class="text-xs text-zinc-500 underline" @click="enrichOpen = false">close</button>
+          <button class="text-xs text-zinc-500 underline hover:text-zinc-300" @click="enrichOpen = false">close</button>
+          <button class="w-7 h-7 shrink-0 flex items-center justify-center rounded-md text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800" @click="enrichOpen = false" aria-label="Close">✕</button>
           <span class="flex-1"></span>
           <span class="text-xs text-red-400" x-show="enrichErr" x-text="enrichErr"></span>
         </div>
