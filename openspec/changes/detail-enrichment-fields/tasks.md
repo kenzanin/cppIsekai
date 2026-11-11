@@ -16,11 +16,11 @@
 
 ## 3. HTTP API
 
-- [ ] 3.1 `GET /api/enrichment/<id>/detail?plugin=&slug=&force=0|1` and `/covers?...`: loads `title_meta`; returns stored `fetched` filtered by source id when present and `force=0`; else calls the enrichment plugin; on success upserts `fetched` (JSON array, per source, `fetched_at` set); envelope `{ ok, data, cached, fetched_at }`. On plugin failure with existing `fetched`: serve `fetched` (stale, `cached:true`); with no `fetched`: 502.
-- [ ] 3.2 `POST /api/enrichment/chosen` `{plugin, slug, chosen}` — full-overwrite of `chosen` under same PK; unknown keys rejected (glaze exact); returns `{ok:true}`; 400 on bad shape.
-- [ ] 3.3 `POST /api/enrichment/reset` `{plugin, slug, mode: "cover"|"detail"|"all"}` — clears chosen cover / chosen non-tag fields / all; keeps `fetched`.
-- [ ] 3.4 Detail envelope merge: in `/api/detail/<plugin>/<slug>` (and the SSR context), after the scraper envelope is built, merge `title_meta.chosen`: `chosen.title ?? source name`, synopsis/artist/author/cover same pattern; `tags` = union(source tags ∪ chosen.tags_add) − chosen.tags_hidden; cover override goes to the page as `chosen_cover` URL consumed by the detail page; also expose `enrichment: { fetched_at, chosen }` for the Alpine picker (button states, "last fetched <date>").
-- [ ] 3.5 Routes registered in `http_api_content.cpp` (extend `/api/detail` merge there or in `http_api_title.cpp` — match the file layout seen today; keep files ≤~200 code-loc; if the merge grows, a new `http_api_enrich.cpp` is allowed per the crown-split convention).
+- [x] 3.1 `GET /api/enrichment/<id>/detail?plugin=&slug=&force=0|1` and `/covers?...`: loads `title_meta`; returns stored `fetched` filtered by source id when present and `force=0`; else calls the enrichment plugin; on success upserts `fetched` (JSON array, per source, `fetched_at` set); envelope `{ ok, data, cached, fetched_at }`. On plugin failure with existing `fetched`: serve `fetched` (stale, `cached:true`); with no `fetched`: 502.
+- [x] 3.2 `POST /api/enrichment/chosen` `{plugin, slug, chosen}` — full-overwrite of `chosen` under same PK; unknown keys rejected (glaze exact); returns `{ok:true}`; 400 on bad shape.
+- [x] 3.3 `POST /api/enrichment/reset` `{plugin, slug, mode: "cover"|"detail"|"all"}` — clears chosen cover / chosen non-tag fields / all; keeps `fetched`.
+- [x] 3.4 Detail envelope merge: in `/api/detail/<plugin>/<slug>` (and the SSR context), after the scraper envelope is built, merge `title_meta.chosen`: `chosen.title ?? source name`, synopsis/artist/author/cover same pattern; `tags` = union(source tags ∪ chosen.tags_add) − chosen.tags_hidden; cover override goes to the page as `chosen_cover` URL consumed by the detail page; also expose `enrichment: { fetched_at, chosen }` for the Alpine picker (button states, "last fetched <date>").
+- [x] 3.5 Routes registered in `http_api_content.cpp` (extend `/api/detail` merge there or in `http_api_title.cpp` — match the file layout seen today; keep files ≤~200 code-loc; if the merge grows, a new `http_api_enrich.cpp` is allowed per the crown-split convention).
 
 ## 4. Detail page UI
 
