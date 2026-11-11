@@ -1,4 +1,10 @@
 ## 2026-11-11
+* **Update**: Linked `architecture/atsumaru-plugin.md` to `references/goisekai-plugin-examples.md` (Atsumaru was ported from the goIsekai reference corpus (example plugin + HAR)).
+* **Update**: Linked `decisions/api-cache-lock-miss-regression.md` to `architecture/local-first-reads.md` (The db-lock-as-cache-miss bug violates the local-first read contract).
+* **Creation**: Documented concept `decisions/api-cache-lock-miss-regression.md` (api_cache db-lock treated as cache miss: local-first regression (UNFIXED)).
+* **Creation**: Documented concept `decisions/host-url-codec.md` (host.url_encode/url_decode: percent-codec host tool (no crypto yet)).
+* **Creation**: Documented concept `decisions/plugin-website-field.md` (plugin manifest website field -> api rows + card link).
+* **Creation**: Documented concept `architecture/atsumaru-plugin.md` (Atsumaru plugin (atsu.moe): Typesense search, CDN images, composite chapter ids).
 * **Creation**: Documented concept `decisions/template-golden-test.md` (Golden-file render test for top-level templates).
 * **Creation**: Documented concept `references/goisekai-plugin-examples.md` (goIsekai reference corpus: example plugins + HAR captures).
 * **Update**: Updated concept `architecture/detail-page.md`.
