@@ -69,8 +69,28 @@ void register_enrich(Ctx& c) {
                 return crow::response{400, R"({"ok":false,"error":"unknown chosen key"})"};
         }
         crow::json::wvalue chosen_out;
-        for (const char* key : {"title", "synopsis", "artist", "author", "cover"})
+        for (const char* key : {"title", "synopsis", "cover"})
             if (ch.has(key) && ch[key].t() == crow::json::type::String) chosen_out[key] = ch[key];
+        for (const char* key : {"artist", "author"}) {
+            // String (single name) or List of strings; normalized to array so apply_chosen's union path works.
+            if (!ch.has(key)) continue;
+            if (ch[key].t() == crow::json::type::String) {
+                crow::json::wvalue one(crow::json::type::List);
+                one[0] = ch[key];
+                chosen_out[key] = std::move(one);
+            } else if (ch[key].t() == crow::json::type::List) {
+                crow::json::wvalue out_arr(crow::json::type::List);
+                int n = 0;
+                for (const auto& item : ch[key]) {
+                    if (item.t() != crow::json::type::String)
+                        return crow::response{400, R"({"ok":false,"error":"artist/author array must be strings"})"};
+                    out_arr[n++] = item;
+                }
+                chosen_out[key] = std::move(out_arr);
+            } else {
+                return crow::response{400, R"({"ok":false,"error":"artist/author must be a string or array of strings"})"};
+            }
+        }
         for (const char* key : {"tags_add", "tags_hidden"}) {
             if (!ch.has(key)) continue;
             const auto& arr = ch[key];

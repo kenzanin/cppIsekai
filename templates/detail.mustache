@@ -39,8 +39,81 @@
                 x-text="refreshing ? '…' : '⟳ Update'"></button>
       </div>
       <p class="text-xs text-red-400 mt-2" x-show="err" x-text="err" x-cloak></p>
-    </div>
-  </div>
+      <!-- enrichment (detail-enrichment-fields): fetch detail/covers, picker, reset. Saved-manga library gate is enforced server-side (not in library = 404). -->
+      <div class="mt-4 flex flex-wrap items-center gap-2" x-show="inLibrary" x-cloak>
+        <button @click="openEnrich('detail', false)" :disabled="enrichBusy" class="px-3 py-1.5 text-xs border border-zinc-700 rounded-md text-zinc-300 hover:bg-zinc-800 disabled:opacity-40">Fetch detail</button>
+        <button @click="openEnrich('detail', true)" :disabled="enrichBusy" class="px-3 py-1.5 text-xs border border-zinc-800 rounded-md text-zinc-500 hover:bg-zinc-800 disabled:opacity-40" title="always refetch, overwrite stored candidates">⟳ force</button>
+        <button @click="openEnrich('covers', false)" :disabled="enrichBusy" class="px-3 py-1.5 text-xs border border-zinc-700 rounded-md text-zinc-300 hover:bg-zinc-800 disabled:opacity-40">Fetch covers</button>
+        <button @click="openEnrich('covers', true)" :disabled="enrichBusy" class="px-3 py-1.5 text-xs border border-zinc-800 rounded-md text-zinc-500 hover:bg-zinc-800 disabled:opacity-40" title="always refetch candidate covers">⟳ force</button>
+        <button @click="resetDetail()" :disabled="enrichBusy" class="px-3 py-1.5 text-xs border border-zinc-800 rounded-md text-zinc-500 hover:bg-zinc-800 disabled:opacity-40" title="clear chosen title/synopsis/artist/author/tags (keeps cover)">Reset detail</button>
+        <button @click="resetCover()" :disabled="enrichBusy" class="px-3 py-1.5 text-xs border border-zinc-800 rounded-md text-zinc-500 hover:bg-zinc-800 disabled:opacity-40" title="drop chosen cover, restore the library cover">Reset cover</button>
+        <span class="text-[11px] text-zinc-600" x-show="enrichLastFetched" x-text="'last fetched ' + fmtEnrichDate(enrichLastFetched)"></span>
+        <span class="text-[11px] text-zinc-600" x-show="enrichBusy">fetching…</span>
+      </div>
+      <!-- picker panel: candidates grouped per source, user picks; nothing auto-applied -->
+      <div class="mt-3 border border-zinc-800 rounded-lg p-3 text-sm" x-show="enrichOpen" x-cloak>
+        <div class="flex items-center gap-2 mb-2">
+          <strong class="text-zinc-300" x-text="enrichKind === 'covers' ? 'Cover candidates' : 'Detail candidates'"></strong>
+          <button class="text-xs text-zinc-500 underline" @click="enrichOpen = false">close</button>
+          <span class="flex-1"></span>
+          <span class="text-xs text-red-400" x-show="enrichErr" x-text="enrichErr"></span>
+        </div>
+        <p class="text-xs text-zinc-600 mb-2">Pick per field; nothing is applied until you choose it. Tags can be toggled; the detail page hides any tag in “hidden tags”.</p>
+        <template x-for="src in enrichSources" :key="src.id">
+          <div class="mb-3" x-show="candFor(src.id, enrichKind)">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-xs uppercase tracking-wide text-zinc-500" x-text="src.name || src.id"></span>
+              <span class="text-[10px] text-zinc-700" x-show="busySources[src.id]">fetching…</span>
+              <span class="text-[10px] text-zinc-700" x-show="!busySources[src.id] && candFor(src.id, enrichKind) && candFor(src.id, enrichKind).cached">(cached)</span>
+            </div>
+            <template x-if="candFor(src.id, enrichKind) && candFor(src.id, enrichKind).ok">
+              <div>
+                <template x-if="enrichKind === 'covers'">
+                  <div class="flex flex-wrap gap-2">
+                    <template x-for="u in (candFor(src.id, 'covers').data && candFor(src.id, 'covers').data.covers) || []" :key="u">
+                      <button @click="pickField('cover', u)" class="w-20 border rounded overflow-hidden hover:ring-2 hover:ring-emerald-600" :class="chosenNow().cover === u ? 'ring-2 ring-emerald-600' : ''">
+                        <img :src="'/cache/img?url='+encodeURIComponent(u)+'&cover=1&plugin='+encodeURIComponent(plugin)+'&slug='+encodeURIComponent(slug)" class="w-full aspect-[2/3] object-cover" loading="lazy" alt="">
+                      </button>
+                    </template>
+                  </div>
+                </template>
+                <template x-if="enrichKind !== 'covers'">
+                  <div class="space-y-1">
+                    <p x-show="candFor(src.id, 'detail').data && candFor(src.id, 'detail').data.title" class="flex items-center gap-2">
+                      <button @click="pickField('title', candFor(src.id, 'detail').data.title)" class="text-xs px-2 py-0.5 rounded border border-zinc-700 text-zinc-400 hover:bg-zinc-800">use title</button>
+                      <span class="text-xs text-zinc-300" x-text="candFor(src.id, 'detail').data.title"></span>
+                    </p>
+                    <p x-show="candFor(src.id, 'detail').data && candFor(src.id, 'detail').data.synopsis" class="leading-snug">
+                      <button @click="pickField('synopsis', candFor(src.id, 'detail').data.synopsis)" class="text-xs px-2 py-0.5 rounded border border-zinc-700 text-zinc-400 hover:bg-zinc-800 mr-1">use synopsis</button>
+                      <span class="text-xs text-zinc-500" x-text="candFor(src.id, 'detail').data.synopsis"></span>
+                    </p>
+                    <p x-show="candFor(src.id, 'detail').data && (candFor(src.id, 'detail').data.authors || []).length" class="flex items-center gap-1 flex-wrap">
+                      <span class="text-[10px] text-zinc-600 mr-1">authors</span>
+                      <template x-for="a in candFor(src.id, 'detail').data.authors" :key="a">
+                        <button @click="toggleName('author', a)" class="text-xs px-2 py-0.5 rounded-full border" :class="(chosenNow().author || []).includes(a) ? 'border-emerald-600 text-emerald-300' : 'border-zinc-700 text-zinc-500 hover:text-zinc-300'" x-text="a"></button>
+                      </template>
+                    </p>
+                    <p x-show="candFor(src.id, 'detail').data && (candFor(src.id, 'detail').data.artists || []).length" class="flex items-center gap-1 flex-wrap">
+                      <span class="text-[10px] text-zinc-600 mr-1">artists</span>
+                      <template x-for="a in candFor(src.id, 'detail').data.artists" :key="a">
+                        <button @click="toggleName('artist', a)" class="text-xs px-2 py-0.5 rounded-full border" :class="(chosenNow().artist || []).includes(a) ? 'border-emerald-600 text-emerald-300' : 'border-zinc-700 text-zinc-500 hover:text-zinc-300'" x-text="a"></button>
+                      </template>
+                    </p>
+                    <p x-show="candFor(src.id, 'detail').data && (candFor(src.id, 'detail').data.tags || []).length" class="flex items-center gap-1 flex-wrap">
+                      <span class="text-[10px] text-zinc-600 mr-1">tags</span>
+                      <template x-for="t in candFor(src.id, 'detail').data.tags" :key="t">
+                        <button @click="toggleTag(t)" class="text-xs px-2 py-0.5 rounded-full border" :class="(chosenNow().tags_add || []).includes(t) ? 'border-emerald-600 text-emerald-300' : 'border-zinc-700 text-zinc-500 hover:text-zinc-300'" x-text="t"></button>
+                      </template>
+                    </p>
+                  </div>
+                </template>
+              </div>
+            </template>
+            <p class="text-xs text-red-400" x-show="candFor(src.id, enrichKind) && !candFor(src.id, enrichKind).ok" x-text="(candFor(src.id, enrichKind) || {}).error"></p>
+          </div>
+        </template>
+        <p class="text-xs text-zinc-600" x-show="!enrichSources.length">No enrichment sources loaded. Dev copies: symlink <code>~/tmp/goIsekai</code>… → see README “Enrichment plugins”.</p>
+      </div>
 
   <!-- chapters (chapter-list-controls 2.1): eye/check toggles, read/total counter,
        client-side pager 20/page -->

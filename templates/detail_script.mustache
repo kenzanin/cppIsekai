@@ -6,6 +6,9 @@ function detailPage() {
     detail: {}, chapters: [], cached: false, loading: true, refreshing: false,
     err: '', coverBroken: false, hint: null, related: [], pluginName: '', pluginLogoOk: true,
     inLibrary: false, libraryBusy: false,
+    enrichment: null, enrichLastFetched: 0, enrichSources: [],
+    enrichOpen: false, enrichKind: 'detail', enrichBusy: false, busySources: {}, cand: {}, enrichErr: '',
+    hiddenTags: [],
     chPage: 0, showHidden: false, readState: {}, cbzReady: {}, // id -> {skip, read} (chapter-list-controls 1.2); cbzReady: chapter fully cached
     get pageCount() { return Math.max(1, Math.ceil(this.visibleChapters().length / 20)); },
     visibleChapters() { return this.showHidden ? this.chapters : this.chapters.filter(c => !c.done); },
@@ -36,9 +39,71 @@ function detailPage() {
     async boot() {
       this.loadPluginMeta();
       this.loadLibrary();
+      this.loadEnrichSources();
       await this.load();
       this.loadChapterState();
     },
+    async loadEnrichSources() { // loaded enrichment plugins (picker needs the list)
+      try {
+        const j = await (await fetch('/api/enrichment')).json();
+        this.enrichSources = (j && j.sources) || [];
+      } catch (e) { this.enrichSources = []; }
+    },
+    async openEnrich(kind, force) { // per-source fetch; cached unless force=true
+      this.enrichKind = kind; this.enrichOpen = true; this.enrichErr = ''; this.enrichBusy = true;
+      for (const src of this.enrichSources) {
+        this.busySources = { ...this.busySources, [src.id]: true };
+        try {
+          const r = await fetch(`/api/enrichment/${encodeURIComponent(src.id)}/${kind}?plugin=${encodeURIComponent(this.plugin)}&slug=${encodeURIComponent(this.slug)}&force=${force ? 1 : 0}`);
+          const j = await r.json();
+          this.cand = { ...this.cand, [src.id + ':' + kind]: j };
+          if (j && j.fetched_at) this.enrichLastFetched = Math.max(this.enrichLastFetched || 0, j.fetched_at);
+        } catch (e) { this.cand = { ...this.cand, [src.id + ':' + kind]: { ok: false, error: String(e) } }; }
+        this.busySources = { ...this.busySources, [src.id]: false };
+      }
+      this.enrichBusy = false;
+    },
+    candFor(id, kind) { return this.cand[id + ':' + (kind || this.enrichKind)] || null; },
+    chosenNow() { return (this.enrichment && this.enrichment.chosen) || {}; },
+    async saveChosen(patch) { // full-overwrite POST; server re-merges on next load
+      const chosen = { ...this.chosenNow(), ...patch };
+      for (const k of Object.keys(chosen)) if (chosen[k] === undefined || chosen[k] === null) delete chosen[k];
+      const r = await fetch('/api/enrichment/chosen', {method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ plugin: this.plugin, slug: this.slug, chosen })});
+      if (!r.ok) { this.enrichErr = 'save failed'; return; }
+      await this.load(); // re-renders merged detail + enrichment block
+    },
+    async pickField(field, value) { await this.saveChosen({ [field]: value }); },
+    async toggleName(field, name) { // artist/author: union of chosen names (array)
+      const cur = new Set(this.chosenNow()[field] || []);
+      if (cur.has(name)) cur.delete(name); else cur.add(name);
+      const arr = [...cur];
+      await this.saveChosen({ [field]: arr.length ? arr : undefined });
+    },
+    async toggleTag(tag) { // tags_add: add/remove one tag
+      const cur = new Set(this.chosenNow().tags_add || []);
+      if (cur.has(tag)) cur.delete(tag); else cur.add(tag);
+      const arr = [...cur];
+      await this.saveChosen({ tags_add: arr.length ? arr : undefined });
+    },
+    async toggleHideTag(tag) { // tags_hidden: hide a rendered tag without deleting it
+      const cur = new Set((this.enrichment && this.enrichment.chosen && this.enrichment.chosen.tags_hidden) || []);
+      const key = String(tag).toLowerCase();
+      const plain = new Set([...cur].map(x => String(x).toLowerCase()));
+      if (plain.has(key)) { for (const x of [...cur]) if (String(x).toLowerCase() === key) cur.delete(x); }
+      else cur.add(tag);
+      const arr = [...cur];
+      await this.saveChosen({ tags_hidden: arr.length ? arr : undefined });
+    },
+    async resetCover() {
+      try { await fetch('/api/enrichment/reset', {method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ plugin: this.plugin, slug: this.slug, mode: 'cover' })}); await this.load(); } catch (e) {}
+    },
+    async resetDetail() { // clears non-tag choseD fields, keeps chosen.cover (task 4.3)
+      try { await fetch('/api/enrichment/reset', {method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ plugin: this.plugin, slug: this.slug, mode: 'detail' })}); await this.load(); } catch (e) {}
+    },
+    fmtEnrichDate(ts) { return ts ? this.fmtDate(ts) : ''; },
     async load() {
       this.loading = true; this.err = '';
       this.loadRelated(); // fire-and-forget (D4): failure never blocks the page
@@ -60,6 +125,9 @@ function detailPage() {
         const c = await (await fetch(`/api/chapters/${this.plugin}/${encodeURIComponent(this.slug)}`)).json();
         if (!d.ok || !c.ok) { this.err = d.error || c.error || 'load failed'; return; }
         this.detail = d.data || {}; this.cached = !!(d.cached || c.cached);
+        this.enrichment = (d.enrichment) || null;
+        this.enrichLastFetched = Math.max(this.enrichLastFetched || 0, (this.enrichment && this.enrichment.fetched_at) || 0);
+        this.hiddenTags = (this.enrichment && this.enrichment.chosen && this.enrichment.chosen.tags_hidden) || [];
         this.chapters = (c.data || []).slice().sort((a, b) => (b.number ?? 0) - (a.number ?? 0));
         this.checkCbz();
       } catch (e) { this.err = String(e); }
