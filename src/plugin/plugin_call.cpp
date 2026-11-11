@@ -156,4 +156,44 @@ std::string Host::call(const std::string& id, const std::string& method, const s
     return fail(std::move(shape_err));
 }
 
+std::string Host::enrich(const std::string& id, const std::string& title, const std::string& kind) {
+    if (kind != "detail" && kind != "covers") {
+        return err_json("enrich: kind must be 'detail' or 'covers'");
+    }
+    std::shared_ptr<Runtime> rt;
+    {
+        const std::scoped_lock lock(impl_->mu);
+        if (const auto it = impl_->plugins.find(id); it != impl_->plugins.end()) {
+            rt = it->second;
+        }
+    }
+    if (!rt) {
+        return err_json("enrich: no source '" + id + "'");
+    }
+    const auto& caps = rt->info.capabilities;
+    bool is_enrichment = false;
+    for (const auto& c : caps) {
+        if (c == "enrichment") {
+            is_enrichment = true;
+            break;
+        }
+    }
+    if (!is_enrichment) {
+        return err_json("enrich: '" + id + "' is not an enrichment source");
+    }
+    glz::generic params;
+    auto& pobj = params.data.emplace<glz::generic::object_t>();
+    glz::generic t;
+    t.data = title;
+    pobj["title"] = std::move(t);
+    glz::generic k;
+    k.data = kind;
+    pobj["kind"] = std::move(k);
+    const std::string params_json = dump_json(params);
+    const std::string reply = call(id, "enrich", params_json);
+    // The reply already passed the runtime-agnostic shape gate in `call`.
+    // Surface it untouched so envelope parsing stays additive for the caller.
+    return reply;
+}
+
 } // namespace plugin

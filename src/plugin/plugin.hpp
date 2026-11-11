@@ -90,6 +90,13 @@ public:
      *  {"ok":true,"data":...} or {"ok":false,"error":"..."}. */
     std::string call(const std::string& id, const std::string& method, const std::string& params_json);
 
+    /** \brief Enrichment call (task 1.3): kind ∈ `detail` | `covers`. Gates
+     *  on the plugin's `enrichment` capability, routes through the shared
+     *  `call` path (same envelope, health, proxy, cookie handling), and
+     *  returns `{"ok":true,"data":...}` with a validated data object or
+     *  `{"ok":false,"error":...}`. Never writes to the Store. */
+    std::string enrich(const std::string& id, const std::string& title, const std::string& kind);
+
     /** \brief Last-call outcome for id; ok-when-unknown when never called. */
     [[nodiscard]] CallHealth health(const std::string& id) const;
 
