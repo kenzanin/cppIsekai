@@ -51,9 +51,11 @@ end
 local function best_record(query)
   local q = normalize(query)
   if q == "" then return nil end
+  local enc = query:gsub("([^%w%-%._~])", function(c) return string.format("%%%02X", c:byte()) end)
+  -- brackets/includes must be percent-encoded or the MangaDex API returns an empty collection
   local url = string.format(
-    "%s/manga?limit=10&order[relevance]=desc&title=%s&includes[]=author&includes[]=artist&includes[]=tag&includes[]=cover_art",
-    API, (query:gsub("([^%w%-%._~])", function(c) return string.format("%%%02X", c:byte()) end))
+    "%s/manga?limit=10&order%%5Brelevance%%5D=desc&title=%s&includes%%5B%%5D=author&includes%%5B%%5D=artist&includes%%5B%%5D=tag&includes%%5B%%5D=cover_art",
+    API, enc
   )
   local body = get(url)
   if not body or type(body.data) ~= "table" then return nil end
