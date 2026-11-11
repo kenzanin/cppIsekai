@@ -1,0 +1,496 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>cppIsekai</title>
+  <script src="/static/tailwind.min.js"></script>
+  <script src="/static/htmx.min.js"></script>
+  <script defer src="/static/alpine.min.js"></script>
+</head>
+<body class="bg-zinc-950 text-zinc-100 min-h-screen">
+  <header class="flex items-center gap-1 border-b border-zinc-800 px-4 h-12">
+    <a href="/" class="px-3 py-1 rounded hover:bg-zinc-800/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 transition-colors bg-zinc-800">Library</a>
+    <a href="/search" class="px-3 py-1 rounded hover:bg-zinc-800/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 transition-colors ">Search</a>
+    <a href="/history" class="px-3 py-1 rounded hover:bg-zinc-800/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 transition-colors ">History</a>
+    <a href="/plugins" class="px-3 py-1 rounded hover:bg-zinc-800/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 transition-colors ">Plugins</a>
+    <a href="/settings" class="px-3 py-1 rounded hover:bg-zinc-800/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 transition-colors ">Settings</a>
+    <span class="flex-1"></span>
+    <a href="/logs" class="px-3 py-1 rounded hover:bg-zinc-800/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 transition-colors ">Logs</a>
+    <a href="/about" class="px-3 py-1 rounded hover:bg-zinc-800/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 transition-colors ">About</a>
+  </header>
+  <main class="p-4">
+<div x-data="detailPage" x-init="boot()">
+  <!-- header: cover + meta -->
+  <div class="flex gap-5 mb-6">
+    <div style="position: relative; align-self: flex-start" class="shrink-0">
+      <template x-if="detail.cover">
+        <img :src="'/cache/img?url='+encodeURIComponent(detail.cover)+'&cover=1&plugin='+encodeURIComponent(plugin)+'&slug='+encodeURIComponent(slug)" class="w-40 h-56 object-cover rounded-lg" @error="coverBroken=true" x-show="!coverBroken" alt="">
+      </template>
+      <button @click="resetCover()" :disabled="enrichBusy" x-show="inLibrary && enrichment && enrichment.chosen && enrichment.chosen.cover" x-cloak class="absolute bottom-1 right-1 text-[10px] px-1.5 py-0.5 rounded bg-black/70 text-zinc-300 hover:text-white" title="drop chosen cover, restore the library cover">Reset cover</button>
+    </div>
+    <div class="flex-1 min-w-0">
+      <h1 class="text-2xl font-semibold mb-2 leading-tight" x-text="detail.name || '…'"></h1>
+      <div class="flex flex-wrap gap-1.5 mb-2" x-show="detail.status || detail.release_at" x-cloak>
+        <span class="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300" x-show="detail.status" x-text="detail.status"></span>
+        <span class="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400" x-show="detail.release_at" x-text="fmtDate(detail.release_at)"></span>
+        <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-900/40 text-emerald-300 border border-emerald-800" x-show="cached">cached</span>
+      </div>
+      <div class="flex flex-wrap gap-1.5 mb-3" x-show="detail.tags && detail.tags.length" x-cloak>
+        <template x-for="t in detail.tags" :key="t">
+          <span class="text-xs px-2 py-0.5 rounded-full border border-zinc-700 text-zinc-400" x-text="t"></span>
+        </template>
+      </div>
+      <div class="text-sm text-zinc-400 mb-1" x-show="detail.authors && detail.authors.length" x-cloak>
+        <span class="text-zinc-500">Author:</span> <span x-text="(detail.authors || []).join(', ')"></span>
+      </div>
+      <div class="text-sm text-zinc-400 mb-1" x-show="detail.artists && detail.artists.length" x-cloak>
+        <span class="text-zinc-500">Artist:</span> <span x-text="(detail.artists || []).join(', ')"></span>
+      </div>
+      <p class="text-sm text-zinc-400 leading-relaxed" x-show="detail.description" x-text="detail.description"></p>
+      <div class="flex gap-2 mt-4">
+        <template x-if="hint">
+        <a :href="hint.url"
+           class="px-3 py-1.5 text-sm border border-emerald-700 bg-emerald-900/40 text-emerald-300 hover:bg-emerald-900/60 rounded-md"
+           x-text="hint.text"></a>
+      </template>
+        <button @click="toggleLibrary()"
+                class="px-3 py-1.5 text-sm border rounded-md disabled:opacity-40"
+                :class="inLibrary ? 'border-emerald-700 bg-emerald-900/40 text-emerald-300 hover:bg-emerald-900/60' : 'border-zinc-700 text-zinc-300 hover:bg-zinc-800'"
+                x-text="inLibrary ? 'In library' : 'Add to library'"></button>
+        <button @click="refresh()" :disabled="refreshing"
+                class="px-3 py-1.5 text-sm border border-zinc-700 text-zinc-300 hover:bg-zinc-800 rounded-md disabled:opacity-40"
+                x-text="refreshing ? '…' : '⟳ Update'"></button>
+      </div>
+      <p class="text-xs text-red-400 mt-2" x-show="err" x-text="err" x-cloak></p>
+      <!-- enrichment (detail-enrichment-fields): fetch detail/covers, picker, reset. Saved-manga library gate is enforced server-side (not in library = 404). -->
+      <div class="mt-4 flex flex-wrap items-center gap-2" x-show="inLibrary" x-cloak>
+        <button @click="openEnrich('detail', false)" :disabled="enrichBusy" class="px-3 py-1.5 text-xs border border-zinc-700 rounded-md text-zinc-300 hover:bg-zinc-800 disabled:opacity-40">Fetch detail</button>
+        <button @click="openEnrich('detail', true)" :disabled="enrichBusy" class="px-3 py-1.5 text-xs border border-zinc-800 rounded-md text-zinc-500 hover:bg-zinc-800 disabled:opacity-40" title="always refetch, overwrite stored candidates">⟳ force</button>
+        <button @click="openEnrich('covers', false)" :disabled="enrichBusy" class="px-3 py-1.5 text-xs border border-zinc-700 rounded-md text-zinc-300 hover:bg-zinc-800 disabled:opacity-40">Fetch covers</button>
+        <button @click="openEnrich('covers', true)" :disabled="enrichBusy" class="px-3 py-1.5 text-xs border border-zinc-800 rounded-md text-zinc-500 hover:bg-zinc-800 disabled:opacity-40" title="always refetch candidate covers">⟳ force</button>
+        <button @click="resetDetail()" :disabled="enrichBusy" class="px-3 py-1.5 text-xs border border-zinc-800 rounded-md text-zinc-500 hover:bg-zinc-800 disabled:opacity-40" title="clear chosen title/synopsis/artist/author/tags (keeps cover)">Reset detail</button>
+        <span class="text-[11px] text-zinc-600" x-show="enrichLastFetched" x-text="'last fetched ' + fmtEnrichDate(enrichLastFetched)"></span>
+        <span class="text-[11px] text-zinc-600" x-show="enrichBusy">fetching…</span>
+      </div>
+      <!-- picker panel: candidates grouped per source, user picks; nothing auto-applied -->
+      <div :class="enrichKind === 'covers' ? 'fixed inset-0 z-50 bg-black/80 backdrop-blur-sm overflow-y-auto p-6' : 'mt-3 border border-zinc-800 rounded-lg p-3 text-sm'" x-show="enrichOpen" x-cloak @keydown.escape.window="enrichOpen = false">
+        <div :class="enrichKind === 'covers' ? 'max-w-4xl mx-auto bg-zinc-950 border border-zinc-800 rounded-xl p-4 text-sm' : ''">
+        <div class="flex items-center gap-2 mb-2">
+          <strong class="text-zinc-300" x-text="enrichKind === 'covers' ? 'Cover candidates' : 'Detail candidates'"></strong>
+          <button class="text-xs text-zinc-500 underline hover:text-zinc-300" @click="enrichOpen = false">close</button>
+          <button class="w-7 h-7 shrink-0 flex items-center justify-center rounded-md text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800" @click="enrichOpen = false" aria-label="Close">✕</button>
+          <span class="flex-1"></span>
+          <span class="text-xs text-red-400" x-show="enrichErr" x-text="enrichErr"></span>
+        </div>
+        <p class="text-xs text-zinc-600 mb-2">Pick per field; nothing is applied until you choose it. Tags can be toggled; the detail page hides any tag in “hidden tags”.</p>
+<!-- combined detail candidates from BOTH enrichment sources; normalized dedupe, MangaDex wins; one block, md/mu badges -->
+        <div class="space-y-1" x-show="enrichKind !== 'covers' && (candFor('mangadex-enrichment', 'detail') || candFor('mangaupdates-enrichment', 'detail'))">
+          <div class="mb-2" x-show="altTitleCandidates().length">
+            <span class="text-[10px] text-zinc-600 mr-1">alt titles</span>
+            <div class="flex items-center gap-1 flex-wrap mt-1">
+              <template x-for="t in altTitleCandidates()" :key="t.lang + '|' + t.title">
+                <button @click="pickField('title', t.title)" class="text-xs px-2 py-0.5 rounded-full border" :class="chosenNow().title === t.title ? 'border-emerald-600 text-emerald-300' : 'border-zinc-700 text-zinc-500 hover:text-zinc-300'" :title="((t.lang ? t.lang + ' — ' : '') + (t.main ? 'main' : 'alt'))"><span class="text-[9px] text-zinc-700 mr-1" x-text="t.lang || ''"></span><span x-text="t.title"></span><span class="text-[8px] text-zinc-700 ml-1 align-middle" x-text="t.source === 'mangadex-enrichment' ? 'MD' : 'MU'"></span></button>
+              </template>
+            </div>
+          </div>
+          <template x-for="row in mergedSynopses()" :key="row.src">
+            <p class="leading-snug mb-1">
+              <button @click="pickField('synopsis', row.text)" class="text-xs px-2 py-0.5 rounded border border-zinc-700 text-zinc-400 hover:bg-zinc-800 mr-1" x-text="'use synopsis (' + (row.src === 'mangadex-enrichment' ? 'MD' : 'MU') + ')'"></button>
+              <span class="text-xs text-zinc-500" x-text="row.text"></span>
+            </p>
+          </template>
+          <p x-show="mergedList('authors').length" class="flex items-center gap-1 flex-wrap">
+            <span class="text-[10px] text-zinc-600 mr-1">authors</span>
+            <template x-for="a in mergedList('authors')" :key="a.name">
+              <button @click="toggleName('author', a.name)" class="text-xs px-2 py-0.5 rounded-full border" :class="(chosenNow().author || []).includes(a.name) ? 'border-emerald-600 text-emerald-300' : 'border-zinc-700 text-zinc-500 hover:text-zinc-300'"><span x-text="a.name"></span><span class="text-[8px] text-zinc-700 ml-1 align-middle" x-text="a.source === 'mangadex-enrichment' ? 'MD' : 'MU'"></span></button>
+            </template>
+          </p>
+          <p x-show="mergedList('artists').length" class="flex items-center gap-1 flex-wrap">
+            <span class="text-[10px] text-zinc-600 mr-1">artists</span>
+            <template x-for="a in mergedList('artists')" :key="a.name">
+              <button @click="toggleName('artist', a.name)" class="text-xs px-2 py-0.5 rounded-full border" :class="(chosenNow().artist || []).includes(a.name) ? 'border-emerald-600 text-emerald-300' : 'border-zinc-700 text-zinc-500 hover:text-zinc-300'"><span x-text="a.name"></span><span class="text-[8px] text-zinc-700 ml-1 align-middle" x-text="a.source === 'mangadex-enrichment' ? 'MD' : 'MU'"></span></button>
+            </template>
+          </p>
+          <p x-show="mergedList('tags').length" class="flex items-center gap-1 flex-wrap">
+            <span class="text-[10px] text-zinc-600 mr-1">tags</span>
+            <template x-for="t in mergedList('tags')" :key="t.name">
+              <button @click="toggleTag(t.name)" class="text-xs px-2 py-0.5 rounded-full border" :class="(chosenNow().tags_add || []).includes(t.name) ? 'border-emerald-600 text-emerald-300' : 'border-zinc-700 text-zinc-500 hover:text-zinc-300'"><span x-text="t.name"></span><span class="text-[8px] text-zinc-700 ml-1 align-middle" x-text="t.source === 'mangadex-enrichment' ? 'MD' : 'MU'"></span></button>
+            </template>
+          </p>
+        </div>
+        <!-- per-source errors (covers keep their own grid below) -->
+        <template x-for="src in enrichSources" :key="'err-' + src.id">
+          <p class="text-xs text-red-400" x-show="candFor(src.id, enrichKind) && !candFor(src.id, enrichKind).ok" x-text="(candFor(src.id, enrichKind) || {}).error"></p>
+        </template>
+        <template x-for="src in enrichSources" :key="src.id">
+          <div class="mb-3" x-show="enrichKind === 'covers' && candFor(src.id, 'covers') && candFor(src.id, 'covers').ok">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-xs uppercase tracking-wide text-zinc-500" x-text="src.name || src.id"></span>
+              <span class="text-[10px] text-zinc-700" x-show="busySources[src.id]">fetching…</span>
+              <span class="text-[10px] text-zinc-700" x-show="!busySources[src.id] && candFor(src.id, enrichKind) && candFor(src.id, enrichKind).cached">(cached)</span>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <template x-for="u in (candFor(src.id, 'covers').data && candFor(src.id, 'covers').data.covers) || []" :key="u">
+                <button @click="pickField('cover', u)" class="w-20 border rounded overflow-hidden hover:ring-2 hover:ring-emerald-600" :class="chosenNow().cover === u ? 'ring-2 ring-emerald-600' : ''">
+                  <img :src="'/cache/img?url='+encodeURIComponent(u)+'&cover=1&plugin='+encodeURIComponent(plugin)+'&slug='+encodeURIComponent(slug)" class="w-full aspect-[2/3] object-cover" loading="lazy" alt="">
+                </button>
+              </template>
+            </div>
+          </div>
+        </template>
+        <p class="text-xs text-zinc-600" x-show="!enrichSources.length">No enrichment sources loaded. Dev copies: symlink <code>~/tmp/goIsekai</code>… → see README “Enrichment plugins”.</p>
+        </div>
+      </div>
+
+  <!-- chapters (chapter-list-controls 2.1): eye/check toggles, read/total counter,
+       client-side pager 20/page -->
+  <h2 class="text-xl font-semibold mb-4 flex items-center justify-between">
+    <span>Chapters</span>
+    <span class="flex items-center gap-2 text-sm font-normal" x-show="pageCount > 1" x-cloak>
+      <button class="px-2 border border-zinc-700 rounded disabled:opacity-30" :disabled="chPage <= 0"
+              @click="chPage--">‹</button>
+      <span class="text-xs text-zinc-500" x-text="(chPage+1)+' / '+pageCount"></span>
+      <button class="px-2 border border-zinc-700 rounded disabled:opacity-30" :disabled="chPage >= pageCount-1"
+              @click="chPage++">›</button><button x-show="hiddenCount() > 0" @click="showHidden = !showHidden" class="px-1.5 border border-zinc-700 rounded text-xs" :class="showHidden ? 'text-emerald-400 border-emerald-700' : ''" x-cloak x-text="(showHidden ? 'hide' : 'show') + ' ' + hiddenCount()" title="toggle hidden chapters"></button>
+    </span>
+  </h2>
+  <p class="text-sm text-zinc-500 mb-3" x-show="!loading && !chapters.length && !err" x-cloak>No chapters.</p>
+  <div class="divide-y divide-zinc-800 border border-zinc-800 rounded-lg" x-show="chapters.length" x-cloak>
+    <template x-for="ch in chPageRows()" :key="ch.id">
+      <div class="flex items-center gap-3 px-4 py-2.5 hover:bg-zinc-900/50">
+        <!-- eye: hide/show chapter row (skip flag feeds reader window) -->
+        <button @click="toggleDone(ch)" class="shrink-0" :class="ch.done ? 'text-emerald-400' : 'text-zinc-600 hover:text-zinc-400'"
+                :title="ch.done ? 'unhide chapter' : 'hide chapter'">
+          <svg x-show="!ch.done" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M10 3C5 3 1.7 7 1 10c.7 3 4 7 9 7s8.3-4 9-7c-.7-3-4-7-9-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-2a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/></svg>
+          <svg x-show="ch.done" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 20 20"><path d="M2 10c.7-3 4-7 8-7s7.3 4 8 7c-.7 3-4 7-8 7s-7.3-4-8-7Zm8 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" stroke-linecap="round"/><path d="M3 17 17 3" stroke-linecap="round"/></svg>
+        </button>
+        <a :href="'/read/'+encodeURIComponent(plugin)+'/'+encodeURIComponent(slug)+'?ch='+(Number(ch.number) || ch.number)"
+           class="text-sm font-medium w-20 shrink-0 hover:text-emerald-300" x-text="chLabel(ch)"></a>
+        <span class="text-xs text-zinc-500 flex-1 truncate" x-text="ch.title"></span>
+        <span class="text-xs text-zinc-500" x-text="fmtDate(ch.release_at)"></span>
+        <!-- read/total counter; total when the plugin reports it -->
+        <span class="text-xs text-zinc-500 tabular-nums" x-show="readMax(ch) > 0" x-text="readMax(ch)+(ch.pages ? '/'+ch.pages : '')"></span>
+        <!-- check: read state, lit when fully read -->
+        <button @click="toggleRead(ch)" class="shrink-0" :class="isRead(ch) ? 'text-emerald-400' : 'text-zinc-600 hover:text-zinc-400'"
+                :title="isRead(ch) ? 'unread' : 'mark read'">
+          <svg x-show="isRead(ch)" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M10 1 2.5 3.5v5c0 4.5 3.2 8.7 7.5 10 4.3-1.3 7.5-5.5 7.5-10v-5L10 1Zm-1 12-3-3 1.4-1.4L9 10.2l4.6-4.6L15 7l-6 6Z"/></svg>
+          <svg x-show="!isRead(ch)" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 20 20"><path d="M10 2 3.5 4.2v4.3c0 4 2.9 7.8 6.5 9 3.6-1.2 6.5-5 6.5-9V4.2L10 2Z" stroke-linejoin="round"/><path d="m7 10 2.2 2.2L13.5 8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <a x-show="cbzReady[ch.id]" :href="'/export/cbz?plugin='+plugin+'&slug='+encodeURIComponent(slug+'/'+chSlug(ch))"
+           class="text-xs h-7 px-2 inline-flex items-center rounded border border-zinc-700 text-zinc-300 hover:bg-zinc-800" title="export cached chapter as cbz">⬇ cbz</a>
+        <span x-show="!cbzReady[ch.id]" class="text-xs h-7 px-2 inline-flex items-center rounded border border-zinc-800 text-zinc-600 cursor-not-allowed" title="chapter not fully cached yet">⬇ cbz</span>
+      </div>
+    </template>
+  </div>
+  <!-- related (user steer): text-only links to the source site; hidden until data arrives -->
+  <div class="mt-8" x-show="related.length" x-cloak>
+    <h2 class="text-xl font-semibold mb-4">Related</h2>
+    <ul class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
+      <template x-for="m in related" :key="m.id">
+        <li class="text-sm truncate">
+          <a :href="m.url" target="_blank" rel="noopener" class="text-zinc-300 hover:text-emerald-300 hover:underline" x-text="m.name"></a>
+        </li>
+      </template>
+    </ul>
+  </div>
+
+  <!-- attribution (detail-enrichment 3.1): plugin name + logo; @error falls back to name only -->
+  <div class="mt-6 flex items-center gap-2 text-xs text-zinc-500" x-show="pluginName" x-cloak>
+    <template x-if="pluginLogoOk">
+      <img :src="'/plugin/'+encodeURIComponent(plugin)+'/logo'" class="h-5 w-5 object-contain rounded" @error="pluginLogoOk=false" alt="">
+    </template>
+    <span x-text="pluginName"></span>
+  </div>
+</div>
+
+<script>
+function detailPage() {
+  const parts = location.pathname.split('/').filter(Boolean); // view manga <plugin> <slug...>
+  return {
+    plugin: parts[2] || '', slug: parts.slice(3).join('/') || '',
+    detail: {}, chapters: [], cached: false, loading: true, refreshing: false,
+    err: '', coverBroken: false, hint: null, related: [], pluginName: '', pluginLogoOk: true,
+    inLibrary: false, libraryBusy: false,
+    enrichment: null, enrichLastFetched: 0, enrichSources: [],
+    enrichOpen: false, enrichKind: 'detail', enrichBusy: false, busySources: {}, cand: {}, enrichErr: '',
+    hiddenTags: [],
+    chPage: 0, showHidden: false, readState: {}, cbzReady: {}, // id -> {skip, read} (chapter-list-controls 1.2); cbzReady: chapter fully cached
+    get pageCount() { return Math.max(1, Math.ceil(this.visibleChapters().length / 20)); },
+    visibleChapters() { return this.showHidden ? this.chapters : this.chapters.filter(c => !c.done); },
+    chPageRows() { return this.visibleChapters().slice(this.chPage * 20, this.chPage * 20 + 20); },
+    hiddenCount() { return this.chapters.length - this.visibleChapters().length; },
+    readMax(ch) { return (this.readState[ch.id] && this.readState[ch.id].read) || 0; },
+    isRead(ch) { return ch.pages ? this.readMax(ch) >= ch.pages : this.readMax(ch) > 0; },
+    async loadChapterState() {
+      if (!this.chapters.length) return;
+      try {
+        const r = await fetch('/chapter/state', {method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ids: this.chapters.map(c => c.id)})});
+        if (r.ok) { const j = await r.json(); this.chapters.forEach(c => { if (j[c.id]) c.done = !!j[c.id].skip; }); this.readState = j; }
+      } catch (e) { /* list renders without state */ }
+    },
+    async toggleRead(ch) {
+      const to = this.isRead(ch) ? 0 : (ch.pages || 1);
+      this.readState[ch.id] = {...(this.readState[ch.id] || {}), read: to || undefined};
+      if (!to) delete this.readState[ch.id].read;
+      try { await fetch(`/chapter/${encodeURIComponent(ch.id)}/read`, {method: 'POST',
+        headers: {'Content-Type': 'application/json'}, body: JSON.stringify({page: to})}); } catch (e) {}
+    },
+    async toggleDone(ch) {
+      ch.done = !ch.done;
+      try { await fetch(`/chapter/${encodeURIComponent(ch.id)}/skip`, {method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({skipped: ch.done})}); } catch (e) {}
+    },
+    async boot() {
+      this.loadPluginMeta();
+      this.loadLibrary();
+      this.loadEnrichSources();
+      await this.load();
+      this.loadChapterState();
+    },
+    normAltTitle(s) { return String(s || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim(); },
+    altTitleCandidates() {
+      // merge main title + altTitles from all sources; normalized dedupe; MangaDex wins on collision
+      const seen = new Map();
+      for (const src of this.enrichSources) {
+        const c = this.candFor(src.id, 'detail');
+        const alts = c && c.data && Array.isArray(c.data.alt_titles) ? c.data.alt_titles : [];
+        for (const t of alts) {
+          const raw = String(t && t.title || '').trim();
+          if (!raw) continue;
+          const key = this.normAltTitle(raw);
+          if (!key) continue;
+          if (!seen.has(key)) {
+            seen.set(key, { title: raw, lang: String(t.lang || ''), main: !!t.main, source: src.id });
+          }
+        }
+      }
+      const arr = [...seen.values()];
+      arr.sort((a, b) => (b.main ? 1 : 0) - (a.main ? 1 : 0)); // main titles first
+      return arr;
+    },
+    srcData(id) { const c = this.candFor(id, 'detail'); return (c && c.data) || {}; },
+    mergedList(field) { // MD first; MU shown only when no normalized collision
+      const md = this.srcData('mangadex-enrichment')[field];
+      const mu = this.srcData('mangaupdates-enrichment')[field];
+      const out = []; const seen = new Set();
+      const push = (v, source) => { const raw = String(v || '').trim(); const k = this.normAltTitle(raw); if (k && !seen.has(k)) { seen.add(k); out.push({ name: raw, source }); } };
+      (Array.isArray(md) ? md : []).forEach(v => push(v, 'mangadex-enrichment'));
+      (Array.isArray(mu) ? mu : []).forEach(v => push(v, 'mangaupdates-enrichment'));
+      return out;
+    },
+    mergedSynopses() {
+      const md = this.srcData('mangadex-enrichment').synopsis;
+      const mu = this.srcData('mangaupdates-enrichment').synopsis;
+      const out = [];
+      if (md) out.push({ src: 'mangadex-enrichment', text: md, key: this.normAltTitle(md) });
+      if (mu) { const k = this.normAltTitle(mu); if (!out.length || out[0].key !== k) out.push({ src: 'mangaupdates-enrichment', text: mu, key: k }); }
+      return out;
+    },
+    async loadEnrichSources() { // loaded enrichment plugins (picker needs the list)
+      try {
+        const j = await (await fetch('/api/enrichment')).json();
+        this.enrichSources = (j && j.sources) || [];
+      } catch (e) { this.enrichSources = []; }
+    },
+    async openEnrich(kind, force) { // per-source fetch; cached unless force=true
+      this.enrichKind = kind; this.enrichOpen = true; this.enrichErr = ''; this.enrichBusy = true;
+      for (const src of this.enrichSources) {
+        this.busySources = { ...this.busySources, [src.id]: true };
+        try {
+          const r = await fetch(`/api/enrichment/${encodeURIComponent(src.id)}/${kind}?plugin=${encodeURIComponent(this.plugin)}&slug=${encodeURIComponent(this.slug)}&force=${force ? 1 : 0}`);
+          const j = await r.json();
+          this.cand = { ...this.cand, [src.id + ':' + kind]: j };
+          if (j && j.fetched_at) this.enrichLastFetched = Math.max(this.enrichLastFetched || 0, j.fetched_at);
+        } catch (e) { this.cand = { ...this.cand, [src.id + ':' + kind]: { ok: false, error: String(e) } }; }
+        this.busySources = { ...this.busySources, [src.id]: false };
+      }
+      this.enrichBusy = false;
+    },
+    candFor(id, kind) { return this.cand[id + ':' + (kind || this.enrichKind)] || null; },
+    chosenNow() { return (this.enrichment && this.enrichment.chosen) || {}; },
+    async saveChosen(patch) { // full-overwrite POST; server re-merges on next load
+      const chosen = { ...this.chosenNow(), ...patch };
+      for (const k of Object.keys(chosen)) if (chosen[k] === undefined || chosen[k] === null) delete chosen[k];
+      const r = await fetch('/api/enrichment/chosen', {method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ plugin: this.plugin, slug: this.slug, chosen })});
+      if (!r.ok) { this.enrichErr = 'save failed'; return; }
+      await this.load(); // re-renders merged detail + enrichment block
+    },
+    async pickField(field, value) { await this.saveChosen({ [field]: value }); },
+    async toggleName(field, name) { // artist/author: union of chosen names (array)
+      const cur = new Set(this.chosenNow()[field] || []);
+      if (cur.has(name)) cur.delete(name); else cur.add(name);
+      const arr = [...cur];
+      await this.saveChosen({ [field]: arr.length ? arr : undefined });
+    },
+    async toggleTag(tag) { // tags_add: add/remove one tag
+      const cur = new Set(this.chosenNow().tags_add || []);
+      if (cur.has(tag)) cur.delete(tag); else cur.add(tag);
+      const arr = [...cur];
+      await this.saveChosen({ tags_add: arr.length ? arr : undefined });
+    },
+    async toggleHideTag(tag) { // tags_hidden: hide a rendered tag without deleting it
+      const cur = new Set((this.enrichment && this.enrichment.chosen && this.enrichment.chosen.tags_hidden) || []);
+      const key = String(tag).toLowerCase();
+      const plain = new Set([...cur].map(x => String(x).toLowerCase()));
+      if (plain.has(key)) { for (const x of [...cur]) if (String(x).toLowerCase() === key) cur.delete(x); }
+      else cur.add(tag);
+      const arr = [...cur];
+      await this.saveChosen({ tags_hidden: arr.length ? arr : undefined });
+    },
+    async resetCover() {
+      try { await fetch('/api/enrichment/reset', {method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ plugin: this.plugin, slug: this.slug, mode: 'cover' })}); await this.load(); } catch (e) {}
+    },
+    async resetDetail() { // clears non-tag choseD fields, keeps chosen.cover (task 4.3)
+      try { await fetch('/api/enrichment/reset', {method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ plugin: this.plugin, slug: this.slug, mode: 'detail' })}); await this.load(); } catch (e) {}
+    },
+    fmtEnrichDate(ts) { return ts ? this.fmtDate(ts) : ''; },
+    async load() {
+      this.loading = true; this.err = '';
+      this.loadRelated(); // fire-and-forget (D4): failure never blocks the page
+      try {
+        // continue-hint badge (reader-page 2.2): stored position, if any.
+        if (this.plugin && this.slug) {
+          const r = await fetch(`/api/position/${encodeURIComponent(this.plugin)}/${encodeURIComponent(this.slug)}`);
+          if (r.ok) {
+            const p = await r.json();
+            if (p && p.ch) {
+              this.hint = {
+                text: `continue ch ${p.ch} p ${p.page || 1}`,
+                url: `/read/${encodeURIComponent(this.plugin)}/${encodeURIComponent(this.slug)}?ch=${p.ch}`
+              };
+            }
+          }
+        }
+        const d = await (await fetch(`/api/detail/${this.plugin}/${encodeURIComponent(this.slug)}`)).json();
+        const c = await (await fetch(`/api/chapters/${this.plugin}/${encodeURIComponent(this.slug)}`)).json();
+        if (!d.ok || !c.ok) { this.err = d.error || c.error || 'load failed'; return; }
+        this.detail = d.data || {}; this.cached = !!(d.cached || c.cached);
+        this.enrichment = (d.enrichment) || null;
+        this.enrichLastFetched = Math.max(this.enrichLastFetched || 0, (this.enrichment && this.enrichment.fetched_at) || 0);
+        this.hiddenTags = (this.enrichment && this.enrichment.chosen && this.enrichment.chosen.tags_hidden) || [];
+        this.chapters = (c.data || []).slice().sort((a, b) => (b.number ?? 0) - (a.number ?? 0));
+        this.checkCbz();
+      } catch (e) { this.err = String(e); }
+      this.loading = false;
+    },
+    async refresh() {
+      this.refreshing = true;
+      try {
+        const r = await (await fetch(`/api/refresh/${this.plugin}/${encodeURIComponent(this.slug)}`, {method: 'POST'})).json();
+        if (!r.ok) { this.err = r.error || 'refresh failed'; } else { await this.load(); this.cached = false; }
+      } catch (e) { this.err = String(e); }
+      this.refreshing = false;
+    },
+    chLabel(ch) { const n = Number(ch.number); return Number.isFinite(n) ? 'ch ' + String(n).padStart(3, '0') : (ch.title || 'ch'); },
+    chSlug(ch) { const n = Number(ch.number); return Number.isFinite(n) && n > 0 ? 'ch' + String(n).padStart(3, '0') : 'chx'; },
+    async checkCbz() {
+      // per-chapter cache-full probe for the cbz button gate.
+      for (const ch of this.chapters) {
+        const n = Number(ch.number);
+        const total = ch.pages || 0;
+        if (!Number.isFinite(n) || n <= 0 || !total || this.cbzReady[ch.id]) continue;
+        try {
+          const r = await fetch(`/api/cbz-ready?plugin=${encodeURIComponent(this.plugin)}&slug=${encodeURIComponent(this.slug)}&ch=${n}&pages=${total}`);
+          const j = r.ok ? await r.json() : null;
+          this.cbzReady[ch.id] = !!(j && j.full);
+        } catch (e) { this.cbzReady[ch.id] = false; }
+      }
+    },
+    fmtDate(ts) { if (!ts) return ''; const d = new Date(ts * 1000); return isNaN(d) ? '' : d.toISOString().slice(0, 10); },
+    async loadRelated() {
+      // merge scraper related + enrichment recommendations (MangaDex/MangaUpdates); dedupe by URL
+      const grab = (url) => fetch(url).then(r => r.ok ? r.json() : null).catch(() => null);
+      try {
+        const [scraper, md, mu] = await Promise.all([
+          grab(`/api/related/${encodeURIComponent(this.plugin)}/${encodeURIComponent(this.slug)}`),
+          grab(`/api/enrichment/mangadex-enrichment/recommendations?plugin=${encodeURIComponent(this.plugin)}&slug=${encodeURIComponent(this.slug)}`),
+          grab(`/api/enrichment/mangaupdates-enrichment/recommendations?plugin=${encodeURIComponent(this.plugin)}&slug=${encodeURIComponent(this.slug)}`),
+        ]);
+        const seen = new Set();
+        const merged = [];
+        const push = (it) => { const key = (it && (it.url || it.id || it.name)) || ''; if (key && !seen.has(key)) { seen.add(key); merged.push(it); } };
+        if (scraper && scraper.ok) ((scraper.data && scraper.data.items) || []).forEach(push);
+        if (md && md.ok) ((md.data && md.data.items) || []).forEach(push);
+        if (mu && mu.ok) ((mu.data && mu.data.items) || []).forEach(push);
+        this.related = merged;
+      } catch (e) { /* related section stays hidden */ }
+    },
+    async toggleLibrary() {
+      if (this.libraryBusy) return;
+      this.libraryBusy = true;
+      try {
+        const url = this.inLibrary ? '/api/library/remove' : '/api/library';
+        const body = {plugin: this.plugin, slug: this.slug, name: (this.detail && this.detail.name) || this.slug,
+                      cover: (this.detail && this.detail.cover) || ''};
+        const r = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+        const j = await r.json().catch(() => null);
+        if (!r.ok || !j || j.ok === false) { this.err = (j && j.error) || 'library failed'; }
+        else this.inLibrary = !this.inLibrary;
+      } catch (e) { this.err = String(e); }
+      this.libraryBusy = false;
+    },
+    async loadLibrary() {
+      try {
+        const r = await fetch('/api/library');
+        if (r.ok) {
+          const j = await r.json();
+          if (j.ok) this.inLibrary = (j.data || []).some(m => m.plugin === this.plugin && m.slug === this.slug);
+        }
+      } catch (e) { /* toggle stays at default false; err line untouched */ }
+    },
+    async loadPluginMeta() {
+      try {
+        const r = await fetch('/api/plugins');
+        const j = r.ok ? await r.json() : {};
+        const m = (j.plugins || []).find(p => p.key === this.plugin);
+        this.pluginName = (m && m.name) || this.plugin;
+      } catch (e) { this.pluginName = this.plugin; }
+    },
+  };
+}
+</script>
+  </main>
+  <div id="srv-status" style="display:none;position:fixed;top:0;left:0;right:0;z-index:50;text-align:center;font-size:12px;padding:6px 0;"></div>
+  <script>
+  (function () {
+    const el = document.getElementById('srv-status');
+    let down = false, wasDown = false;
+    async function probe() {
+      try {
+        const r = await fetch('/health', {cache: 'no-store'});
+        if (!r.ok) throw 0;
+        if (wasDown) { flash('Server back online', '#065f46'); wasDown = false; }
+        else el.style.display = 'none';
+        down = false;
+      } catch (e) {
+        down = true; wasDown = true;
+        el.textContent = 'Server offline — waiting for it to come back…';
+        el.style.background = '#7f1d1d'; el.style.color = '#fecaca'; el.style.display = 'block';
+      }
+    }
+    function flash(msg, bg) {
+      el.textContent = msg; el.style.background = bg; el.style.color = '#d1fae5'; el.style.display = 'block';
+      setTimeout(() => { el.style.display = 'none'; }, 4000);
+    }
+    window.__srvRestart = async function () {
+      wasDown = true;
+      try { await fetch('/admin/restart', {method: 'POST'}); } catch (e) { /* expected: connection drops */ }
+      el.textContent = 'Server restarting… waiting for it to come back';
+      el.style.background = '#78350f'; el.style.color = '#fde68a'; el.style.display = 'block';
+      const t = setInterval(async () => {
+        try {
+          const r = await fetch('/health', {cache: 'no-store'});
+          if (r.ok) { clearInterval(t); flash('Server back online', '#065f46'); wasDown = false; }
+        } catch (e) {}
+      }, 1000);
+    };
+    setInterval(probe, 5000);
+    probe();
+  })();
+  </script>
+</body>
+</html>

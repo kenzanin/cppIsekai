@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>cppIsekai</title>
+  <script src="/static/tailwind.min.js"></script>
+  <script src="/static/htmx.min.js"></script>
+  <script defer src="/static/alpine.min.js"></script>
+</head>
+<body class="bg-zinc-950 text-zinc-100 min-h-screen">
+  <header class="flex items-center gap-1 border-b border-zinc-800 px-4 h-12">
+    <a href="/" class="px-3 py-1 rounded hover:bg-zinc-800/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 transition-colors ">Library</a>
+    <a href="/search" class="px-3 py-1 rounded hover:bg-zinc-800/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 transition-colors ">Search</a>
+    <a href="/history" class="px-3 py-1 rounded hover:bg-zinc-800/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 transition-colors ">History</a>
+    <a href="/plugins" class="px-3 py-1 rounded hover:bg-zinc-800/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 transition-colors ">Plugins</a>
+    <a href="/settings" class="px-3 py-1 rounded hover:bg-zinc-800/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 transition-colors ">Settings</a>
+    <span class="flex-1"></span>
+    <a href="/logs" class="px-3 py-1 rounded hover:bg-zinc-800/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 transition-colors bg-zinc-800">Logs</a>
+    <a href="/about" class="px-3 py-1 rounded hover:bg-zinc-800/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 transition-colors ">About</a>
+  </header>
+  <main class="p-4">
+  <pre id="log" class="bg-zinc-900 rounded p-3 text-xs leading-5 h-[70vh] overflow-auto"
+       x-data x-init="const ws=new WebSocket(`ws://${location.host}/ws/log`); ws.onmessage=e=>{$el.textContent+=e.data; $el.scrollTop=$el.scrollHeight}">first log line
+second log line
+</pre>
+  </main>
+  <div id="srv-status" style="display:none;position:fixed;top:0;left:0;right:0;z-index:50;text-align:center;font-size:12px;padding:6px 0;"></div>
+  <script>
+  (function () {
+    const el = document.getElementById('srv-status');
+    let down = false, wasDown = false;
+    async function probe() {
+      try {
+        const r = await fetch('/health', {cache: 'no-store'});
+        if (!r.ok) throw 0;
+        if (wasDown) { flash('Server back online', '#065f46'); wasDown = false; }
+        else el.style.display = 'none';
+        down = false;
+      } catch (e) {
+        down = true; wasDown = true;
+        el.textContent = 'Server offline — waiting for it to come back…';
+        el.style.background = '#7f1d1d'; el.style.color = '#fecaca'; el.style.display = 'block';
+      }
+    }
+    function flash(msg, bg) {
+      el.textContent = msg; el.style.background = bg; el.style.color = '#d1fae5'; el.style.display = 'block';
+      setTimeout(() => { el.style.display = 'none'; }, 4000);
+    }
+    window.__srvRestart = async function () {
+      wasDown = true;
+      try { await fetch('/admin/restart', {method: 'POST'}); } catch (e) { /* expected: connection drops */ }
+      el.textContent = 'Server restarting… waiting for it to come back';
+      el.style.background = '#78350f'; el.style.color = '#fde68a'; el.style.display = 'block';
+      const t = setInterval(async () => {
+        try {
+          const r = await fetch('/health', {cache: 'no-store'});
+          if (r.ok) { clearInterval(t); flash('Server back online', '#065f46'); wasDown = false; }
+        } catch (e) {}
+      }, 1000);
+    };
+    setInterval(probe, 5000);
+    probe();
+  })();
+  </script>
+</body>
+</html>

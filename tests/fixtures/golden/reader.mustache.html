@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>cppIsekai — reader</title>
+  <script src="/static/tailwind.min.js"></script>
+  <script defer src="/static/alpine.min.js"></script>
+  <style>[x-cloak]{display:none !important}</style>
+</head>
+<body class="bg-black text-zinc-100 h-screen overflow-y-auto">
+<main class="min-h-screen">
+
+<div x-data="readerPage" x-init="boot()" @keydown.window="keys($event)" @scroll.window="track()" @wheel.window.passive="wheel($event)"
+     class="relative" :dir="dir">
+
+  <p class="text-sm text-red-400 py-2" x-show="err" x-text="err"></p>
+  <p class="text-sm text-zinc-500 py-8" x-show="!err && !pages.length">Loading&#8230;</p>
+
+  <!-- done overlay: last chapter finished -->
+  <div x-show="done" x-cloak
+       class="fixed inset-0 z-40 flex flex-col items-center justify-center gap-4 bg-black/90">
+    <p class="text-4xl font-bold">Done &#127881;</p>
+    <a :href="'/view/manga/'+encodeURIComponent(plugin)+'/'+encodeURIComponent(slug)"
+       class="px-4 py-2 rounded border border-zinc-600 text-zinc-100 hover:bg-zinc-800">Back to detail</a>
+  </div>
+
+  <!-- dim page indicator (hidden while nav shown) -->
+  <div x-show="!navShown && !done && pages.length" x-cloak
+       class="fixed bottom-3 inset-x-0 z-10 text-center text-xs tabular-nums text-zinc-500 opacity-60 pointer-events-none"
+       x-text="label()"></div>
+
+  <!-- tap zones (paged/spread only); center third toggles nav, sides page -->
+  <div class="fixed top-0 bottom-0 left-0 w-1/3 z-10" x-show="mode !== 'webtoon' && !done"
+       @click="step(dir === 'rtl' ? 1 : -1)"></div>
+  <div class="fixed top-0 bottom-0 left-1/3 w-1/3 z-10" x-show="!done"
+       @click="navShown = !navShown"></div>
+  <div class="fixed top-0 bottom-0 right-0 w-1/3 z-10" x-show="mode !== 'webtoon' && !done"
+       @click="step(dir === 'rtl' ? -1 : 1)"></div>
+
+  <div :class="shellClass()" data-shell>
+    <template x-for="(view, vi) in views" :key="vi">
+      <div x-show="mode === 'webtoon' || vi === cur()" :class="viewClass()" :data-vi="vi" :style="{zoom: zoomPct / 100}">
+        <template x-for="u in view" :key="u">
+          <img :src="loaded(vi) ? u : spacer" :class="imgClass()" alt="" draggable="false">
+        </template>
+      </div>
+    </template>
+  </div>
+  <!-- top overlay: back + chapter dropdown (synced) + mode/dir/zoom. Shown only while navShown. -->
+  <div x-show="navShown && !done" x-cloak
+       class="fixed top-0 inset-x-0 z-30 flex items-center gap-2 px-2 py-2 flex-wrap bg-zinc-950/90 border-b border-zinc-800 backdrop-blur">
+    <a :href="'/view/manga/'+encodeURIComponent(plugin)+'/'+encodeURIComponent(slug)"
+       class="flex items-center gap-1.5 px-2 py-2 rounded border border-zinc-700 text-zinc-100 hover:bg-zinc-800" aria-label="Back to detail">
+      <svg class="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 19l-7-7 7-7"/><path d="M3.5 12H14"/><path d="M14 4h4a2 2 0 012 2v12a2 2 0 01-2 2h-4"/></svg>
+      <span class="text-sm font-medium">Detail</span>
+    </a>
+    <select :value="ch" @change="gotoChapter($event.target.value)" aria-label="Chapter"
+            class="bg-zinc-900 border border-zinc-700 rounded px-2 py-2 text-sm max-w-[35vw]">
+      <template x-for="c in chaptersList" :key="c.id">
+        <option :value="c.number" :selected="Number(c.number) === ch" x-text="'ch ' + c.number + (c.title ? ' — ' + c.title : '')"></option>
+      </template>
+    </select>
+    <select x-model="mode" @change="modeChanged()" aria-label="Reading mode"
+            class="bg-zinc-900 border border-zinc-700 rounded px-2 py-2 text-sm">
+      <option value="webtoon">webtoon</option>
+      <option value="paged">paged</option>
+      <option value="spread-h">spread h</option>
+      <option value="spread-v">spread v</option>
+    </select>
+    <select x-model="dir" x-show="mode !== 'webtoon'" @change="persist()" aria-label="Direction"
+            class="bg-zinc-900 border border-zinc-700 rounded px-2 py-2 text-sm">
+      <option value="ltr">ltr</option>
+      <option value="rtl">rtl</option>
+    </select>
+    <div class="flex items-center gap-1" role="group" aria-label="Image zoom">
+      <button @click="zoomOut()" :disabled="zoom === 'custom' && zoomPct <= 25" aria-label="Zoom out"
+              class="w-9 h-9 rounded border border-zinc-700 text-lg leading-none text-zinc-100 hover:bg-zinc-800 disabled:opacity-30">&#8722;</button>
+      <span class="w-12 text-center text-xs tabular-nums text-zinc-400 select-none" x-show="zoom === 'custom'" x-cloak x-text="zoomPct + '%'"></span>
+      <span class="w-12 text-center text-xs tabular-nums text-zinc-600 select-none" x-show="zoom !== 'custom'" x-cloak x-text="'—'"></span>
+      <button @click="zoomIn()" :disabled="zoom === 'custom' && zoomPct >= 400" aria-label="Zoom in"
+              class="w-9 h-9 rounded border border-zinc-700 text-lg leading-none text-zinc-100 hover:bg-zinc-800 disabled:opacity-30">+</button>
+    </div>
+    <select x-model="zoom" @change="zoomPresetChanged()" aria-label="Zoom"
+            class="bg-zinc-900 border border-zinc-700 rounded px-2 py-2 text-sm">
+      <option value="fit-h">fit H</option>
+      <option value="fit-w">fit W</option>
+      <option value="1:1">1:1</option>
+      <option value="custom">custom</option>
+    </select>
+    <span class="flex-1"></span>
+    <span class="text-xs text-zinc-500 tabular-nums pr-1" x-text="label()"></span>
+  </div>
+  <!-- bottom overlay: page list only. Shown only while navShown. -->
+  <div x-show="navShown && !done" x-cloak
+       class="fixed bottom-0 inset-x-0 z-30 bg-zinc-950/90 border-t border-zinc-800 backdrop-blur">
+    <template x-if="pages.length <= 24">
+      <div class="flex gap-1 flex-wrap justify-center px-2 py-2">
+        <template x-for="n in pages.length" :key="n">
+          <button @click="goto_page(n)"
+                  :class="n === page ? 'bg-zinc-100 text-zinc-900 border-zinc-100' : 'text-zinc-300 border-zinc-700 hover:bg-zinc-800'"
+                  class="w-10 h-10 text-base leading-none font-medium tabular-nums rounded border"
+                  x-text="n"></button>
+        </template>
+      </div>
+    </template>
+    <template x-if="pages.length > 24">
+      <div class="flex justify-center px-2 py-2">
+        <select :value="page" @change="goto_page(Number($event.target.value))" aria-label="Page"
+                class="bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm">
+          <template x-for="n in pages.length" :key="n">
+            <option :value="n" :selected="n === page" x-text="'p ' + n + ' / ' + pages.length"></option>
+          </template>
+        </select>
+      </div>
+    </template>
+  </div>
+</div>
+
+<script>
+function readerPage() {
+  // /read/<plugin>/<slug..>?ch=&page=&mode=&dir= -- 3.2's resume seeds
+  // page/mode/dir; without them: first page, paged rtl (long-strip default).
+  const parts = location.pathname.split('/').filter(Boolean);
+  return {
+    plugin: decodeURIComponent(parts[1] || ''),
+    slug: decodeURIComponent(parts.slice(2).join('/')) || '',
+    ch: 1, chId: '', pages: [], prev_ch: 0, next_ch: 0,
+    page: 1, mode: 'paged', dir: 'rtl', zoom: 'fit-h', zoomPct: 100, wheelAt: 0,
+    navShown: false, done: false,
+    seen: [], err: '', io: null, chaptersList: [],
+    spacer: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
+    async boot() {
+      const q = new URLSearchParams(location.search);
+      // seed: stored position (12/3/paged/rtl),
+      // then ?ch and ?page override, then JS defaults (ch 1, paged rtl).
+      const resumeCh = Number('12');
+      this.ch = Number.isFinite(resumeCh) ? Math.max(0, resumeCh) : 1;
+      this.page = Number('3') || 1;
+      // jump-to-ch always starts at page 1; only the same-chapter resume keeps a page
+      const qChRaw = q.get('ch');
+      const qCh = qChRaw === null || qChRaw === '' ? NaN : Number(qChRaw);
+      if ('paged') this.mode = 'paged';
+      if ('rtl') this.dir = 'rtl';
+      if ('fit-width') { this.applyZoomSeed('fit-width'); }
+      if (Number.isFinite(qCh)) {
+        this.ch = Math.max(0, qCh);
+        const resume = Number('12');
+        if (!q.get('page') && this.ch !== resume) this.page = 1; // different chapter => restart at p1
+      }
+      if (q.get('mode')) this.mode = q.get('mode');
+      if (q.get('dir')) this.dir = q.get('dir');
+      if (q.get('page')) this.page = Number(q.get('page')) || 1;
+      if (q.get('zoom')) this.applyZoomSeed(q.get('zoom'));
+      try {
+        const [p, c] = await Promise.all([
+          fetch(`/api/pages/${encodeURIComponent(this.plugin)}/${encodeURIComponent(this.slug)}/${this.ch}`).then(r => r.json()),
+          fetch(`/api/chapters/${encodeURIComponent(this.plugin)}/${encodeURIComponent(this.slug)}`).then(r => r.json()),
+        ]);
+        if (!Array.isArray(p.pages)) { this.err = p.error || 'load failed'; return; }
+        this.pages = p.pages;
+        this.prev_ch = p.prev_ch || 0;
+        this.next_ch = p.next_ch || 0;
+        // /api/pages exposes only the chapter number; the position store keys
+        // the plugin chapter id, so resolve it once for POST /reader/position.
+        this.chaptersList = c.data || [];
+        const hit = (c.data || []).find(x => Number(x.number) === this.ch);
+        this.chId = hit ? String(hit.id) : '';
+        this.io = new IntersectionObserver(
+            es => es.forEach(e => e.isIntersecting && this.mark(+e.target.dataset.vi)),
+            {rootMargin: '400px'});
+        this.observe();
+        this.preload();
+      } catch (e) { this.err = String(e); }
+    },
+    // --- layout: one screen = one view; page is the view's first page number
+    get pairing() { return this.mode === 'spread-h' || this.mode === 'spread-v'; },
+    get views() { // 1 alone, then (2,3) (4,5)...; odd tail alone
+      if (!this.pairing) return this.pages.map(u => [u]);
+      const v = this.pages.length ? [this.pages.slice(0, 1)] : [];
+      for (let i = 1; i < this.pages.length; i += 2) v.push(this.pages.slice(i, i + 2));
+      return v;
+    },
+    firstOf(i) { return this.pairing ? (i === 0 ? 1 : 2 * i) : i + 1; },
+    viewOf(p) { return this.pairing ? Math.floor(p / 2) : p - 1; },
+    cur() { return Math.max(0, Math.min(this.viewOf(this.page), this.views.length - 1)); },
+    label() {
+      if (!this.pages.length) return '';
+      const f = this.firstOf(this.cur());
+      return (this.views[this.cur()].length > 1 ? `p ${f}\u2013${f + 1}` : `p ${f}`) + ` / ${this.pages.length}p`;
+    },
+    applyZoomSeed(z) { // 'fit-h' | 'fit-w' | '1:1' | 'custom:NN'
+      if (typeof z === 'string' && z.indexOf('custom:') === 0) {
+        const pct = Number(z.slice(7));
+        this.zoom = 'custom';
+        this.zoomPct = Number.isFinite(pct) ? Math.min(400, Math.max(25, Math.round(pct))) : 100;
+      } else if (z === 'fit-h' || z === 'fit-w' || z === '1:1' || z === 'custom') {
+        this.zoom = z;
+        if (z !== 'custom') this.zoomPct = 100;
+      }
+    },
+    zoomSeed() { return this.zoom === 'custom' ? 'custom:' + Math.round(this.zoomPct) : this.zoom; },
+    chUrl(n, page) {
+      const q = new URLSearchParams({ch: String(n), mode: this.mode, dir: this.dir, zoom: this.zoomSeed()});
+      if (page) q.set('page', String(page));
+      return `/read/${encodeURIComponent(this.plugin)}/${encodeURIComponent(this.slug)}?${q}`;
+    },
+    // --- navigation
+    step(d) {
+      const i = this.cur() + d;
+      if (i < 0) {
+        if (this.prev_ch) {
+          const prev = this.chaptersList.find(c => Number(c.number) === Number(this.prev_ch));
+          window.location = this.chUrl(this.prev_ch, prev && prev.pages ? prev.pages : 1);
+        }
+        return;
+      }
+      if (i >= this.views.length) {
+        if (this.next_ch) { window.location = this.chUrl(this.next_ch, 1); }
+        else { this.done = true; }
+        return;
+      }
+      this.page = this.firstOf(i);
+      this.persist(); // 3.3: debounced position POST on view change
+      this.$nextTick(() => { this.preload(); this._resetScroll(); });
+    },
+    goto_page(n) {
+      if (n < 1 || n > this.pages.length) return;
+      this.page = this.firstOf(this.viewOf(n));
+      this.persist();
+      this.$nextTick(() => {
+        this.preload();
+        if (this.mode !== 'webtoon') { this._resetScroll(); return; }
+        const el = this.$root.querySelector(`[data-vi="${this.cur()}"]`);
+        if (el) el.scrollIntoView();
+      });
+    },
+    gotoChapter(n) { window.location = this.chUrl(Number(n)); },
+    wheel(e) {
+      const shell = this.$root.querySelector('[data-shell]');
+      if (shell && shell.scrollHeight > shell.clientHeight + 2) {
+        shell.scrollTop += e.deltaY; // overlays eat native wheel; scroll shell manually
+        return;
+      }
+      if (this.mode === 'webtoon') return; // body handles it
+      if (this.zoom !== 'fit-h') return;   // no overflow left: nothing to do
+      const d = e.deltaY > 8 ? 1 : e.deltaY < -8 ? -1 : 0;
+      if (!d) return;
+      const now = Date.now();
+      if (this.wheelAt && now - this.wheelAt < 180) return; // debounce trackpad inertia
+      this.wheelAt = now;
+      this.step(d);
+    },
+    zoomIn() { this.zoom = 'custom'; this.zoomPct = Math.min(400, this.zoomPct + 15); this.persist(); },
+    zoomOut() { this.zoom = 'custom'; this.zoomPct = Math.max(25, this.zoomPct - 15); this.persist(); },
+    _scrollBy(f) { window.scrollBy({top: f * window.innerHeight, behavior: 'smooth'}); },
+    _resetScroll() { const shell = this.$root.querySelector('[data-shell]'); if (shell) shell.scrollTop = 0; },
+    keys(e) {
+      if (e.key === 'Escape' && this.done) { this.done = false; return; }
+      if (/^(SELECT|INPUT|TEXTAREA)$/.test(e.target.tagName)) return; // form controls first, always
+      if (e.key === '+' || e.key === '=') { e.preventDefault(); this.zoomIn(); return; }
+      if (e.key === '-') { e.preventDefault(); this.zoomOut(); return; }
+      if (e.key === '0') { e.preventDefault(); this.zoom = 'custom'; this.zoomPct = 100; this.persist(); return; }
+      const s = this.dir === 'rtl' ? -1 : 1; // RTL flips horizontal arrows (manga reads right-to-left)
+      if (this.mode === 'webtoon') {
+        // ArrowLeft/Right = prev/next page everywhere; webtoon additionally scrolls natively on Up/Down
+        if (e.key === 'ArrowRight') { e.preventDefault(); this.goto_page(this.page + 1); }
+        else if (e.key === 'ArrowLeft') { e.preventDefault(); this.goto_page(this.page - 1); }
+        else if (e.key === 'PageDown') { e.preventDefault(); this._scrollBy(0.9); }
+        else if (e.key === 'PageUp') { e.preventDefault(); this._scrollBy(-0.9); }
+        else if (e.key === 'Home') { e.preventDefault(); this.goto_page(1); }
+        else if (e.key === 'End') { e.preventDefault(); this.goto_page(this.pages.length); }
+        return;
+      }
+      if (e.key === 'ArrowRight') { e.preventDefault(); this.step(s); }
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); this.step(-s); }
+      else if (e.key === 'ArrowDown' || e.key === 'PageDown') { e.preventDefault(); this.step(1); }
+      else if (e.key === 'ArrowUp' || e.key === 'PageUp') { e.preventDefault(); this.step(-1); }
+      else if (e.key === 'Home') { e.preventDefault(); this.goto_page(1); }
+      else if (e.key === 'End') { e.preventDefault(); this.goto_page(this.pages.length); }
+    },
+    zoomPresetChanged() { // presets always reset; 'custom' keeps the +/- percentage
+      if (this.zoom !== 'custom') this.zoomPct = 100;
+      this.persist();
+    },
+    modeChanged() { // re-paired views: keep page, reseed observers, realign scroll
+      this.persist();
+      this.$nextTick(() => {
+        this.observe();
+        this.preload();
+        if (this.mode !== 'webtoon') return;
+        const el = this.$root.querySelector(`[data-vi="${this.cur()}"]`);
+        if (el) el.scrollIntoView();
+      });
+    },
+    // --- lazy loading: webtoon via observer, paged/spread via neighbours
+    mark(i) { if (!this.seen.includes(i)) this.seen.push(i); },
+    loaded(i) { return this.seen.indexOf(i) >= 0; },
+    preload() {
+      if (this.mode === 'webtoon') return;
+      const i = this.cur();
+      this.mark(i - 1); this.mark(i); this.mark(i + 1);
+    },
+    observe() { if (this.io) this.$root.querySelectorAll('[data-vi]').forEach(el => this.io.observe(el)); },
+    track() { // webtoon: topmost visible row is the page
+      if (this.mode !== 'webtoon') return;
+      for (const el of this.$root.querySelectorAll('[data-vi]')) {
+        if (el.getBoundingClientRect().bottom > 64) {
+          const p = this.firstOf(+el.dataset.vi);
+          if (p !== this.page) { this.page = p; this.persist(); }
+          return;
+        }
+      }
+    },
+    persist() { // 3.3: ~300ms debounce -- rapid paging and mode/dir switches coalesce into one POST (the POST is also the worker nudge, D4)
+      clearTimeout(this.t);
+      this.t = setTimeout(() => this.save(), 300);
+    },
+    async save() { // fires once, with the page/mode/dir as of 300ms after the last change
+      if (!this.chId) return;
+      try {
+        await fetch('/reader/position', {method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({plugin: this.plugin, manga: this.slug, chapter: this.chId,
+                                chapter_number: this.ch, page: this.page, mode: this.mode, direction: this.dir, zoom: this.zoomSeed()})});
+      } catch (e) { console.warn('position', e); }
+    },
+    // --- chrome
+    shellClass() {
+      if (this.mode === 'webtoon') return 'flex flex-col items-center gap-1 py-2';
+      // fit-h centers and clips to the screen; wider/taller content scrolls
+      if (this.zoom === 'fit-h') return 'flex items-center justify-center h-screen';
+      return 'h-screen overflow-auto py-2 text-center';
+    },
+    viewClass() {
+      if (this.mode === 'webtoon') return 'w-full';
+      const col = this.mode === 'spread-v' ? 'flex-col ' : '';
+      if (this.zoom === 'fit-h') {
+        return this.mode === 'spread-v'
+          ? 'flex flex-col items-center justify-center gap-1 h-full'
+          : 'flex items-center justify-center gap-1 h-full'; // paged + spread-h; :dir mirrors pairs
+      }
+      return 'inline-flex ' + col + 'items-center justify-center gap-1 min-w-full min-h-full';
+    },
+    imgClass() {
+      if (this.mode === 'webtoon') return 'w-full';
+      switch (this.zoom) {
+        case 'fit-w':
+          if (this.mode === 'spread-h') return 'w-1/2 h-auto object-contain';
+          return 'w-full h-auto object-contain'; // paged + spread-v
+        case '1:1':
+          return 'max-w-none max-h-none w-auto h-auto'; // natural size, scroll
+        case 'custom':
+          return 'max-w-none max-h-none w-auto h-auto'; // CSS zoom (view :style) scales this
+        default: // fit-h
+          return 'max-h-full max-w-full object-contain';
+      }
+    },
+  };
+}
+</script>
+</main>
+  <div id="srv-status" style="display:none;position:fixed;top:0;left:0;right:0;z-index:50;text-align:center;font-size:12px;padding:6px 0;"></div>
+  <script>
+  (function () {
+    const el = document.getElementById('srv-status');
+    let down = false, wasDown = false;
+    async function probe() {
+      try {
+        const r = await fetch('/health', {cache: 'no-store'});
+        if (!r.ok) throw 0;
+        if (wasDown) { flash('Server back online', '#065f46'); wasDown = false; }
+        else el.style.display = 'none';
+        down = false;
+      } catch (e) {
+        down = true; wasDown = true;
+        el.textContent = 'Server offline — waiting for it to come back…';
+        el.style.background = '#7f1d1d'; el.style.color = '#fecaca'; el.style.display = 'block';
+      }
+    }
+    function flash(msg, bg) {
+      el.textContent = msg; el.style.background = bg; el.style.color = '#d1fae5'; el.style.display = 'block';
+      setTimeout(() => { el.style.display = 'none'; }, 4000);
+    }
+    window.__srvRestart = async function () {
+      wasDown = true;
+      try { await fetch('/admin/restart', {method: 'POST'}); } catch (e) { /* expected: connection drops */ }
+      el.textContent = 'Server restarting… waiting for it to come back';
+      el.style.background = '#78350f'; el.style.color = '#fde68a'; el.style.display = 'block';
+      const t = setInterval(async () => {
+        try {
+          const r = await fetch('/health', {cache: 'no-store'});
+          if (r.ok) { clearInterval(t); flash('Server back online', '#065f46'); wasDown = false; }
+        } catch (e) {}
+      }, 1000);
+    };
+    setInterval(probe, 5000);
+    probe();
+  })();
+  </script>
+</body>
+</html>

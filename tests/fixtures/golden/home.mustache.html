@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>cppIsekai</title>
+  <script src="/static/tailwind.min.js"></script>
+  <script src="/static/htmx.min.js"></script>
+  <script defer src="/static/alpine.min.js"></script>
+</head>
+<body class="bg-zinc-950 text-zinc-100 min-h-screen">
+  <header class="flex items-center gap-1 border-b border-zinc-800 px-4 h-12">
+    <a href="/" class="px-3 py-1 rounded hover:bg-zinc-800/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 transition-colors bg-zinc-800">Library</a>
+    <a href="/search" class="px-3 py-1 rounded hover:bg-zinc-800/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 transition-colors ">Search</a>
+    <a href="/history" class="px-3 py-1 rounded hover:bg-zinc-800/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 transition-colors ">History</a>
+    <a href="/plugins" class="px-3 py-1 rounded hover:bg-zinc-800/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 transition-colors ">Plugins</a>
+    <a href="/settings" class="px-3 py-1 rounded hover:bg-zinc-800/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 transition-colors ">Settings</a>
+    <span class="flex-1"></span>
+    <a href="/logs" class="px-3 py-1 rounded hover:bg-zinc-800/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 transition-colors ">Logs</a>
+    <a href="/about" class="px-3 py-1 rounded hover:bg-zinc-800/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 transition-colors ">About</a>
+  </header>
+  <main class="p-4">
+  <div class="flex gap-6">
+    <aside class="w-52 shrink-0 space-y-4">
+      <nav class="space-y-1">
+        <a href="/" class="block px-2 py-1 rounded bg-zinc-800"
+           hx-get="/library/grid" hx-target="#grid" hx-push-url="/">All plugins</a>
+        <a href="/?plugin=mangadex"
+           class="flex justify-between px-2 py-1 rounded bg-zinc-800"
+           hx-get="/library/grid?plugin=mangadex" hx-target="#grid" hx-push-url="/?plugin=mangadex">
+          <span class="flex items-center gap-1.5">
+            <img src="/plugin/mangadex/logo" alt="" class="w-4 h-4 rounded-sm">
+            <span>mangadex</span>
+          </span>
+          <span class="text-zinc-500">2</span>
+        </a>
+        <a href="/?plugin=baka"
+           class="flex justify-between px-2 py-1 rounded "
+           hx-get="/library/grid?plugin=baka" hx-target="#grid" hx-push-url="/?plugin=baka">
+          <span class="flex items-center gap-1.5">
+            
+            <span>baka</span>
+          </span>
+          <span class="text-zinc-500">0</span>
+        </a>
+      </nav>
+      <p class="px-2 text-sm text-zinc-400">2 titles</p>
+      <p class="px-2 text-sm text-zinc-600">more later</p>
+    </aside>
+    <section class="flex-1 space-y-4">
+      <form action="/" method="get" class="flex gap-2"
+            hx-get="/library/grid" hx-target="#grid" hx-push-url="true">
+        
+        <input name="q" value="" placeholder="Search library"
+               class="focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:border-transparent transition flex-1 bg-zinc-900 border border-zinc-700 rounded px-3 py-1.5">
+      </form>
+      <div id="grid">
+        <ul class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                  <li>
+            <a href="&#x2F;view&#x2F;manga&#x2F;mangadex&#x2F;one-piece" class="group block min-w-0">
+                <img src="/cache/img?url=http:&#x2F;&#x2F;example&#x2F;cover.jpg&cover=1&plugin=mangadex&slug=one-piece"
+                     class="w-full aspect-[2/3] object-cover rounded-lg border border-zinc-800 transition duration-150 group-hover:border-zinc-700" alt="One Piece" loading="lazy"
+                     onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+              <div class="aspect-[2/3] w-full rounded-lg flex items-center justify-center text-center text-xs text-zinc-400 bg-zinc-800"
+                   style="display:none">One Piece</div>
+              <p class="mt-1 text-sm truncate text-zinc-300 group-hover:text-zinc-100 transition-colors">One Piece</p>
+              <p class="text-xs text-zinc-500">mangadex</p>
+            </a>
+          </li>
+                  <li>
+            <a href="&#x2F;view&#x2F;manga&#x2F;baka&#x2F;no-cover" class="group block min-w-0">
+                <img src="/cache/img?url=&cover=1&plugin=baka&slug=no-cover"
+                     class="w-full aspect-[2/3] object-cover rounded-lg border border-zinc-800 transition duration-150 group-hover:border-zinc-700" alt="No Cover" loading="lazy"
+                     onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+              <div class="aspect-[2/3] w-full rounded-lg flex items-center justify-center text-center text-xs text-zinc-400 bg-zinc-800"
+                   style="display:none">No Cover</div>
+              <p class="mt-1 text-sm truncate text-zinc-300 group-hover:text-zinc-100 transition-colors">No Cover</p>
+              <p class="text-xs text-zinc-500">baka</p>
+            </a>
+          </li>
+        </ul>
+              </div>
+    </section>
+  </div>
+  </main>
+  <div id="srv-status" style="display:none;position:fixed;top:0;left:0;right:0;z-index:50;text-align:center;font-size:12px;padding:6px 0;"></div>
+  <script>
+  (function () {
+    const el = document.getElementById('srv-status');
+    let down = false, wasDown = false;
+    async function probe() {
+      try {
+        const r = await fetch('/health', {cache: 'no-store'});
+        if (!r.ok) throw 0;
+        if (wasDown) { flash('Server back online', '#065f46'); wasDown = false; }
+        else el.style.display = 'none';
+        down = false;
+      } catch (e) {
+        down = true; wasDown = true;
+        el.textContent = 'Server offline — waiting for it to come back…';
+        el.style.background = '#7f1d1d'; el.style.color = '#fecaca'; el.style.display = 'block';
+      }
+    }
+    function flash(msg, bg) {
+      el.textContent = msg; el.style.background = bg; el.style.color = '#d1fae5'; el.style.display = 'block';
+      setTimeout(() => { el.style.display = 'none'; }, 4000);
+    }
+    window.__srvRestart = async function () {
+      wasDown = true;
+      try { await fetch('/admin/restart', {method: 'POST'}); } catch (e) { /* expected: connection drops */ }
+      el.textContent = 'Server restarting… waiting for it to come back';
+      el.style.background = '#78350f'; el.style.color = '#fde68a'; el.style.display = 'block';
+      const t = setInterval(async () => {
+        try {
+          const r = await fetch('/health', {cache: 'no-store'});
+          if (r.ok) { clearInterval(t); flash('Server back online', '#065f46'); wasDown = false; }
+        } catch (e) {}
+      }, 1000);
+    };
+    setInterval(probe, 5000);
+    probe();
+  })();
+  </script>
+</body>
+</html>

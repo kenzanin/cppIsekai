@@ -236,6 +236,18 @@ add_test(NAME worker COMMAND test_worker)
 _cppisekai_pch(test_worker)
 
 
+# template goldens: one representative render per top-level page, diffed against
+# tests/fixtures/golden/<name>.html -- locks the partial include graph and the
+# context keys each page reads. CPPISEKAI_UPDATE_GOLDEN=1 rewrites goldens.
+add_executable(test_templates tests/test_templates.cpp)
+target_include_directories(test_templates PRIVATE src)
+target_compile_definitions(
+  test_templates
+  PRIVATE CPPISEKAI_TEMPLATES_DIR="${PROJECT_SOURCE_DIR}/templates"
+          CPPISEKAI_GOLDEN_DIR="${PROJECT_SOURCE_DIR}/tests/fixtures/golden")
+target_compile_options(test_templates PRIVATE -Wall -Wextra)
+add_test(NAME templates COMMAND test_templates)
+
 # ponytail: no CPack/install yet -- add when packaging matters
 
 find_program(CLANG_TIDY clang-tidy)

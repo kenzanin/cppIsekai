@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>cppIsekai</title>
+  <script src="/static/tailwind.min.js"></script>
+  <script src="/static/htmx.min.js"></script>
+  <script defer src="/static/alpine.min.js"></script>
+</head>
+<body class="bg-zinc-950 text-zinc-100 min-h-screen">
+  <header class="flex items-center gap-1 border-b border-zinc-800 px-4 h-12">
+    <a href="/" class="px-3 py-1 rounded hover:bg-zinc-800/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 transition-colors ">Library</a>
+    <a href="/search" class="px-3 py-1 rounded hover:bg-zinc-800/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 transition-colors bg-zinc-800">Search</a>
+    <a href="/history" class="px-3 py-1 rounded hover:bg-zinc-800/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 transition-colors ">History</a>
+    <a href="/plugins" class="px-3 py-1 rounded hover:bg-zinc-800/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 transition-colors ">Plugins</a>
+    <a href="/settings" class="px-3 py-1 rounded hover:bg-zinc-800/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 transition-colors ">Settings</a>
+    <span class="flex-1"></span>
+    <a href="/logs" class="px-3 py-1 rounded hover:bg-zinc-800/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 transition-colors ">Logs</a>
+    <a href="/about" class="px-3 py-1 rounded hover:bg-zinc-800/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 transition-colors ">About</a>
+  </header>
+  <main class="p-4">
+<div x-data="searchPage" x-init="boot()">
+  <!-- plugin + query row -->
+  <div class="flex items-center gap-3 mb-4">
+    <select x-model="plugin" @change="pick()" class="bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-sm">
+      <option value="" disabled>select a plugin</option>
+      <template x-for="p in plugins" :key="p.key">
+        <option :value="p.key" x-text="p.name"></option>
+      </template>
+    </select>
+    <template x-if="plugin && !logoBroken">
+      <span class="w-6 h-6 rounded bg-zinc-800 flex items-center justify-center text-xs font-bold">
+        <img :src="'/plugin/'+plugin+'/logo'" class="w-6 h-6 rounded object-cover" @error="logoBroken=true" alt="">
+      </span>
+    </template>
+    <input x-model="q" @keydown.enter="search()"
+           placeholder="Search manga…" class="focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:border-transparent transition flex-1 bg-zinc-900 border border-zinc-700 rounded px-3 py-1.5">
+    <button @click="search()" :disabled="!plugin || loading"
+            class="px-4 py-1.5 text-sm bg-zinc-800 rounded hover:bg-zinc-700 disabled:opacity-40">Search</button>
+  </div>
+  <p class="text-xs text-yellow-500 mb-3" x-show="notice" x-text="notice" x-cloak></p>
+
+  <!-- genre chips -->
+  <div class="flex flex-wrap gap-1.5 mb-3" x-show="genres.length" x-cloak>
+    <template x-for="g in genres" :key="g">
+      <button @click="toggleTag(g)"
+              class="text-xs px-2 py-0.5 rounded-full border"
+              :class="tags.includes(g) ? 'bg-zinc-100 text-zinc-900 border-zinc-100' : 'bg-zinc-900 border-zinc-700 text-zinc-400'"
+              x-text="g"></button>
+    </template>
+  </div>
+
+  <!-- count + top pager -->
+  <div class="flex items-center gap-4 mb-2 text-sm text-zinc-400">
+    <span x-text="total===null ? '' : total+' results'"></span>
+    <span class="flex-1"></span>
+    <template x-if="pages()>1">
+      <nav class="flex gap-2 items-center">
+        <button @click="go(page-1)" :disabled="page<=1" class="px-2 py-0.5 rounded bg-zinc-800 disabled:opacity-30">‹</button>
+        <span x-text="page+' / '+pages()"></span>
+        <button @click="go(page+1)" :disabled="page>=pages()" class="px-2 py-0.5 rounded bg-zinc-800 disabled:opacity-30">›</button>
+      </nav>
+    </template>
+  </div>
+
+  <!-- error -->
+  <div class="text-sm text-red-400 mb-2" x-show="err" x-cloak>
+    <span x-text="err"></span>
+    <button @click="run()" class="underline ml-2">Retry</button>
+  </div>
+
+  <!-- skeleton -->
+  <div x-show="loading" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4" x-cloak>
+    <template x-for="i in 12" :key="'sk'+i">
+      <div>
+        <div class="aspect-[3/4] rounded bg-zinc-800 animate-pulse"></div>
+        <div class="h-3 mt-1 rounded bg-zinc-800 animate-pulse"></div>
+      </div>
+    </template>
+  </div>
+
+  <!-- grid -->
+  <div x-show="!loading && items.length" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4" x-cloak>
+    <template x-for="(it,idx) in items" :key="it.id">
+      <li class="list-none">
+        <a :href="'/view/manga/'+plugin+'/'+encodeURIComponent(it.id)" class="block group">
+          <div class="aspect-[3/4] rounded overflow-hidden"
+               :style="'background:hsl('+(idx*47%360)+' 40% 28%)'">
+            <img :src="'/cache/img?url='+encodeURIComponent(it.cover)+'&cover=1&plugin='+encodeURIComponent(plugin)" class="w-full h-full object-cover" loading="lazy"
+                 @error="$el.style.display='none'" alt="">
+          </div>
+          <p class="mt-1 text-sm truncate group-hover:text-white" x-text="it.name"></p>
+          <p class="text-xs text-zinc-500" x-text="it.status"></p>
+        </a>
+      </li>
+    </template>
+  </div>
+
+  <!-- empty -->
+  <div x-show="!loading && total===0" class="text-zinc-500 text-sm py-8 text-center" x-cloak>
+    No results for this search — try different keywords or fewer filters.
+  </div>
+
+  <!-- bottom pager -->
+  <div class="flex justify-center mt-4 mb-8" x-show="pages()>1" x-cloak>
+    <nav class="flex gap-2 items-center text-sm">
+      <button @click="go(page-1)" :disabled="page<=1" class="px-3 py-1 rounded bg-zinc-800 disabled:opacity-30">‹ Prev</button>
+      <span x-text="page+' / '+pages()"></span>
+      <button @click="go(page+1)" :disabled="page>=pages()" class="px-3 py-1 rounded bg-zinc-800 disabled:opacity-30">Next ›</button>
+    </nav>
+  </div>
+</div>
+<script>
+function searchPage() {
+  const PAGE = 12
+  return {
+    plugins: [], plugin: '', q: '', tags: [], genres: [],
+    items: [], total: null, page: 1, loading: false, err: '', notice: '',
+    logoBroken: false,
+    logoFor(k) { return k && !this.logoBroken },
+    async boot() {
+      const j = await (await fetch('/api/plugins')).json()
+      this.plugins = (j.plugins || []).filter(p => p.enabled && p.key)
+      const u = new URL(location)
+      this.plugin = u.searchParams.get('plugin') || ''
+      this.q = u.searchParams.get('q') || ''
+      this.page = parseInt(u.searchParams.get('page')) || 1
+      this.tags = (u.searchParams.get('tags') || '').split(',').filter(Boolean)
+      if (this.plugin) { await this.loadGenres(); await this.run(false) }
+      else if (!this.plugins.length) this.notice = 'No enabled plugin — aktifkan satu di halaman Plugins.'
+    },
+    async pick() { this.tags = []; this.items = []; this.total = null; this.page = 1; this.sync()
+      await this.loadGenres() },
+    async loadGenres() {
+      this.genres = []
+      if (!this.plugin) return
+      try {
+        const j = await (await fetch(`/plugin/${this.plugin}/genres`)).json()
+        if (j.ok) this.genres = j.data
+      } catch (e) { /* no row */ }
+    },
+    toggleTag(g) {
+      const i = this.tags.indexOf(g)
+      i >= 0 ? this.tags.splice(i, 1) : this.tags.push(g)
+      this.page = 1; this.run()
+    },
+    search() { this.page = 1; this.run() },
+    go(p) { if (p >= 1 && p <= this.pages()) { this.page = p; this.run() } },
+    pages() { return this.total === null ? 1 : Math.max(1, Math.ceil(this.total / PAGE)) },
+    async run(push = true) {
+      if (!this.plugin) return
+      this.loading = true; this.err = ''
+      const u = new URL(`/plugin/${this.plugin}/search`, location.origin)
+      u.searchParams.set('title', this.q); u.searchParams.set('page', this.page); u.searchParams.set('limit', PAGE)
+      if (this.tags.length) u.searchParams.set('tags', this.tags.join(','))
+      try {
+        const j = await (await fetch(u)).json()
+        if (!j.ok) { this.err = j.error || 'search failed' }
+        else { this.items = j.data.items; this.total = j.data.total }
+      } catch (e) { this.err = String(e) }
+      this.loading = false
+      if (push) this.sync()
+    },
+    sync() {
+      const u = new URL(location); u.search = ''
+      if (this.plugin) u.searchParams.set('plugin', this.plugin)
+      if (this.q) u.searchParams.set('q', this.q)
+      if (this.tags.length) u.searchParams.set('tags', this.tags.join(','))
+      if (this.page > 1) u.searchParams.set('page', this.page)
+      history.pushState({}, '', u)
+    },
+  }
+}
+window.addEventListener('popstate', () => location.reload())
+</script>
+  </main>
+  <div id="srv-status" style="display:none;position:fixed;top:0;left:0;right:0;z-index:50;text-align:center;font-size:12px;padding:6px 0;"></div>
+  <script>
+  (function () {
+    const el = document.getElementById('srv-status');
+    let down = false, wasDown = false;
+    async function probe() {
+      try {
+        const r = await fetch('/health', {cache: 'no-store'});
+        if (!r.ok) throw 0;
+        if (wasDown) { flash('Server back online', '#065f46'); wasDown = false; }
+        else el.style.display = 'none';
+        down = false;
+      } catch (e) {
+        down = true; wasDown = true;
+        el.textContent = 'Server offline — waiting for it to come back…';
+        el.style.background = '#7f1d1d'; el.style.color = '#fecaca'; el.style.display = 'block';
+      }
+    }
+    function flash(msg, bg) {
+      el.textContent = msg; el.style.background = bg; el.style.color = '#d1fae5'; el.style.display = 'block';
+      setTimeout(() => { el.style.display = 'none'; }, 4000);
+    }
+    window.__srvRestart = async function () {
+      wasDown = true;
+      try { await fetch('/admin/restart', {method: 'POST'}); } catch (e) { /* expected: connection drops */ }
+      el.textContent = 'Server restarting… waiting for it to come back';
+      el.style.background = '#78350f'; el.style.color = '#fde68a'; el.style.display = 'block';
+      const t = setInterval(async () => {
+        try {
+          const r = await fetch('/health', {cache: 'no-store'});
+          if (r.ok) { clearInterval(t); flash('Server back online', '#065f46'); wasDown = false; }
+        } catch (e) {}
+      }, 1000);
+    };
+    setInterval(probe, 5000);
+    probe();
+  })();
+  </script>
+</body>
+</html>
