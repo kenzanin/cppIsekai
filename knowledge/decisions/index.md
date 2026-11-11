@@ -19,3 +19,4 @@
 * [Settings restart button + per-chapter CBZ cache-full gate](restart-and-cbz-gate.md) - Restart-settings-button via fork watchdog + execv, and per-chapter CBZ gate on cache-full probe.
 * [curl-impersonate: chrome-family only; ini-fed profile dropdown; local-time crow log](curl-impersonate-chrome-only.md) - ff* is unsupported in-process (NSS vs BoringSSL fault in curl_multi_perform); chrome-family only, dynamic per request; settings profile dropdown fed from ini fetch_profiles; crow logs in local time.
 * [Static assets: vendored, precompressed brotli-only via explicit routes](static-assets-br.md) - Vendored JS ships as precomputed .br via explicit crow routes with year-immutable caching; CDN runtime and plain siblings dropped, brotli treated as universal.
+* [Golden-file render test for top-level templates](template-golden-test.md) - Top-level mustache pages are locked by golden-file render tests that catch broken partial includes and dropped context keys.

@@ -1,4 +1,5 @@
 ## 2026-11-11
+* **Creation**: Documented concept `decisions/template-golden-test.md` (Golden-file render test for top-level templates).
 * **Creation**: Documented concept `references/goisekai-plugin-examples.md` (goIsekai reference corpus: example plugins + HAR captures).
 * **Update**: Updated concept `architecture/detail-page.md`.
 
