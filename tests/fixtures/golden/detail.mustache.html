@@ -243,12 +243,12 @@
           <svg x-show="!ch.done" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M10 3C5 3 1.7 7 1 10c.7 3 4 7 9 7s8.3-4 9-7c-.7-3-4-7-9-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-2a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/></svg>
           <svg x-show="ch.done" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 20 20"><path d="M2 10c.7-3 4-7 8-7s7.3 4 8 7c-.7 3-4 7-8 7s-7.3-4-8-7Zm8 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" stroke-linecap="round"/><path d="M3 17 17 3" stroke-linecap="round"/></svg>
         </button>
-        <a :href="'/read/'+encodeURIComponent(plugin)+'/'+encodeURIComponent(slug)+'?ch='+(Number(ch.number) || ch.number)"
+        <a :href="'/read/'+encodeURIComponent(plugin)+'/'+encodeURIComponent(slug)+'?ch='+(Number(ch.number) || ch.number)+'&ch_id='+encodeURIComponent(ch.id)"
            class="text-sm font-medium w-20 shrink-0 hover:text-emerald-300" x-text="chLabel(ch)"></a>
-        <span class="text-xs text-zinc-500 flex-1 truncate" x-text="ch.title"></span>
-        <span class="text-xs text-zinc-500" x-text="fmtDate(ch.release_at)"></span>
+        <span class="text-xs text-zinc-300 flex-1 truncate" x-text="ch.title"></span>
+        <span class="text-xs text-zinc-300" x-text="fmtDate(ch.release_at)"></span>
         <!-- read/total counter; total when the plugin reports it -->
-        <span class="text-xs text-zinc-500 tabular-nums" x-show="readMax(ch) > 0" x-text="readMax(ch)+(ch.pages ? '/'+ch.pages : '')"></span>
+        <span class="text-xs text-zinc-300 tabular-nums" x-show="readMax(ch) > 0" x-text="readMax(ch)+(ch.pages ? '/'+ch.pages : '')"></span>
         <!-- check: read state, lit when fully read -->
         <button @click="toggleRead(ch)" class="shrink-0" :class="isRead(ch) ? 'text-emerald-400' : 'text-zinc-600 hover:text-zinc-400'"
                 :title="isRead(ch) ? 'unread' : 'mark read'">
