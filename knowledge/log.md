@@ -1,4 +1,7 @@
 ## 2026-11-12
+* **Update**: Updated concept `architecture/http-layer-gotchas.md`.
+* **Update**: Updated concept `architecture/per-manga-dim-blur.md`.
+* **Creation**: Documented concept `architecture/per-manga-dim-blur.md` (Per-manga dim+blur cover toggle).
 * **Update**: Updated concept `architecture/atsumaru-plugin.md`.
 * **Update**: Linked `architecture/library-dedup.md` to `architecture/library-grid-stats.md` (both land saved_manga columns and are synced from the same envelope envelope-derived sync pass).
 * **Update**: Linked `architecture/library-dedup.md` to `architecture/library-page.md` (dup_group/alt_titles fuel the duplicate chip, dup sort and cross-plugin dedup UX on library-page).
