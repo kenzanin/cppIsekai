@@ -10,6 +10,7 @@ function readerPage() {
     page: 1, mode: 'paged', dir: 'rtl', zoom: 'fit-h', zoomPct: 100, wheelAt: 0,
     navShown: false, done: false,
     seen: [], err: '', io: null, chaptersList: [],
+    _prefetch: new Map(), _reqToken: 0, _chaptersReady: null, t: null,
     spacer: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
     async boot() {
       const q = new URLSearchParams(location.search);
@@ -33,26 +34,70 @@ function readerPage() {
       if (q.get('dir')) this.dir = q.get('dir');
       if (q.get('page')) this.page = Number(q.get('page')) || 1;
       if (q.get('zoom')) this.applyZoomSeed(q.get('zoom'));
+      // chapter list is needed once for position-write id resolution; pages load per chapter
+      this._chaptersReady = fetch(`/api/chapters/${encodeURIComponent(this.plugin)}/${encodeURIComponent(this.slug)}`)
+        .then(r => r.json())
+        .then(c => { this.chaptersList = c.data || []; })
+        .catch(e => { this.err = String(e); });
+      window.addEventListener('popstate', () => this._onPop());
+      await this.loadChapter(this.ch, this.page, {push: false});
+    },
+    // fetch (or reuse prefetched) one chapter's pages and swap content in place; no document reload
+    async loadChapter(n, page, opts) {
+      const push = !opts || opts.push !== false;
+      // flush any pending position POST against the OLD chapter before ch/chId change
+      if (this.t) { clearTimeout(this.t); this.t = null; this.save(); }
+      const token = ++this._reqToken;
+      const cached = this._prefetch.get(n);
+      this._prefetch.delete(n);
+      let p;
       try {
-        const [p, c] = await Promise.all([
-          fetch(`/api/pages/${encodeURIComponent(this.plugin)}/${encodeURIComponent(this.slug)}/${this.ch}`).then(r => r.json()),
-          fetch(`/api/chapters/${encodeURIComponent(this.plugin)}/${encodeURIComponent(this.slug)}`).then(r => r.json()),
-        ]);
-        if (!Array.isArray(p.pages)) { this.err = p.error || 'load failed'; return; }
-        this.pages = p.pages;
-        this.prev_ch = p.prev_ch || 0;
-        this.next_ch = p.next_ch || 0;
-        // /api/pages exposes only the chapter number; the position store keys
-        // the plugin chapter id, so resolve it once for POST /reader/position.
-        this.chaptersList = c.data || [];
-        const hit = (c.data || []).find(x => Number(x.number) === this.ch);
-        this.chId = hit ? String(hit.id) : '';
-        this.io = new IntersectionObserver(
-            es => es.forEach(e => e.isIntersecting && this.mark(+e.target.dataset.vi)),
-            {rootMargin: '400px'});
-        this.observe();
-        this.preload();
-      } catch (e) { this.err = String(e); }
+        p = cached || await fetch(`/api/pages/${encodeURIComponent(this.plugin)}/${encodeURIComponent(this.slug)}/${n}`).then(r => r.json());
+      } catch (e) { this.err = String(e); return; }
+      await this._chaptersReady;
+      if (token !== this._reqToken) return; // stale response: a newer switch is in flight
+      if (!p || !Array.isArray(p.pages)) { this.err = (p && p.error) || 'load failed'; return; }
+      this.ch = n;
+      this.page = Math.max(1, Math.min(page || 1, p.pages.length));
+      this.pages = p.pages;
+      this.prev_ch = p.prev_ch || 0;
+      this.next_ch = p.next_ch || 0;
+      this.err = '';
+      this.done = false;
+      // /api/pages exposes only the chapter number; the position store keys
+      // the plugin chapter id, so resolve it once for POST /reader/position.
+      const hit = (this.chaptersList || []).find(x => Number(x.number) === n);
+      this.chId = hit ? String(hit.id) : '';
+      this.seen = [];
+      if (this.io) this.io.disconnect();
+      this.io = new IntersectionObserver(
+          es => es.forEach(e => e.isIntersecting && this.mark(+e.target.dataset.vi)),
+          {rootMargin: '400px'});
+      if (push) history.pushState({ch: n, page: this.page}, '', this.chUrl(n, this.page));
+      this.$nextTick(() => { this.observe(); this.preload(); this._resetScroll(); this._prefetchAdjacent(); });
+    },
+    _onPop() {
+      const q = new URLSearchParams(location.search);
+      const n = Number(q.get('ch'));
+      if (!Number.isFinite(n)) return;
+      const page = Number(q.get('page')) || 1;
+      if (n === this.ch) { this.goto_page(page); return; }
+      this.loadChapter(n, page, {push: false});
+    },
+    // prefetch the adjacent chapters' page lists (next first, then previous)
+    _prefetchAdjacent() {
+      const list = [this.next_ch, this.prev_ch].filter(Boolean);
+      for (const n of list) {
+        if (this._prefetch.has(n)) continue;
+        fetch(`/api/pages/${encodeURIComponent(this.plugin)}/${encodeURIComponent(this.slug)}/${n}`)
+          .then(r => r.json())
+          .then(p => {
+            if (!Array.isArray(p.pages)) return;
+            this._prefetch.set(n, p);
+            for (const k of [...this._prefetch.keys()]) if (Math.abs(k - this.ch) > 1) this._prefetch.delete(k);
+          })
+          .catch(() => {});
+      }
     },
     // --- layout: one screen = one view; page is the view's first page number
     get pairing() { return this.mode === 'spread-h' || this.mode === 'spread-v'; },
@@ -91,13 +136,16 @@ function readerPage() {
       const i = this.cur() + d;
       if (i < 0) {
         if (this.prev_ch) {
+          // land on the LAST page of the previous chapter; prefetched list tells us the count
+          const cached = this._prefetch.get(this.prev_ch);
           const prev = this.chaptersList.find(c => Number(c.number) === Number(this.prev_ch));
-          window.location = this.chUrl(this.prev_ch, prev && prev.pages ? prev.pages : 1);
+          const last = (cached && cached.pages.length) || (prev && prev.pages) || 1;
+          this.loadChapter(this.prev_ch, last);
         }
         return;
       }
       if (i >= this.views.length) {
-        if (this.next_ch) { window.location = this.chUrl(this.next_ch, 1); }
+        if (this.next_ch) { this.loadChapter(this.next_ch, 1); }
         else { this.done = true; }
         return;
       }
@@ -116,7 +164,7 @@ function readerPage() {
         if (el) el.scrollIntoView();
       });
     },
-    gotoChapter(n) { window.location = this.chUrl(Number(n)); },
+    gotoChapter(n) { this.loadChapter(Number(n), 1); },
     wheel(e) {
       const shell = this.$root.querySelector('[data-shell]');
       if (shell && shell.scrollHeight > shell.clientHeight + 2) {
