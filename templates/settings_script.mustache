@@ -2,7 +2,7 @@
 function settingsPage() {
   const RESTART = new Set(['server.port', 'paths.library', 'paths.log_file', 'paths.data_dir', 'paths.templates_dir',
                            'cache.cache_max_mb', 'cache.image_format', 'cache.cover_max_px', 'log.level']);
-  const LIVE = new Set(['plugin.fetch_profile']);
+  const LIVE = new Set(['plugin.fetch_profile', 'update.interval_days', 'update.per_plugin_limit', 'update.request_delay_ms']);
   // fetch_profile options come from the ini ([plugin] fetch_profiles), surfaced as
   // j.fetch_profiles; fall back to ENUMS if the server didn't send any.
   const ENUMS = { 'cache.image_format': ['webp', 'avif', 'jxl', 'none'],

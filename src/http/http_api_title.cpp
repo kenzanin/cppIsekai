@@ -87,49 +87,26 @@ void register_title(Ctx& c) {
     CROW_ROUTE(app, "/api/refresh/<string>/<string>")
         .methods(crow::HTTPMethod::POST)(
             [&](const crow::request& /*req*/, std::string plugin, std::string slug) -> crow::response {
-                if (!valid_title_pair(plugin, slug)) {
-                    return crow::response{404, R"({"ok":false,"error":"unknown title"})"};
-                }
-                const bool enabled = on_pool(db, [&] { return store.plugin_enabled(plugin); });
-                if (!enabled) {
-                    crow::response r{R"({"ok":false,"error":"plugin disabled"})"};
+                const RefreshOutcome rr = refresh_title(store, db, plugin_pool, plugins, plugin, slug);
+                auto json = [&](int code, const std::string& body) {
+                    crow::response r{code, body};
                     r.set_header("Content-Type", "application/json");
                     return r;
+                };
+                switch (rr.result) {
+                    case RefreshResult::kRejected:
+                        return crow::response{404, R"({"ok":false,"error":"unknown title"})"};
+                    case RefreshResult::kDisabled:
+                        return json(200, R"({"ok":false,"error":"plugin disabled"})");
+                    case RefreshResult::kUpstreamFailed: {
+                        const std::string body =
+                            std::string("{\"ok\":false,\"error\":\"refresh failed: ") + rr.failed_method + "\"}";
+                        return json(502, body); // upstream plugin call failed, not the route
+                    }
+                    case RefreshResult::kOk:
+                        return json(200, R"({"ok":true})");
                 }
-                return crow::response{on_pool(plugin_pool, [&] {
-                    crow::json::wvalue p;
-                    p["id"] = slug;
-                    const std::string params = p.dump();
-                    std::string fresh[2];
-                    const char* methods[2] = {"detail", "chapters"};
-                    for (int i = 0; i < 2; ++i) {
-                        fresh[i] = plugins.call(plugin, methods[i], params);
-                        glz::generic env;
-                        if (glz::read_json(env, fresh[i]) || !envelope_ok(env)) {
-                            const std::string body =
-                                std::string("{\"ok\":false,\"error\":\"refresh failed: ") + methods[i] + "\"}";
-                            crow::response r{502, body}; // upstream plugin call failed, not the route
-                            r.set_header("Content-Type", "application/json");
-                            return r; // cache untouched: nothing stored yet
-                        }
-                    }
-                    for (int i = 0; i < 2; ++i) {
-                        const std::string key = stale_key(plugin, methods[i], params);
-                        // Same key shape call_cached persists under; write-through here
-                        // keeps refresh and lazy cache consistent. db worker (store is not
-                        // thread-safe) — plugin_pool hands back to on_pool(db).
-                        const std::string body = fresh[i];
-                        on_pool(db, [&] {
-                            store.api_cache_put(plugin, key, params, body,
-                                                static_cast<std::int64_t>(std::time(nullptr)), kApiCacheTtl);
-                            return 0;
-                        });
-                    }
-                    sync_saved_stats(store, db, plugin, slug, fresh[0], fresh[1]);
-                    crow::response r{R"({"ok":true})"};
-                    r.set_header("Content-Type", "application/json");
-                    return r;
-                })};
+                return json(500, R"({"ok":false,"error":"refresh failed"})");
             });
 }
 

@@ -17,6 +17,7 @@
 #include "reader/window.hpp"
 
 #include <cstdlib>
+#include <ctime>
 #include <string>
 #include <vector>
 
@@ -183,4 +184,87 @@ inline void sync_saved_stats(Store& store, BS::thread_pool<>& db, const std::str
         store.saved_read_rollup(plugin, slug, completed, 0);
         return 0;
     });
+}
+
+/** \brief Shared refresh body for the detail-page button and the auto-update
+ *  scheduler (auto-update 3.1). Calls the plugin methods (detail+chapters by
+ *  default), writes envelopes through the cache, and stamps the
+ *  `update_attempts` tracker. Http-aware: the route maps the result enum to
+ *  status codes; the scheduler uses the enum directly. */
+inline std::string refresh_error_text(const std::string& method, const std::string& envelope) {
+    // Prefer the plugin's own error string; fall back to the method name.
+    glz::generic env;
+    if (!glz::read_json(env, envelope) || !env.is_object())
+        return "refresh failed: " + method;
+    const auto it = env.get_object().find("error");
+    if (it != env.get_object().end())
+        if (const auto* s = std::get_if<std::string>(&it->second.data))
+            if (!s->empty())
+                return *s;
+    return "refresh failed: " + method;
+}
+
+enum class RefreshResult { kOk, kRejected, kDisabled, kUpstreamFailed };
+
+struct RefreshOutcome {
+    RefreshResult result = RefreshResult::kOk;
+    std::string failed_method; // set when result == kUpstreamFailed
+    std::string envelope;      // the failing envelope (for error text), else last chapters body
+};
+
+/** \brief `chapters_only`: skip the detail call (auto-update runs cheap
+ *  freshness checks). The detail-page path passes false and refreshes both. */
+inline RefreshOutcome refresh_title(Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool,
+                                     plugin::Host& plugins, const std::string& plugin, const std::string& slug,
+                                     bool chapters_only = false) {
+    RefreshOutcome out;
+    if (!http::api::valid_title_pair(plugin, slug)) {
+        out.result = RefreshResult::kRejected; // not an attempt: nothing upstream was hit
+        return out;
+    }
+    const bool enabled = http::on_pool(db, [&] { return store.plugin_enabled(plugin); });
+    if (!enabled) {
+        out.result = RefreshResult::kDisabled; // not an attempt either
+        return out;
+    }
+    crow::json::wvalue p;
+    p["id"] = slug;
+    const std::string params = p.dump();
+    const std::vector<const char*> methods = chapters_only ? std::vector<const char*>{"chapters"}
+                                                          : std::vector<const char*>{"detail", "chapters"};
+    std::string fresh[2];
+    for (std::size_t i = 0; i < methods.size(); ++i) {
+        fresh[i] = http::on_pool(plugin_pool, [&] { return plugins.call(plugin, methods[i], params); });
+        glz::generic env;
+        if (glz::read_json(env, fresh[i]) || !envelope_ok(env)) {
+            out.result = RefreshResult::kUpstreamFailed;
+            out.failed_method = methods[i];
+            out.envelope = fresh[i];
+            const std::string err = refresh_error_text(methods[i], fresh[i]);
+            http::on_pool(db, [&] { // 3.2: stamp the failure so backoff/rotation sees it
+                store.upsert_update_attempt(plugin, slug, "error", err);
+                return 0;
+            });
+            return out;
+        }
+    }
+    for (std::size_t i = 0; i < methods.size(); ++i) {
+        const std::string key = stale_key(plugin, methods[i], params);
+        const std::string body = fresh[i];
+        http::on_pool(db, [&] {
+            store.api_cache_put(plugin, key, params, body, static_cast<std::int64_t>(std::time(nullptr)),
+                                kApiCacheTtl);
+            return 0;
+        });
+    }
+    const std::string detail_env = chapters_only ? std::string{} : fresh[0];
+    const std::string chapters_env = chapters_only ? fresh[0] : fresh[1];
+    sync_saved_stats(store, db, plugin, slug, detail_env, chapters_env);
+    http::on_pool(db, [&] { // 3.2: stamp success (resets backoff)
+        store.upsert_update_attempt(plugin, slug, "ok", "");
+        return 0;
+    });
+    out.result = RefreshResult::kOk;
+    out.envelope = chapters_env;
+    return out;
 }

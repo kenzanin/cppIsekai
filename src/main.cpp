@@ -3,6 +3,7 @@
 #include "log/log.hpp"
 #include "plugin/plugin.hpp"
 #include "store/store.hpp"
+#include "update/scheduler.hpp"
 
 #include <CLI/CLI.hpp> // system 2.7.2: flag parsing
 #include <BS_thread_pool.hpp>
@@ -109,7 +110,12 @@ int main(int argc, char** argv) {
     ccfg.cover_max_px = cfg.cover_max_px;
     cache::Cache images{ccfg, makeCurlFetcher(cfg.proxy)};
 
+    // auto-update scheduler: started after pools/store are up, joined before drain
+    update::Scheduler scheduler{store, db_pool, plugin_pool, plugins, ini_path, overrides};
+    scheduler.start();
+
     spdlog::info("cppIsekai listening on :{} (config: {})", cfg.port, ini_path);
     serve(store, db_pool, plugin_pool, plugins, logs, images, cfg.port, ini_path, overrides, cfg.templates_dir);
+    scheduler.stop();
     running.store(false);
 }

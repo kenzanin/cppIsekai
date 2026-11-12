@@ -39,6 +39,9 @@ struct Config {
     std::string log_level;      // [log] level: trace|debug|info|warning|error
     std::string templates_dir;  // [paths] templates_dir: mustache template root
     std::string enrichment_dir; // [paths] enrichment_dir: metadata-only enrichment plugins (NOT scraper plugins)
+    int update_interval_days{};      // [update] interval_days: days between auto-update runs
+    int update_per_plugin_limit{};   // [update] per_plugin_limit: max chapter-list refreshes per plugin per run
+    int update_request_delay_ms{};   // [update] request_delay_ms: pause between auto-update requests
 };
 
 // Per-knob CLI state. Explicit = opt->count() > 0 (D7), never value comparison;
@@ -94,6 +97,15 @@ inline Config to_config(const std::array<std::string, kEntryCount>& v) {
     c.templates_dir = v[12];
     c.enrichment_dir = v[13];
     c.log_level = v[14];
+    c.update_interval_days = num_or<int>(v[15], kEntries[15].def);
+    if (c.update_interval_days < 1)
+        c.update_interval_days = num_or<int>(kEntries[15].def, kEntries[15].def); // min 1 (task 1.2)
+    c.update_per_plugin_limit = num_or<int>(v[16], kEntries[16].def);
+    if (c.update_per_plugin_limit < 1)
+        c.update_per_plugin_limit = num_or<int>(kEntries[16].def, kEntries[16].def); // min 1
+    c.update_request_delay_ms = num_or<int>(v[17], kEntries[17].def);
+    if (c.update_request_delay_ms < 0)
+        c.update_request_delay_ms = num_or<int>(kEntries[17].def, kEntries[17].def); // min 0
     if (c.port <= 0) {
         c.port = num_or<int>(kEntries[0].def, kEntries[0].def); // design ceiling: port > 0
     }
@@ -283,14 +295,17 @@ inline int save(const std::map<std::string, std::string>& updates, const std::st
         if (e == nullptr)
             return reject("unknown config key: " + full, -1);
         if (e->type != Type::Str) {
+            long long parsed = 0;
             try {
                 std::size_t used = 0;
-                std::stoll(value, &used);
+                parsed = std::stoll(value, &used);
                 if (used != value.size())
                     return reject("value of " + full + " is not an integer", -1);
             } catch (...) { // empty / non-numeric: same 400-class reject
                 return reject("value of " + full + " is not an integer", -1);
             }
+            if (parsed < e->min_value)
+                return reject("value of " + full + " is below the minimum of " + std::to_string(e->min_value), -1);
         }
         plan.push_back({e, &value});
     }

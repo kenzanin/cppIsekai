@@ -71,6 +71,18 @@ struct ReaderPosition {
     std::int64_t updated_at{}; // unix seconds; stamped by the store on write
 };
 
+/** Auto-update attempt record: one row per (plugin, slug), written by both
+ *  the scheduler and the manual refresh path. */
+struct UpdateAttempt {
+    std::string plugin;
+    std::string slug;
+    std::int64_t last_attempt_at{}; // unix seconds
+    std::string outcome;            // ok|error|skipped
+    std::string error;              // short error text; '' on success
+    int consecutive_errors{};
+    std::int64_t backoff_until{};   // 0 = not backed off
+};
+
 struct StoreImpl;
 
 class Store {
@@ -91,6 +103,18 @@ public:
     bool plugin_enabled(const std::string& plugin_id);
     int count(const std::string& plugin, const std::string& query);
     std::vector<Title> search(const std::string& plugin, const std::string& query, int limit, int offset);
+
+    /** \brief Upsert one update_attempts row. Success (outcome=ok) resets
+     *  consecutive_errors/backoff_until; errors increment the counter and set
+     *  backoff_until = now + min(2^n, 72)h. */
+    void upsert_update_attempt(const std::string& plugin, const std::string& slug, const std::string& outcome,
+                               const std::string& error);
+    /** \brief Auto-update batch pick: saved_manga read_ch <= 1, not backed
+     *  off, per_plugin_limit rows per plugin (never-attempted first, then
+     *  oldest last_attempt_at). */
+    std::vector<UpdateAttempt> update_candidates(std::int64_t now, int per_plugin_limit);
+    /** \brief Single attempt row; nullopt when never attempted. */
+    std::optional<UpdateAttempt> update_attempt_get(const std::string& plugin, const std::string& slug);
 
     /** \brief Per-plugin key-value state (tokens etc.); survives restart.
      *  nullopt when absent. */

@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <string>
 #include <thread>
+#include <ctime>
 
 #include "store/store.hpp"
 
@@ -453,4 +454,82 @@ TEST_CASE("Store: title_meta round-trip and corrupt-row tolerance (enrichment 2.
     sqlite3_finalize(st);
     sqlite3_close(db);
     CHECK_FALSE(store.title_meta_get(plugin, slug).has_value());
+}
+
+TEST_CASE("Store: update_attempts upsert/backoff/reset (auto-update 2.2)") {
+    TestStoreDb fixture;
+    Store store(fixture.path);
+
+    auto save = [&](const std::string& plugin, const std::string& slug, int read_ch) {
+        SavedManga m;
+        m.plugin = plugin; m.slug = slug; m.name = slug; m.cover = ""; m.read_ch = read_ch;
+        store.save_manga(m);
+    };
+    save("Asura", "m1", 0);
+
+    SUBCASE("first error: consecutive_errors=1, backoff ~now+2h") {
+        store.upsert_update_attempt("Asura", "m1", "error", "boom");
+        auto a = store.update_attempt_get("Asura", "m1");
+        REQUIRE(a.has_value());
+        CHECK(a->consecutive_errors == 1);
+        CHECK(a->outcome == "error");
+        CHECK(a->error == "boom");
+        CHECK(a->backoff_until > 0);
+    }
+    SUBCASE("success resets counter and backoff") {
+        store.upsert_update_attempt("Asura", "m1", "error", "boom");
+        store.upsert_update_attempt("Asura", "m1", "error", "boom");
+        store.upsert_update_attempt("Asura", "m1", "ok", "");
+        auto a = store.update_attempt_get("Asura", "m1");
+        REQUIRE(a.has_value());
+        CHECK(a->consecutive_errors == 0);
+        CHECK(a->backoff_until == 0);
+        CHECK(a->outcome == "ok");
+    }
+    SUBCASE("not attempted -> nullopt") {
+        CHECK_FALSE(store.update_attempt_get("Asura", "never").has_value());
+    }
+}
+
+TEST_CASE("Store: update_candidates per-plugin cap, ordering, backoff exclusion (auto-update 2.2)") {
+    TestStoreDb fixture;
+    Store store(fixture.path);
+    auto now = static_cast<std::int64_t>(std::time(nullptr));
+
+    auto save = [&](const std::string& plugin, const std::string& slug, int read_ch) {
+        SavedManga m;
+        m.plugin = plugin; m.slug = slug; m.name = slug; m.cover = ""; m.read_ch = read_ch;
+        store.save_manga(m);
+    };
+    for (int i = 0; i < 30; ++i) save("Asura", "a" + std::to_string(i), i % 2); // all <=1
+    for (int i = 0; i < 30; ++i) save("Flame", "f" + std::to_string(i), 0);
+    save("Flame", "f_wellread", 5); // excluded
+
+    SUBCASE("cap 10 per plugin: 2 plugins -> 20, well-read excluded") {
+        auto c = store.update_candidates(now, 10);
+        int asura = 0, flame = 0;
+        for (const auto& a : c) {
+            if (a.plugin == "Asura") ++asura;
+            if (a.plugin == "Flame") ++flame;
+            CHECK(a.slug != "f_wellread");
+        }
+        CHECK(asura == 10);
+        CHECK(flame == 10);
+    }
+    SUBCASE("never-attempted first; oldest last_attempt_at next") {
+        // stamp attempts on two Asura titles
+        store.upsert_update_attempt("Asura", "a0", "ok", "");
+        store.upsert_update_attempt("Asura", "a1", "ok", "");
+        auto c = store.update_candidates(now + 100000, 2); // far future: all not backed off
+        int asura_seen = 0;
+        for (const auto& a : c)
+            if (a.plugin == "Asura") { ++asura_seen; CHECK(a.slug != "a0"); CHECK(a.slug != "a1"); }
+        CHECK(asura_seen == 2);
+    }
+    SUBCASE("backed-off title excluded") {
+        store.upsert_update_attempt("Asura", "a0", "error", "boom"); // backoff_until = now + 2h
+        auto c = store.update_candidates(now, 30);
+        for (const auto& a : c)
+            CHECK(a.slug != "a0");
+    }
 }

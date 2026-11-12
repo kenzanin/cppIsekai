@@ -68,6 +68,16 @@ struct TitleMetaEntity {
     std::int64_t fetched_at{}; // last fetch watermark (unix seconds)
 };
 
+struct UpdateAttemptsEntity {
+    std::string plugin; // composite PK with slug: one row per manga
+    std::string slug;
+    std::int64_t last_attempt_at{}; // unix seconds
+    std::string outcome;            // ok|error|skipped
+    std::string error;              // short plugin/host error text; '' on success
+    int consecutive_errors{};       // backoff curve input
+    std::int64_t backoff_until{};   // 0 = no backoff
+};
+
 struct ApiCacheEntity {
     std::string plugin_id; // composite PK with query_hash
     std::string query_hash;
@@ -120,6 +130,14 @@ inline auto create_storage(const std::string& path) {
                    make_column("chosen", &TitleMetaEntity::chosen),
                    make_column("fetched_at", &TitleMetaEntity::fetched_at),
                    primary_key(&TitleMetaEntity::plugin, &TitleMetaEntity::slug)),
+        make_table("update_attempts", make_column("plugin", &UpdateAttemptsEntity::plugin),
+                   make_column("slug", &UpdateAttemptsEntity::slug),
+                   make_column("last_attempt_at", &UpdateAttemptsEntity::last_attempt_at, default_value(0)),
+                   make_column("outcome", &UpdateAttemptsEntity::outcome, default_value("")),
+                   make_column("error", &UpdateAttemptsEntity::error, default_value("")),
+                   make_column("consecutive_errors", &UpdateAttemptsEntity::consecutive_errors, default_value(0)),
+                   make_column("backoff_until", &UpdateAttemptsEntity::backoff_until, default_value(0)),
+                   primary_key(&UpdateAttemptsEntity::plugin, &UpdateAttemptsEntity::slug)),
         make_table("api_cache", make_column("plugin_id", &ApiCacheEntity::plugin_id),
                    make_column("query_hash", &ApiCacheEntity::query_hash),
                    make_column("params_json", &ApiCacheEntity::params_json),

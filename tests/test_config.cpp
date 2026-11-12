@@ -93,6 +93,27 @@ TEST_CASE("config: layered resolve default < ini < env < flag") {
         CHECK(resolve(parse_args({"--server-port", "7777"}), "no-such-cfg.ini", fake_env({})).port == 7777);
     }
 
+    SUBCASE("update knobs: defaults, bounds and round-trip") {
+        Config d = resolve(none, "no-such-cfg.ini", fake_env({}));
+        CHECK(d.update_interval_days == 1);
+        CHECK(d.update_per_plugin_limit == 10);
+        CHECK(d.update_request_delay_ms == 1000);
+        auto ini = tmp_ini("[update]\ninterval_days = 2\nper_plugin_limit = 5\nrequest_delay_ms = 0\n");
+        Config a = resolve(none, ini, fake_env({}));
+        CHECK(a.update_interval_days == 2);
+        CHECK(a.update_per_plugin_limit == 5);
+        CHECK(a.update_request_delay_ms == 0);
+        auto bad = tmp_ini("[update]\ninterval_days = 0\nper_plugin_limit = 0\nrequest_delay_ms = -1\n");
+        Config b = resolve(none, bad, fake_env({})); // boot: out-of-bounds falls back, never applied
+        CHECK(b.update_interval_days == 1);
+        CHECK(b.update_per_plugin_limit == 10);
+        CHECK(b.update_request_delay_ms == 1000);
+        CHECK(resolve(none, "no-such-cfg.ini", fake_env({{"CPPISEKAI_UPDATE_INTERVAL_DAYS", "3"},
+                                                         {"CPPISEKAI_UPDATE_PER_PLUGIN_LIMIT", "7"},
+                                                         {"CPPISEKAI_UPDATE_REQUEST_DELAY_MS", "2500"}}))
+                  .update_request_delay_ms == 2500);
+    }
+
     SUBCASE("port <= 0 falls back to default (validation ceiling)") {
         auto ini = tmp_ini("[server]\nport = 0\n");
         CHECK(resolve(none, ini, fake_env({})).port == 8090);
@@ -146,7 +167,7 @@ TEST_CASE("config: dump projects registry as commented ini template (D4)") {
         CHECK(row[key][1] == "; " + std::string(e.doc));
         CHECK(row[key][2] == key + " = " + std::string(e.def));
     }
-    CHECK(headers == 5); // one header per group: server plugin cache paths log
+    CHECK(headers == 6); // one header per group: server plugin cache paths log update
 
     // And the template is honest ini: SimpleIni reads every default back.
     CSimpleIniA ini;
@@ -258,6 +279,18 @@ TEST_CASE("config: save merges comment-safe (D5)") {
         const auto before = read(path);
         CHECK(save({{"paths.data_dir", "d"}, {"made.up", "1"}}, path, &err) == -1);
         CHECK(read(path) == before);
+    }
+
+    SUBCASE("out-of-bounds numeric rejected, file untouched") {
+        const auto path = tmp_ini("[update]\ninterval_days = 1\n");
+        const auto before = read(path);
+        CHECK(save({{"update.interval_days", "0"}}, path, &err) == -1);
+        CHECK(err == "value of update.interval_days is below the minimum of 1");
+        CHECK(save({{"update.per_plugin_limit", "0"}}, path, &err) == -1);
+        CHECK(save({{"update.request_delay_ms", "-1"}}, path, &err) == -1);
+        CHECK(save({{"update.interval_days", "2"}, {"update.per_plugin_limit", "5"}, {"update.request_delay_ms", "2500"}}, path, &err) == 3);
+        CHECK(save({{"update.request_delay_ms", "0"}}, path, &err) == 1);
+        CHECK(read(path).find("interval_days = 2") != std::string::npos);
     }
 
     SUBCASE("missing file: created from the dump template, resolve() reads it back") {

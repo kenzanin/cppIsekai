@@ -21,10 +21,11 @@ struct Entry {
     const char* def;
     const char* doc;
     Type type;
+    long long min_value = 0; // lower bound for numeric knobs; 0 = no bound (docs/tests rely on designated initializers)
 };
 
 // Order is the projection order consumed by config.hpp -- do not reorder.
-inline constexpr std::array<Entry, 15> kEntries{
+inline constexpr std::array<Entry, 18> kEntries{
     {
         // section      key                   flag                 alias          env def doc
         // type
@@ -148,6 +149,32 @@ inline constexpr std::array<Entry, 15> kEntries{
          .def = "info",
          .doc = "Log level (trace|debug|info|warning|error)",
          .type = Type::Str},
+        {.section = "update",
+         .key = "interval_days",
+         .flag = "update-interval-days",
+         .alias = "",
+         .env = "CPPISEKAI_UPDATE_INTERVAL_DAYS",
+         .def = "1",
+         .doc = "Auto-update: days between library chapter-list refresh runs (min 1)",
+         .type = Type::Int,
+         .min_value = 1},
+        {.section = "update",
+         .key = "per_plugin_limit",
+         .flag = "update-per-plugin-limit",
+         .alias = "",
+         .env = "CPPISEKAI_UPDATE_PER_PLUGIN_LIMIT",
+         .def = "10",
+         .doc = "Max chapter-list refreshes per plugin per auto-update run (min 1)",
+         .type = Type::Int,
+         .min_value = 1},
+        {.section = "update",
+         .key = "request_delay_ms",
+         .flag = "update-request-delay-ms",
+         .alias = "",
+         .env = "CPPISEKAI_UPDATE_REQUEST_DELAY_MS",
+         .def = "1000",
+         .doc = "Delay between auto-update chapter-list requests (ms, 0 = no delay)",
+         .type = Type::Int},
     },
 };
 
