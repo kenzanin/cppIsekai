@@ -108,7 +108,7 @@
               if (this.filters.includes('dup') && !((+c.dataset.dup || 0) > 0)) return false;
               if (this.filters.includes('new') && !((+c.dataset.update || 0) > 0)) return false;
               if (this.filters.includes('done') && !((+c.dataset.total || 0) > 0 && (+c.dataset.read || 0) >= (+c.dataset.total || 0))) return false;
-              if (this.filters.includes('complete') && c.dataset.status !== 'complete') return false;
+              if (this.filters.includes('complete') && (c.dataset.status || '').toLowerCase() !== 'completed') return false;
               return true;
             },
             apply() {
@@ -166,10 +166,12 @@
                        onerror="this.style.display='none';this.parentNode.querySelector('[data-fallback]').style.display='flex'">
                 <div class="aspect-[2/3] w-full rounded-lg flex items-center justify-center text-center text-2xl text-zinc-400 bg-zinc-800" data-fallback
                      style="display:none;">One Piece</div>
-                <span x-show="(+$el.closest('li').dataset.update) > 0" class="absolute left-2 top-2 rounded bg-red-600 px-3 py-1 text-[20px] font-semibold uppercase tracking-wide text-white">New</span>
-                <span x-show="!((+$el.closest('li').dataset.update) > 0) && (+$el.closest('li').dataset.total || 0) > 0 && (+$el.closest('li').dataset.read || 0) >= (+$el.closest('li').dataset.total || 0)" class="absolute left-2 top-2 rounded bg-emerald-600 px-3 py-1 text-[20px] font-semibold uppercase tracking-wide text-white">Done</span>
-                <span x-show="$el.closest('li').dataset.status" class="absolute left-2 top-[52px] rounded bg-zinc-900/85 px-3 py-1 text-[20px] font-medium uppercase tracking-wide text-zinc-300" x-text="$el.closest('li').dataset.status"></span>
-                <button class="absolute left-2 bottom-2 rounded bg-black/70 px-3 py-1 text-[20px] text-zinc-200 hover:bg-black/85 flex items-center gap-2" @click.prevent="setPlugin('mangadex')"><img src="/plugin/mangadex/logo" alt="" class="w-7 h-7 rounded-sm" onerror="this.style.display='none'">mangadex</button>
+                <div class="absolute left-2 top-2 flex items-center gap-1">
+                  <span x-show="(+$el.closest('li').dataset.update) > 0" class="rounded bg-red-600/70 px-2 py-0.5 text-[12px] font-semibold uppercase tracking-wide text-white">New</span>
+                  <span x-show="!((+$el.closest('li').dataset.update) > 0) && (+$el.closest('li').dataset.total || 0) > 0 && (+$el.closest('li').dataset.read || 0) >= (+$el.closest('li').dataset.total || 0)" class="rounded bg-emerald-600/70 px-2 py-0.5 text-[12px] font-semibold uppercase tracking-wide text-white">Done</span>
+                  <span x-show="$el.closest('li').dataset.status" class="rounded bg-black/40 px-2 py-0.5 text-[12px] font-medium uppercase tracking-wide text-zinc-100" x-text="$el.closest('li').dataset.status"></span>
+                </div>
+                <button class="absolute left-2 bottom-2 rounded bg-black/40 px-2 py-0.5 text-[12px] text-zinc-100 hover:bg-black/60 flex items-center gap-1.5" @click.prevent="setPlugin('mangadex')"><img src="/plugin/mangadex/logo" alt="" class="w-5 h-5 rounded-sm" onerror="this.style.display='none'">mangadex</button>
               </div>
               <p class="mt-1 text-sm truncate text-zinc-300 group-hover:text-zinc-100 transition-colors">One Piece</p>
               <p class="text-xs text-zinc-500" x-show="(+$el.closest('li').dataset.total || 0) > 0"><span x-text="$el.closest('li').dataset.read"></span> / <span x-text="$el.closest('li').dataset.total"></span> read</p>
@@ -183,10 +185,12 @@
                        onerror="this.style.display='none';this.parentNode.querySelector('[data-fallback]').style.display='flex'">
                 <div class="aspect-[2/3] w-full rounded-lg flex items-center justify-center text-center text-2xl text-zinc-400 bg-zinc-800" data-fallback
                      style="display:none;">No Cover</div>
-                <span x-show="(+$el.closest('li').dataset.update) > 0" class="absolute left-2 top-2 rounded bg-red-600 px-3 py-1 text-[20px] font-semibold uppercase tracking-wide text-white">New</span>
-                <span x-show="!((+$el.closest('li').dataset.update) > 0) && (+$el.closest('li').dataset.total || 0) > 0 && (+$el.closest('li').dataset.read || 0) >= (+$el.closest('li').dataset.total || 0)" class="absolute left-2 top-2 rounded bg-emerald-600 px-3 py-1 text-[20px] font-semibold uppercase tracking-wide text-white">Done</span>
-                <span x-show="$el.closest('li').dataset.status" class="absolute left-2 top-[52px] rounded bg-zinc-900/85 px-3 py-1 text-[20px] font-medium uppercase tracking-wide text-zinc-300" x-text="$el.closest('li').dataset.status"></span>
-                <button class="absolute left-2 bottom-2 rounded bg-black/70 px-3 py-1 text-[20px] text-zinc-200 hover:bg-black/85 flex items-center gap-2" @click.prevent="setPlugin('baka')"><img src="/plugin/baka/logo" alt="" class="w-7 h-7 rounded-sm" onerror="this.style.display='none'">baka</button>
+                <div class="absolute left-2 top-2 flex items-center gap-1">
+                  <span x-show="(+$el.closest('li').dataset.update) > 0" class="rounded bg-red-600/70 px-2 py-0.5 text-[12px] font-semibold uppercase tracking-wide text-white">New</span>
+                  <span x-show="!((+$el.closest('li').dataset.update) > 0) && (+$el.closest('li').dataset.total || 0) > 0 && (+$el.closest('li').dataset.read || 0) >= (+$el.closest('li').dataset.total || 0)" class="rounded bg-emerald-600/70 px-2 py-0.5 text-[12px] font-semibold uppercase tracking-wide text-white">Done</span>
+                  <span x-show="$el.closest('li').dataset.status" class="rounded bg-black/40 px-2 py-0.5 text-[12px] font-medium uppercase tracking-wide text-zinc-100" x-text="$el.closest('li').dataset.status"></span>
+                </div>
+                <button class="absolute left-2 bottom-2 rounded bg-black/40 px-2 py-0.5 text-[12px] text-zinc-100 hover:bg-black/60 flex items-center gap-1.5" @click.prevent="setPlugin('baka')"><img src="/plugin/baka/logo" alt="" class="w-5 h-5 rounded-sm" onerror="this.style.display='none'">baka</button>
               </div>
               <p class="mt-1 text-sm truncate text-zinc-300 group-hover:text-zinc-100 transition-colors">No Cover</p>
               <p class="text-xs text-zinc-500" x-show="(+$el.closest('li').dataset.total || 0) > 0"><span x-text="$el.closest('li').dataset.read"></span> / <span x-text="$el.closest('li').dataset.total"></span> read</p>
