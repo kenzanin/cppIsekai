@@ -1,9 +1,9 @@
 ---
 type: Decision
 title: xmake build system alongside cmake + prod-code gate tasks
-description: "xmake is the primary build path (cmake kept, ./build rebuilt by xmake). New flow: xmake build → xmake test → xmake gate (format/fix/build/test, prod src only). Includes daily commands + 8 gotchas. Committed d019d91/3a8a466/12b7202."
-tags: [build, xmake, cmake, clang-tidy, clang-format, gate, workflow]
-generated: { by: agent/mcp, at: "2026-11-12T04:15:47Z" }
+description: "xmake is the primary build path (cmake kept, ./build rebuilt by xmake). Daily: xmake -j → xmake test; gate = format/fix/build/test with tidy/fix diff-scoped vs HEAD since 2026-11-12 (5a41afc) — vendor-template TUs skip the crawl; always build+test after fix, its reflow has eaten separators. Original decisions d019d91/3a8a466/12b7202."
+tags: [build, xmake, cmake, clang-tidy, clang-format, gate, workflow, diff-scope]
+generated: { by: agent/mcp, at: "2026-11-12T16:04:56Z" }
 status: stable
 ---
 
@@ -31,3 +31,8 @@ Target parity: vendored static C libs (wasm3, quickjs, lexbor), daemon cppIsekai
 6. Tasks need set_menu to be invocable as `xmake <name>` (see xmake-custom-plugins skill).
 7. Appending to .gitignore without a trailing newline glues entries (".xmake/compile_commands.json") — check-ignore with `git check-ignore -v` after editing.
 8. xmake-skills plugin package installed globally from github.com/xmake-io/xmake-skills (58 skills, commit ef67caa) — reference for xmake idioms.
+
+## 2026-11-12 update: gate tidy/fix diff-scoped; fix-phase separator corruption (commit 5a41afc)
+
+- User ruling "skip vendor in tidy": `xmake tidy` / `xmake fix` now sweep only sources changed vs HEAD plus untracked (ponytail note in xmake.lua). The full-tree crawl burned ~20min re-instantiating sol2/quickjs/wasm3/sqlite_orm templates inside untouched TUs. Widen by hand for a one-off tree-wide pass.
+- Gotcha 9: the fix phase eats separators while reflowing — `{}, pctx` became `{} pctx` (src/reader/worker.hpp) and a `,` vanished between defaulted params (src/http/img.hpp); both broke the build AFTER fix ran. Always build+test immediately after `xmake fix` and review its diff (both repaired in 5a41afc).
