@@ -1,0 +1,8 @@
+{
+  "name": "MangaFire",
+  "id": "mangafire",
+  "version": "1.0.0",
+  "website": "https://mangafire.to",
+  "runtime": "lua",
+  "capabilities": ["search", "detail", "chapters"], "api": 1
+}
