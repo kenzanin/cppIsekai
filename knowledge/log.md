@@ -1,4 +1,5 @@
 ## 2026-11-12
+* **Creation**: Documented concept `decisions/plugin-port-js-wasm.md` (Plugin port to JS and WASM — plan).
 * **Creation**: Documented concept `decisions/plugin-backend-interface.md` (Plugin backends stay struct+dispatch; introduce PluginBackend interface only for a 4th runtime or out-of-process).
 * **Creation**: Documented concept `references/host-crypto-vrf-sign.md` (host.crypto.vrf_sign: host-executed VRF signing (tables plugin-side)).
 * **Creation**: Documented concept `references/mangafire-vrf-algorithm.md` (Mangafire VRF algorithm (port target for host.crypto.vrf_sign)).
