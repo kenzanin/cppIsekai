@@ -39,7 +39,7 @@ namespace reader {
 struct WindowCtx {
     std::string plugin;
     std::string slug;
-    int chapter{}; // 1-based chapter number; 0 = unknown
+    int chapter{};   // 1-based chapter number; 0 = unknown
     int page_base{}; // chapter-absolute page of batch[0]; 0 = legacy batch position
 };
 
@@ -65,7 +65,8 @@ inline std::string rel_path(const WindowCtx& ctx, int page, const std::string& u
     }
     const auto pad = [](int n) {
         auto s = std::to_string(n);
-        while (s.size() < 3) s = "0" + s;
+        while (s.size() < 3)
+            s = "0" + s;
         return s;
     };
     // V3 (cache-layout-v3 D4): <plugin>/manga/<slug>/chNNN/pNNN.<ext> -- same
@@ -73,8 +74,7 @@ inline std::string rel_path(const WindowCtx& ctx, int page, const std::string& u
     // slot (ext-free hit, no dupes). ponytail: no per-chapter id8 suffix
     // (lo's call, see cache::page_rel); upgrade there if duplicate chapter
     // numbers ever collide.
-    return ctx.plugin + "/manga/" + ctx.slug + "/ch" + pad(ctx.chapter) +
-           "/p" + pad(page) + "." + ext;
+    return ctx.plugin + "/manga/" + ctx.slug + "/ch" + pad(ctx.chapter) + "/p" + pad(page) + "." + ext;
 }
 
 class Worker {
@@ -107,7 +107,8 @@ public:
             stop_ = true;
         }
         cv_.notify_all();
-        if (thread_.joinable()) thread_.join();
+        if (thread_.joinable())
+            thread_.join();
     }
 
 private:
@@ -125,10 +126,12 @@ private:
             for (std::size_t i = 0; i < batch.size(); ++i) {
                 const int page = ctx.page_base > 0 ? ctx.page_base + int(i) : int(i) + 1;
                 const cache::Cache::PageCtx pctx{ctx.plugin, ctx.slug, ctx.chapter, page};
-                const auto p = ctx.plugin.empty()
-                    ? images_.ensure(batch[i], "img",
-                                     rel_path(ctx, ctx.page_base > 0 ? ctx.page_base + int(i) : int(i) + 1, batch[i]))
-                    : images_.img_ensure(batch[i], {}, pctx); // transcode to [cache] image_format
+                const auto p =
+                    ctx.plugin.empty()
+                        ? images_.ensure(
+                              batch[i], "img",
+                              rel_path(ctx, ctx.page_base > 0 ? ctx.page_base + int(i) : int(i) + 1, batch[i]))
+                        : images_.img_ensure(batch[i], {}, pctx); // transcode to [cache] image_format
                 spdlog::debug("worker: prefetch {} -> {}", batch[i], p ? *p : std::string("failed"));
             }
             lock.lock();

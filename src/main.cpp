@@ -105,7 +105,7 @@ int main(int argc, char** argv) {
     // [cache]: one shared disk-LRU (img now, api in 3.3); cap resolved in MiB.
     const std::int64_t cache_max_bytes = cfg.cache_max_mb << 20;
     cache::Config ccfg{"data/cache", cache_max_bytes};
-    ccfg.image_format = cfg.image_format;   // ponytail: must ride Config, else ini knob silently ignored
+    ccfg.image_format = cfg.image_format; // ponytail: must ride Config, else ini knob silently ignored
     ccfg.cover_max_px = cfg.cover_max_px;
     cache::Cache images{ccfg, makeCurlFetcher(cfg.proxy)};
 

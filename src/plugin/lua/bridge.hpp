@@ -9,8 +9,8 @@
  * because they hang off the runtime holder.
  */
 
-#include "plugin/runtime_common.hpp"
 #include "plugin/plugin.hpp" // LiveProfile: the 1.2 install_host_tools signature
+#include "plugin/runtime_common.hpp"
 
 #include <glaze/glaze.hpp>
 
@@ -40,5 +40,5 @@ void install_host_tools(lua_State* L, const std::string& id, const Config& conf,
                         const StateGet& sget, const StateSet& sset, const std::string& dir,
                         const LiveProfile& live_profile);
 
-} // namespace plugin::lua
+} // namespace lua
 } // namespace plugin

@@ -1,5 +1,5 @@
-#include "wasm_rt.hpp"
 #include "wasm_internal.hpp"
+#include "wasm_rt.hpp"
 
 #include "plugin/fs.hpp"
 #include "plugin/htmltext.hpp"

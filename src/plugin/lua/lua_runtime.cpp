@@ -1,7 +1,7 @@
 #include "bridge.hpp"
 
+#include "plugin/htmltext.hpp" // host.re2/html core (task 1.3)
 #include "plugin/http_client.hpp"
-#include "plugin/htmltext.hpp"  // host.re2/html core (task 1.3)
 #include "plugin/plugin.hpp"
 
 #include <spdlog/spdlog.h>
@@ -38,9 +38,7 @@ void install_host_tools(lua_State* L, const std::string& id, const Config& conf,
     // fs.read: confined read-only access into this plugin's own folder (D5).
     sol::table fs_tab = sv.create_named_table("host");
     sol::table fs = sv.create_table();
-    fs["read"] = [dir](const std::string& rel) -> std::optional<std::string> {
-        return fs_read(dir, rel);
-    };
+    fs["read"] = [dir](const std::string& rel) -> std::optional<std::string> { return fs_read(dir, rel); };
     fs_tab["fs"] = fs;
 
     sol::table log = sv.create_table();
@@ -71,9 +69,15 @@ void install_host_tools(lua_State* L, const std::string& id, const Config& conf,
     };
     fs_tab["url_decode"] = [](const std::string& s) {
         const auto hv = [](const char c) {
-            if (c >= '0' && c <= '9') { return c - '0'; }
-            if (c >= 'A' && c <= 'F') { return c - 'A' + 10; }
-            if (c >= 'a' && c <= 'f') { return c - 'a' + 10; }
+            if (c >= '0' && c <= '9') {
+                return c - '0';
+            }
+            if (c >= 'A' && c <= 'F') {
+                return c - 'A' + 10;
+            }
+            if (c >= 'a' && c <= 'f') {
+                return c - 'a' + 10;
+            }
             return 0;
         };
         std::string out;
@@ -155,9 +159,8 @@ void install_host_tools(lua_State* L, const std::string& id, const Config& conf,
     // guards the network half, the instruction hook the CPU half.
     sol::table http = sv.create_table();
     http["fetch"] = [id, timeout_ms = conf.fetch_timeout_ms, live = &live_profile,
-                     proxy = conf.proxy](
-                        const std::string& url, const sol::optional<sol::table>& opts,
-                        sol::this_state ts) -> std::pair<sol::object, std::optional<std::string>> {
+                     proxy = conf.proxy](const std::string& url, const sol::optional<sol::table>& opts,
+                                         sol::this_state ts) -> std::pair<sol::object, std::optional<std::string>> {
         const auto fail = [&](std::string why) {
             spdlog::warn("[plugin:{}] fetch {} failed: {}", id, url, why);
             return std::make_pair(sol::make_object(ts, sol::lua_nil), std::optional(std::move(why)));
@@ -210,8 +213,7 @@ void install_host_tools(lua_State* L, const std::string& id, const Config& conf,
         const std::string cookie_jar = use_cookies ? cookie_jar_path(id) : std::string{};
         // The shared sync path (http_client): one option block, retry, impersonation.
         const FetchResult fr =
-            fetch_sync(url, ms, profile_name, method, body, accept_header, ua_header, extra_headers, proxy,
-                       cookie_jar);
+            fetch_sync(url, ms, profile_name, method, body, accept_header, ua_header, extra_headers, proxy, cookie_jar);
         if (!fr.error.empty()) {
             return fail(fr.error);
         }
@@ -273,9 +275,7 @@ void install_host_tools(lua_State* L, const std::string& id, const Config& conf,
         return to_table(ts, html_select(h, c));
     };
     html["attr"] = [to_table](sol::this_state ts, const std::string& h, const std::string& c,
-                              const std::string& a) -> sol::object {
-        return to_table(ts, html_attr(h, c, a));
-    };
+                              const std::string& a) -> sol::object { return to_table(ts, html_attr(h, c, a)); };
     fs_tab["html"] = html;
 }
 

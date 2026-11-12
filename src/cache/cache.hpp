@@ -38,8 +38,8 @@ using Fetcher = std::function<std::optional<std::string>(const std::string& key)
 struct Config {
     std::string root = "data/cache";
     std::int64_t max_bytes = 2048LL << 20; // cache_max_mb, default 2048
-    std::string image_format = "webp"; // [cache] image_format: webp|avif|jxl|none
-    std::int64_t cover_max_px = 800;   // [cache] cover_max_px: cover resize cap
+    std::string image_format = "webp";     // [cache] image_format: webp|avif|jxl|none
+    std::int64_t cover_max_px = 800;       // [cache] cover_max_px: cover resize cap
 };
 
 class Cache {
@@ -67,38 +67,45 @@ public:
     /** \brief Persist body for key under kind -- the write half of ensure(),
      *  no fetch. A repeat store refreshes the entry and bumps recency like a
      *  hit. Returns the entry path; nullopt on write failure. */
-    std::optional<std::string> store(const std::string& key, const std::string& kind,
-                                     const std::string& body, const std::string& rel_path = {});
+    std::optional<std::string> store(const std::string& key, const std::string& kind, const std::string& body,
+                                     const std::string& rel_path = {});
 
     /** \brief Cached body for key; recency bumps exactly like an ensure() hit.
      *  nullopt on miss, or when the file vanished (index self-heals). */
-    std::optional<std::string> peek(const std::string& key, const std::string& kind,
-                                    const std::string& rel_path = {});
+    std::optional<std::string> peek(const std::string& key, const std::string& kind, const std::string& rel_path = {});
 
     /** \brief V3 context-aware store for img pool only: writes body under a
      *  layout-specific path (cover / chapter-dir / sha fallback), plus a one-line
      *  JSON sidecar for covers when dims+ratio can be decoded. Returns the stored
      *  path; nullopt on write failure. Decode fail falls back to v2 hash name and
      *  stores original bytes (no sidecar). */
-    struct CoverCtx { std::string url{}; std::string plugin{}; int w{}, h{}; double ratio{}; bool cover{}; };
-    struct PageCtx  { std::string plugin{}; std::string slug{}; int chapter{}; int page{}; };
-    std::optional<std::string> img_store(const std::string& key, const std::string& body,
-                                         const CoverCtx& cover_ctx, const PageCtx& page_ctx,
-                                         const std::string& ext_override = {});
+    struct CoverCtx {
+        std::string url{};
+        std::string plugin{};
+        int w{}, h{};
+        double ratio{};
+        bool cover{};
+    };
+    struct PageCtx {
+        std::string plugin{};
+        std::string slug{};
+        int chapter{};
+        int page{};
+    };
+    std::optional<std::string> img_store(const std::string& key, const std::string& body, const CoverCtx& cover_ctx,
+                                         const PageCtx& page_ctx, const std::string& ext_override = {});
 
     /** \brief Serve-through ensure for /cache/img (v3 wiring): hit serves
      *  extension-free (cover scan / page prefix scan, any stored format);
      *  miss fetches, transcodes to the configured [cache] image_format
      *  (covers also resized to cover_max_px), stores via the img_store
      *  layout + sidecar. nullopt on fetch/write failure. */
-    std::optional<std::string> img_ensure(const std::string& key, const CoverCtx& cover_ctx,
-                                         const PageCtx& page_ctx);
+    std::optional<std::string> img_ensure(const std::string& key, const CoverCtx& cover_ctx, const PageCtx& page_ctx);
 
     /** \brief Extension-free cover lookup (D1): scan the boot index for
      *  img/<plugin>/covers/<sha1(url)-16>.<ext>; old formats keep serving.
      *  nullopt when absent. */
-    std::optional<std::string> cover_serve(const std::string& plugin,
-                                           const std::string& url);
+    std::optional<std::string> cover_serve(const std::string& plugin, const std::string& url);
 
     /** \brief Ratio from a cover filename tail "<hash>-<r4>.<ext>"
      *  (fixed-point 4 digits, no dot in the name besides the extension);
@@ -106,8 +113,7 @@ public:
     static double ratio_of_name(const std::string& cover_name);
 
 private:
-    std::string path_for(const std::string& key, const std::string& kind,
-                         const std::string& rel_path) const;
+    std::string path_for(const std::string& key, const std::string& kind, const std::string& rel_path) const;
 
     /** \brief tmp+rename write + index bookkeeping + trim; mu_ held by
      *  callers. */

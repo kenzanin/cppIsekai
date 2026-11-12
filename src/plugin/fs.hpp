@@ -27,13 +27,13 @@ inline std::optional<std::string> fs_read(const std::filesystem::path& dir, cons
     const std::string base_s = base.generic_string();
     const std::string full_s = full.generic_string();
     if (full_s.compare(0, base_s.size(), base_s) != 0) {
-        return std::nullopt;  // outside the root
+        return std::nullopt; // outside the root
     }
     if (full_s.size() > base_s.size() && full_s[base_s.size()] != '/') {
-        return std::nullopt;  // prefix collision: plugins/good vs plugins/goodie
+        return std::nullopt; // prefix collision: plugins/good vs plugins/goodie
     }
     if (full_s == base_s) {
-        return std::nullopt;  // the root itself is not a file
+        return std::nullopt; // the root itself is not a file
     }
     std::error_code ec;
     if (!fs::is_regular_file(full, ec)) {

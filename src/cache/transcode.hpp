@@ -29,10 +29,12 @@ inline bool vips_ready() {
  *  > 0 resizes so the longest side fits it (covers); 0 keeps dimensions. */
 inline TranscodeResult transcode(std::string_view in, std::string_view format, int cover_max_px) {
     TranscodeResult passthrough{std::string(in), {}, 0, 0};
-    if (format == "none" || !vips_ready()) return passthrough;
+    if (format == "none" || !vips_ready())
+        return passthrough;
 
     VipsImage* img = vips_image_new_from_buffer(in.data(), in.size(), "", nullptr);
-    if (img == nullptr) return passthrough;
+    if (img == nullptr)
+        return passthrough;
 
     const int w = vips_image_get_width(img);
     const int h = vips_image_get_height(img);
@@ -67,7 +69,8 @@ inline TranscodeResult transcode(std::string_view in, std::string_view format, i
         out.height = vips_image_get_height(work);
         g_free(buf);
     }
-    if (work != img) g_object_unref(work);
+    if (work != img)
+        g_object_unref(work);
     g_object_unref(img);
     return out;
 }

@@ -50,25 +50,36 @@ void register_library(Ctx& c) {
         SavedManga m;
         m.plugin = json["plugin"].s();
         m.slug = json["slug"].s();
-        m.name = json.has("name") && json["name"].t() == crow::json::type::String ? json["name"].s() : std::string{json["slug"].s()};
-        m.cover = json.has("cover") && json["cover"].t() == crow::json::type::String ? json["cover"].s() : std::string{};
-        on_pool(db, [&] { store.save_manga(m); store.recompute_dup_groups(); return 0; }); // dedup 2.3
+        m.name = json.has("name") && json["name"].t() == crow::json::type::String ? json["name"].s()
+                                                                                  : std::string{json["slug"].s()};
+        m.cover =
+            json.has("cover") && json["cover"].t() == crow::json::type::String ? json["cover"].s() : std::string{};
+        on_pool(db, [&] {
+            store.save_manga(m);
+            store.recompute_dup_groups();
+            return 0;
+        }); // dedup 2.3
         crow::response r{R"({"ok":true,"saved":true})"};
         r.set_header("Content-Type", "application/json");
         return r;
     });
 
-    CROW_ROUTE(app, "/api/library/remove").methods(crow::HTTPMethod::POST)([&](const crow::request& req) -> crow::response {
-        const auto json = crow::json::load(req.body);
-        if (!json || !json.has("plugin") || !json.has("slug"))
-            return crow::response{R"({"ok":false,"error":"missing plugin/slug"})"};
-        const std::string plugin = json["plugin"].s();
-        const std::string slug = json["slug"].s();
-        on_pool(db, [&] { store.unsave_manga(plugin, slug); store.recompute_dup_groups(); return 0; }); // dedup 2.3
-        crow::response r{R"({"ok":true,"saved":false})"};
-        r.set_header("Content-Type", "application/json");
-        return r;
-    });
+    CROW_ROUTE(app, "/api/library/remove")
+        .methods(crow::HTTPMethod::POST)([&](const crow::request& req) -> crow::response {
+            const auto json = crow::json::load(req.body);
+            if (!json || !json.has("plugin") || !json.has("slug"))
+                return crow::response{R"({"ok":false,"error":"missing plugin/slug"})"};
+            const std::string plugin = json["plugin"].s();
+            const std::string slug = json["slug"].s();
+            on_pool(db, [&] {
+                store.unsave_manga(plugin, slug);
+                store.recompute_dup_groups();
+                return 0;
+            }); // dedup 2.3
+            crow::response r{R"({"ok":true,"saved":false})"};
+            r.set_header("Content-Type", "application/json");
+            return r;
+        });
 }
 
 } // namespace api

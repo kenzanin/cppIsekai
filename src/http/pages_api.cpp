@@ -17,8 +17,8 @@ std::string url_encode(const std::string& s) {
     std::string out;
     out.reserve(s.size());
     for (const unsigned char c : s) {
-        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') ||
-            c == '-' || c == '.' || c == '_' || c == '~') {
+        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '.' ||
+            c == '_' || c == '~') {
             out.push_back(static_cast<char>(c));
         } else {
             out.push_back('%');
@@ -40,10 +40,12 @@ std::optional<std::string> build_pages_response(const std::string& chs_env, cons
     double prev = 0, next = 0;
     const auto fmt_ch = [](double v) {
         const long long t = static_cast<long long>(v);
-        if (v == static_cast<double>(t)) return std::to_string(t); // integral: "2"
-        std::string s = std::to_string(v);                          // "1.500000"
+        if (v == static_cast<double>(t))
+            return std::to_string(t);      // integral: "2"
+        std::string s = std::to_string(v); // "1.500000"
         s.erase(s.find_last_not_of('0') + 1);
-        if (s.back() == '.') s.pop_back();
+        if (s.back() == '.')
+            s.pop_back();
         return s;
     };
     bool have_prev = false, have_next = false;
@@ -89,9 +91,8 @@ std::optional<std::string> build_pages_response(const std::string& chs_env, cons
     for (const auto& el : *pages) {
         if (const auto* s = std::get_if<std::string>(&el.data)) {
             ++page; // 1-based page number, index stays 0-based
-            page_urls.emplace_back("/cache/img?url=" + url_encode(*s) + "&plugin=" + url_encode(ctx.plugin) +
-                                   "&slug=" + url_encode(ctx.slug) + "&ch=" + fmt_ch(ctx.ch) +
-                                   "&page=" + std::to_string(page));
+            page_urls.emplace_back("/cache/img?url=" + url_encode(*s) + "&plugin=" + url_encode(ctx.plugin) + "&slug=" +
+                                   url_encode(ctx.slug) + "&ch=" + fmt_ch(ctx.ch) + "&page=" + std::to_string(page));
         }
     }
     out["pages"] = std::move(page_urls);

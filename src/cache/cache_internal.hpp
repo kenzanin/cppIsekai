@@ -27,7 +27,8 @@ inline std::string ext_of(const std::string& key) {
         return "bin";
     std::string ext = name.substr(dot + 1);
     for (char& c : ext) {
-        if (!std::isalnum(static_cast<unsigned char>(c))) return "bin";
+        if (!std::isalnum(static_cast<unsigned char>(c)))
+            return "bin";
         c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
     }
     return ext;
@@ -42,14 +43,16 @@ inline bool legacy_v1(const fs::path& root) {
         fs::directory_iterator it(root / kind, ec), end{};
         for (; !ec && it != end; it.increment(ec)) {
             std::error_code fec;
-            if (it->is_directory(fec)) return false;
-            if (!it->is_regular_file(fec) || fec) continue;
+            if (it->is_directory(fec))
+                return false;
+            if (!it->is_regular_file(fec) || fec)
+                continue;
             const std::string name = it->path().filename().string();
-            if (!name.empty() && name[0] == '.') continue; // .tmp leftovers
+            if (!name.empty() && name[0] == '.')
+                continue; // .tmp leftovers
             const std::string stem = it->path().stem().string();
             if (stem.size() != 40 || // 40 = sha1 hex
-                !std::all_of(stem.begin(), stem.end(),
-                             [](unsigned char c) { return std::isxdigit(c); }))
+                !std::all_of(stem.begin(), stem.end(), [](unsigned char c) { return std::isxdigit(c); }))
                 return false;
             seen = true;
         }
@@ -60,8 +63,8 @@ inline bool legacy_v1(const fs::path& root) {
 // V3 layout helpers: cover / chapter dir / hash fallback rel_path builders.
 // Cover ratio rides in the filename as fixed-point 4 digits (no dot):
 // <hash>-6988.webp == ratio 0.6988. Sidecar .json files are gone.
-inline std::string cover_rel(const std::string& plugin, const std::string& url_hash,
-                             const std::string& ext, double ratio) {
+inline std::string cover_rel(const std::string& plugin, const std::string& url_hash, const std::string& ext,
+                             double ratio) {
     const int r4 = ratio > 0.0 ? static_cast<int>(std::lround(ratio * 10000.0)) : 0;
     return plugin + "/cover/" + url_hash + "-" + std::to_string(r4) + "." + ext;
 }
@@ -70,12 +73,13 @@ inline std::string cover_rel(const std::string& plugin, const std::string& url_h
  *  absent/zero (old files without the suffix keep serving, no header). */
 inline double ratio_from_name(const std::string& name) {
     const auto dot = name.find_last_of('.');
-    if (dot == std::string::npos) return 0.0;
+    if (dot == std::string::npos)
+        return 0.0;
     const auto dash = name.find_last_of('-', dot);
-    if (dash == std::string::npos) return 0.0;
+    if (dash == std::string::npos)
+        return 0.0;
     const std::string digits = name.substr(dash + 1, dot - dash - 1);
-    if (digits.empty() || digits.size() > 5 ||
-        !std::all_of(digits.begin(), digits.end(), ::isdigit))
+    if (digits.empty() || digits.size() > 5 || !std::all_of(digits.begin(), digits.end(), ::isdigit))
         return 0.0;
     return static_cast<double>(std::stoi(digits)) / 10000.0;
 }
@@ -84,7 +88,8 @@ inline std::string page_rel(const std::string& plugin, const std::string& slug, 
     // pad(n) = min-3 zero-padding: ch 2 -> ch002, ch 12 -> ch012, ch 123 -> ch123
     const auto pad = [](int n) {
         auto s = std::to_string(n);
-        while (s.size() < 3) s = "0" + s;
+        while (s.size() < 3)
+            s = "0" + s;
         return s;
     };
     // ponytail: number-only dir suffix (lo's call). Fractional numbers keep

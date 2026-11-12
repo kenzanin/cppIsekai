@@ -12,9 +12,8 @@ namespace fs = std::filesystem;
 
 namespace cache {
 
-std::optional<std::string> Cache::img_store(const std::string& key, const std::string& body,
-                                            const CoverCtx& cover_ctx, const PageCtx& page_ctx,
-                                            const std::string& ext_override) {
+std::optional<std::string> Cache::img_store(const std::string& key, const std::string& body, const CoverCtx& cover_ctx,
+                                            const PageCtx& page_ctx, const std::string& ext_override) {
     // V3 layout (D1-D4): cover -> <plugin>/cover/<urlhash16>.<ext> + sidecar;
     // page -> <plugin>/manga/<slug>/ch<n>-<id8>/pNNN.<ext> via page_rel;
     // no context -> sha fallback. ext_override (transcode target ext) wins,
@@ -24,22 +23,20 @@ std::optional<std::string> Cache::img_store(const std::string& key, const std::s
     if (cover_ctx.cover) {
         const auto h = sha1_hex(cover_ctx.url.empty() ? key : cover_ctx.url).substr(0, 16);
         rel = internal::cover_rel(cover_ctx.plugin.empty() ? "common" : cover_ctx.plugin, h, ext,
-                    cover_ctx.w > 0 && cover_ctx.h > 0
-                        ? static_cast<double>(cover_ctx.w) / static_cast<double>(cover_ctx.h)
-                        : 0.0);
-    } else if (page_ctx.plugin.empty() || page_ctx.slug.empty() || page_ctx.chapter < 1 ||
-               page_ctx.page < 1) {
+                                  cover_ctx.w > 0 && cover_ctx.h > 0
+                                      ? static_cast<double>(cover_ctx.w) / static_cast<double>(cover_ctx.h)
+                                      : 0.0);
+    } else if (page_ctx.plugin.empty() || page_ctx.slug.empty() || page_ctx.chapter < 1 || page_ctx.page < 1) {
         rel = {}; // no complete page context: sha fallback
     } else {
-        rel = internal::page_rel(page_ctx.plugin, page_ctx.slug, page_ctx.chapter, page_ctx.page) +
-              "." + ext;
+        rel = internal::page_rel(page_ctx.plugin, page_ctx.slug, page_ctx.chapter, page_ctx.page) + "." + ext;
     }
 
     const std::lock_guard lock(mu_);
-    const std::string path = rel.empty() ? path_for(key, "img", {})
-                                         : (fs::path(conf_.root) / "img" / rel).string();
+    const std::string path = rel.empty() ? path_for(key, "img", {}) : (fs::path(conf_.root) / "img" / rel).string();
     auto stored = persist_locked(path, body);
-    if (!stored) return std::nullopt;
+    if (!stored)
+        return std::nullopt;
     return stored;
 }
 
@@ -67,8 +64,8 @@ std::optional<std::string> Cache::img_ensure(const std::string& key, const Cover
     std::optional<std::string> hit; // candidate chosen under lock, verified outside
     {
         const std::lock_guard lock(mu_);
-        if (!cover_ctx.cover && !page_ctx.plugin.empty() && !page_ctx.slug.empty() &&
-            page_ctx.chapter >= 1 && page_ctx.page >= 1) {
+        if (!cover_ctx.cover && !page_ctx.plugin.empty() && !page_ctx.slug.empty() && page_ctx.chapter >= 1 &&
+            page_ctx.page >= 1) {
             const std::string prefix =
                 internal::page_rel(page_ctx.plugin, page_ctx.slug, page_ctx.chapter, page_ctx.page) + ".";
             for (const auto& [path, _] : entries_)
@@ -77,8 +74,8 @@ std::optional<std::string> Cache::img_ensure(const std::string& key, const Cover
                     break;
                 }
             if (!hit)
-                spdlog::debug("cache: img ctx-miss, fetching {} (ch{} p{} {})", key,
-                              page_ctx.chapter, page_ctx.page, page_ctx.slug);
+                spdlog::debug("cache: img ctx-miss, fetching {} (ch{} p{} {})", key, page_ctx.chapter, page_ctx.page,
+                              page_ctx.slug);
             // Context miss: fetch below lands in this exact v3 spot. Deliberately
             // no sha-fallback lookup here -- an entry there predates this
             // context's layout and would serve the wrong landing path.
@@ -96,7 +93,8 @@ std::optional<std::string> Cache::img_ensure(const std::string& key, const Cover
     if (hit) {
         const std::lock_guard lock(mu_);
         auto it = entries_.find(*hit);
-        if (it != entries_.end()) it->second.tick = ++tick_; // recency bump
+        if (it != entries_.end())
+            it->second.tick = ++tick_; // recency bump
         spdlog::debug("cache: img hit {} ({})", *hit, key);
         return *hit;
     }
@@ -105,7 +103,8 @@ std::optional<std::string> Cache::img_ensure(const std::string& key, const Cover
         if (hit && alive(*hit)) {
             const std::lock_guard lock(mu_);
             auto it = entries_.find(*hit);
-            if (it != entries_.end()) it->second.tick = ++tick_;
+            if (it != entries_.end())
+                it->second.tick = ++tick_;
             return hit;
         }
         spdlog::debug("cache: img cover-miss, fetching {} (plugin={})", key, cover_ctx.plugin);
@@ -113,14 +112,12 @@ std::optional<std::string> Cache::img_ensure(const std::string& key, const Cover
 
     const std::optional<std::string> raw = fetch_ ? fetch_(key) : std::nullopt;
     if (!raw) {
-        spdlog::debug("cache: img fetch failed {} (cover={} plugin={} slug={} ch{} p{})", key,
-                      cover_ctx.cover, cover_ctx.plugin, page_ctx.slug, page_ctx.chapter,
-                      page_ctx.page);
+        spdlog::debug("cache: img fetch failed {} (cover={} plugin={} slug={} ch{} p{})", key, cover_ctx.cover,
+                      cover_ctx.plugin, page_ctx.slug, page_ctx.chapter, page_ctx.page);
         return std::nullopt;
     }
 
-    const auto tc = transcode(*raw, conf_.image_format,
-                                         cover_ctx.cover ? static_cast<int>(conf_.cover_max_px) : 0);
+    const auto tc = transcode(*raw, conf_.image_format, cover_ctx.cover ? static_cast<int>(conf_.cover_max_px) : 0);
     if (tc.bytes.empty()) {
         spdlog::debug("cache: img transcode failed {} ({} B raw)", key, raw->size());
         return std::nullopt;
@@ -131,25 +128,23 @@ std::optional<std::string> Cache::img_ensure(const std::string& key, const Cover
         ctx.h = tc.height;
     }
     auto stored = img_store(key, tc.bytes, ctx, page_ctx, tc.ext);
-    if (stored) spdlog::debug("cache: img stored {} ({} B)", *stored, tc.bytes.size());
+    if (stored)
+        spdlog::debug("cache: img stored {} ({} B)", *stored, tc.bytes.size());
     return stored;
 }
 
-std::optional<std::string> Cache::cover_serve(const std::string& plugin,
-                                              const std::string& url) {
+std::optional<std::string> Cache::cover_serve(const std::string& plugin, const std::string& url) {
     // Extension-free lookup (D1): entries_ keys are full on-disk paths
     // (<root>/img/...); covers land at <root>/img/<plugin>/cover/<sha1(url)-16>-<r4>.<ext>.
     // Match the tail (hash prefix, any ratio suffix and ext).
     const std::lock_guard lock(mu_);
-    const std::string tail = "img/" +
-                             (plugin.empty() ? std::string("common") : plugin) +
-                             "/cover/" + sha1_hex(url).substr(0, 16) + "-";
+    const std::string tail =
+        "img/" + (plugin.empty() ? std::string("common") : plugin) + "/cover/" + sha1_hex(url).substr(0, 16) + "-";
     for (const auto& [path, _] : entries_) {
         if (path.find(tail) != std::string::npos)
             return path;
     }
     return std::nullopt;
 }
-
 
 } // namespace cache

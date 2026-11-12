@@ -4,8 +4,8 @@
 #include "img.hpp"
 #include "pages_api.hpp"
 
-#include <string>
 #include <filesystem>
+#include <string>
 
 namespace fs = std::filesystem;
 
@@ -14,18 +14,28 @@ namespace {
 // cache-full check for one chapter: <root>/img/<plugin>/manga/<slug>/<chdir>/pNNN.ext
 // count >= pages. ch-dir matched by chNNN prefix (collision id8 variant counts too).
 bool chapter_cached(const std::string& plugin, const std::string& slug, int chapter, int pages) {
-    if (chapter <= 0 || pages <= 0) return false;
+    if (chapter <= 0 || pages <= 0)
+        return false;
     const fs::path base = fs::path("data/cache") / "img" / plugin / "manga" / slug;
-    const std::string prefix = "ch" + (chapter < 10 ? std::string("00") : chapter < 100 ? std::string("0") : std::string()) + std::to_string(chapter);
+    const std::string prefix = "ch" +
+                               (chapter < 10    ? std::string("00")
+                                : chapter < 100 ? std::string("0")
+                                                : std::string()) +
+                               std::to_string(chapter);
     std::error_code ec;
-    if (!fs::is_directory(base, ec)) return false;
+    if (!fs::is_directory(base, ec))
+        return false;
     for (const auto& ch : fs::directory_iterator(base, ec)) {
-        if (ec) return false;
-        if (!ch.is_directory(ec)) continue;
-        if (ch.path().filename().string().rfind(prefix, 0) != 0) continue;
+        if (ec)
+            return false;
+        if (!ch.is_directory(ec))
+            continue;
+        if (ch.path().filename().string().rfind(prefix, 0) != 0)
+            continue;
         int n = 0;
         for (const auto& p : fs::directory_iterator(ch.path(), ec)) {
-            if (!ec && p.is_regular_file(ec)) ++n;
+            if (!ec && p.is_regular_file(ec))
+                ++n;
         }
         return n >= pages;
     }
@@ -68,9 +78,8 @@ void register_content(Ctx& c) {
         q["id"] = slug;
         const std::string chs_params = q.dump();
         const std::string body = on_pool(plugin_pool, [&] {
-            const std::string chs_env =
-                call_cached(store, plugin, "chapters", chs_params,
-                            [&] { return plugins.call(plugin, "chapters", chs_params); });
+            const std::string chs_env = call_cached(store, plugin, "chapters", chs_params,
+                                                    [&] { return plugins.call(plugin, "chapters", chs_params); });
             // Pre-resolve the chapter id from the list so the pages call
             // targets the right one even when the plugin's list is stale.
             std::string chapter_id;
@@ -99,9 +108,8 @@ void register_content(Ctx& c) {
             crow::json::wvalue pages_q;
             pages_q["id"] = chapter_id;
             const std::string pages_params = pages_q.dump();
-            const std::string pages_env =
-                call_cached(store, plugin, "pages", pages_params,
-                            [&] { return plugins.call(plugin, "pages", pages_params); });
+            const std::string pages_env = call_cached(store, plugin, "pages", pages_params,
+                                                      [&] { return plugins.call(plugin, "pages", pages_params); });
             return build_pages_response(chs_env, pages_env, PagesCtx{plugin, slug, chd}).value_or(std::string{});
         });
         crow::response r;
@@ -143,7 +151,8 @@ void register_content(Ctx& c) {
         res.body = std::move(r.body);
         res.compressed = false; // images are already compressed bytes
         res.set_header("Content-Type", std::string(r.mime));
-        if (r.ratio_header) res.set_header("X-Image-Ratio", *r.ratio_header);
+        if (r.ratio_header)
+            res.set_header("X-Image-Ratio", *r.ratio_header);
         return res;
     });
 
@@ -179,8 +188,7 @@ void register_content(Ctx& c) {
         res.body = std::move(*zip);
         res.compressed = false; // zip container, already deflate-packed
         res.set_header("Content-Type", "application/zip");
-        res.set_header("Content-Disposition",
-                       "attachment; filename=\"" + param(req, "slug") + ".cbz\"");
+        res.set_header("Content-Disposition", "attachment; filename=\"" + param(req, "slug") + ".cbz\"");
         return res;
     });
 }

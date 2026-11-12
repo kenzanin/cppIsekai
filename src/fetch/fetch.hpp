@@ -59,8 +59,8 @@ inline void applyProxy(CURL* e, const std::string& proxy) {
  *  the linked lib, ff* from the firefox sibling (both probed, v0.6.1). */
 inline bool is_known_target(std::string_view t) {
     for (std::string_view k :
-         {"chrome99", "chrome100", "chrome101", "chrome104", "chrome107", "chrome110", "chrome116", "edge99",
-          "edge101", "safari15_3", "safari15_5"}) {  // ff*: unsupported (NSS vs BoringSSL); see fetch_curl.cpp
+         {"chrome99", "chrome100", "chrome101", "chrome104", "chrome107", "chrome110", "chrome116", "edge99", "edge101",
+          "safari15_3", "safari15_5"}) { // ff*: unsupported (NSS vs BoringSSL); see fetch_curl.cpp
         if (t == k) {
             return true;
         }

@@ -81,10 +81,12 @@ std::vector<Host::EnrichmentRow> Host::enrichment_rows() const {
         bool is_enr = false;
         std::string caps;
         for (size_t i = 0; i < info.capabilities.size(); ++i) {
-            if (info.capabilities[i] == "enrichment") is_enr = true;
+            if (info.capabilities[i] == "enrichment")
+                is_enr = true;
             caps += (i != 0 ? "," : "") + info.capabilities[i];
         }
-        if (!is_enr) continue;
+        if (!is_enr)
+            continue;
         EnrichmentRow row;
         row.id = info.id;
         row.name = info.name;
@@ -105,9 +107,11 @@ std::vector<Host::EnrichmentRow> Host::enrichment_rows() const {
 bool Host::is_enrichment(const std::string& id) const {
     const std::scoped_lock lock(impl_->mu);
     const auto it = impl_->plugins.find(id);
-    if (it == impl_->plugins.end()) return false;
+    if (it == impl_->plugins.end())
+        return false;
     for (const auto& c : it->second->info.capabilities) {
-        if (c == "enrichment") return true;
+        if (c == "enrichment")
+            return true;
     }
     return false;
 }

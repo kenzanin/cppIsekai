@@ -34,8 +34,8 @@ using HttpFetch = std::function<std::optional<std::string>(const std::string& ur
 /** Host services the guest reaches through env imports or globals, bound per
  *  plugin at load. nullopt results are the import's -1 (domain failure). */
 struct Services {
-    StateGet state_get; /**< per-plugin persistent read */
-    StateSet state_set; /**< per-plugin persistent write */
+    StateGet state_get;   /**< per-plugin persistent read */
+    StateSet state_set;   /**< per-plugin persistent write */
     HttpFetch http_fetch; /**< blocking fetch through the shared curl path */
 };
 
@@ -45,8 +45,8 @@ struct Services {
  *  (already logged). */
 struct RawReply {
     bool invoked = false; /**< whether the entry produced a reply at all */
-    std::string error; /**< host-side diagnostic when !invoked */
-    glz::generic reply; /**< the reply value; shape-checked by the core gate */
+    std::string error;    /**< host-side diagnostic when !invoked */
+    glz::generic reply;   /**< the reply value; shape-checked by the core gate */
 };
 
 /** \brief Serialize a glz::generic; "null" on write failure so envelopes stay

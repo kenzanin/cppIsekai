@@ -2,8 +2,8 @@
  *  \brief Internal seam: the curl-family fn tables shared by the dlopen loader
  *  and the transfer body. */
 #pragma once
-#include <string>
 #include <curl/curl.h>
+#include <string>
 namespace fetch {
 struct CurlApi {
     CURL* (*easy_init)();

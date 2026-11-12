@@ -1,5 +1,5 @@
-#include "wasm_rt.hpp"
 #include "wasm_internal.hpp"
+#include "wasm_rt.hpp"
 
 #include <stdexcept>
 #include <string_view>
@@ -7,7 +7,6 @@
 namespace plugin::wasm {
 
 constexpr uint32_t kStackBytes = 64 * 1024;
-
 
 // ---------------------------------------------------------------------------
 // lifecycle
@@ -88,8 +87,8 @@ Loaded load(std::string id, std::string dir, std::vector<std::uint8_t> wasm_byte
         const char* name;
         IM3Function* slot;
     };
-    for (const Export& x : {Export{"alloc", &inst->f_alloc}, Export{"handle", &inst->f_handle},
-                            Export{"last_len", &inst->f_last_len}}) {
+    for (const Export& x :
+         {Export{"alloc", &inst->f_alloc}, Export{"handle", &inst->f_handle}, Export{"last_len", &inst->f_last_len}}) {
         if (const M3Result e = m3_FindFunctionIn(x.slot, inst->module, x.name)) {
             return fail(std::string("export ") + x.name + ": " + (e != nullptr ? e : "missing"));
         }

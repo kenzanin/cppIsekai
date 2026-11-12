@@ -1,10 +1,10 @@
 #include "htmltext.hpp"
 #include "htmltext_internal.hpp"
 
-#include <lexbor/html/html.h>
-#include <lexbor/dom/dom.h>
 #include <lexbor/css/css.h>
 #include <lexbor/css/selectors/selectors.h>
+#include <lexbor/dom/dom.h>
+#include <lexbor/html/html.h>
 #include <lexbor/selectors/selectors.h>
 
 #include <cstring>
@@ -21,8 +21,8 @@ public:
         if (doc_ == nullptr) {
             return;
         }
-        const lxb_status_t st = lxb_html_document_parse(
-            doc_, reinterpret_cast<const lxb_char_t*>(html.data()), html.size());
+        const lxb_status_t st =
+            lxb_html_document_parse(doc_, reinterpret_cast<const lxb_char_t*>(html.data()), html.size());
         if (st != LXB_STATUS_OK) {
             lxb_html_document_destroy(doc_);
             doc_ = nullptr;
@@ -71,8 +71,7 @@ struct ParserGuard {
 
 /// Runs `fn` on every element matching the CSS selector, in document order.
 /// Selector/CSS failure yields zero visits (lenient), never an error.
-template <typename Fn>
-void select_each(const std::string& html, const std::string& css, Fn fn) {
+template <typename Fn> void select_each(const std::string& html, const std::string& css, Fn fn) {
     HtmlDoc doc(html);
     if (doc.get() == nullptr) {
         return;
@@ -97,8 +96,8 @@ void select_each(const std::string& html, const std::string& css, Fn fn) {
         return;
     }
 
-    lxb_css_selector_list_t* list = lxb_css_selectors_parse(
-        parser_guard.p, reinterpret_cast<const lxb_char_t*>(css.data()), css.size());
+    lxb_css_selector_list_t* list =
+        lxb_css_selectors_parse(parser_guard.p, reinterpret_cast<const lxb_char_t*>(css.data()), css.size());
     if (list == nullptr) {
         return; // malformed selector: zero matches (lenient)
     }

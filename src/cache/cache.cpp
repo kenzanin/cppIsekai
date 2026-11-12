@@ -25,10 +25,12 @@ Cache::Cache(Config conf, Fetcher fetch) : conf_(std::move(conf)), fetch_(std::m
     const fs::path root(conf_.root);
 
     std::error_code ec;
-    for (const char* kind : {"img"}) fs::create_directories(root / kind, ec);
+    for (const char* kind : {"img"})
+        fs::create_directories(root / kind, ec);
     std::vector<fs::path> stale; // rollback copies left by earlier boots
     for (const fs::directory_entry& e : fs::directory_iterator(root, ec)) {
-        if (e.path().filename().string().rfind(".legacy-", 0) == 0) stale.push_back(e.path());
+        if (e.path().filename().string().rfind(".legacy-", 0) == 0)
+            stale.push_back(e.path());
     }
     for (const fs::path& p : stale) {
         std::error_code rec;
@@ -45,7 +47,8 @@ Cache::Cache(Config conf, Fetcher fetch) : conf_(std::move(conf)), fetch_(std::m
             for (const char* kind : {"img"}) {
                 std::error_code rec;
                 const fs::path from = root / kind;
-                if (fs::exists(from, rec)) fs::rename(from, root / (std::string(".legacy-") + kind), rec);
+                if (fs::exists(from, rec))
+                    fs::rename(from, root / (std::string(".legacy-") + kind), rec);
             }
         }
         std::ofstream marker(stamp, std::ios::binary); // v2 era begins: never purge again
@@ -65,25 +68,22 @@ Cache::Cache(Config conf, Fetcher fetch) : conf_(std::move(conf)), fetch_(std::m
             continue;
         }
         std::error_code fec;
-        if (!it->is_regular_file(fec) || fec) continue;
+        if (!it->is_regular_file(fec) || fec)
+            continue;
         // ponytail: cover sidecars (<hash>.json next to covers) excluded from
         // LRU byte accounting (D3).
-        if (it->path().parent_path().filename() == "cover" &&
-            it->path().extension() == ".json")
+        if (it->path().parent_path().filename() == "cover" && it->path().extension() == ".json")
             continue;
-        seeds.push_back({it->path().string(), static_cast<std::int64_t>(it->file_size(fec)),
-                         it->last_write_time(fec)});
+        seeds.push_back({it->path().string(), static_cast<std::int64_t>(it->file_size(fec)), it->last_write_time(fec)});
     }
-    std::stable_sort(seeds.begin(), seeds.end(),
-                     [](const Seed& a, const Seed& b) { return a.mtime < b.mtime; });
+    std::stable_sort(seeds.begin(), seeds.end(), [](const Seed& a, const Seed& b) { return a.mtime < b.mtime; });
     for (Seed& s : seeds) {
         bytes_ += s.bytes;
         entries_.emplace(std::move(s.path), Entry{s.bytes, ++tick_});
     }
 }
 
-std::string Cache::path_for(const std::string& key, const std::string& kind,
-                            const std::string& rel_path) const {
+std::string Cache::path_for(const std::string& key, const std::string& kind, const std::string& rel_path) const {
     // D2: rel_path (img only) replaces the sha name; caller guarantees a
     // slug-derived fs-safe subpath. Empty keeps v1 byte-for-byte.
     if (!rel_path.empty() && kind == "img")
@@ -119,8 +119,7 @@ std::optional<std::string> Cache::persist_locked(const std::string& path, const 
     return path;
 }
 
-std::optional<std::string> Cache::ensure(const std::string& key, const std::string& kind,
-                                         const std::string& rel_path) {
+std::optional<std::string> Cache::ensure(const std::string& key, const std::string& kind, const std::string& rel_path) {
     // ponytail: one lock across the (blocking) fetch serializes concurrent
     // misses; per-key inflight dedup when parallel workers actually starve.
     std::lock_guard lock(mu_);
@@ -133,23 +132,24 @@ std::optional<std::string> Cache::ensure(const std::string& key, const std::stri
     }
 
     const std::optional<std::string> body = fetch_ ? fetch_(key) : std::nullopt;
-    if (!body) return std::nullopt;
+    if (!body)
+        return std::nullopt;
 
     return persist_locked(path, *body);
 }
 
-std::optional<std::string> Cache::store(const std::string& key, const std::string& kind,
-                                        const std::string& body, const std::string& rel_path) {
+std::optional<std::string> Cache::store(const std::string& key, const std::string& kind, const std::string& body,
+                                        const std::string& rel_path) {
     const std::lock_guard lock(mu_);
     return persist_locked(path_for(key, kind, rel_path), body);
 }
 
-std::optional<std::string> Cache::peek(const std::string& key, const std::string& kind,
-                                       const std::string& rel_path) {
+std::optional<std::string> Cache::peek(const std::string& key, const std::string& kind, const std::string& rel_path) {
     const std::lock_guard lock(mu_);
 
     const auto it = entries_.find(path_for(key, kind, rel_path));
-    if (it == entries_.end()) return std::nullopt;
+    if (it == entries_.end())
+        return std::nullopt;
 
     std::ifstream in(it->first, std::ios::binary);
     if (!in) {
@@ -173,7 +173,8 @@ void Cache::trim(const std::string& keep) {
                 victim = it;
             }
         }
-        if (victim == entries_.end()) break; // only `keep` left: cap < one file
+        if (victim == entries_.end())
+            break; // only `keep` left: cap < one file
         bytes_ -= victim->second.bytes;
         std::error_code ec;
         fs::remove(victim->first, ec);
@@ -182,6 +183,8 @@ void Cache::trim(const std::string& keep) {
 }
 
 // Cache::ratio_of_name — public wrapper over the anonymous-namespace helper.
-double Cache::ratio_of_name(const std::string& cover_name) { return internal::ratio_from_name(cover_name); }
+double Cache::ratio_of_name(const std::string& cover_name) {
+    return internal::ratio_from_name(cover_name);
+}
 
 } // namespace cache

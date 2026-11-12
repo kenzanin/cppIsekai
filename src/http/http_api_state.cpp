@@ -29,13 +29,19 @@ void register_state(Ctx& c) {
     CROW_ROUTE(app, "/api/display/dim-blur")
         .methods(crow::HTTPMethod::POST)([&](const crow::request& req) -> crow::response {
             const auto body = crow::json::load(req.body);
-            if (!body || !body.has("plugin") || !body.has("slug")) return crow::response{400};
+            if (!body || !body.has("plugin") || !body.has("slug"))
+                return crow::response{400};
             const std::string plugin = body["plugin"].s();
             const std::string slug = body["slug"].s();
-            if (plugin.empty() || plugin.find('/') != std::string::npos || slug.empty()) return crow::response{400};
+            if (plugin.empty() || plugin.find('/') != std::string::npos || slug.empty())
+                return crow::response{400};
             bool on = false;
-            if (body.has("on")) on = body["on"].t() == crow::json::type::True;
-            on_pool(db, [&] { store.state_set(kStateHost, dim_key(plugin, slug), on ? "1" : "0"); return 0; });
+            if (body.has("on"))
+                on = body["on"].t() == crow::json::type::True;
+            on_pool(db, [&] {
+                store.state_set(kStateHost, dim_key(plugin, slug), on ? "1" : "0");
+                return 0;
+            });
             crow::response r{on ? R"({"ok":true,"on":true})" : R"({"ok":true,"on":false})"};
             r.set_header("Content-Type", "application/json");
             return r;
@@ -48,7 +54,8 @@ void register_state(Ctx& c) {
         for (const auto& k : keys) {
             const auto rest = k.substr(std::string(kDimPrefix).size());
             const auto slash = rest.find('/');
-            if (slash == std::string::npos || slash == 0) continue;
+            if (slash == std::string::npos || slash == 0)
+                continue;
             crow::json::wvalue pair(crow::json::type::List);
             pair[0] = rest.substr(0, slash);
             pair[1] = rest.substr(slash + 1);
@@ -80,8 +87,7 @@ void register_state(Ctx& c) {
             });
 
             std::vector<crow::json::wvalue> window;
-            const std::optional<ReaderPosition> last =
-                on_pool(db, [&] { return store.position_last(); });
+            const std::optional<ReaderPosition> last = on_pool(db, [&] { return store.position_last(); });
             if (last) {
                 const std::string& plugin = last->plugin;
                 const std::string& manga = last->slug;
@@ -126,28 +132,28 @@ void register_state(Ctx& c) {
 
     // Batch read/skip state (chapter-list-controls 1.2): one round trip for
     // the detail page list. Absent keys omit the field.
-    CROW_ROUTE(app, "/chapter/state")
-        .methods(crow::HTTPMethod::POST)([&](const crow::request& req) -> crow::response {
-            const auto body = crow::json::load(req.body);
-            std::vector<std::string> ids;
-            if (body && body.has("ids") && body["ids"].t() == crow::json::type::List)
-                for (const auto& v : body["ids"])
-                    if (v.t() == crow::json::type::String)
-                        ids.push_back(v.s());
-            crow::json::wvalue out;
-            on_pool(db, [&] {
-                for (const auto& id : ids) {
-                    if (const auto s = store.state_get(kStateHost, std::string(kSkipPrefix) + id); s && *s == "1")
-                        out[id]["skip"] = true;
-                    if (const auto r = store.state_get(kStateHost, std::string(kReadPrefix) + id); r && !r->empty() && *r != "0")
-                        out[id]["read"] = std::atoi(r->c_str());
-                }
-                return 0;
-            });
-            crow::response res{out};
-            res.set_header("Content-Type", "application/json");
-            return res;
+    CROW_ROUTE(app, "/chapter/state").methods(crow::HTTPMethod::POST)([&](const crow::request& req) -> crow::response {
+        const auto body = crow::json::load(req.body);
+        std::vector<std::string> ids;
+        if (body && body.has("ids") && body["ids"].t() == crow::json::type::List)
+            for (const auto& v : body["ids"])
+                if (v.t() == crow::json::type::String)
+                    ids.push_back(v.s());
+        crow::json::wvalue out;
+        on_pool(db, [&] {
+            for (const auto& id : ids) {
+                if (const auto s = store.state_get(kStateHost, std::string(kSkipPrefix) + id); s && *s == "1")
+                    out[id]["skip"] = true;
+                if (const auto r = store.state_get(kStateHost, std::string(kReadPrefix) + id);
+                    r && !r->empty() && *r != "0")
+                    out[id]["read"] = std::atoi(r->c_str());
+            }
+            return 0;
         });
+        crow::response res{out};
+        res.set_header("Content-Type", "application/json");
+        return res;
+    });
 }
 
 } // namespace api

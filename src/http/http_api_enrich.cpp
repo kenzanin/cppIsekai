@@ -55,51 +55,61 @@ void register_enrich(Ctx& c) {
     });
 
     // POST /api/enrichment/chosen {plugin, slug, chosen: {...}} — full-overwrite under (plugin, slug).
-    CROW_ROUTE(app, "/api/enrichment/chosen").methods(crow::HTTPMethod::POST)
-    ([&](const crow::request& req) -> crow::response {
-        const auto json = crow::json::load(req.body);
-        if (!json || !json.has("plugin") || !json.has("slug") || !json.has("chosen"))
-            return crow::response{400, R"({"ok":false,"error":"missing plugin/slug/chosen"})"};
-        const std::string plugin = json["plugin"].s();
-        const std::string slug = json["slug"].s();
-        if (!valid_title_pair(plugin, slug)) {
-            return crow::response{404, R"({"ok":false,"error":"unknown title"})"};
-        }
-        const auto& ch = json["chosen"];
-        const auto normalized = normalize_chosen(ch);
-        if (!normalized)
-            return crow::response{400, R"({"ok":false,"error":"invalid chosen: unknown key, wrong type, or non-string element"})"};
-        on_pool(db, [&] { store.title_meta_put_chosen(plugin, slug, *normalized); return 0; });
-        crow::response r{R"({"ok":true})"};
-        r.set_header("Content-Type", "application/json");
-        return r;
-    });
+    CROW_ROUTE(app, "/api/enrichment/chosen")
+        .methods(crow::HTTPMethod::POST)([&](const crow::request& req) -> crow::response {
+            const auto json = crow::json::load(req.body);
+            if (!json || !json.has("plugin") || !json.has("slug") || !json.has("chosen"))
+                return crow::response{400, R"({"ok":false,"error":"missing plugin/slug/chosen"})"};
+            const std::string plugin = json["plugin"].s();
+            const std::string slug = json["slug"].s();
+            if (!valid_title_pair(plugin, slug)) {
+                return crow::response{404, R"({"ok":false,"error":"unknown title"})"};
+            }
+            const auto& ch = json["chosen"];
+            const auto normalized = normalize_chosen(ch);
+            if (!normalized)
+                return crow::response{
+                    400, R"({"ok":false,"error":"invalid chosen: unknown key, wrong type, or non-string element"})"};
+            on_pool(db, [&] {
+                store.title_meta_put_chosen(plugin, slug, *normalized);
+                return 0;
+            });
+            crow::response r{R"({"ok":true})"};
+            r.set_header("Content-Type", "application/json");
+            return r;
+        });
 
     // POST /api/enrichment/reset {plugin, slug, mode} — cover | detail | all; keeps fetched.
-    CROW_ROUTE(app, "/api/enrichment/reset").methods(crow::HTTPMethod::POST)
-    ([&](const crow::request& req) -> crow::response {
-        const auto json = crow::json::load(req.body);
-        if (!json || !json.has("plugin") || !json.has("slug") || !json.has("mode"))
-            return crow::response{400, R"({"ok":false,"error":"missing plugin/slug/mode"})"};
-        const std::string plugin = json["plugin"].s();
-        const std::string slug = json["slug"].s();
-        const std::string mode = json["mode"].s();
-        if (!valid_title_pair(plugin, slug)) {
-            return crow::response{404, R"({"ok":false,"error":"unknown title"})"};
-        }
-        int bad = 0;
-        on_pool(db, [&] {
-            if (mode == "cover") store.title_meta_reset_cover(plugin, slug);
-            else if (mode == "detail") store.title_meta_reset_detail(plugin, slug);
-            else if (mode == "all") { store.title_meta_reset_cover(plugin, slug); store.title_meta_reset_detail(plugin, slug); }
-            else bad = 1;
-            return 0;
+    CROW_ROUTE(app, "/api/enrichment/reset")
+        .methods(crow::HTTPMethod::POST)([&](const crow::request& req) -> crow::response {
+            const auto json = crow::json::load(req.body);
+            if (!json || !json.has("plugin") || !json.has("slug") || !json.has("mode"))
+                return crow::response{400, R"({"ok":false,"error":"missing plugin/slug/mode"})"};
+            const std::string plugin = json["plugin"].s();
+            const std::string slug = json["slug"].s();
+            const std::string mode = json["mode"].s();
+            if (!valid_title_pair(plugin, slug)) {
+                return crow::response{404, R"({"ok":false,"error":"unknown title"})"};
+            }
+            int bad = 0;
+            on_pool(db, [&] {
+                if (mode == "cover")
+                    store.title_meta_reset_cover(plugin, slug);
+                else if (mode == "detail")
+                    store.title_meta_reset_detail(plugin, slug);
+                else if (mode == "all") {
+                    store.title_meta_reset_cover(plugin, slug);
+                    store.title_meta_reset_detail(plugin, slug);
+                } else
+                    bad = 1;
+                return 0;
+            });
+            if (bad)
+                return crow::response{400, R"({"ok":false,"error":"mode must be cover|detail|all"})"};
+            crow::response r{R"({"ok":true})"};
+            r.set_header("Content-Type", "application/json");
+            return r;
         });
-        if (bad) return crow::response{400, R"({"ok":false,"error":"mode must be cover|detail|all"})"};
-        crow::response r{R"({"ok":true})"};
-        r.set_header("Content-Type", "application/json");
-        return r;
-    });
 }
 
 } // namespace api

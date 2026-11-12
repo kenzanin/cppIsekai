@@ -1,5 +1,5 @@
-#include "http_routes.hpp"
 #include "enrich_internal.hpp"
+#include "http_routes.hpp"
 
 #include <fstream>
 #include <sstream>
@@ -22,8 +22,8 @@ crow::json::wvalue layout(Store& store, BS::thread_pool<>& db, const char* activ
     return ctx;
 }
 
-
-crow::json::wvalue home_context(Store& store, BS::thread_pool<>& db, const crow::request& req, reader::CoverWorker& covers) {
+crow::json::wvalue home_context(Store& store, BS::thread_pool<>& db, const crow::request& req,
+                                reader::CoverWorker& covers) {
     const std::string plugin = param(req, "plugin");
     const std::string q = param(req, "q");
     const int page_no = page_of(param(req, "page"));
@@ -62,7 +62,8 @@ crow::json::wvalue home_context(Store& store, BS::thread_pool<>& db, const crow:
         crow::json::wvalue row;
         row["name"] = item.name;
         row["id"] = item.plugin_id; // client grid filter + ?plugin= deep-link key off plugin_id
-        row["titles"] = std::to_string(saved_by_plugin[item.plugin_id]); // saved_manga is the Library; title search-cache is empty for plugin results
+        row["titles"] = std::to_string(saved_by_plugin[item.plugin_id]); // saved_manga is the Library; title
+                                                                         // search-cache is empty for plugin results
         row["current"] = item.plugin_id == plugin;
         if (!item.plugin_id.empty()) {
             row["logo"] = item.plugin_id; // absent key renders no <img> in the partial
@@ -87,9 +88,11 @@ crow::json::wvalue home_context(Store& store, BS::thread_pool<>& db, const crow:
     std::vector<reader::CoverJob> jobs;
     for (std::size_t i = 0; i < saved.size(); ++i) {
         const std::string& c = ovl[i].has_value() ? *ovl[i] : saved[i].cover;
-        if (!c.empty()) jobs.push_back({c, saved[i].plugin});
+        if (!c.empty())
+            jobs.push_back({c, saved[i].plugin});
     }
-    if (!jobs.empty()) covers.nudge(std::move(jobs));
+    if (!jobs.empty())
+        covers.nudge(std::move(jobs));
     ctx["saved_mode"] = !saved.empty();
     ctx["empty_saved"] = saved.empty();
     std::vector<crow::json::wvalue> saved_rows;
@@ -136,7 +139,8 @@ crow::response html(const std::string& file, const crow::json::wvalue& ctx) {
 
 } // namespace
 
-void register_pages(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, LogBuffer& logs, reader::CoverWorker& covers) {
+void register_pages(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, LogBuffer& logs,
+                    reader::CoverWorker& covers) {
     CROW_ROUTE(app, "/")
     ([&](const crow::request& req) { return html("home.mustache", home_context(store, db, req, covers)); });
 
@@ -204,7 +208,6 @@ void register_pages(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, L
 
 } // namespace http
 
-
 namespace {
 void br_asset(const crow::request& req, crow::response& res, const char* path, const char* mime) {
     // Serve precompressed brotli body when the client advertises it; else
@@ -235,7 +238,8 @@ void br_asset(const crow::request& req, crow::response& res, const char* path, c
     res.body = ss.str();
     res.compressed = false; // precompressed (br or plain bytes) — never re-deflate
     res.set_header("Content-Type", mime);
-    if (served_br) res.set_header("Content-Encoding", "br");
+    if (served_br)
+        res.set_header("Content-Encoding", "br");
     res.set_header("Cache-Control", "public, max-age=31536000, immutable");
     res.end();
 }

@@ -12,8 +12,8 @@ namespace api {
 // reader merely loses its prefetch. The worker (task 3.3) mirrors this shape.
 // Declared in api_ctx.hpp; the state TU reuses it for the skip-rerun.
 std::vector<std::string> reader_window(Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool,
-                                       plugin::Host& plugins, const std::string& plugin_id,
-                                       const std::string& manga_id, const reader::Position& pos) {
+                                       plugin::Host& plugins, const std::string& plugin_id, const std::string& manga_id,
+                                       const reader::Position& pos) {
     crow::json::wvalue query;
     query["id"] = manga_id;
     const std::string chapters_query = query.dump();
@@ -143,7 +143,9 @@ void register_reader(Ctx& c) {
                 chapter_number = body["chapter_number"].d();
             on_pool(db, [&] {
                 const auto stored = store.position_get(plugin, manga);
-                ReaderPosition next{plugin, manga, chapter, resolve_chapter_number(stored, chapter_number), pos.page, mode, direction, zoom, 0};
+                ReaderPosition next{plugin,   manga, chapter,   resolve_chapter_number(stored, chapter_number),
+                                    pos.page, mode,  direction, zoom,
+                                    0};
                 if (stored) {
                     // same chapter, no page sent -> keep the page
                     if (chapter == stored->chapter_id)
@@ -153,7 +155,8 @@ void register_reader(Ctx& c) {
                 // detail-enrichment 1.1 (chapter-list-controls): max pages-read per chapter for the row counter/check.
                 if (!chapter.empty()) {
                     int prev = 0;
-                    if (const auto s = store.state_get(kStateHost, std::string(kReadPrefix) + chapter); s && !s->empty())
+                    if (const auto s = store.state_get(kStateHost, std::string(kReadPrefix) + chapter);
+                        s && !s->empty())
                         prev = std::atoi(s->c_str()); // state_get returns the stored "N"
                     const int p = pos.page > 1 ? pos.page : 1;
                     const int now = std::max(prev, p);
@@ -161,13 +164,12 @@ void register_reader(Ctx& c) {
                 }
                 // library-grid-stats 2.4: reader touch stamps last_read_at + clears has_update.
                 store.saved_clear_update(plugin, manga);
-                spdlog::debug("position {} {} ch={} p={} cn={} mode='{}' dir='{}'", plugin, manga, chapter,
-                              next.page, next.chapter_number, next.mode, next.direction);
+                spdlog::debug("position {} {} ch={} p={} cn={} mode='{}' dir='{}'", plugin, manga, chapter, next.page,
+                              next.chapter_number, next.mode, next.direction);
                 return 0;
             });
 
-            const std::vector<std::string> found =
-                reader_window(store, db, plugin_pool, plugins, plugin, manga, pos);
+            const std::vector<std::string> found = reader_window(store, db, plugin_pool, plugins, plugin, manga, pos);
             std::vector<crow::json::wvalue> window;
             for (const auto& url : found)
                 window.emplace_back(url);

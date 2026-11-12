@@ -15,19 +15,19 @@
 
 #include <spdlog/spdlog.h>
 
+#include <cstdlib>
 #include <functional>
 #include <future>
 #include <memory>
 #include <string>
 #include <utility>
-#include <cstdlib>
 
 #include "cache/cache.hpp"
 #include "config/config.hpp"
 #include "log/log.hpp"
-#include "reader/worker.hpp"
-#include "reader/cover_worker.hpp"
 #include "plugin/plugin.hpp"
+#include "reader/cover_worker.hpp"
+#include "reader/worker.hpp"
 #include "store/store.hpp"
 
 namespace http {
@@ -68,13 +68,14 @@ inline int page_of(const std::string& text) {
 
 /** \brief HTML pages + the log websocket: /, /library/grid, /search,
  *  /plugins, /about, /logs, ws /log. */
-void register_pages(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, LogBuffer& logs, reader::CoverWorker& covers);
+void register_pages(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, LogBuffer& logs,
+                    reader::CoverWorker& covers);
 
 /** \brief JSON API: plugin registry/call routes, reader position/skip,
  *  config save, image cache, CBZ export, dev reload. */
 void register_api(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool,
-                  plugin::Host& plugins, cache::Cache& images, reader::Worker& prefetch, reader::CoverWorker& covers, const std::string& ini_path,
-                  const config::Overrides& overrides);
+                  plugin::Host& plugins, cache::Cache& images, reader::Worker& prefetch, reader::CoverWorker& covers,
+                  const std::string& ini_path, const config::Overrides& overrides);
 
 } // namespace http
 

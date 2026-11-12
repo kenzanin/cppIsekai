@@ -9,8 +9,8 @@
  * {ok=false, error=...}. */
 
 #include "fs.hpp" // plugin::fs_read -- confined read-only file helper (also drags <filesystem>/<fstream> for embedders)
-#include <BS_thread_pool.hpp>
 #include <curl/curl.h>
+#include <BS_thread_pool.hpp>
 
 #include <atomic>
 #include <memory>

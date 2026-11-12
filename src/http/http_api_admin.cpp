@@ -11,11 +11,11 @@
 
 #include <chrono>
 #include <cstdlib>
+#include <errno.h>
+#include <signal.h>
+#include <sys/wait.h>
 #include <thread>
 #include <unistd.h>
-#include <signal.h>
-#include <errno.h>
-#include <sys/wait.h>
 
 namespace http {
 namespace api {
@@ -165,14 +165,18 @@ void register_admin(Ctx& c) {
                     if (it != d->second.get_object().end() && it->second.is_array()) {
                         std::vector<reader::CoverJob> jobs;
                         for (const auto& el : it->second.get_array()) {
-                            if (!el.is_object()) continue;
+                            if (!el.is_object())
+                                continue;
                             const auto& obj = el.get_object();
                             const auto c2 = obj.find("cover");
-                            if (c2 == obj.end()) continue;
+                            if (c2 == obj.end())
+                                continue;
                             const auto* s = std::get_if<std::string>(&c2->second.data);
-                            if (s && !s->empty()) jobs.push_back({*s, id});
+                            if (s && !s->empty())
+                                jobs.push_back({*s, id});
                         }
-                        if (!jobs.empty()) covers.nudge(std::move(jobs));
+                        if (!jobs.empty())
+                            covers.nudge(std::move(jobs));
                     }
                 }
             }
@@ -193,20 +197,27 @@ void register_admin(Ctx& c) {
                 if (const char* v = ini.GetValue("plugin", "fetch_profiles", nullptr)) {
                     std::string tok;
                     for (const char c : std::string(v)) {
-                        if (c == ',') { if (!tok.empty()) { fetch_profiles.push_back(tok); tok.clear(); } }
-                        else if (c != ' ' && c != '\t') tok += c;
+                        if (c == ',') {
+                            if (!tok.empty()) {
+                                fetch_profiles.push_back(tok);
+                                tok.clear();
+                            }
+                        } else if (c != ' ' && c != '\t')
+                            tok += c;
                     }
-                    if (!tok.empty()) fetch_profiles.push_back(tok);
+                    if (!tok.empty())
+                        fetch_profiles.push_back(tok);
                 }
             }
         }
         if (fetch_profiles.empty())
-            fetch_profiles = {"chrome99","chrome100","chrome101","chrome104","chrome107","chrome110","chrome116",
-                              "edge99","edge101","safari15_3","safari15_5",
-                              "ff91esr","ff95","ff98","ff100","ff102","ff109","ff117"};
+            fetch_profiles = {"chrome99",  "chrome100", "chrome101", "chrome104",  "chrome107",  "chrome110",
+                              "chrome116", "edge99",    "edge101",   "safari15_3", "safari15_5", "ff91esr",
+                              "ff95",      "ff98",      "ff100",     "ff102",      "ff109",      "ff117"};
         crow::json::wvalue list(crow::json::type::List);
         int p = 0;
-        for (const auto& x : fetch_profiles) list[p++] = x;
+        for (const auto& x : fetch_profiles)
+            list[p++] = x;
 
         crow::json::wvalue knobs(crow::json::type::List);
         int i = 0;
@@ -288,19 +299,22 @@ void register_admin(Ctx& c) {
         if (pid == 0) {
             // The watchdog inherits every fd, including crow's listen socket;
             // hold it and the re-exec'd instance can never bind. Drop them all.
-            for (int fd = 3; fd < 1024; ++fd) close(fd);
+            for (int fd = 3; fd < 1024; ++fd)
+                close(fd);
             // Watchdog child: wait for the parent to actually exit (ESRCH), not
             // EPERM from reparenting under init; then exec with the original argv.
             for (;;) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
-                if (kill(parent, 0) != 0 && errno == ESRCH) break;
+                if (kill(parent, 0) != 0 && errno == ESRCH)
+                    break;
             }
             // Parent is gone but the kernel may still hold the listening
             // socket briefly; give the port a beat to free before re-exec.
             std::this_thread::sleep_for(std::chrono::milliseconds(1500));
             char exe_buf[4096];
             const ssize_t n = readlink("/proc/self/exe", exe_buf, sizeof(exe_buf) - 1);
-            if (n <= 0) _exit(1);
+            if (n <= 0)
+                _exit(1);
             std::string exe(exe_buf, static_cast<std::size_t>(n));
             // Rebuilt binary since boot: kernel marks the old path " (deleted)".
             // Strip it and re-exec the current file on disk instead.

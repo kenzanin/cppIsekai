@@ -1,7 +1,7 @@
-#include "js_rt.hpp"
 #include "js_internal.hpp"
+#include "js_rt.hpp"
 
-#include "plugin/fs.hpp" // plugin::fs_read -- the fs.read body
+#include "plugin/fs.hpp"       // plugin::fs_read -- the fs.read body
 #include "plugin/htmltext.hpp" // host.re2/html core (task 1.3)
 
 #include <spdlog/spdlog.h>
@@ -183,7 +183,8 @@ JSValue js_html_attr(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueCon
     if (argc < 3) {
         return JS_ThrowTypeError(ctx, "html.attr(html, css, attr)");
     }
-    const std::vector<std::string> vals = html_attr(arg_str(ctx, argv[0]), arg_str(ctx, argv[1]), arg_str(ctx, argv[2]));
+    const std::vector<std::string> vals =
+        html_attr(arg_str(ctx, argv[0]), arg_str(ctx, argv[1]), arg_str(ctx, argv[2]));
     JSValue arr = JS_NewArray(ctx);
     for (size_t i = 0; i < vals.size(); ++i) {
         JS_SetPropertyUint32(ctx, arr, i, JS_NewStringLen(ctx, vals[i].data(), vals[i].size()));

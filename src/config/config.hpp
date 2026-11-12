@@ -31,13 +31,13 @@ struct Config {
     std::string fetch_profile;
     std::int64_t plugin_timeout_ops;
     std::int64_t cache_max_mb;
-    std::string image_format;    // [cache] image_format: webp|avif|jxl|none
-    std::int64_t cover_max_px;   // [cache] cover_max_px: cover resize cap
+    std::string image_format;  // [cache] image_format: webp|avif|jxl|none
+    std::int64_t cover_max_px; // [cache] cover_max_px: cover resize cap
     std::string db;
     std::string log_file;
     std::string data_dir;
-    std::string log_level; // [log] level: trace|debug|info|warning|error
-    std::string templates_dir; // [paths] templates_dir: mustache template root
+    std::string log_level;      // [log] level: trace|debug|info|warning|error
+    std::string templates_dir;  // [paths] templates_dir: mustache template root
     std::string enrichment_dir; // [paths] enrichment_dir: metadata-only enrichment plugins (NOT scraper plugins)
 };
 
@@ -112,8 +112,9 @@ struct Describe {
     Type type{};
 };
 
-inline std::vector<Describe> describe(const std::string& ini_path, const Overrides& flags,
-                                      const EnvLookup& env = [](const char* n) { return std::getenv(n); }) {
+inline std::vector<Describe> describe(
+    const std::string& ini_path, const Overrides& flags,
+    const EnvLookup& env = [](const char* n) { return std::getenv(n); }) {
     CSimpleIniA ini;
     const bool have_ini = ini.LoadFile(ini_path.c_str()) >= 0;
     std::vector<Describe> out;
@@ -167,8 +168,7 @@ inline std::vector<Describe> describe(const std::string& ini_path, const Overrid
  *  form. Integers up to 1e18 keep exact integer text; fractional doubles go
  *  through to_string(double); any other value type is an error. Crow-free so
  *  the branchy part is unit-testable (review I1). */
-inline bool parse_updates(const std::string& body, std::map<std::string, std::string>& out,
-                          std::string& err) {
+inline bool parse_updates(const std::string& body, std::map<std::string, std::string>& out, std::string& err) {
     glz::generic root;
     if (glz::read_json(root, body) || !root.is_object()) {
         err = "body must be a JSON object";
@@ -178,9 +178,8 @@ inline bool parse_updates(const std::string& body, std::map<std::string, std::st
         if (const auto* s = std::get_if<std::string>(&val.data))
             out[key] = *s;
         else if (const auto* n = std::get_if<double>(&val.data)) // glz::generic: f64 numbers
-            out[key] = (*n == std::floor(*n) && std::fabs(*n) < 1e18)
-                           ? std::to_string(static_cast<long long>(*n))
-                           : std::to_string(*n);
+            out[key] = (*n == std::floor(*n) && std::fabs(*n) < 1e18) ? std::to_string(static_cast<long long>(*n))
+                                                                      : std::to_string(*n);
         else {
             err = "value of '" + key + "' must be a string or number";
             return false;

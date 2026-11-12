@@ -61,9 +61,9 @@ struct Instance {
     IM3Environment env = nullptr;
     IM3Runtime rt = nullptr;
     IM3Module module = nullptr;
-    IM3Function f_alloc = nullptr;     // i32(size) -> i32 ptr
-    IM3Function f_handle = nullptr;    // i32(ptr), i32(len) -> i32 out (0 = no reply)
-    IM3Function f_last_len = nullptr;  // () -> i32
+    IM3Function f_alloc = nullptr;    // i32(size) -> i32 ptr
+    IM3Function f_handle = nullptr;   // i32(ptr), i32(len) -> i32 out (0 = no reply)
+    IM3Function f_last_len = nullptr; // () -> i32
 };
 
 struct Loaded {

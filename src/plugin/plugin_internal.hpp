@@ -5,13 +5,13 @@
  *  Not a public header; plugin.hpp stays the surface.
  */
 
-#include "plugin.hpp"
 #include "fs.hpp"
-#include "runtime_common.hpp"
-#include "lua/bridge.hpp"
 #include "http_client.hpp"
-#include "plugin/wasm/wasm_rt.hpp"
+#include "lua/bridge.hpp"
+#include "plugin.hpp"
 #include "plugin/js/js_rt.hpp"
+#include "plugin/wasm/wasm_rt.hpp"
+#include "runtime_common.hpp"
 
 #include <glaze/glaze.hpp>
 #include <sol/sol.hpp>
@@ -24,8 +24,8 @@
 #include <ctime>
 #include <fstream>
 #include <map>
-#include <mutex>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <utility>
@@ -40,8 +40,8 @@ namespace plugin {
 // Host::call, shared by every backend.
 struct Runtime {
     PluginInfo info;
-    std::mutex mu; // one call at a time per runtime, whatever the backend
-    glz::generic cfg;  // parsed config.json; meaningful only when has_cfg
+    std::mutex mu;    // one call at a time per runtime, whatever the backend
+    glz::generic cfg; // parsed config.json; meaningful only when has_cfg
     bool has_cfg = false;
 
     // lua backend (info.runtime == "lua")
@@ -67,7 +67,7 @@ struct Host::Impl {
     LiveProfile live_profile;
     std::mutex mu;
     std::map<std::string, std::shared_ptr<Runtime>> plugins;
-    BS::thread_pool<>* db = nullptr; // db-worker gate for storage.*, set via use_db
+    BS::thread_pool<>* db = nullptr;          // db-worker gate for storage.*, set via use_db
     std::map<std::string, CallHealth> health; // last call outcome per plugin id
 };
 

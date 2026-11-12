@@ -18,7 +18,6 @@ namespace cbz {
  *  fs level; resolve store-side and pass a path in when wanted.
  *  Nothing cached (including an unknown slug) yields an empty-but-valid zip;
  *  nullopt only when a file cannot be read or the zip cannot be written. */
-std::optional<std::string> build(const std::string& cache_root, const std::string& plugin,
-                                 const std::string& slug);
+std::optional<std::string> build(const std::string& cache_root, const std::string& plugin, const std::string& slug);
 
 } // namespace cbz

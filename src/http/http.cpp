@@ -1,8 +1,8 @@
 #include "http.hpp"
 #include "http_routes.hpp"
 
-#include "reader/worker.hpp"
 #include "reader/cover_worker.hpp"
+#include "reader/worker.hpp"
 
 #include <cstdio>
 #include <optional>

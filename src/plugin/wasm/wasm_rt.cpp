@@ -71,8 +71,7 @@ RawReply invoke(Instance& inst, const std::string& envelope_json) {
         out.error = "wasm: bad reply length";
         return out;
     }
-    const auto reply_mem =
-        guest_mem(inst, static_cast<uint32_t>(reply_ptr), static_cast<uint32_t>(reply_len));
+    const auto reply_mem = guest_mem(inst, static_cast<uint32_t>(reply_ptr), static_cast<uint32_t>(reply_len));
     if (!reply_mem) {
         out.error = "wasm: reply outside linear memory";
         return out;

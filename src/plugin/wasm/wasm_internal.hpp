@@ -24,8 +24,8 @@ inline constexpr uint64_t kGasPerCall = 5'000'000;
 std::optional<std::span<uint8_t>> guest_mem(Instance& inst, uint32_t off, uint32_t len);
 
 // Import-domain failures carried in i32 results.
-inline constexpr int32_t kNotFound = -1;  // key/relation/file absent, fetch failed
-inline constexpr int32_t kTruncated = -2; // result larger than the guest's cap
+inline constexpr int32_t kNotFound = -1;   // key/relation/file absent, fetch failed
+inline constexpr int32_t kTruncated = -2;  // result larger than the guest's cap
 inline constexpr int32_t kBadPattern = -3; // re2 pattern failed compilation
 
 /** \brief Reads a guest string at [off, off+len); nullopt out of bounds. */

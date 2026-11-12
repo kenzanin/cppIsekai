@@ -9,7 +9,8 @@ using namespace sqlite_orm;
 std::optional<ApiCacheRow> Store::api_cache_get(const std::string& plugin_id, const std::string& query_hash) {
     // Raw connection: payload is JSONB binary — sqlite_orm has no mapping for it.
     sqlite3* db = nullptr;
-    if (sqlite3_open(impl_->path.c_str(), &db) != SQLITE_OK) return std::nullopt;
+    if (sqlite3_open(impl_->path.c_str(), &db) != SQLITE_OK)
+        return std::nullopt;
     sqlite3_busy_timeout(db, 3000);
     sqlite3_stmt* stmt = nullptr;
     std::optional<ApiCacheRow> row;
@@ -35,11 +36,11 @@ std::optional<ApiCacheRow> Store::api_cache_get(const std::string& plugin_id, co
     return row;
 }
 
-void Store::api_cache_put(const std::string& plugin_id, const std::string& query_hash,
-                          const std::string& params_json, const std::string& payload,
-                          std::int64_t fetched_at, std::int64_t ttl_s) {
+void Store::api_cache_put(const std::string& plugin_id, const std::string& query_hash, const std::string& params_json,
+                          const std::string& payload, std::int64_t fetched_at, std::int64_t ttl_s) {
     sqlite3* db = nullptr;
-    if (sqlite3_open(impl_->path.c_str(), &db) != SQLITE_OK) return;
+    if (sqlite3_open(impl_->path.c_str(), &db) != SQLITE_OK)
+        return;
     sqlite3_busy_timeout(db, 3000);
     sqlite3_stmt* stmt = nullptr;
     // jsonb(?) rejects malformed JSON -> the write fails loudly, never stores garbage.
@@ -62,12 +63,11 @@ void Store::api_cache_put(const std::string& plugin_id, const std::string& query
 }
 
 std::optional<SavedManga> Store::saved_get(const std::string& plugin, const std::string& slug) {
-    auto rows = impl_->storage.get_all<store_detail::SavedMangaEntity>(
-        where(c(&store_detail::SavedMangaEntity::plugin) == plugin && c(&store_detail::SavedMangaEntity::slug) == slug));
+    auto rows = impl_->storage.get_all<store_detail::SavedMangaEntity>(where(
+        c(&store_detail::SavedMangaEntity::plugin) == plugin && c(&store_detail::SavedMangaEntity::slug) == slug));
     if (rows.empty())
         return std::nullopt;
     const auto& r = rows[0];
-    return SavedManga{r.plugin, r.slug, r.name, r.cover, r.added_at,
-                      r.status, r.total_ch, r.read_ch, r.has_update, r.last_read_at, r.updated_at,
-                      r.synopsis, r.alt_titles, r.dup_group};
+    return SavedManga{r.plugin,  r.slug,       r.name,         r.cover,      r.added_at, r.status,     r.total_ch,
+                      r.read_ch, r.has_update, r.last_read_at, r.updated_at, r.synopsis, r.alt_titles, r.dup_group};
 }

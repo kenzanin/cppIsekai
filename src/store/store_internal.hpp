@@ -2,10 +2,10 @@
 /** \file store_internal.hpp
  *  \brief Storage entities + Impl plumbing shared by the store TUs.
  */
-#include <sqlite_orm/sqlite_orm.h>
-#include <sqlite3.h>
 #include <memory>
+#include <sqlite3.h>
 #include <string>
+#include <sqlite_orm/sqlite_orm.h>
 namespace store_detail {
 using namespace sqlite_orm;
 
@@ -44,32 +44,32 @@ struct ReaderPositionEntity {
 };
 
 struct SavedMangaEntity {
-    std::string plugin;     // composite PK with slug: one row per saved manga
+    std::string plugin; // composite PK with slug: one row per saved manga
     std::string slug;
     std::string name;
     std::string cover;
     std::int64_t added_at{};
-    std::string status;       // ongoing|hiatus|complete|canceled (plugin source; stored verbatim)
-    int total_ch{};           // chapters reported by the source envelope; 0 = unknown
-    int read_ch{};            // chapters fully read (host/read >= pages) at last rollup
-    int has_update{};         // 1 when a refresh/detail-open saw newer chapters than stored
+    std::string status;          // ongoing|hiatus|complete|canceled (plugin source; stored verbatim)
+    int total_ch{};              // chapters reported by the source envelope; 0 = unknown
+    int read_ch{};               // chapters fully read (host/read >= pages) at last rollup
+    int has_update{};            // 1 when a refresh/detail-open saw newer chapters than stored
     std::int64_t last_read_at{}; // reader position POST timestamp; 0 = never opened
-    std::int64_t updated_at{}; // unix seconds of last envelope-derived change; 0 = never synced
-    std::string synopsis;      // plugin-source detail envelope synopsis (NOT enrichment)
-    std::string alt_titles;    // plugin-source detail envelope alt titles, JSON array verbatim
-    int dup_group{};           // 0 = unique; elsewhere groups same work (recomputed, never trusted across boots)
+    std::int64_t updated_at{};   // unix seconds of last envelope-derived change; 0 = never synced
+    std::string synopsis;        // plugin-source detail envelope synopsis (NOT enrichment)
+    std::string alt_titles;      // plugin-source detail envelope alt titles, JSON array verbatim
+    int dup_group{};             // 0 = unique; elsewhere groups same work (recomputed, never trusted across boots)
 };
 
 struct TitleMetaEntity {
-    std::string plugin;      // composite PK with slug: one row per saved manga
+    std::string plugin; // composite PK with slug: one row per saved manga
     std::string slug;
-    std::string fetched;     // JSON array: [{source, fetched_at, data}]; never expires
-    std::string chosen;      // JSON object: {title?, synopsis?, artist?, author?, cover?, tags_add[], tags_hidden[]}
+    std::string fetched;       // JSON array: [{source, fetched_at, data}]; never expires
+    std::string chosen;        // JSON object: {title?, synopsis?, artist?, author?, cover?, tags_add[], tags_hidden[]}
     std::int64_t fetched_at{}; // last fetch watermark (unix seconds)
 };
 
 struct ApiCacheEntity {
-    std::string plugin_id;   // composite PK with query_hash
+    std::string plugin_id; // composite PK with query_hash
     std::string query_hash;
     std::string params_json;
     std::int64_t fetched_at{};
@@ -102,9 +102,9 @@ inline auto create_storage(const std::string& path) {
                    make_column("zoom", &ReaderPositionEntity::zoom, default_value("")),
                    make_column("updated_at", &ReaderPositionEntity::updated_at),
                    primary_key(&ReaderPositionEntity::plugin, &ReaderPositionEntity::slug)),
-        make_table("saved_manga", make_column("plugin", &SavedMangaEntity::plugin), make_column("slug", &SavedMangaEntity::slug),
-                   make_column("name", &SavedMangaEntity::name), make_column("cover", &SavedMangaEntity::cover),
-                   make_column("added_at", &SavedMangaEntity::added_at),
+        make_table("saved_manga", make_column("plugin", &SavedMangaEntity::plugin),
+                   make_column("slug", &SavedMangaEntity::slug), make_column("name", &SavedMangaEntity::name),
+                   make_column("cover", &SavedMangaEntity::cover), make_column("added_at", &SavedMangaEntity::added_at),
                    make_column("status", &SavedMangaEntity::status, default_value("ongoing")),
                    make_column("total_ch", &SavedMangaEntity::total_ch, default_value(0)),
                    make_column("read_ch", &SavedMangaEntity::read_ch, default_value(0)),
@@ -115,16 +115,15 @@ inline auto create_storage(const std::string& path) {
                    make_column("alt_titles", &SavedMangaEntity::alt_titles, default_value("")),
                    make_column("dup_group", &SavedMangaEntity::dup_group, default_value(0)),
                    primary_key(&SavedMangaEntity::plugin, &SavedMangaEntity::slug)),
-        make_table("title_meta", make_column("plugin", &TitleMetaEntity::plugin), make_column("slug", &TitleMetaEntity::slug),
-                   make_column("fetched", &TitleMetaEntity::fetched),
+        make_table("title_meta", make_column("plugin", &TitleMetaEntity::plugin),
+                   make_column("slug", &TitleMetaEntity::slug), make_column("fetched", &TitleMetaEntity::fetched),
                    make_column("chosen", &TitleMetaEntity::chosen),
                    make_column("fetched_at", &TitleMetaEntity::fetched_at),
                    primary_key(&TitleMetaEntity::plugin, &TitleMetaEntity::slug)),
         make_table("api_cache", make_column("plugin_id", &ApiCacheEntity::plugin_id),
                    make_column("query_hash", &ApiCacheEntity::query_hash),
                    make_column("params_json", &ApiCacheEntity::params_json),
-                   make_column("fetched_at", &ApiCacheEntity::fetched_at),
-                   make_column("ttl_s", &ApiCacheEntity::ttl_s),
+                   make_column("fetched_at", &ApiCacheEntity::fetched_at), make_column("ttl_s", &ApiCacheEntity::ttl_s),
                    primary_key(&ApiCacheEntity::plugin_id, &ApiCacheEntity::query_hash)));
 }
 

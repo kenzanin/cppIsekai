@@ -23,8 +23,8 @@ std::string err_json(std::string msg) {
 // The wasm env.http_fetch service: moved verbatim from the monolith so both
 // load paths (wasm and js) share the same front as the lua host tools.
 wasm::HttpFetch make_wasm_fetch(const std::string& id, const Config& conf, const LiveProfile& live_profile) {
-    return [id, timeout_ms = conf.fetch_timeout_ms, live = &live_profile, proxy = conf.proxy](
-               const std::string& url, const std::string& opts_json) -> std::optional<std::string> {
+    return [id, timeout_ms = conf.fetch_timeout_ms, live = &live_profile,
+            proxy = conf.proxy](const std::string& url, const std::string& opts_json) -> std::optional<std::string> {
         long ms = timeout_ms;
         std::string live_default;
         if (auto p = live->load()) {
@@ -80,8 +80,8 @@ wasm::HttpFetch make_wasm_fetch(const std::string& id, const Config& conf, const
 
         profile_name = checked_profile(std::move(profile_name), live_default);
         const std::string cookie_jar = use_cookies ? cookie_jar_path(id) : std::string{};
-        const FetchResult fr = fetch_sync(url, ms, profile_name, method, body, accept_header, ua_header,
-                                          extra_headers, proxy, cookie_jar);
+        const FetchResult fr =
+            fetch_sync(url, ms, profile_name, method, body, accept_header, ua_header, extra_headers, proxy, cookie_jar);
         if (!fr.error.empty()) {
             spdlog::warn("[plugin:{}] fetch {} failed: {}", id, url, fr.error);
             return std::nullopt;
@@ -112,10 +112,8 @@ namespace {
  *  (data/plugins, upserts into the Store registry /plugins shows) and the
  *  enrichment scan (data/enrichment, stays out of the registry). Keeps the
  *  two paths byte-identical except for directory, tagging and upsert. */
-void scan_dir(const Config& conf, LiveProfile& live_profile, Store& store,
-             const StateGet& sget, const StateSet& sset,
-             const std::string& dir, bool is_enrichment,
-             std::map<std::string, std::shared_ptr<Runtime>>& fresh) {
+void scan_dir(const Config& conf, LiveProfile& live_profile, Store& store, const StateGet& sget, const StateSet& sset,
+              const std::string& dir, bool is_enrichment, std::map<std::string, std::shared_ptr<Runtime>>& fresh) {
     std::error_code ec;
     if (!fs::exists(fs::path(dir), ec)) {
         spdlog::warn("{} dir '{}' missing; skipped", is_enrichment ? "enrichment" : "plugin", dir);
@@ -173,7 +171,10 @@ void scan_dir(const Config& conf, LiveProfile& live_profile, Store& store,
             // callers can distinguish; harmless if the manifest already set it.
             bool has_cap = false;
             for (const auto& c : rt.info.capabilities) {
-                if (c == "enrichment") { has_cap = true; break; }
+                if (c == "enrichment") {
+                    has_cap = true;
+                    break;
+                }
             }
             if (!has_cap) {
                 rt.info.capabilities.emplace_back("enrichment");
@@ -188,8 +189,7 @@ void scan_dir(const Config& conf, LiveProfile& live_profile, Store& store,
             ss << cf.rdbuf();
             if (auto ec = glz::read_json(rt.cfg, std::move(ss).str())) {
                 spdlog::warn("{} {}: config.json invalid ({})", kind, rt.info.id, glz::format_error(ec));
-            }
-            else {
+            } else {
                 rt.has_cfg = true;
             }
         }
@@ -218,8 +218,7 @@ void scan_dir(const Config& conf, LiveProfile& live_profile, Store& store,
             }
             rt.lua = {L, &lua_close};
             lua::open_sandbox(L);
-            lua::install_host_tools(L, rt.info.id, conf, rt.cfg, rt.has_cfg, sget, sset, rt.info.dir,
-                               live_profile);
+            lua::install_host_tools(L, rt.info.id, conf, rt.cfg, rt.has_cfg, sget, sset, rt.info.dir, live_profile);
             // Entry scripts return nothing; run them, check validity explicitly.
             const sol::protected_function_result script =
                 sol::state_view(L).safe_script_file((fs::path(rt.info.dir) / rt.info.entry).string());

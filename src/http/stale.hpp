@@ -31,15 +31,16 @@ inline constexpr std::int64_t kApiCacheTtl = 24 * 3600;
  *  network is only used on a cold miss (nothing cached) or when the caller
  *  explicitly refreshes. */
 inline bool stale_optin(const std::string& method) {
-    return method == "search" || method == "detail" || method == "chapters" ||
-           method == "pages" || method == "genres" || method == "related";
+    return method == "search" || method == "detail" || method == "chapters" || method == "pages" ||
+           method == "genres" || method == "related";
 }
 
 /** \brief `ok` of an ABI envelope; anything but a literal true is a failure
  *  to serve. */
 inline bool envelope_ok(const glz::generic& g) {
     const auto* obj = std::get_if<glz::generic::object_t>(&g.data);
-    if (!obj) return false;
+    if (!obj)
+        return false;
     const auto ok = obj->find("ok");
     const auto* b = ok == obj->end() ? nullptr : std::get_if<bool>(&ok->second.data);
     return b && *b;
@@ -52,7 +53,8 @@ inline std::optional<glz::generic::array_t> envelope_data(const std::string& env
     if (glz::read_json(parsed, envelope) || !envelope_ok(parsed) || !parsed.is_object())
         return std::nullopt;
     const auto data = parsed.get_object().find("data");
-    if (data == parsed.get_object().end() || !data->second.is_array()) return std::nullopt;
+    if (data == parsed.get_object().end() || !data->second.is_array())
+        return std::nullopt;
     return data->second.get_array();
 }
 
@@ -63,12 +65,12 @@ inline std::optional<glz::generic::array_t> envelope_data(const std::string& env
  *  ponytail: no response-shape version in the key -- a plugin that reshapes
  *  its payload under an unchanged query serves old-shape stale; add a version
  *  segment here when a redesign actually ships. */
-inline std::string stale_key(const std::string& plugin, const std::string& method,
-                             const std::string& params_json) {
+inline std::string stale_key(const std::string& plugin, const std::string& method, const std::string& params_json) {
     std::string canon = params_json;
     glz::generic_sorted params;
     if (!glz::read_json(params, params_json)) {
-        if (auto s = glz::write_json(params)) canon = std::move(*s);
+        if (auto s = glz::write_json(params))
+            canon = std::move(*s);
     }
     return sha1_hex(plugin + '|' + method + '|' + canon);
 }
@@ -77,9 +79,10 @@ inline std::string stale_key(const std::string& plugin, const std::string& metho
  *  on failure. Envelopes that glaze cannot re-shape pass through untouched
  *  in both directions. */
 template <class Call> // std::string() -- the ABI call seam
-std::string call_cached(Store& store, const std::string& id, const std::string& method,
-                        const std::string& params_json, Call&& call) {
-    if (!stale_optin(method)) return call();
+std::string call_cached(Store& store, const std::string& id, const std::string& method, const std::string& params_json,
+                        Call&& call) {
+    if (!stale_optin(method))
+        return call();
 
     const std::string key = stale_key(id, method, params_json);
     const std::int64_t now = static_cast<std::int64_t>(std::time(nullptr));
@@ -89,15 +92,17 @@ std::string call_cached(Store& store, const std::string& id, const std::string& 
     // opens never trigger a plugin call when a row exists. Cold miss is the
     // sole automatic network path (it cannot be avoided).
     if (auto row = store.api_cache_get(id, key)) {
-        spdlog::debug("[plugin:{}] {} api_cache SERVE ({} B, age={}s ttl={}s)", id, method,
-                      row->payload.size(), now - row->fetched_at, row->ttl_s);
+        spdlog::debug("[plugin:{}] {} api_cache SERVE ({} B, age={}s ttl={}s)", id, method, row->payload.size(),
+                      now - row->fetched_at, row->ttl_s);
         glz::generic served;
         if (!glz::read_json(served, row->payload) && served.is_object()) {
             // cold hit carries no flag; an expired row is marked cached so the
             // UI can show ⬇/Update is meaningful.
             const bool fresh = row->ttl_s > 0 && row->fetched_at + row->ttl_s > now;
-            if (!fresh) served.get_object()["cached"].data = true;
-            if (auto out = glz::write_json(served)) return std::move(*out);
+            if (!fresh)
+                served.get_object()["cached"].data = true;
+            if (auto out = glz::write_json(served))
+                return std::move(*out);
         }
         return row->payload;
     }
@@ -106,7 +111,8 @@ std::string call_cached(Store& store, const std::string& id, const std::string& 
     std::string res = call();
 
     glz::generic env;
-    if (glz::read_json(env, res)) return res; // malformed: no shape to key on
+    if (glz::read_json(env, res))
+        return res; // malformed: no shape to key on
 
     if (envelope_ok(env)) {
         spdlog::debug("[plugin:{}] {} fresh envelope cached", id, method);
@@ -121,7 +127,8 @@ std::string call_cached(Store& store, const std::string& id, const std::string& 
         glz::generic served;
         if (!glz::read_json(served, row->payload) && served.is_object()) {
             served.get_object()["cached"].data = true; // top-level flag, via glaze
-            if (auto out = glz::write_json(served)) return std::move(*out);
+            if (auto out = glz::write_json(served))
+                return std::move(*out);
         }
         return row->payload; // unshapeable last-good still beats a fresh error
     }
