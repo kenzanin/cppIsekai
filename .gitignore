@@ -8,3 +8,5 @@ test_*.db
 test_*.log
 build/
 .serena/
+.superpowers/
+.xmake/compile_commands.json

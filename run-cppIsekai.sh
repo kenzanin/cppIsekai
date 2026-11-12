@@ -1,3 +1,3 @@
 #!/bin/sh
 
-./build/cppIsekai --config ./data/cppisekai.ini
+./build/linux/x86_64/release/cppIsekai --config ./data/cppisekai.ini
