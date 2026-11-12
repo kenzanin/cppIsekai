@@ -1,3 +1,4 @@
+#include "plugin/url_codec.hpp"
 #include "bridge.hpp"
 
 #include "plugin/htmltext.hpp" // host.re2/html core (task 1.3)
@@ -82,50 +83,11 @@ end
 
     fs_tab["now"] = sol::as_function([] { return static_cast<long long>(std::time(nullptr)); });
 
-    // host.url_encode/url_decode: query-component codec. encode = RFC 3986
-    // percent-encoding, unreserved ALPHA DIGIT '-' '.' '_' '~'; decode also
-    // maps '+' to space (query-string convention).
-    static constexpr char kHex[] = "0123456789ABCDEF";
-    fs_tab["url_encode"] = [](const std::string& s) {
-        std::string out;
-        for (const char c : s) {
-            const auto uc = static_cast<unsigned char>(c);
-            if (std::isalnum(uc) || c == '-' || c == '.' || c == '_' || c == '~') {
-                out += c;
-            } else {
-                out += '%';
-                out += kHex[uc >> 4];
-                out += kHex[uc & 0x0F];
-            }
-        }
-        return out;
-    };
-    fs_tab["url_decode"] = [](const std::string& s) {
-        const auto hv = [](const char c) {
-            if (c >= '0' && c <= '9') {
-                return c - '0';
-            }
-            if (c >= 'A' && c <= 'F') {
-                return c - 'A' + 10;
-            }
-            if (c >= 'a' && c <= 'f') {
-                return c - 'a' + 10;
-            }
-            return 0;
-        };
-        std::string out;
-        for (size_t i = 0; i < s.size(); ++i) {
-            if (s[i] == '%' && i + 2 < s.size()) {
-                out += static_cast<char>((hv(s[i + 1]) << 4) | hv(s[i + 2]));
-                i += 2;
-            } else if (s[i] == '+') {
-                out += ' ';
-            } else {
-                out += s[i];
-            }
-        }
-        return out;
-    };
+    // host.url_encode/url_decode: shared query-component codec (src/plugin/url_codec.hpp);
+    // decode leaves '+' verbatim (queryEncode semantics, goIsekai parity).
+    fs_tab["url_encode"] = [](const std::string& s) { return plugin::url_encode(s); };
+    fs_tab["url_decode"] = [](const std::string& s) { return plugin::url_decode(s); };
+
 
     // ponytail: io shim is read-only via istream; widen only when a plugin
     // needs incremental reads (io.lines multi-arg / formats).
