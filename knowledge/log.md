@@ -1,4 +1,8 @@
 ## 2026-11-12
+* **Creation**: Documented concept `references/mangafire-vrf-algorithm.md` (Mangafire VRF algorithm (port target for host.crypto.vrf_sign)).
+* **Creation**: Documented concept `decisions/luajit-migration.md` (LuaJIT migration: skipped (not faster, higher risk)).
+* **Update**: Updated concept `references/goisekai-abi-mapping.md`.
+* **Creation**: Documented concept `references/goisekai-abi-mapping.md` (goIsekai to cppIsekai plugin ABI mapping).
 * **Update**: Updated concept `decisions/xmake-build-system.md`.
 * **Creation**: Documented concept `decisions/xmake-build-system.md` (xmake build system alongside cmake + prod-code gate tasks).
 * **Update**: Updated concept `architecture/http-layer-gotchas.md`.
