@@ -1,4 +1,5 @@
 ## 2026-11-12
+* **Update**: Updated concept `decisions/third-party-dependencies.md`.
 * **Creation**: Documented concept `decisions/plugin-lifecycle.md` (Plugin lifecycle: disabled = cache-only reads; folder-removal GC purges every trace).
 * **Creation**: Documented concept `decisions/plugin-port-js-wasm.md` (Plugin port to JS and WASM — plan).
 * **Creation**: Documented concept `decisions/plugin-backend-interface.md` (Plugin backends stay struct+dispatch; introduce PluginBackend interface only for a 4th runtime or out-of-process).

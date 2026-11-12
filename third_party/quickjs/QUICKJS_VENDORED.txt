@@ -1,4 +1,0 @@
-quickjs-ng vendored snapshot
-upstream: https://github.com/quickjs-ng/quickjs
-commit: d4187c7 (master, 2026-11-07)
-scope: core lib only (dtoa/libregexp/libunicode/quickjs + headers); no libc shim - host integrates via js_rt

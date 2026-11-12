@@ -46,11 +46,10 @@ cppIsekai — local-first C++23 manga viewer daemon (Linux, Arch). Crow master +
 ## Commands
 
 ```bash
-cmake -S . -B build -G Ninja          # configure (system deps via pacman: libvips lua54 curl crow asio ninja cli11)
-cmake --build build -j                # build, zero-warning gate (-Wall -Wextra)
-ctest --test-dir build --output-on-failure    # full suite (9 targets: store, plugin, cache, slug, config, http_img, stale, window, worker)
-ctest --test-dir build -R <name>      # focused single target
-./build/cppIsekai --config data/cppisekai.ini   # run (bare boot refuses with usage; --help exit 0)
+xmake -y                            # configure + build (xrepo packages auto-install; zero-warning gate -Wall -Wextra)
+xmake test                          # full suite (doctest)
+xmake test <target>                 # single target, e.g. xmake test test_store
+./run-cppIsekai.sh                   # run (bare boot refuses with usage; --help exit 0)
 ```
 
 OpenSpec (planning home = repo root):

@@ -81,7 +81,7 @@ public:
      *  stores original bytes (no sidecar). */
     struct CoverCtx {
         std::string url;
-        std::string plugin;
+        std::string plugin{};
         int w{}, h{};
         double ratio{};
         bool cover{};
@@ -91,7 +91,7 @@ public:
         std::string slug;
         int chapter{};
         int page{};
-        std::string chapter_id; // id8 dir-suffix source; empty keeps plain chNNN
+        std::string chapter_id{}; // id8 dir-suffix source; empty keeps plain chNNN
     };
     std::optional<std::string> img_store(const std::string& key, const std::string& body, const CoverCtx& cover_ctx,
                                          const PageCtx& page_ctx, const std::string& ext_override = {});

@@ -11,7 +11,7 @@ namespace {
 constexpr long long kOpsPerCall = 200000; // same scale as the lua instruction budget
 constexpr long long kOpsChunk = 512;
 
-int budget_interrupt(JSContext* /*ctx*/, void* opaque) {
+int budget_interrupt(JSRuntime* /*rt*/, void* opaque) {
     auto& ops = *static_cast<long long*>(opaque);
     ops -= kOpsChunk;
     return ops > 0 ? 0 : 1; // 1 = stop the script

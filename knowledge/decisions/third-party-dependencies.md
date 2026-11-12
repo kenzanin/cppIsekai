@@ -2,12 +2,14 @@
 type: decision
 title: "Dependency vendoring: system-shared first, minimal vendoring"
 description: "Dependencies: crow/asio/libvips/lua54/curl-headers/cli11 from pacman; sol2, BS::thread_pool, readerwriterqueue, glaze, wasm3, libsql amalgamation, curl-impersonate and simpleini vendored minimal; pin hashes in README"
-generated: { by: agent/mcp, at: "2026-11-07T11:37:17Z" }
+generated: { by: agent/mcp, at: "2026-11-12T17:25:19Z" }
 status: stable
 ---
 
-Source: tmp/konsep_awal.md. System packages (pacman / pkg-config): libvips 8.18.7, lua54 5.4.9, curl headers 8.23, crow 1.3.4, asio 1.38.2 (under Crow), cli11 2.7.2 (flag parsing). Vendored under third_party/ (headers/source + LICENSE only): sol2 v3.5.0 9190880 (MIT, include <sol/sol.hpp>), BS::thread_pool bd4533f (MIT), readerwriterqueue 6867b56 (BSD), glaze 0a363d4 (MIT), wasm3 28ecb9a sources (MIT, static), libsql sqlite amalgamation 3.47.0 from libsql-ffi/bundled/src (PD, static), curl-impersonate v0.6.1 prebuilt libcurl-impersonate-chrome.so.4.8.0 (shared, BUILD_RPATH), simpleini v4.27 fd6db69 (MIT, single header, whole-line comments survive rewrite). Runtime config precedence: --port > $PORT > [server] port in data/cppisekai.ini > 8090; SimpleIni round-trip check proves comments survive. The main.cpp smoke binary proves link+runtime for all. Vendored total ~38M. Details and licenses: README.md.
+Dependency policy (updated 2026-11-13, xmake migration complete): system packages via pacman/pkg-config — libvips 8.18.x, lua 5.4, curl, crow 1.3.x (bundles asio), cli 11 — everything else pins via xrepo in xmake.lua, locked in xmake-requires.lock (committed):
 
-# Related Concepts
-- [Build system: CMake + C++23, exe-only](build-toolchain-cpp23.md): Dependency choices (system cli11, vendored simpleini, dst) implement the toolchain/build decision
-- [Dependencies & plugins: curl-first APIs, runtime parity, no hand-rolled crypto](deps-and-plugins.md): Extension of vendoring policy: tambah libzippp+libzip (CBZ), stbrumme/hash-library, quickjs-ng; base64 reuse glaze; no hand-rolled crypto.
+- glaze 7.9.0 (JSON), sol2 3.5.0 (Lua binding), thread-pool 5.1.0 (BS::thread_pool), readerwriterqueue 1.0.7, lexbor 3.0.0 (HTML), libzippp 7.1 (CBZ; header nested as libzippp/libzippp.h), quickjs-ng 0.15.1 (JS runtime; JS_SetInterruptHandler takes runtime not ctx), simpleini 4.27 (config), sqlite_orm 1.9.1 (store).
+
+Vendored remainder under third_party/ (no xrepo equivalent): wasm3 and curl-impersonate only; include dirs wired from xmake.lua target cfg.
+
+History: before 2026-11-13 the nine packages above were vendored header/source copies under third_party/; removed in the xmake migration (see git log, build: subjects). System-package versions evolve via pacman; the pin table is the compatibility contract.

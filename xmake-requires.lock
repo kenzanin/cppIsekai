@@ -1,0 +1,159 @@
+{
+    ["linux|x86_64"] = {
+        ["cmake#f56260b5"] = {
+            repo = {
+                branch = "master",
+                commit = "1730b3e52c29bc0dc5dcdc4a1aeb0d3f362f2c10",
+                url = "https://gitlab.com/tboox/xmake-repo.git"
+            },
+            version = "4.3.4"
+        },
+        ["convertutf#f56260b5"] = {
+            repo = {
+                branch = "master",
+                commit = "1730b3e52c29bc0dc5dcdc4a1aeb0d3f362f2c10",
+                url = "https://gitlab.com/tboox/xmake-repo.git"
+            },
+            version = "v1.0.1"
+        },
+        ["glaze 7.9.0#f56260b5"] = {
+            repo = {
+                branch = "master",
+                commit = "1730b3e52c29bc0dc5dcdc4a1aeb0d3f362f2c10",
+                url = "https://gitlab.com/tboox/xmake-repo.git"
+            },
+            version = "v7.9.0"
+        },
+        ["lexbor 3.0.0#f56260b5"] = {
+            repo = {
+                branch = "master",
+                commit = "1730b3e52c29bc0dc5dcdc4a1aeb0d3f362f2c10",
+                url = "https://gitlab.com/tboox/xmake-repo.git"
+            },
+            version = "v3.0.0"
+        },
+        ["libzippp 7.1#f56260b5"] = {
+            repo = {
+                branch = "master",
+                commit = "1730b3e52c29bc0dc5dcdc4a1aeb0d3f362f2c10",
+                url = "https://gitlab.com/tboox/xmake-repo.git"
+            },
+            version = "7.1"
+        },
+        ["libzip v1.10.1#f56260b5"] = {
+            repo = {
+                branch = "master",
+                commit = "1730b3e52c29bc0dc5dcdc4a1aeb0d3f362f2c10",
+                url = "https://gitlab.com/tboox/xmake-repo.git"
+            },
+            version = "v1.10.1"
+        },
+        ["lua 5.4#f56260b5"] = {
+            repo = {
+                branch = "master",
+                commit = "1730b3e52c29bc0dc5dcdc4a1aeb0d3f362f2c10",
+                url = "https://gitlab.com/tboox/xmake-repo.git"
+            },
+            version = "v5.4.8"
+        },
+        ["ninja#f56260b5"] = {
+            repo = {
+                branch = "master",
+                commit = "1730b3e52c29bc0dc5dcdc4a1aeb0d3f362f2c10",
+                url = "https://gitlab.com/tboox/xmake-repo.git"
+            },
+            version = "v1.13.2"
+        },
+        ["pkgconfig::fmt#fd44226e"] = {
+            version = "latest"
+        },
+        ["pkgconfig::libzip#fd44226e"] = {
+            version = "latest"
+        },
+        ["pkgconfig::lua5.4#fd44226e"] = {
+            version = "latest"
+        },
+        ["pkgconfig::re2#fd44226e"] = {
+            version = "latest"
+        },
+        ["pkgconfig::spdlog#fd44226e"] = {
+            version = "latest"
+        },
+        ["pkgconfig::sqlite3#fd44226e"] = {
+            version = "latest"
+        },
+        ["pkgconfig::vips#fd44226e"] = {
+            version = "latest"
+        },
+        ["pkgconfig::zlib#fd44226e"] = {
+            version = "latest"
+        },
+        ["quickjs-ng 0.15.1#f56260b5"] = {
+            repo = {
+                branch = "master",
+                commit = "1730b3e52c29bc0dc5dcdc4a1aeb0d3f362f2c10",
+                url = "https://gitlab.com/tboox/xmake-repo.git"
+            },
+            version = "v0.15.1"
+        },
+        ["readerwriterqueue 1.0.7#f56260b5"] = {
+            repo = {
+                branch = "master",
+                commit = "1730b3e52c29bc0dc5dcdc4a1aeb0d3f362f2c10",
+                url = "https://gitlab.com/tboox/xmake-repo.git"
+            },
+            version = "v1.0.7"
+        },
+        ["simpleini 4.27#f56260b5"] = {
+            repo = {
+                branch = "master",
+                commit = "1730b3e52c29bc0dc5dcdc4a1aeb0d3f362f2c10",
+                url = "https://gitlab.com/tboox/xmake-repo.git"
+            },
+            version = "v4.27"
+        },
+        ["sol2 3.5.0#f56260b5"] = {
+            repo = {
+                branch = "master",
+                commit = "1730b3e52c29bc0dc5dcdc4a1aeb0d3f362f2c10",
+                url = "https://gitlab.com/tboox/xmake-repo.git"
+            },
+            version = "v3.5.0"
+        },
+        ["sqlite3#f56260b5"] = {
+            repo = {
+                branch = "master",
+                commit = "1730b3e52c29bc0dc5dcdc4a1aeb0d3f362f2c10",
+                url = "https://gitlab.com/tboox/xmake-repo.git"
+            },
+            version = "3.54.0+100"
+        },
+        ["sqlite_orm 1.9.1#f56260b5"] = {
+            repo = {
+                branch = "master",
+                commit = "1730b3e52c29bc0dc5dcdc4a1aeb0d3f362f2c10",
+                url = "https://gitlab.com/tboox/xmake-repo.git"
+            },
+            version = "v1.9.1"
+        },
+        ["thread-pool 5.1.0#f56260b5"] = {
+            repo = {
+                branch = "master",
+                commit = "1730b3e52c29bc0dc5dcdc4a1aeb0d3f362f2c10",
+                url = "https://gitlab.com/tboox/xmake-repo.git"
+            },
+            version = "v5.1.0"
+        },
+        ["zlib#f56260b5"] = {
+            repo = {
+                branch = "master",
+                commit = "1730b3e52c29bc0dc5dcdc4a1aeb0d3f362f2c10",
+                url = "https://gitlab.com/tboox/xmake-repo.git"
+            },
+            version = "v1.3.2"
+        }
+    },
+    __meta__ = {
+        version = "1.0"
+    }
+}

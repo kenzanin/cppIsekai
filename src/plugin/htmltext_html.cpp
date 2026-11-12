@@ -136,7 +136,7 @@ std::vector<std::string> html_select(const std::string& html, const std::string&
 
 std::vector<std::string> html_attr(const std::string& html, const std::string& css, const std::string& attr) {
     std::vector<std::string> out;
-    select_each(html, css, [&](lxb_dom_element_t* el, lxb_dom_document_t* ddoc) {
+    select_each(html, css, [&](lxb_dom_element_t* el, lxb_dom_document_t* /*ddoc*/) {
         // Elements without the requested attribute are skipped (spec).
         for (lxb_dom_attr_t* a = lxb_dom_element_first_attribute(el); a != nullptr;
              a = lxb_dom_element_next_attribute(a)) {

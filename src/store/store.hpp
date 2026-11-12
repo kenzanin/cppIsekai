@@ -52,8 +52,8 @@ struct SavedManga {
     int has_update{};              // 1 when a refresh observed growth beyond stored total_ch
     std::int64_t last_read_at{};   // reader position timestamp; 0 = never opened
     std::int64_t updated_at{};     // unix seconds of last envelope-derived change; 0 = never synced
-    std::string synopsis;          // plugin-source detail envelope synopsis (or 'description'; NOT enrichment)
-    std::string alt_titles;        // plugin-source detail envelope alt titles, JSON array verbatim
+    std::string synopsis{};        // plugin-source detail envelope synopsis (or 'description'; NOT enrichment)
+    std::string alt_titles{};      // plugin-source detail envelope alt titles, JSON array verbatim
     int dup_group{};               // 0 = unique; recomputed from FTS5 + Dice similarity (library-dedup 2.2)
 };
 

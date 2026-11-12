@@ -1,6 +1,6 @@
 #include "export_cbz.hpp"
 
-#include <libzippp.h>
+#include <libzippp/libzippp.h>
 
 #include <chrono>
 #include <filesystem>

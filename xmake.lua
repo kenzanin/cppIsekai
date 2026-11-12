@@ -3,13 +3,14 @@ set_version("0.1.0")
 
 set_languages("c23", "c++23")
 add_rules("mode.debug", "mode.release")
-set_config("mode", "release") -- daemon runs from this build; cmake parity is unoptimized
+set_config("mode", "release") -- daemon runs from this build
+set_policy("package.requires_lock", true) -- lock resolved versions (xmake-requires.lock); bump via the pins below
 
 local TP = "third_party"
 local CURL_SO = "$(projectdir)/" .. TP .. "/curl-impersonate/lib/libcurl-impersonate-chrome.so.4.8.0"
 local CURL_LIB = "$(projectdir)/" .. TP .. "/curl-impersonate/lib"
 
--- shared source groups (mirror CMakeLists)
+-- shared source groups
 local STORE_SRC = {"src/store/store_core.cpp", "src/store/store_search.cpp", "src/store/store_api.cpp",
                    "src/store/store_enrichment.cpp"}
 local CACHE_SRC = {"src/cache/cache.cpp", "src/cache/cache_img.cpp"}
@@ -20,9 +21,13 @@ local PLUGIN_SRC = {"src/plugin/plugin_core.cpp", "src/plugin/plugin_load.cpp", 
                     "src/plugin/htmltext_html.cpp"}
 local FETCH_SRC = {"src/fetch/fetch.cpp", "src/fetch/fetch_curl.cpp"}
 
--- system shared libs via pkg-config (pacman-installed, same as cmake's pkg_check_modules)
+-- pacman system shared libs via pkg-config (README system-deps table)
 add_requires("pkgconfig::sqlite3", "pkgconfig::vips", "pkgconfig::lua5.4", "pkgconfig::re2", "pkgconfig::spdlog",
              "pkgconfig::fmt", "pkgconfig::libzip", "pkgconfig::zlib", {system = true})
+
+-- xrepo pins; formerly vendored under third_party/ (wasm3 + curl-impersonate remain vendored)
+add_requires("glaze 7.9.0", "sol2 3.5.0", "thread-pool 5.1.0", "readerwriterqueue 1.0.7", "lexbor 3.0.0",
+             "libzippp 7.1", "quickjs-ng 0.15.1", "simpleini 4.27", "sqlite_orm 1.9.1")
 
 -- add_files needs flat strings; cfg.files may embed the shared groups above
 local function flatten(list)
@@ -53,6 +58,7 @@ local function cxx_bin(name, cfg)
             end
             add_packages(table.unpack(pkgs))
         end
+        if cfg.reqs then add_packages(table.unpack(cfg.reqs)) end
         if cfg.deps then add_deps(table.unpack(cfg.deps)) end
         if cfg.defs then add_defines(table.unpack(cfg.defs)) end
         if cfg.ldflags then add_ldflags(table.unpack(cfg.ldflags), {force = true}) end
@@ -75,29 +81,13 @@ target("wasm3")
     add_includedirs(TP .. "/wasm3/src", {public = true})
     add_defines("_GNU_SOURCE") -- strict c23 hides POSIX (strnlen); cmake built with gnu23
 
-target("quickjs")
-    set_kind("static")
-    set_languages("c23")
-    add_files(TP .. "/quickjs/*.c")
-    add_includedirs(TP .. "/quickjs", {public = true})
-    add_defines("_GNU_SOURCE")
-    add_syslinks("m", "dl", "pthread")
-
-target("lexbor")
-    set_kind("static")
-    set_languages("c23")
-    add_files(TP .. "/lexbor/source/lexbor/**.c")
-    add_includedirs(TP .. "/lexbor/source", {public = true})
-    add_defines("_GNU_SOURCE") -- same strict-c23 POSIX guard as wasm3
-    set_warnings("none") -- C vendor lib; do not gate on -Wall -Wextra
-
 -- --- daemon ---
 cxx_bin("cppIsekai", {
-    files = {"src/**.cpp", TP .. "/libzippp/libzippp.cpp"},
-    incs = {"src", TP .. "/sol2/include", TP .. "/thread_pool/include", TP .. "/readerwriterqueue/include",
-            TP .. "/glaze", TP .. "/simpleini", TP .. "/sqlite_orm/include", TP .. "/libzippp", TP .. "/lexbor/source"},
-    deps = {"wasm3", "quickjs", "lexbor"},
-    pkgs = {"sqlite3", "vips", "lua5.4", "re2", "spdlog", "fmt", "libzip", "zlib"},
+    files = {"src/**.cpp"},
+    incs = {"src"},
+    deps = {"wasm3"},
+    pkgs = {"sqlite3", "vips", "lua5.4", "re2", "spdlog", "fmt", "zlib"},
+    reqs = {"glaze", "sol2", "thread-pool", "readerwriterqueue", "lexbor", "libzippp", "quickjs-ng", "simpleini", "sqlite_orm"},
     ldflags = {CURL_SO},
     rpath = {CURL_LIB},
     defs = {'CPPISEKAI_FETCH_LIB_DIR="' .. CURL_LIB .. '"', "CROW_USE_LOCALTIMEZONE", "CROW_ENABLE_COMPRESSION"},
@@ -106,17 +96,18 @@ cxx_bin("cppIsekai", {
 -- --- tests (doctest, system package; `xmake test` runs all) ---
 cxx_bin("test_store", {
     files = {"tests/test_store.cpp", STORE_SRC},
-    incs = {"src", TP .. "/sqlite_orm/include", TP .. "/glaze"},
+    incs = {"src"},
     pkgs = {"spdlog", "fmt", "sqlite3"},
+    reqs = {"glaze", "sqlite_orm"},
     test = true,
 })
 
 cxx_bin("test_plugin", {
     files = {"tests/test_plugin.cpp", PLUGIN_SRC, STORE_SRC, FETCH_SRC},
-    incs = {"src", TP .. "/glaze", TP .. "/sol2/include", TP .. "/thread_pool/include", TP .. "/lexbor/source",
-            TP .. "/sqlite_orm/include", TP .. "/readerwriterqueue/include"},
-    deps = {"wasm3", "quickjs", "lexbor"},
+    incs = {"src"},
+    deps = {"wasm3"},
     pkgs = {"sqlite3", "lua5.4", "re2", "spdlog", "fmt"},
+    reqs = {"glaze", "sol2", "thread-pool", "lexbor", "sqlite_orm", "readerwriterqueue", "quickjs-ng"},
     ldflags = {CURL_SO},
     rpath = {CURL_LIB},
     defs = {'TEST_PLUGIN_FIXTURES="$(projectdir)/tests/fixtures/plugins"'},
@@ -125,10 +116,10 @@ cxx_bin("test_plugin", {
 
 cxx_bin("test_htmltext", {
     files = {"tests/test_htmltext.cpp", PLUGIN_SRC, STORE_SRC, FETCH_SRC},
-    incs = {"src", TP .. "/glaze", TP .. "/sol2/include", TP .. "/thread_pool/include", TP .. "/lexbor/source",
-            TP .. "/sqlite_orm/include", TP .. "/readerwriterqueue/include"},
-    deps = {"wasm3", "quickjs", "lexbor"},
+    incs = {"src"},
+    deps = {"wasm3"},
     pkgs = {"sqlite3", "lua5.4", "re2", "spdlog", "fmt"},
+    reqs = {"glaze", "sol2", "thread-pool", "lexbor", "sqlite_orm", "readerwriterqueue", "quickjs-ng"},
     ldflags = {CURL_SO},
     rpath = {CURL_LIB},
     defs = {'TEST_PLUGIN_FIXTURES="$(projectdir)/tests/fixtures/plugins"'},
@@ -163,7 +154,8 @@ cxx_bin("test_vrf", {
 
 cxx_bin("test_config", {
     files = {"tests/test_config.cpp"},
-    incs = {"src", TP .. "/simpleini", TP .. "/glaze"},
+    incs = {"src"},
+    reqs = {"simpleini", "glaze"},
     test = true,
 })
 
@@ -175,30 +167,32 @@ cxx_bin("test_http_img", {
 })
 
 cxx_bin("test_export", {
-    files = {"tests/test_export.cpp", "src/http/export_cbz.cpp", TP .. "/libzippp/libzippp.cpp"},
-    incs = {"src/http", TP .. "/libzippp"},
-    pkgs = {"libzip"},
+    files = {"tests/test_export.cpp", "src/http/export_cbz.cpp"},
+    incs = {"src/http"},
+    reqs = {"libzippp"},
     test = true,
 })
 
 cxx_bin("test_stale", {
     files = {"tests/test_stale.cpp", STORE_SRC},
-    incs = {"src", TP .. "/glaze", TP .. "/sqlite_orm/include"},
+    incs = {"src"},
     pkgs = {"spdlog", "fmt", "vips", "sqlite3"},
+    reqs = {"glaze", "sqlite_orm"},
     test = true,
 })
 
 cxx_bin("test_http_enrich", {
     files = {"tests/test_http_enrich.cpp", STORE_SRC},
-    incs = {"src", TP .. "/glaze", TP .. "/sqlite_orm/include", TP .. "/thread_pool/include", TP .. "/simpleini",
-            TP .. "/readerwriterqueue/include"},
+    incs = {"src"},
     pkgs = {"spdlog", "fmt", "vips", "sqlite3"},
+    reqs = {"glaze", "sqlite_orm", "thread-pool", "simpleini", "readerwriterqueue"},
     test = true,
 })
 
 cxx_bin("test_pages", {
     files = {"tests/test_pages.cpp", "src/http/pages_api.cpp"},
-    incs = {"src", TP .. "/glaze"},
+    incs = {"src"},
+    reqs = {"glaze"},
     pkgs = {"spdlog", "fmt"},
     test = true,
 })

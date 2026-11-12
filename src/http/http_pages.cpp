@@ -16,7 +16,7 @@ namespace {
 
 constexpr int kPageSize = 12;
 
-crow::json::wvalue layout(Store& store, BS::thread_pool<>& db, const char* active) {
+crow::json::wvalue layout(Store& /*store*/, BS::thread_pool<>& /*db*/, const char* active) {
     crow::json::wvalue ctx;
     ctx["active_" + std::string(active)] = true;
     return ctx;
