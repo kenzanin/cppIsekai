@@ -4,7 +4,7 @@
 
 - [x] 1.1 Add `src/plugin/url_codec.hpp` (header-only): `url_encode(s)` — unreserved `A-Za-z0-9-_.~` pass through, remaining bytes as uppercase `%XX` (UTF-8 byte-wise); `url_decode(s)` — strict `%XX` pairs, everything else verbatim, `+` is NOT decoded to space (goIsekai queryEncode semantics). Verify: zero-warning build.
 - [x] 1.2 Lua binding: audit the existing `host.url_encode/url_decode` in `src/plugin/lua/lua_runtime.cpp` — point it at the same core if semantics diverge; if it already matches, leave it and only add the new runtimes. Verify: `test_plugin` green after the refactor (or noted as no-op).
-- [ ] 1.3 JS binding: `host.url_encode(s)` / `host.url_decode(s)` in `src/plugin/js/js_bindings.cpp` (Int-out-of-scope, strings only, one arg, TypeError otherwise). Verify: `test_plugin` JS cases cover round-trip + `a b&c=d%?`.
+- [x] 1.3 JS binding: `host.url_encode(s)` / `host.url_decode(s)` in `src/plugin/js/js_bindings.cpp` (Int-out-of-scope, strings only, one arg, TypeError otherwise). Verify: `test_plugin` JS cases cover round-trip + `a b&c=d%?`.
 - [ ] 1.4 WASM imports: flat `url_encode`/`url_decode` in `src/plugin/wasm/wasm_imports.cpp` (+ minimal `wasm_internal.hpp` plumbing if the import table needs it). Verify: WASM fixture module calls both imports and echoes the round-trip; `test_plugin` green.
 
 ## 2. config.get in JS (parity with Lua)

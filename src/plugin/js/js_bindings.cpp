@@ -3,6 +3,7 @@
 
 #include "plugin/fs.hpp"       // plugin::fs_read -- the fs.read body
 #include "plugin/htmltext.hpp" // host.re2/html core (task 1.3)
+#include "plugin/url_codec.hpp" // plugin::url_{encode,decode} -- host.url_* body
 
 #include <spdlog/spdlog.h>
 
@@ -277,6 +278,25 @@ JSValue js_html_attr(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueCon
     return arr;
 }
 
+// host.url_*: one shared codec core (plugin/url_codec.hpp), thin marshal.
+// Strings only, exactly one arg; anything else is a TypeError (host-surface
+// parity decision, design of js-wasm-host-parity).
+JSValue js_url_encode(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
+    if (argc != 1 || !JS_IsString(argv[0])) {
+        return JS_ThrowTypeError(ctx, "url_encode(string)");
+    }
+    const std::string out = plugin::url_encode(arg_str(ctx, argv[0]));
+    return JS_NewStringLen(ctx, out.data(), out.size());
+}
+
+JSValue js_url_decode(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
+    if (argc != 1 || !JS_IsString(argv[0])) {
+        return JS_ThrowTypeError(ctx, "url_decode(string)");
+    }
+    const std::string out = plugin::url_decode(arg_str(ctx, argv[0]));
+    return JS_NewStringLen(ctx, out.data(), out.size());
+}
+
 } // namespace
 
 void bind_host_globals(JSContext* c) {
@@ -325,6 +345,10 @@ void bind_host_globals(JSContext* c) {
     bind(html, "select", JS_NewCFunction(c, js_html_select, "select", 2));
     bind(html, "attr", JS_NewCFunction(c, js_html_attr, "attr", 3));
     bind(host, "html", html);
+
+    // Query-component codec, same core lua's host.url_* delegate to.
+    bind(host, "url_encode", JS_NewCFunction(c, js_url_encode, "url_encode", 1));
+    bind(host, "url_decode", JS_NewCFunction(c, js_url_decode, "url_decode", 1));
 
     bind(g, "host", host); // consumes the host reference tree
 

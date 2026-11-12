@@ -341,3 +341,20 @@ TEST_CASE("multi-file plugins: confined require() in lua and js") {
     std::error_code ec;
     std::filesystem::remove("test_modtest.db", ec);
 }
+
+TEST_CASE("js host.url_*: shared codec, strings only") {
+    LogSetup ls;
+    Store store("test_jsurl.db");
+    plugin::Host host(test_conf());
+    host.load_all(store);
+
+    const std::string res = host.call("jsfix", "url", "{\"s\":\"x/y z\"}");
+    CHECK(res.find("\"ok\":true") != std::string::npos);
+    CHECK(res.find("\"enc\":\"a%20b%26c%3Dd%25%3F\"") != std::string::npos);
+    CHECK(res.find("\"dec\":\"a b&c=d%?\"") != std::string::npos);
+    CHECK(res.find("\"rt\":\"x/y z\"") != std::string::npos);
+
+    const std::string bad = host.call("jsfix", "urlbad", "{}");
+    CHECK(bad.find("\"ok\":true") != std::string::npos);
+    CHECK(bad.find("url_encode(string)") != std::string::npos);
+}
