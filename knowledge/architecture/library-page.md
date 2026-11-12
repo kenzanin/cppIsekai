@@ -3,31 +3,18 @@ type: decision
 title: "Library page design (status, progress, done/new badges)"
 description: "Design locked: title-level status/total/read/has_update, badges done/new, sidebar filter, mark_read+clear_update, placeholder covers; store+sync layer SHIPPED via library-grid-stats 2026-11-11 (16/16 tests), badge UI lands with library-grid-controls."
 tags: [library, ui, schema]
-generated: { by: agent/mcp, at: "2026-11-11T16:59:41Z" }
+generated: { by: agent/cli, at: "2026-11-12T00:58:45Z" }
 status: stable
 ---
 
-Library page design, locked before any implementation (user directive: no coding until they green-light via staged openspec per page).
+Design locked: title-level status/total/read/has_update, badges done/new, sidebar filter, placeholder covers; store+sync layer SHIPPED via library-grid-stats 2026-11-11 (16/16 tests); badge UI landed via library-grid-controls 2026-11-12 (12/12 tasks, 16/16 ctest).
 
-User decisions:
-1. Granularity: title-level fields first, generically named (total/read), not per-chapter table. A chapter table is deferred until the per-chapter viewer exists.
-2. Cover: placeholder (hue from id, as today) -- proxy /img + vips thumbnails is a later slice.
-3. Interactions: easiest working path -- mark_read(id) sets read=total and clears the flag; POST route + htmx card swap.
-4. Approach: 'important and functional first', no gold-plating.
-5. Process: user will drive implementation themselves as staged openspec per page; agents prepare design only.
+Badge semantics (user clarification 2026-11-12, CRITICAL):
+- New (red) = has_update=1 (plugin reports chapter growth).
+- Done (green) = ALL available chapters read (read_ch >= total_ch AND total > 0). NOT a plugin status.
+- Complete (green-ish filter) = plugin-reported status 'Completed' (manga tamat). Status values vary in casing per plugin (atsumaru: 'Completed'/'Ongoing', mangadex: 'ongoing') — compare case-insensitively, normalize to 'completed'.
+- Overlay layout 2026-11-12: New/Done badge + status chip on ONE line top-left (text-[12px], translucent bg: red-600/70, emerald-600/70, black/40); plugin button (name + logo /plugin/<id>/logo) bottom-left, plugin_id-keyed. Transparent bg via Tailwind opacity modifiers — no SVG assets needed.
 
-Schema additions to TitleEntity (sync_schema migrates): status TEXT default 'ongoing' (ongoing|hiatus|complete|canceled), total INT default 0 (chapters/pages unknown = 0), read INT default 0, has_update INT 0/1 (plugin sets on refresh; cleared on open/read).
+Client grid (library-grid-controls D1): saved-mode grid fully client-side (x-data gridPage) — data-* attrs on cards, q/plugin/filters/sort/page state client-side, 12/page, pager + empty state, 'Reset filters' + sidebar 'N titles · reset filters' card both dispatch grid:reset CustomEvent; sidebar plugin rows dispatch grid:plugin (saved mode) with plugin_id (NOT display name — display name broke matching; commit ba9334d); active sidebar row toggled via data-grid-plugin syncSidebar(). ?plugin=<id> deep-link preselects filter on load. hx-get stays for non-saved mode deep-link nav.
 
-Card badges:
-- status chip: ongoing=blue, hiatus=amber, complete=green, canceled=gray
-- done when read >= total && total > 0 (green)
-- new when has_update=1 (red, takes priority over done)
-- progress bar read/total under the title
-
-Store additions: mark_read(id), clear_update(id); search() returns the new fields; sidebar filter All/Ongoing/Completed/New as query param on /library/grid.
-
-Seed updated so every badge state is visible (fixed deterministic mix, not random at runtime).
-
-# Related Concepts
-- [Home demo: library grid, plugin filter, live log](home-demo.md): Library page design extends the home demo grid
-- [cppIsekai core architecture: plugin-per-site manga viewer](manga-viewer-core.md): Library page is a page of the core viewer architecture
+Sidebar counts = saved_manga by plugin_id; row link in saved mode = client filter; logo via /plugin/<id>/logo; enrichment alts fed to saved_manga (see library-dedup). Commits: 8e4cc2b (overlay one-row + complete filter), 047d450 (logo overlay 2x font), ba9334d (plugin_id filter), a34960d (controls ship).

@@ -1,3 +1,8 @@
+## 2026-11-12
+* **Update**: Updated concept `architecture/library-grid-stats.md`.
+* **Update**: Updated concept `architecture/library-page.md`.
+* **Update**: Updated concept `architecture/library-dedup.md`.
+
 ## 2026-11-11
 * **Update**: Updated concept `architecture/library-dedup.md`.
 * **Creation**: Documented concept `architecture/library-dedup.md` (library-dedup: signal columns on saved_manga; site plugins carry description, not synopsis).
