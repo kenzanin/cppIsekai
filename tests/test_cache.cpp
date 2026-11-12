@@ -260,6 +260,20 @@ TEST_CASE("cache v3: page landing paths + duplicate chapter disambiguation") {
     REQUIRE(ok(r));
     CHECK(fs::path(*r).parent_path().filename().string() == "ch002");
 
+    // duplicate chapter numbers (multi-language ch076 x2): the id8 suffix
+    // keeps one dir per chapter id; >8-char ids take the last 8
+    cache::Cache::PageCtx p3 = pg;
+    p3.chapter_id = "12345678";
+    const auto d = cache.img_store("http://x/p3b.png", "F", {}, p3);
+    REQUIRE(ok(d));
+    CHECK(fs::path(*d).parent_path().filename().string() == "ch012-12345678");
+
+    cache::Cache::PageCtx p4 = pg;
+    p4.chapter_id = "a1b2c3d4e5f6";
+    const auto e = cache.img_store("http://x/p3c.png", "G", {}, p4);
+    REQUIRE(ok(e));
+    CHECK(fs::path(*e).parent_path().filename().string() == "ch012-c3d4e5f6");
+
     // no context -> sha fallback at pool root
     const auto f = cache.img_store("http://x/plain.gif", "E", {}, {});
     REQUIRE(ok(f));

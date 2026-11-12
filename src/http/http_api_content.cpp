@@ -136,6 +136,7 @@ void register_content(Ctx& c) {
         const auto slug = param(req, "slug");
         const int ch = std::atoi(param(req, "ch").c_str());
         const int page = std::atoi(param(req, "page").c_str());
+        const std::string ch_id = param(req, "ch_id");
         cache::Cache::CoverCtx cctx;
         cache::Cache::PageCtx pctx;
         if (cover) {
@@ -143,7 +144,7 @@ void register_content(Ctx& c) {
             cctx.plugin = plugin;
             cctx.url = url;
         } else if (!plugin.empty() && !slug.empty() && ch >= 1 && page >= 1) {
-            pctx = {plugin, slug, ch, page};
+            pctx = {plugin, slug, ch, page, ch_id};
         }
         const ImgReply r = serve_cached_image(images, url, cctx, pctx);
         crow::response res;

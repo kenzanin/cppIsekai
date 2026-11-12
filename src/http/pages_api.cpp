@@ -92,7 +92,8 @@ std::optional<std::string> build_pages_response(const std::string& chs_env, cons
         if (const auto* s = std::get_if<std::string>(&el.data)) {
             ++page; // 1-based page number, index stays 0-based
             page_urls.emplace_back("/cache/img?url=" + url_encode(*s) + "&plugin=" + url_encode(ctx.plugin) + "&slug=" +
-                                   url_encode(ctx.slug) + "&ch=" + fmt_ch(ctx.ch) + "&page=" + std::to_string(page));
+                                       url_encode(ctx.slug) + "&ch=" + fmt_ch(ctx.ch) + "&page=" + std::to_string(page) +
+                                       "&ch_id=" + url_encode(target_id));
         }
     }
     out["pages"] = std::move(page_urls);

@@ -84,7 +84,8 @@ inline double ratio_from_name(const std::string& name) {
     return static_cast<double>(std::stoi(digits)) / 10000.0;
 }
 
-inline std::string page_rel(const std::string& plugin, const std::string& slug, int chapter, int page) {
+inline std::string page_rel(const std::string& plugin, const std::string& slug, int chapter, int page,
+                            const std::string& chapter_id = {}) {
     // pad(n) = min-3 zero-padding: ch 2 -> ch002, ch 12 -> ch012, ch 123 -> ch123
     const auto pad = [](int n) {
         auto s = std::to_string(n);
@@ -92,11 +93,16 @@ inline std::string page_rel(const std::string& plugin, const std::string& slug, 
             s = "0" + s;
         return s;
     };
-    // ponytail: number-only dir suffix (lo's call). Fractional numbers keep
-    // '.' (fs-safe); one chapter dir shared by all its pages. If duplicate
-    // chapter numbers across languages ever collide, re-add an id8 suffix
-    // derived from the chapter ID.
-    return plugin + "/manga/" + slug + "/ch" + pad(chapter) + "/p" + pad(page);
+    // Fractional numbers keep '.' (fs-safe); one chapter dir per chapter id.
+    // Duplicate chapter numbers (multi-language releases share ch N) collide
+    // on number-only dirs, so an id8 suffix -- the manga-slug collision rule
+    // (slug.hpp) -- separates them; empty id keeps the legacy plain chNNN.
+    std::string dir = "ch" + pad(chapter);
+    if (!chapter_id.empty()) {
+        dir += "-";
+        dir += chapter_id.size() <= 8 ? chapter_id : chapter_id.substr(chapter_id.size() - 8);
+    }
+    return plugin + "/manga/" + slug + "/" + dir + "/p" + pad(page);
 }
 
 } // namespace internal

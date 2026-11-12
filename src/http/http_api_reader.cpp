@@ -177,7 +177,7 @@ void register_reader(Ctx& c) {
                 if (chapter_number) { // v3 placement; else the sha fallback
                     spdlog::debug("nudge {} urls, ctx {}.{} ch{} base-p{}", found.size(), plugin, manga,
                                   *chapter_number, pos.page + 1);
-                    prefetch.nudge(found, {plugin, manga, int(*chapter_number), pos.page + 1});
+                    prefetch.nudge(found, {plugin, manga, int(*chapter_number), pos.page + 1, pos.chapter_id});
                 } else {
                     spdlog::debug("nudge {} urls, no chapter number -> sha fallback", found.size());
                     prefetch.nudge(found); // background delta fetch (3.3)

@@ -41,6 +41,7 @@ struct WindowCtx {
     std::string slug;
     int chapter{};   // 1-based chapter number; 0 = unknown
     int page_base{}; // chapter-absolute page of batch[0]; 0 = legacy batch position
+    std::string chapter_id; // id8 cache-dir suffix; empty keeps the plain chNNN shape
 };
 
 /** \brief <plugin>/<slug>/chNNN/pNNN.<ext> from \p ctx + the url's 1-based
@@ -71,9 +72,9 @@ inline std::string rel_path(const WindowCtx& ctx, int page, const std::string& u
     };
     // V3 (cache-layout-v3 D4): <plugin>/manga/<slug>/chNNN/pNNN.<ext> -- same
     // shape as cache page_rel, so worker and /cache/img land one file per
-    // slot (ext-free hit, no dupes). ponytail: no per-chapter id8 suffix
-    // (lo's call, see cache::page_rel); upgrade there if duplicate chapter
-    // numbers ever collide.
+    // slot (ext-free hit, no dupes). The per-chapter id8 suffix for duplicate
+    // numbers lives in cache::page_rel via PageCtx.chapter_id; this helper
+    // stays on the legacy shape (its caller is the sha-fallback branch).
     return ctx.plugin + "/manga/" + ctx.slug + "/ch" + pad(ctx.chapter) + "/p" + pad(page) + "." + ext;
 }
 
@@ -125,7 +126,7 @@ private:
             lock.unlock();
             for (std::size_t i = 0; i < batch.size(); ++i) {
                 const int page = ctx.page_base > 0 ? ctx.page_base + int(i) : int(i) + 1;
-                const cache::Cache::PageCtx pctx{ctx.plugin, ctx.slug, ctx.chapter, page};
+                const cache::Cache::PageCtx pctx{ctx.plugin, ctx.slug, ctx.chapter, page, ctx.chapter_id};
                 const auto p =
                     ctx.plugin.empty()
                         ? images_.ensure(
