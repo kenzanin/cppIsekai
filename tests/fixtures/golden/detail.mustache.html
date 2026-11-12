@@ -7,22 +7,60 @@
   <script src="/static/htmx.min.js"></script>
   <script defer src="/static/alpine.min.js"></script>
   <style>
-    /* dim+blur for cover images only (covers carry &cover=1); server-rendered from host/dim_blur */
-    .dim-blur img[src*="cover=1"] { filter: brightness(0.35) blur(6px); }
+    /* per-manga dim+blur: toggling host/dim/<plugin>/<slug> marks this page's cover */
+    img.cover-dim { filter: brightness(0.35) blur(6px); }
     .dim-toggle { font-size: 11px; }
   </style>
   <script>
-    const paintToggles = function (on) { document.querySelectorAll('[data-dim-toggle]').forEach(b => b.textContent = on ? 'Show covers' : 'Dim + blur covers'); };
-    window.toggleDimBlur = async function () {
-      const on = !document.body.classList.contains('dim-blur');
+    // Cover imgs carry &plugin=<p>&slug=<s>. Parse once, dim the pair, label toggles.
+    const coverKey = function (img) {
       try {
-        const r = await fetch('/api/display/dim-blur', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ on }) });
-        if (!r.ok) return;
-        document.body.classList.toggle('dim-blur', on);
-        paintToggles(on);
-      } catch (e) { /* server unreachable; leave UI unchanged */ }
+        const u = new URL(img.src, location.origin);
+        if (u.searchParams.get('cover') !== '1') return null;
+        const plugin = u.searchParams.get('plugin');
+        const slug = u.searchParams.get('slug');
+        return plugin && slug ? plugin + '/' + slug : null;
+      } catch (e) { return null; }
     };
-    document.addEventListener('DOMContentLoaded', function () { paintToggles(document.body.classList.contains('dim-blur')); });
+    const dimSet = new Set();
+    const paintDim = function () {
+      document.querySelectorAll('img[src*="cover=1"]').forEach(img => {
+        const k = coverKey(img);
+        img.classList.toggle('cover-dim', !!k && dimSet.has(k));
+      });
+      document.querySelectorAll('[data-dim-toggle]').forEach(b => {
+        const k = b.dataset.dimToggle;
+        const on = !!k && dimSet.has(k);
+        b.textContent = on ? 'Show cover' : 'Dim + blur cover';
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+    };
+    const loadDim = async function () {
+      try {
+        const r = await fetch('/api/display/dim-list');
+        if (!r.ok) return;
+        const j = await r.json();
+        (j.data || []).forEach(([p, s]) => dimSet.add(p + '/' + s));
+        paintDim();
+      } catch (e) { /* leave covers alone */ }
+    };
+    window.paintDim = paintDim; // detail page renders its cover async; it repaints after load()
+    // Toggle one manga (from detail button) or a pair passed explicitly.
+    window.toggleDimBlur = async function (plugin, slug) {
+      plugin = plugin || (window.__dimPair && window.__dimPair[0]);
+      slug = slug || (window.__dimPair && window.__dimPair[1]);
+      if (!plugin || !slug) return;
+      const k = plugin + '/' + slug;
+      const on = !dimSet.has(k);
+      try {
+        const r = await fetch('/api/display/dim-blur', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ plugin, slug, on }) });
+        if (!r.ok) return;
+        if (on) dimSet.add(k); else dimSet.delete(k);
+        paintDim();
+      } catch (e) { /* leave UI unchanged */ }
+    };
+    document.addEventListener('DOMContentLoaded', loadDim);
+    window.addEventListener('htmx:afterSwap', paintDim); // grid reloads via htmx keep their dim
   </script>
 </head>
 <body class="bg-zinc-950 text-zinc-100 min-h-screen">
@@ -44,7 +82,7 @@
         <img :src="'/cache/img?url='+encodeURIComponent(detail.cover)+'&cover=1&plugin='+encodeURIComponent(plugin)+'&slug='+encodeURIComponent(slug)" class="w-40 h-56 object-cover rounded-lg" @error="coverBroken=true" x-show="!coverBroken" alt="">
       </template>
       <button @click="resetCover()" :disabled="enrichBusy" x-show="inLibrary && enrichment && enrichment.chosen && enrichment.chosen.cover" x-cloak class="absolute bottom-1 right-1 text-[10px] px-1.5 py-0.5 rounded bg-black/70 text-zinc-300 hover:text-white" title="drop chosen cover, restore the library cover">Reset cover</button>
-      <button onclick="toggleDimBlur()" data-dim-toggle class="absolute -bottom-7 left-0 dim-toggle px-2 py-1 rounded border border-zinc-700 text-zinc-400 hover:bg-zinc-800">Dim + blur covers</button>
+      <button @click="toggleDimBlur(plugin, slug)" :data-dim-toggle="plugin + '/' + slug" class="absolute -bottom-7 left-0 dim-toggle px-2 py-1 rounded border border-zinc-700 text-zinc-400 hover:bg-zinc-800">Dim + blur cover</button>
     </div>
     <div class="flex-1 min-w-0">
       <h1 class="text-2xl font-semibold mb-2 leading-tight" x-text="detail.name || '…'"></h1>
@@ -301,6 +339,8 @@ function detailPage() {
       this.loadLibrary();
       this.loadEnrichSources();
       await this.load();
+      // cover img renders via x-if after load(); paintDim at DOMContentLoaded missed it
+      this.$nextTick(() => window.paintDim && window.paintDim());
       this.loadChapterState();
     },
     normAltTitle(s) { return String(s || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim(); },

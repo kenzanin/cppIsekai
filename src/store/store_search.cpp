@@ -374,6 +374,25 @@ void Store::state_set(const std::string& plugin_id, const std::string& key, cons
     impl_->storage.replace(store_detail::StateEntity{plugin_id, key, value}); // INSERT OR REPLACE on the composite pk: upsert
 }
 
+std::vector<std::string> Store::state_keys_value(const std::string& plugin_id, const std::string& key_prefix, const std::string& value) {
+    std::string pat;
+    pat.reserve(key_prefix.size() + 1);
+    for (char ch : key_prefix) {
+        if (ch == '%' || ch == '_' || ch == '\\')
+            pat += '\\';
+        pat += ch;
+    }
+    pat += '%';
+    auto rows = impl_->storage.get_all<store_detail::StateEntity>(
+        where(c(&store_detail::StateEntity::plugin_id) == plugin_id &&
+              like(&store_detail::StateEntity::key, pat).escape(std::string("\\")) &&
+              c(&store_detail::StateEntity::value) == value));
+    std::vector<std::string> out;
+    out.reserve(rows.size());
+    for (const auto& r : rows) out.push_back(r.key);
+    return out;
+}
+
 void Store::position_set(const ReaderPosition& pos) {
     // REPLACE on the (plugin, slug) PK: the route layers optional fields over
     // the stored row, this just persists the result. updated_at stamped here.

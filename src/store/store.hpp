@@ -96,6 +96,8 @@ public:
      *  nullopt when absent. */
     std::optional<std::string> state_get(const std::string& plugin_id, const std::string& key);
     void state_set(const std::string& plugin_id, const std::string& key, const std::string& value);
+    /** \brief Values '1' under \p key_prefix; returns the full keys. */
+    std::vector<std::string> state_keys_value(const std::string& plugin_id, const std::string& key_prefix, const std::string& value);
 
     /** \brief Upsert the last-read position of one manga; updated_at is
      *  stamped here, any nonzero value in \p pos is ignored. */

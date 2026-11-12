@@ -19,24 +19,48 @@ void register_state(Ctx& c) {
     auto& plugins = c.plugins;
     auto& prefetch = c.prefetch;
 
-    // Display pref: dim+blur cover images. Stored in host/dim_blur (host bucket,
-    // survives restart, not per-plugin). Applied server-side on every page shell.
+    // Per-manga dim+blur cover. Key = host/dim/<plugin>/<slug> in the host
+    // bucket; toggled from the detail page, applied to every cover img that
+    // carries plugin+slug (grid/detail); search results have no slug and are
+    // never dimmed.
+    const auto dim_key = [](const std::string& plugin, const std::string& slug) {
+        return std::string(kDimPrefix) + plugin + '/' + slug;
+    };
     CROW_ROUTE(app, "/api/display/dim-blur")
         .methods(crow::HTTPMethod::POST)([&](const crow::request& req) -> crow::response {
             const auto body = crow::json::load(req.body);
+            if (!body || !body.has("plugin") || !body.has("slug")) return crow::response{400};
+            const std::string plugin = body["plugin"].s();
+            const std::string slug = body["slug"].s();
+            if (plugin.empty() || plugin.find('/') != std::string::npos || slug.empty()) return crow::response{400};
             bool on = false;
-            if (body && body.has("on")) {
-                const auto t = body["on"].t();
-                on = (t == crow::json::type::True);
-            }
-            on_pool(db, [&] {
-                store.state_set(kStateHost, kDimBlurKey, on ? "1" : "0");
-                return 0;
-            });
+            if (body.has("on")) on = body["on"].t() == crow::json::type::True;
+            on_pool(db, [&] { store.state_set(kStateHost, dim_key(plugin, slug), on ? "1" : "0"); return 0; });
             crow::response r{on ? R"({"ok":true,"on":true})" : R"({"ok":true,"on":false})"};
             r.set_header("Content-Type", "application/json");
             return r;
         });
+    // GET list of dimmed manga: [["plugin","slug"], ...] for client-side paint.
+    CROW_ROUTE(app, "/api/display/dim-list")([&] {
+        const auto keys = on_pool(db, [&] { return store.state_keys_value(kStateHost, kDimPrefix, "1"); });
+        crow::json::wvalue list(crow::json::type::List);
+        int idx = 0;
+        for (const auto& k : keys) {
+            const auto rest = k.substr(std::string(kDimPrefix).size());
+            const auto slash = rest.find('/');
+            if (slash == std::string::npos || slash == 0) continue;
+            crow::json::wvalue pair(crow::json::type::List);
+            pair[0] = rest.substr(0, slash);
+            pair[1] = rest.substr(slash + 1);
+            list[idx++] = std::move(pair);
+        }
+        crow::json::wvalue out;
+        out["ok"] = true;
+        out["data"] = std::move(list);
+        crow::response r{out};
+        r.set_header("Content-Type", "application/json");
+        return r;
+    });
 
     // Chapter skip (image-cache): the flag lands under reserved
     // host/skip/<uuid>; the window re-runs against the last position so the

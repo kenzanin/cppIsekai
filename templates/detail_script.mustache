@@ -51,6 +51,8 @@ function detailPage() {
       this.loadLibrary();
       this.loadEnrichSources();
       await this.load();
+      // cover img renders via x-if after load(); paintDim at DOMContentLoaded missed it
+      this.$nextTick(() => window.paintDim && window.paintDim());
       this.loadChapterState();
     },
     normAltTitle(s) { return String(s || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim(); },

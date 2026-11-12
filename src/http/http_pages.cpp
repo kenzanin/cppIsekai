@@ -19,8 +19,6 @@ constexpr int kPageSize = 12;
 crow::json::wvalue layout(Store& store, BS::thread_pool<>& db, const char* active) {
     crow::json::wvalue ctx;
     ctx["active_" + std::string(active)] = true;
-    const auto dim = on_pool(db, [&] { return store.state_get(http::api::kStateHost, http::api::kDimBlurKey); });
-    if (dim && *dim == "1") ctx["dim_blur"] = true;
     return ctx;
 }
 
@@ -208,10 +206,13 @@ void register_pages(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, L
 
 
 namespace {
-crow::response br_asset(const crow::request& req, const char* path, const char* mime) {
+void br_asset(const crow::request& req, crow::response& res, const char* path, const char* mime) {
     // Serve precompressed brotli body when the client advertises it; else
     // fall back to the plain sibling (must exist). Content-Encoding: br is
     // only set on the .br branch, never on the plain one.
+    // Out-param on purpose: crow's response move assignment drops the
+    // `compressed` flag, so a response returned by value would get gzip'd on
+    // top of the brotli body (browser decodes gzip, gets brotli, JS explodes).
     const std::string ae = req.get_header_value("Accept-Encoding");
     const bool wants_br = ae.find("br") != std::string::npos;
     // Vendored assets ship .br only; fall back to it even for clients that
@@ -224,29 +225,30 @@ crow::response br_asset(const crow::request& req, const char* path, const char* 
         f.open(file, std::ios::binary);
         served_br = true;
         if (!f) {
-            crow::response r{404};
-            return r;
+            res.code = 404;
+            res.end();
+            return;
         }
     }
     std::stringstream ss;
     ss << f.rdbuf();
-    crow::response r{ss.str()};
-    r.compressed = false; // precompressed (br or plain bytes) — never re-deflate
-    r.set_header("Content-Type", mime);
-    if (served_br) r.set_header("Content-Encoding", "br");
-    r.set_header("Cache-Control", "public, max-age=31536000, immutable");
-    return r;
+    res.body = ss.str();
+    res.compressed = false; // precompressed (br or plain bytes) — never re-deflate
+    res.set_header("Content-Type", mime);
+    if (served_br) res.set_header("Content-Encoding", "br");
+    res.set_header("Cache-Control", "public, max-age=31536000, immutable");
+    res.end();
 }
 } // namespace
 
 void http::register_static(crow::SimpleApp& app) {
-    CROW_ROUTE(app, "/static/htmx.min.js")([](const crow::request& req) {
-        return br_asset(req, "static/htmx.min.js", "application/javascript");
+    CROW_ROUTE(app, "/static/htmx.min.js")([](const crow::request& req, crow::response& res) {
+        br_asset(req, res, "static/htmx.min.js", "application/javascript");
     });
-    CROW_ROUTE(app, "/static/alpine.min.js")([](const crow::request& req) {
-        return br_asset(req, "static/alpine.min.js", "application/javascript");
+    CROW_ROUTE(app, "/static/alpine.min.js")([](const crow::request& req, crow::response& res) {
+        br_asset(req, res, "static/alpine.min.js", "application/javascript");
     });
-    CROW_ROUTE(app, "/static/tailwind.min.js")([](const crow::request& req) {
-        return br_asset(req, "static/tailwind.min.js", "application/javascript");
+    CROW_ROUTE(app, "/static/tailwind.min.js")([](const crow::request& req, crow::response& res) {
+        br_asset(req, res, "static/tailwind.min.js", "application/javascript");
     });
 }
