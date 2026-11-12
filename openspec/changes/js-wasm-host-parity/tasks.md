@@ -9,11 +9,11 @@
 
 ## 2. config.get in JS (parity with Lua)
 
-- [ ] 2.1 `host.config.get(key)` in `src/plugin/js/js_bindings.cpp`: read `config.json` in the plugin's own folder via `plugin::fs_read`, parse with glaze (or existing lenient parse), missing file/key → nil. WASM out of scope (documented). Verify: `test_plugin` JS case — present key returns value, absent key returns nil, missing file returns nil (no crash).
+- [x] 2.1 `host.config.get(key)` in `src/plugin/js/js_bindings.cpp`: read `config.json` in the plugin's own folder via `plugin::fs_read`, parse with glaze (or existing lenient parse), missing file/key → nil. WASM out of scope (documented). Verify: `test_plugin` JS case — present key returns value, absent key returns nil, missing file returns nil (no crash).
 
 ## 3. crypto.vrf_sign in JS (parity with Lua)
 
-- [ ] 3.1 `host.crypto.vrf_sign(api_path, params, stages)` in `src/plugin/js/js_bindings.cpp`, binding the shared `src/plugin/vrf.hpp` core. Params object: string values only (non-string / nested → error path); stages array `{iv, key (std-base64), tbl (std-base64)}`. Failure → `null` (Lua nil parity), reason logged tagged with plugin id. Verify: `test_plugin` JS case — signature for the known VRF vector matches `tests/test_vrf.cpp`; invalid stage → nil.
+- [x] 3.1 `host.crypto.vrf_sign(api_path, params, stages)` in `src/plugin/js/js_bindings.cpp`, binding the shared `src/plugin/vrf.hpp` core. Params object: string values only (non-string / nested → error path); stages array `{iv, key (std-base64), tbl (std-base64)}`. Failure → `null` (Lua nil parity), reason logged tagged with plugin id. Verify: `test_plugin` JS case — signature for the known VRF vector matches `tests/test_vrf.cpp`; invalid stage → nil.
 
 ## 4. http.fetch opts parity audit
 

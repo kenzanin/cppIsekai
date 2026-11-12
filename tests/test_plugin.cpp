@@ -370,3 +370,34 @@ TEST_CASE("wasm host.url_*: imports round-trip via shared codec") {
     CHECK(res.find("\"enc\":\"a%20b%26c%3Dd%25%3F\"") != std::string::npos);
     CHECK(res.find("\"rt\":\"a b&c=d%?\"") != std::string::npos);
 }
+
+TEST_CASE("js host.config.get: plugin-local config, nil parity") {
+    LogSetup ls;
+    Store store("test_jsconf.db");
+    plugin::Host host(test_conf());
+    host.load_all(store);
+
+    const std::string res = host.call("js_modtest", "cfg", "{}");
+    CHECK_MESSAGE(res.find("\"ok\":true") != std::string::npos, res);
+    CHECK(res.find("\"v\":\"modul-conf\"") != std::string::npos);
+    CHECK(res.find("\"n\":7") != std::string::npos);
+    CHECK(res.find("\"miss\":null") != std::string::npos); // absent key
+}
+
+TEST_CASE("js host.crypto.vrf_sign: golden vector, null on failure") {
+    LogSetup ls;
+    Store store("test_jsvrf.db");
+    plugin::Host host(test_conf());
+    host.load_all(store);
+
+    // same golden as the lua crypto fixture (tests/test_vrf.cpp "empty" vector)
+    const std::string res = host.call("jsfix", "vrf", "{\"path\":\"/titles\",\"params\":{}}");
+    CHECK_MESSAGE(res.find("\"ok\":true") != std::string::npos, res);
+    CHECK(res.find("\"sig\":\"8sK3xtqdFQ\"") != std::string::npos);
+
+    const std::string bad = host.call("jsfix", "vrfbad", "{}");
+    CHECK_MESSAGE(bad.find("\"ok\":true") != std::string::npos, bad);
+    CHECK(bad.find("\"badkey\":null") != std::string::npos); // core rejects bad base64
+    CHECK(bad.find("\"nested\":null") != std::string::npos); // non-string param value
+    CHECK(bad.find("\"noconf\":null") != std::string::npos); // absent config.json
+}

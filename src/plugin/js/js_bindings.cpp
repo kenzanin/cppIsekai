@@ -4,10 +4,14 @@
 #include "plugin/fs.hpp"       // plugin::fs_read -- the fs.read body
 #include "plugin/htmltext.hpp" // host.re2/html core (task 1.3)
 #include "plugin/url_codec.hpp" // plugin::url_{encode,decode} -- host.url_* body
+#include "plugin/vrf.hpp"      // plugin::vrf_sign -- the host.crypto body
+
+#include <glaze/glaze.hpp>
 
 #include <spdlog/spdlog.h>
 
 #include <ctime>
+#include <map>
 #include <stdexcept>
 #include <vector>
 
@@ -297,6 +301,114 @@ JSValue js_url_decode(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueCo
     return JS_NewStringLen(ctx, out.data(), out.size());
 }
 
+// host.config.get: the plugin's own config.json (design D2, lua parity).
+// Parsed per call -- the file is tiny and configs are read once per tick;
+// absent file/key/parse -> null (lua nil), never an error.
+JSValue js_config_get(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
+    if (argc < 1 || !JS_IsString(argv[0])) {
+        return JS_ThrowTypeError(ctx, "config.get(key)");
+    }
+    const auto data = plugin::fs_read(self(ctx).dir, "config.json");
+    if (!data) {
+        return JS_NULL;
+    }
+    JSValue root = JS_ParseJSON(ctx, data->data(), data->size(), "<config>");
+    if (JS_IsException(root)) {
+        JS_FreeValue(ctx, JS_GetException(ctx));
+        return JS_NULL;
+    }
+    const std::string key = arg_str(ctx, argv[0]);
+    JSValue val = JS_GetPropertyStr(ctx, root, key.c_str());
+    JS_FreeValue(ctx, root);
+    if (JS_IsUndefined(val)) { // absent key: lua nil parity
+        JS_FreeValue(ctx, val);
+        return JS_NULL;
+    }
+    return val;
+}
+
+// host.crypto.vrf_sign: the shared core (plugin/vrf.hpp) behind lua's
+// host.crypto (design D3). Signature string, or null with the reason logged
+// tagged by plugin id. Params carry string values only -- anything else takes
+// the error path (design: no silent String() second contract); stages are
+// {iv 0-255, key b64, tbl b64} as in tests/test_vrf.cpp.
+JSValue js_vrf_sign(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
+    if (argc < 3 || !JS_IsString(argv[0])) {
+        return JS_ThrowTypeError(ctx, "crypto.vrf_sign(api_path, params, stages)");
+    }
+    const Instance& inst = self(ctx);
+    const std::string api_path = arg_str(ctx, argv[0]);
+    const auto fail = [&](const std::string& why) {
+        spdlog::warn("[plugin:{}] vrf_sign {} failed: {}", inst.id, api_path, why);
+        return JS_NULL;
+    };
+    if (api_path.empty()) {
+        return fail("vrf_sign: api_path is empty");
+    }
+
+    std::map<std::string, std::string> prm;
+    if (JS_IsObject(argv[1])) { // absent/non-object: empty, lua optional-table parity
+        glz::generic root;
+        if (auto ec = glz::read_json(root, json_stringify(ctx, argv[1]))) {
+            return fail("vrf_sign: params must be an object");
+        }
+        const auto* obj = std::get_if<glz::generic::object_t>(&root.data);
+        if (!obj) {
+            return fail("vrf_sign: params must be an object");
+        }
+        for (const auto& [k, v] : *obj) {
+            if (const auto* s = std::get_if<std::string>(&v.data)) {
+                prm.emplace(k, *s);
+            } else {
+                return fail("vrf_sign: params[\"" + k + "\"] must be a string");
+            }
+        }
+    }
+
+    std::vector<VrfStage> vstages;
+    {
+        glz::generic root;
+        if (auto ec = glz::read_json(root, json_stringify(ctx, argv[2]))) {
+            return fail("vrf_sign: stages must be a non-empty array");
+        }
+        const auto* arr = std::get_if<glz::generic::array_t>(&root.data);
+        if (!arr || arr->empty()) {
+            return fail("vrf_sign: stages must be a non-empty array");
+        }
+        size_t idx = 0;
+        for (const auto& el : *arr) {
+            ++idx;
+            const auto* so = std::get_if<glz::generic::object_t>(&el.data);
+            if (!so) {
+                return fail("vrf_sign: stage " + std::to_string(idx) + ": missing");
+            }
+            const auto iv = so->find("iv");
+            const auto key = so->find("key");
+            const auto tbl = so->find("tbl");
+            if (iv == so->end() || key == so->end() || tbl == so->end()) {
+                return fail("vrf_sign: stage " + std::to_string(idx) + ": needs iv, key, tbl");
+            }
+            const auto* ivd = std::get_if<double>(&iv->second.data);
+            if (!ivd || *ivd < 0 || *ivd > 255 || *ivd != (double)(int)*ivd) {
+                return fail("vrf_sign: stage " + std::to_string(idx) + ": iv must be integer 0-255");
+            }
+            const auto* k = std::get_if<std::string>(&key->second.data);
+            const auto* t = std::get_if<std::string>(&tbl->second.data);
+            if (!k || !t) {
+                return fail("vrf_sign: stage " + std::to_string(idx) + ": needs iv, key, tbl");
+            }
+            vstages.push_back({static_cast<uint8_t>(*ivd), *k, *t});
+        }
+    }
+
+    std::string err;
+    const auto out = vrf_sign(api_path, prm, vstages, err);
+    if (!out) {
+        return fail(err);
+    }
+    return JS_NewStringLen(ctx, out->data(), out->size());
+}
+
 } // namespace
 
 void bind_host_globals(JSContext* c) {
@@ -349,6 +461,15 @@ void bind_host_globals(JSContext* c) {
     // Query-component codec, same core lua's host.url_* delegate to.
     bind(host, "url_encode", JS_NewCFunction(c, js_url_encode, "url_encode", 1));
     bind(host, "url_decode", JS_NewCFunction(c, js_url_decode, "url_decode", 1));
+
+    // Plugin-local config (design D2) and host-side crypto (D3), lua parity.
+    JSValue config = JS_NewObject(c);
+    bind(config, "get", JS_NewCFunction(c, js_config_get, "get", 1));
+    bind(host, "config", config);
+
+    JSValue crypto = JS_NewObject(c);
+    bind(crypto, "vrf_sign", JS_NewCFunction(c, js_vrf_sign, "vrf_sign", 3));
+    bind(host, "crypto", crypto);
 
     bind(g, "host", host); // consumes the host reference tree
 
