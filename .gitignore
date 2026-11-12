@@ -10,4 +10,5 @@ build/
 .serena/
 .superpowers/
 .xmake/
+packages/
 compile_commands.json
