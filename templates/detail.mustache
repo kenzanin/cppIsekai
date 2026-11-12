@@ -7,6 +7,7 @@
         <img :src="'/cache/img?url='+encodeURIComponent(detail.cover)+'&cover=1&plugin='+encodeURIComponent(plugin)+'&slug='+encodeURIComponent(slug)" class="w-40 h-56 object-cover rounded-lg" @error="coverBroken=true" x-show="!coverBroken" alt="">
       </template>
       <button @click="resetCover()" :disabled="enrichBusy" x-show="inLibrary && enrichment && enrichment.chosen && enrichment.chosen.cover" x-cloak class="absolute bottom-1 right-1 text-[10px] px-1.5 py-0.5 rounded bg-black/70 text-zinc-300 hover:text-white" title="drop chosen cover, restore the library cover">Reset cover</button>
+      <button onclick="toggleDimBlur()" data-dim-toggle class="absolute -bottom-7 left-0 dim-toggle px-2 py-1 rounded border border-zinc-700 text-zinc-400 hover:bg-zinc-800">Dim + blur covers</button>
     </div>
     <div class="flex-1 min-w-0">
       <h1 class="text-2xl font-semibold mb-2 leading-tight" x-text="detail.name || '…'"></h1>

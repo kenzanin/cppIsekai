@@ -16,11 +16,14 @@ namespace {
 
 constexpr int kPageSize = 12;
 
-crow::json::wvalue layout(const char* active) {
+crow::json::wvalue layout(Store& store, BS::thread_pool<>& db, const char* active) {
     crow::json::wvalue ctx;
     ctx["active_" + std::string(active)] = true;
+    const auto dim = on_pool(db, [&] { return store.state_get(http::api::kStateHost, http::api::kDimBlurKey); });
+    if (dim && *dim == "1") ctx["dim_blur"] = true;
     return ctx;
 }
+
 
 crow::json::wvalue home_context(Store& store, BS::thread_pool<>& db, const crow::request& req, reader::CoverWorker& covers) {
     const std::string plugin = param(req, "plugin");
@@ -33,7 +36,7 @@ crow::json::wvalue home_context(Store& store, BS::thread_pool<>& db, const crow:
     const int shown = std::min(page_no, pages);
     const auto titles = on_pool(db, [&] { return store.search(plugin, q, kPageSize, (shown - 1) * kPageSize); });
 
-    auto ctx = layout("library");
+    auto ctx = layout(store, db, "library");
     ctx["q"] = q;
     ctx["plugin"] = plugin;
     ctx["total"] = std::to_string(total);
@@ -143,7 +146,7 @@ void register_pages(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, L
     CROW_ROUTE(app, "/library/grid")
     ([&](const crow::request& req) { return html("grid.mustache", home_context(store, db, req, covers)); });
 
-    CROW_ROUTE(app, "/search")([&] { return html("search.mustache", layout("search")); });
+    CROW_ROUTE(app, "/search")([&] { return html("search.mustache", layout(store, db, "search")); });
 
     // reader (reader-page 3.2): the reader page at /read. Server-side shell
     // only (D1): pages load from /api/pages. The store seed is resume-only
@@ -162,7 +165,7 @@ void register_pages(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, L
             dir = std::move(pos->direction);
             zoom = std::move(pos->zoom);
         }
-        auto ctx = layout("library");
+        auto ctx = layout(store, db, "library");
         ctx["resume_ch"] = ch;
         ctx["resume_page"] = page;
         ctx["resume_mode"] = std::move(mode);
@@ -174,17 +177,17 @@ void register_pages(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, L
     // manga-detail: the shelf page (metadata + chapter list, hydrating from
     // /api/*). Reader is at /read.
     CROW_ROUTE(app, "/view/manga/<string>/<string>")
-    ([](const crow::request&, std::string, std::string) {
-        return html("detail.mustache", layout("library"));
+    ([&](const crow::request&, std::string, std::string) {
+        return html("detail.mustache", layout(store, db, "library"));
     });
 
-    CROW_ROUTE(app, "/plugins")([&] { return html("plugins.mustache", layout("plugins")); });
-    CROW_ROUTE(app, "/settings")([] { return html("settings.mustache", layout("settings")); });
-    CROW_ROUTE(app, "/about")([] { return html("blank.mustache", layout("about")); });
+    CROW_ROUTE(app, "/plugins")([&] { return html("plugins.mustache", layout(store, db, "plugins")); });
+    CROW_ROUTE(app, "/settings")([&] { return html("settings.mustache", layout(store, db, "settings")); });
+    CROW_ROUTE(app, "/about")([&] { return html("blank.mustache", layout(store, db, "about")); });
 
     CROW_ROUTE(app, "/logs")
     ([&] {
-        auto ctx = layout("logs");
+        auto ctx = layout(store, db, "logs");
         std::vector<crow::json::wvalue> lines;
         for (const auto& line : logs.snapshot()) {
             lines.emplace_back(line);

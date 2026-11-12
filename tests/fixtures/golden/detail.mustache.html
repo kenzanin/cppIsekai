@@ -6,6 +6,24 @@
   <script src="/static/tailwind.min.js"></script>
   <script src="/static/htmx.min.js"></script>
   <script defer src="/static/alpine.min.js"></script>
+  <style>
+    /* dim+blur for cover images only (covers carry &cover=1); server-rendered from host/dim_blur */
+    .dim-blur img[src*="cover=1"] { filter: brightness(0.35) blur(6px); }
+    .dim-toggle { font-size: 11px; }
+  </style>
+  <script>
+    const paintToggles = function (on) { document.querySelectorAll('[data-dim-toggle]').forEach(b => b.textContent = on ? 'Show covers' : 'Dim + blur covers'); };
+    window.toggleDimBlur = async function () {
+      const on = !document.body.classList.contains('dim-blur');
+      try {
+        const r = await fetch('/api/display/dim-blur', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ on }) });
+        if (!r.ok) return;
+        document.body.classList.toggle('dim-blur', on);
+        paintToggles(on);
+      } catch (e) { /* server unreachable; leave UI unchanged */ }
+    };
+    document.addEventListener('DOMContentLoaded', function () { paintToggles(document.body.classList.contains('dim-blur')); });
+  </script>
 </head>
 <body class="bg-zinc-950 text-zinc-100 min-h-screen">
   <header class="flex items-center gap-1 border-b border-zinc-800 px-4 h-12">
@@ -26,6 +44,7 @@
         <img :src="'/cache/img?url='+encodeURIComponent(detail.cover)+'&cover=1&plugin='+encodeURIComponent(plugin)+'&slug='+encodeURIComponent(slug)" class="w-40 h-56 object-cover rounded-lg" @error="coverBroken=true" x-show="!coverBroken" alt="">
       </template>
       <button @click="resetCover()" :disabled="enrichBusy" x-show="inLibrary && enrichment && enrichment.chosen && enrichment.chosen.cover" x-cloak class="absolute bottom-1 right-1 text-[10px] px-1.5 py-0.5 rounded bg-black/70 text-zinc-300 hover:text-white" title="drop chosen cover, restore the library cover">Reset cover</button>
+      <button onclick="toggleDimBlur()" data-dim-toggle class="absolute -bottom-7 left-0 dim-toggle px-2 py-1 rounded border border-zinc-700 text-zinc-400 hover:bg-zinc-800">Dim + blur covers</button>
     </div>
     <div class="flex-1 min-w-0">
       <h1 class="text-2xl font-semibold mb-2 leading-tight" x-text="detail.name || '…'"></h1>

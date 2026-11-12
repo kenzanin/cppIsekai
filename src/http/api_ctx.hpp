@@ -43,6 +43,7 @@ inline constexpr const char* kStateHost = "host";
 inline constexpr const char* kSkipPrefix = "host/skip/";
 inline constexpr const char* kReadPrefix = "host/read/";
 inline constexpr const char* kPositionKey = "host/pos";
+inline constexpr const char* kDimBlurKey = "host/dim_blur";
 
 // Typed readers for request/state JSON: absent or wrong-typed -> default.
 // House crow accessors throw on a type mismatch; bodies are a trust boundary.

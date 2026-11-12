@@ -19,6 +19,25 @@ void register_state(Ctx& c) {
     auto& plugins = c.plugins;
     auto& prefetch = c.prefetch;
 
+    // Display pref: dim+blur cover images. Stored in host/dim_blur (host bucket,
+    // survives restart, not per-plugin). Applied server-side on every page shell.
+    CROW_ROUTE(app, "/api/display/dim-blur")
+        .methods(crow::HTTPMethod::POST)([&](const crow::request& req) -> crow::response {
+            const auto body = crow::json::load(req.body);
+            bool on = false;
+            if (body && body.has("on")) {
+                const auto t = body["on"].t();
+                on = (t == crow::json::type::True);
+            }
+            on_pool(db, [&] {
+                store.state_set(kStateHost, kDimBlurKey, on ? "1" : "0");
+                return 0;
+            });
+            crow::response r{on ? R"({"ok":true,"on":true})" : R"({"ok":true,"on":false})"};
+            r.set_header("Content-Type", "application/json");
+            return r;
+        });
+
     // Chapter skip (image-cache): the flag lands under reserved
     // host/skip/<uuid>; the window re-runs against the last position so the
     // response already reflects the reroute.
