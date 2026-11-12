@@ -1,4 +1,7 @@
 ## 2026-11-12
+* **Update**: Linked `architecture/library-dedup.md` to `architecture/library-grid-stats.md` (both land saved_manga columns and are synced from the same envelope envelope-derived sync pass).
+* **Update**: Linked `architecture/library-dedup.md` to `architecture/library-page.md` (dup_group/alt_titles fuel the duplicate chip, dup sort and cross-plugin dedup UX on library-page).
+* **Update**: Linked `architecture/library-grid-stats.md` to `architecture/library-page.md` (library-grid-stats stores and syncs the stat columns that library-page badges and filters render).
 * **Update**: Updated concept `architecture/library-grid-stats.md`.
 * **Update**: Updated concept `architecture/library-page.md`.
 * **Update**: Updated concept `architecture/library-dedup.md`.

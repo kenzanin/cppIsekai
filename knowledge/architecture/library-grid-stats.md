@@ -3,7 +3,7 @@ type: Decision
 title: "library-grid-stats: saved_manga stat columns + envelope-derived sync"
 description: "saved_manga carries plugin-derived stats (status/total_ch/read_ch/has_update/last_read_at/updated_at); refresh+detail-open sync reuses stale-served envelopes; reader touch clears has_update; read_ch recomputed on open/refresh only, never per page-turn."
 tags: [store, library, sqlite, sync, has-update, openspec, grid]
-generated: { by: agent/cli, at: "2026-11-12T00:58:53Z" }
+generated: { by: agent/cli, at: "2026-11-12T00:59:24Z" }
 status: stable
 ---
 
@@ -22,3 +22,6 @@ Store helpers (src/store/store_search.cpp):
 Sync hooks (2026-11-12): sync_saved_stats called on /api/refresh POST and detail-open stale-serve; reuses stale-served envelopes, no double fetch. read_ch recomputed by walking chapters envelope on refresh/detail-open (host read/<id> >= page count, fallback >0). Reader position POST clears has_update + stamps last_read_at. Live smoke 2026-11-12: refresh all 10 saved titles -> total/read/status populated (mangadex a4304d3b: 57/100 read); /reader/position cleared o90AN has_update + stamped last_read_at.
 
 Badge semantics clarification 2026-11-12 (user): New = has_update=1; Done = read>=total>0 (all chapters read); Complete = plugin status 'Completed' (case-insensitive — atsumaru 'Completed', mangadex 'ongoing'). Status from plugin detail envelope, never normalized by host.
+
+# Related Concepts
+- [Library page design (status, progress, done/new badges)](library-page.md): library-grid-stats stores and syncs the stat columns that library-page badges and filters render
