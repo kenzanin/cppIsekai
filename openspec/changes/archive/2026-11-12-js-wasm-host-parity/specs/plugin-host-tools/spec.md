@@ -9,6 +9,8 @@ Plugins SHALL call `now()` to get the current time as INTEGER unix seconds, matc
 - **WHEN** a plugin calls `now()` and includes the value in its result
 - **THEN** the value is unix seconds, consistent with host-generated timestamps
 
+## ADDED Requirements
+
 ### Requirement: Host-tool parity across runtimes
 Every host tool on the Lua surface SHALL be implementable by the JS and WASM bindings with the same request/response semantics, or the gap SHALL be explicitly documented as out of scope in the runtime's contract. The parity set is:
 

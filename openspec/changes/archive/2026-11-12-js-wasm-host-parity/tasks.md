@@ -21,4 +21,4 @@
 
 ## 5. Integration check
 
-- [ ] 5.1 Full suite green (`xmake test`), zero build warnings, daemon boots on a scratch db; `test_plugin` count increases by the new JS/WASM cases. Verify: build + test + scratch boot log shows scheduler line as before.
+- [x] 5.1 Full suite green (`xmake test`), zero build warnings, daemon boots on a scratch db; `test_plugin` count increases by the new JS/WASM cases. Verify: build + test + scratch boot log shows scheduler line as before.
