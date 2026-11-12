@@ -16,12 +16,14 @@ namespace {
 // db thread, one writer (db_pool=1). tsv-style doubled column = FTS5 escape.
 void fts_sync(StoreImpl& impl, const std::string& plugin, const std::string& slug, const std::string& name,
               const std::string& alt_titles, const std::string& synopsis) {
-    if (!impl.fts5_ok)
+    if (!impl.fts5_ok) {
         return;
+    }
     sqlite3* db = nullptr;
     if (sqlite3_open_v2(impl.path.c_str(), &db, SQLITE_OPEN_READWRITE, nullptr) != SQLITE_OK) {
-        if (db)
+        if (db != nullptr) {
             sqlite3_close(db);
+        }
         return;
     }
     sqlite3_busy_timeout(db, 3000);
@@ -49,12 +51,14 @@ void fts_sync(StoreImpl& impl, const std::string& plugin, const std::string& slu
     sqlite3_close(db);
 }
 void fts_delete(StoreImpl& impl, const std::string& plugin, const std::string& slug) {
-    if (!impl.fts5_ok)
+    if (!impl.fts5_ok) {
         return;
+    }
     sqlite3* db = nullptr;
     if (sqlite3_open_v2(impl.path.c_str(), &db, SQLITE_OPEN_READWRITE, nullptr) != SQLITE_OK) {
-        if (db)
+        if (db != nullptr) {
             sqlite3_close(db);
+        }
         return;
     }
     sqlite3_busy_timeout(db, 3000);
@@ -74,10 +78,12 @@ void fts_delete(StoreImpl& impl, const std::string& plugin, const std::string& s
 // issue, swap fold_codepoint for ICU. Mark strip covers Mn ranges we care about.
 uint32_t decode_utf8(const char*& p, const char* end) {
     const auto b0 = static_cast<unsigned char>(*p++);
-    if (b0 < 0x80)
+    if (b0 < 0x80) {
         return b0;
-    if ((b0 & 0xE0) == 0xC0 && p < end)
+    }
+    if ((b0 & 0xE0) == 0xC0 && p < end) {
         return ((b0 & 0x1F) << 6) | (static_cast<unsigned char>(*p++) & 0x3F);
+    }
     if ((b0 & 0xF0) == 0xE0 && end - p >= 2) {
         uint32_t cp = (b0 & 0x0F) << 12;
         cp |= (static_cast<unsigned char>(*p++) & 0x3F) << 6;
@@ -94,9 +100,11 @@ uint32_t decode_utf8(const char*& p, const char* end) {
     return 0xFFFD; // replacement char: token boundary
 }
 void encode_utf8(uint32_t cp, std::string& out) {
-    if (cp < 0x80)
-        out.push_back(static_cast<char>(cp));
-    else if (cp < 0x800) {
+    if (cp < 0x80) {
+        {
+            out.push_back(static_cast<char>(cp));
+        }
+    } else if (cp < 0x800) {
         out.push_back(static_cast<char>(0xC0 | (cp >> 6)));
         out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
     } else if (cp < 0x10000) {
@@ -115,16 +123,21 @@ bool is_mark(uint32_t cp) { // Mn ranges: combining diacritics + kana dakuten/ha
            (cp >= 0xFE20 && cp <= 0xFE2F);
 }
 bool is_separator(uint32_t cp) {
-    if (cp < 0x21)
+    if (cp < 0x21) {
         return true; // C0 controls + space
-    if (cp >= 0x2000 && cp <= 0x206F)
+    }
+    if (cp >= 0x2000 && cp <= 0x206F) {
         return true; // general punctuation
-    if (cp >= 0x2E00 && cp <= 0x2E7F)
+    }
+    if (cp >= 0x2E00 && cp <= 0x2E7F) {
         return true;
-    if (cp >= 0x3000 && cp <= 0x303F)
+    }
+    if (cp >= 0x3000 && cp <= 0x303F) {
         return true; // CJK symbols & punctuation
-    if (cp == 0xFF01)
+    }
+    if (cp == 0xFF01) {
         return true;
+    }
     return cp == 0xFF0C || cp == 0xFF0E || cp == 0xFF1A || cp == 0xFF1B || cp == 0xFF08 || cp == 0xFF09 ||
            cp == 0xFF5B || cp == 0xFF5D;
 }
@@ -134,30 +147,49 @@ uint32_t fold_latin(uint32_t cp) {
         uint32_t from, to;
     };
     static constexpr Pair kTable[] = {
-        {0xE1, 'a'},   {0xE0, 'a'},   {0xE2, 'a'},   {0xE4, 'a'},   {0xE3, 'a'},   {0xE5, 'a'},   {0x0101, 'a'},
-        {0x0103, 'a'}, {0x0105, 'a'}, {0xE9, 'e'},   {0xE8, 'e'},   {0xEA, 'e'},   {0xEB, 'e'},   {0x0113, 'e'},
-        {0x0115, 'e'}, {0x0117, 'e'}, {0x0119, 'e'}, {0x011B, 'e'}, {0xED, 'i'},   {0xEC, 'i'},   {0xEE, 'i'},
-        {0xEF, 'i'},   {0x012B, 'i'}, {0x012D, 'i'}, {0x012F, 'i'}, {0x0131, 'i'}, {0xF3, 'o'},   {0xF2, 'o'},
-        {0xF4, 'o'},   {0xF6, 'o'},   {0xF5, 'o'},   {0xF8, 'o'},   {0x014D, 'o'}, {0x014F, 'o'}, {0x0151, 'o'},
-        {0xFA, 'u'},   {0xF9, 'u'},   {0xFB, 'u'},   {0xFC, 'u'},   {0x016B, 'u'}, {0x016D, 'u'}, {0x016F, 'u'},
-        {0x0171, 'u'}, {0xF1, 'n'},   {0x0144, 'n'}, {0x0146, 'n'}, {0x0148, 'n'}, {0x014A, 'n'}, {0xE7, 'c'},
-        {0x0107, 'c'}, {0x0109, 'c'}, {0x010B, 'c'}, {0x010D, 'c'}, {0x015B, 's'}, {0x015D, 's'}, {0x015F, 's'},
-        {0x0161, 's'}, {0x017F, 's'}, {0x00DF, 's'}, {0x017A, 'z'}, {0x017C, 'z'}, {0x017E, 'z'}, {0xFD, 'y'},
-        {0xFF, 'y'},   {0x0177, 'y'}, {0x00FD, 'y'}, {0x00E6, 'a'}, {0x0153, 'o'}, {0x00FE, 't'}, {0x0111, 'd'},
-        {0x0139, 'l'}, {0x013E, 'l'}, {0x0142, 'l'}, {0x0154, 'r'}, {0x0156, 'r'}, {0x0158, 'r'}, {0x0162, 't'},
-        {0x0164, 't'}, {0x0165, 't'},
+        {.from = 0xE1, .to = 'a'},   {.from = 0xE0, .to = 'a'},   {.from = 0xE2, .to = 'a'},
+        {.from = 0xE4, .to = 'a'},   {.from = 0xE3, .to = 'a'},   {.from = 0xE5, .to = 'a'},
+        {.from = 0x0101, .to = 'a'}, {.from = 0x0103, .to = 'a'}, {.from = 0x0105, .to = 'a'},
+        {.from = 0xE9, .to = 'e'},   {.from = 0xE8, .to = 'e'},   {.from = 0xEA, .to = 'e'},
+        {.from = 0xEB, .to = 'e'},   {.from = 0x0113, .to = 'e'}, {.from = 0x0115, .to = 'e'},
+        {.from = 0x0117, .to = 'e'}, {.from = 0x0119, .to = 'e'}, {.from = 0x011B, .to = 'e'},
+        {.from = 0xED, .to = 'i'},   {.from = 0xEC, .to = 'i'},   {.from = 0xEE, .to = 'i'},
+        {.from = 0xEF, .to = 'i'},   {.from = 0x012B, .to = 'i'}, {.from = 0x012D, .to = 'i'},
+        {.from = 0x012F, .to = 'i'}, {.from = 0x0131, .to = 'i'}, {.from = 0xF3, .to = 'o'},
+        {.from = 0xF2, .to = 'o'},   {.from = 0xF4, .to = 'o'},   {.from = 0xF6, .to = 'o'},
+        {.from = 0xF5, .to = 'o'},   {.from = 0xF8, .to = 'o'},   {.from = 0x014D, .to = 'o'},
+        {.from = 0x014F, .to = 'o'}, {.from = 0x0151, .to = 'o'}, {.from = 0xFA, .to = 'u'},
+        {.from = 0xF9, .to = 'u'},   {.from = 0xFB, .to = 'u'},   {.from = 0xFC, .to = 'u'},
+        {.from = 0x016B, .to = 'u'}, {.from = 0x016D, .to = 'u'}, {.from = 0x016F, .to = 'u'},
+        {.from = 0x0171, .to = 'u'}, {.from = 0xF1, .to = 'n'},   {.from = 0x0144, .to = 'n'},
+        {.from = 0x0146, .to = 'n'}, {.from = 0x0148, .to = 'n'}, {.from = 0x014A, .to = 'n'},
+        {.from = 0xE7, .to = 'c'},   {.from = 0x0107, .to = 'c'}, {.from = 0x0109, .to = 'c'},
+        {.from = 0x010B, .to = 'c'}, {.from = 0x010D, .to = 'c'}, {.from = 0x015B, .to = 's'},
+        {.from = 0x015D, .to = 's'}, {.from = 0x015F, .to = 's'}, {.from = 0x0161, .to = 's'},
+        {.from = 0x017F, .to = 's'}, {.from = 0x00DF, .to = 's'}, {.from = 0x017A, .to = 'z'},
+        {.from = 0x017C, .to = 'z'}, {.from = 0x017E, .to = 'z'}, {.from = 0xFD, .to = 'y'},
+        {.from = 0xFF, .to = 'y'},   {.from = 0x0177, .to = 'y'}, {.from = 0x00FD, .to = 'y'},
+        {.from = 0x00E6, .to = 'a'}, {.from = 0x0153, .to = 'o'}, {.from = 0x00FE, .to = 't'},
+        {.from = 0x0111, .to = 'd'}, {.from = 0x0139, .to = 'l'}, {.from = 0x013E, .to = 'l'},
+        {.from = 0x0142, .to = 'l'}, {.from = 0x0154, .to = 'r'}, {.from = 0x0156, .to = 'r'},
+        {.from = 0x0158, .to = 'r'}, {.from = 0x0162, .to = 't'}, {.from = 0x0164, .to = 't'},
+        {.from = 0x0165, .to = 't'},
     };
-    for (const auto& p : kTable)
-        if (p.from == cp)
+    for (const auto& p : kTable) {
+        if (p.from == cp) {
             return p.to;
+        }
+    }
     return cp;
 }
 uint32_t fold_codepoint(uint32_t cp) {
-    if (cp < 0x80)
+    if (cp < 0x80) {
         return (cp >= 'A' && cp <= 'Z') ? cp + 32 : cp;
+    }
     cp = fold_latin(cp);
-    if (cp >= 0x30A1 && cp <= 0x30F6)
+    if (cp >= 0x30A1 && cp <= 0x30F6) {
         return cp - 0x60; // katakana -> hiragana
+    }
     return cp;
 }
 using TokenMultiset = std::map<std::string, int>;
@@ -165,8 +197,9 @@ TokenMultiset tokenize(const std::string& s) {
     TokenMultiset out;
     std::string cur;
     auto flush = [&] {
-        if (cur.empty())
+        if (cur.empty()) {
             return;
+        }
         out[std::move(cur)] += 1;
         cur.clear();
     };
@@ -178,31 +211,37 @@ TokenMultiset tokenize(const std::string& s) {
             flush();
             continue;
         }
-        if (is_mark(cp))
+        if (is_mark(cp)) {
             continue; // NFKD + strip marks (drop dakuten-class marks)
+        }
         const uint32_t folded = fold_codepoint(cp);
-        if ((folded >= 'a' && folded <= 'z') || (folded >= '0' && folded <= '9'))
+        if ((folded >= 'a' && folded <= 'z') || (folded >= '0' && folded <= '9')) {
             cur.push_back(static_cast<char>(folded));
-        else if (folded >= 0x1100)
+        } else if (folded >= 0x1100) {
             encode_utf8(folded, cur); // CJK/kana/etc: verbatim
-        else
+        } else {
             flush();
+        }
     }
     flush();
     return out;
 }
 // Dice coefficient over two multisets: 2*Σmin(a,b) / (Σa + Σb)
 double dice(const TokenMultiset& a, const TokenMultiset& b) {
-    if (a.empty() || b.empty())
+    if (a.empty() || b.empty()) {
         return 0.0;
-    long sum = 0, inter = 0;
-    for (const auto& [k, v] : a)
+    }
+    long sum = 0;
+    long inter = 0;
+    for (const auto& [k, v] : a) {
         sum += v;
+    }
     for (const auto& [k, v] : b) {
         sum += v;
         auto it = a.find(k);
-        if (it != a.end())
+        if (it != a.end()) {
             inter += std::min(static_cast<long>(v), static_cast<long>(it->second));
+        }
     }
     return (sum == 0) ? 0.0 : (2.0 * static_cast<double>(inter)) / static_cast<double>(sum);
 }
@@ -214,19 +253,21 @@ void Store::recompute_dup_groups() {
     // similarity >= 0.6, union-find components. All writes in ONE txn.
     auto rows =
         impl_->storage.get_all<store_detail::SavedMangaEntity>(order_by(&store_detail::SavedMangaEntity::added_at));
-    if (rows.empty())
+    if (rows.empty()) {
         return;
+    }
     if (!impl_->fts5_ok || rows.size() < 2) {
         // degraded mode: everything unique, one txn clears any stale values
         sqlite3* db = nullptr;
         if (sqlite3_open_v2(impl_->path.c_str(), &db, SQLITE_OPEN_READWRITE, nullptr) != SQLITE_OK) {
-            if (db)
+            if (db != nullptr) {
                 sqlite3_close(db);
+            }
             return;
         }
         sqlite3_busy_timeout(db, 3000);
         sqlite3_exec(db, "BEGIN IMMEDIATE", nullptr, nullptr, nullptr);
-        for (const auto& r : rows)
+        for (const auto& r : rows) {
             if (r.dup_group != 0) {
                 sqlite3_stmt* st = nullptr;
                 if (sqlite3_prepare_v2(db, "UPDATE saved_manga SET dup_group=0 WHERE plugin=? AND slug=?", -1, &st,
@@ -237,20 +278,23 @@ void Store::recompute_dup_groups() {
                     sqlite3_finalize(st);
                 }
             }
+        }
         sqlite3_exec(db, "COMMIT", nullptr, nullptr, nullptr);
         sqlite3_close(db);
         return;
     }
     const std::size_t n = rows.size();
-    std::vector<TokenMultiset> titles(n), syms(n);
+    std::vector<TokenMultiset> titles(n);
+    std::vector<TokenMultiset> syms(n);
     for (std::size_t i = 0; i < n; ++i) {
         titles[i] = tokenize(rows[i].name + " " + rows[i].alt_titles);
         syms[i] = tokenize(rows[i].synopsis);
     }
     // union-find over indices
     std::vector<int> parent(n);
-    for (std::size_t i = 0; i < n; ++i)
+    for (std::size_t i = 0; i < n; ++i) {
         parent[i] = static_cast<int>(i);
+    }
     auto find = [&](int x) {
         while (parent[x] != x) {
             parent[x] = parent[parent[x]];
@@ -261,13 +305,15 @@ void Store::recompute_dup_groups() {
     auto unite = [&](int a, int b) {
         a = find(a);
         b = find(b);
-        if (a != b)
+        if (a != b) {
             parent[a] = b;
+        }
     };
     sqlite3* db = nullptr;
     if (sqlite3_open_v2(impl_->path.c_str(), &db, SQLITE_OPEN_READWRITE, nullptr) != SQLITE_OK) {
-        if (db)
+        if (db != nullptr) {
             sqlite3_close(db);
+        }
         return;
     }
     sqlite3_busy_timeout(db, 3000);
@@ -275,36 +321,44 @@ void Store::recompute_dup_groups() {
         // candidate set: title tokens, OR-joined (alnum so MATCH-safe); skip pure-stopword noise
         std::string match;
         for (const auto& [tok, _] : titles[i]) {
-            if (!match.empty())
+            if (!match.empty()) {
                 match += " OR ";
+            }
             match += tok;
-            if (match.size() > 400)
+            if (match.size() > 400) {
                 break; // cap the query; MATCH accepts longer but keep it cheap
+            }
         }
-        if (match.empty())
+        if (match.empty()) {
             continue;
+        }
         const std::string sql =
             "SELECT plugin, slug, bm25(library_fts) FROM library_fts WHERE library_fts MATCH '{name alt_titles} : (" +
             match + ")' ORDER BY bm25(library_fts) LIMIT 20";
         sqlite3_stmt* st = nullptr;
-        if (sqlite3_prepare_v2(db, sql.c_str(), -1, &st, nullptr) != SQLITE_OK)
+        if (sqlite3_prepare_v2(db, sql.c_str(), -1, &st, nullptr) != SQLITE_OK) {
             continue;
+        }
         while (sqlite3_step(st) == SQLITE_ROW) {
             const char* cp = reinterpret_cast<const char*>(sqlite3_column_text(st, 0));
             const char* cs = reinterpret_cast<const char*>(sqlite3_column_text(st, 1));
-            if (!cp || !cs)
+            if ((cp == nullptr) || (cs == nullptr)) {
                 continue;
+            }
             for (std::size_t j = 0; j < n; ++j) {
-                if (j == i)
+                if (j == i) {
                     continue;
-                if (rows[j].plugin != cp || rows[j].slug != cs)
+                }
+                if (rows[j].plugin != cp || rows[j].slug != cs) {
                     continue;
+                }
                 const double td = dice(titles[i], titles[j]);
                 const double sd = dice(syms[i], syms[j]);
                 // synopsis Dice counts double-ish as corroboration (design D3)
-                const double sim = std::max(td, 0.5 * td + 0.5 * sd);
-                if (sim >= 0.6)
+                const double sim = std::max(td, (0.5 * td) + (0.5 * sd));
+                if (sim >= 0.6) {
                     unite(static_cast<int>(i), static_cast<int>(j));
+                }
             }
         }
         sqlite3_finalize(st);
@@ -315,15 +369,17 @@ void Store::recompute_dup_groups() {
     for (std::size_t i = 0; i < n; ++i) {
         int root = find(static_cast<int>(i));
         auto it = comp_id.find(root);
-        if (it != comp_id.end())
+        if (it != comp_id.end()) {
             out[i] = it->second;
         // provisional marker: decide after counting component sizes
-        else
+        } else {
             comp_id[root] = -1;
+        }
     }
     std::map<int, int> counts;
-    for (std::size_t i = 0; i < n; ++i)
+    for (std::size_t i = 0; i < n; ++i) {
         ++counts[find(static_cast<int>(i))];
+    }
     int gid = 0;
     comp_id.clear();
     for (std::size_t i = 0; i < n; ++i) {
@@ -333,15 +389,17 @@ void Store::recompute_dup_groups() {
             continue;
         }
         auto it = comp_id.find(root);
-        if (it == comp_id.end())
+        if (it == comp_id.end()) {
             it = comp_id.emplace(root, ++gid).first;
+        }
         out[i] = it->second;
     }
     // write all rows in one txn (singletons too, so stale groups clear)
     sqlite3_exec(db, "BEGIN IMMEDIATE", nullptr, nullptr, nullptr);
     for (std::size_t i = 0; i < n; ++i) {
-        if (rows[i].dup_group == out[i])
+        if (rows[i].dup_group == out[i]) {
             continue;
+        }
         sqlite3_stmt* st = nullptr;
         if (sqlite3_prepare_v2(db, "UPDATE saved_manga SET dup_group=? WHERE plugin=? AND slug=?", -1, &st, nullptr) ==
             SQLITE_OK) {
@@ -394,7 +452,13 @@ void Store::upsert_plugin(const std::string& id, const std::string& name, const 
         impl_->storage.update(rows[0]);
         return;
     }
-    impl_->storage.insert(store_detail::PluginEntity{0, name, id, version, capabilities, 1, runtime});
+    impl_->storage.insert(store_detail::PluginEntity{.id = 0,
+                                                     .name = name,
+                                                     .plugin_id = id,
+                                                     .version = version,
+                                                     .capabilities = capabilities,
+                                                     .enabled = 1,
+                                                     .runtime = runtime});
 }
 
 void Store::set_plugin_enabled(std::int64_t id, bool on) {
@@ -416,8 +480,9 @@ namespace {
 std::string like_pattern(const std::string& query) {
     std::string out = "%";
     for (char ch : query) {
-        if (ch == '%' || ch == '_' || ch == '\\')
+        if (ch == '%' || ch == '_' || ch == '\\') {
             out += '\\';
+        }
         out += ch;
     }
     return out + "%";
@@ -426,17 +491,19 @@ std::string like_pattern(const std::string& query) {
 
 int Store::count(const std::string& plugin, const std::string& query) {
     const auto pattern = like_pattern(query);
-    if (plugin.empty())
-        return static_cast<int>(impl_->storage.count<store_detail::TitleEntity>(
-            where(like(&store_detail::TitleEntity::name, pattern).escape(std::string("\\")))));
+    if (plugin.empty()) {
+        return impl_->storage.count<store_detail::TitleEntity>(
+            where(like(&store_detail::TitleEntity::name, pattern).escape(std::string("\\"))));
+    }
 
     auto rows =
         impl_->storage.get_all<store_detail::PluginEntity>(where(c(&store_detail::PluginEntity::name) == plugin));
-    if (rows.empty())
+    if (rows.empty()) {
         return 0;
-    return static_cast<int>(impl_->storage.count<store_detail::TitleEntity>(
+    }
+    return impl_->storage.count<store_detail::TitleEntity>(
         where(c(&store_detail::TitleEntity::plugin_id) == rows[0].id &&
-              like(&store_detail::TitleEntity::name, pattern).escape(std::string("\\")))));
+              like(&store_detail::TitleEntity::name, pattern).escape(std::string("\\"))));
 }
 
 std::vector<Title> Store::search(const std::string& plugin, const std::string& query, int limit, int offset) {
@@ -466,14 +533,15 @@ std::vector<Title> Store::search(const std::string& plugin, const std::string& q
 std::optional<std::string> Store::state_get(const std::string& plugin_id, const std::string& key) {
     auto rows = impl_->storage.get_all<store_detail::StateEntity>(
         where(c(&store_detail::StateEntity::plugin_id) == plugin_id && c(&store_detail::StateEntity::key) == key));
-    if (rows.empty())
+    if (rows.empty()) {
         return std::nullopt;
+    }
     return rows[0].value;
 }
 
 void Store::state_set(const std::string& plugin_id, const std::string& key, const std::string& value) {
-    impl_->storage.replace(
-        store_detail::StateEntity{plugin_id, key, value}); // INSERT OR REPLACE on the composite pk: upsert
+    impl_->storage.replace(store_detail::StateEntity{
+        .plugin_id = plugin_id, .key = key, .value = value}); // INSERT OR REPLACE on the composite pk: upsert
 }
 
 std::vector<std::string> Store::state_keys_value(const std::string& plugin_id, const std::string& key_prefix,
@@ -481,8 +549,9 @@ std::vector<std::string> Store::state_keys_value(const std::string& plugin_id, c
     std::string pat;
     pat.reserve(key_prefix.size() + 1);
     for (char ch : key_prefix) {
-        if (ch == '%' || ch == '_' || ch == '\\')
+        if (ch == '%' || ch == '_' || ch == '\\') {
             pat += '\\';
+        }
         pat += ch;
     }
     pat += '%';
@@ -492,47 +561,86 @@ std::vector<std::string> Store::state_keys_value(const std::string& plugin_id, c
               c(&store_detail::StateEntity::value) == value));
     std::vector<std::string> out;
     out.reserve(rows.size());
-    for (const auto& r : rows)
+    for (const auto& r : rows) {
         out.push_back(r.key);
+    }
     return out;
 }
 
 void Store::position_set(const ReaderPosition& pos) {
     // REPLACE on the (plugin, slug) PK: the route layers optional fields over
     // the stored row, this just persists the result. updated_at stamped here.
-    impl_->storage.replace(store_detail::ReaderPositionEntity{pos.plugin, pos.slug, pos.chapter_id, pos.chapter_number,
-                                                              pos.page, pos.mode, pos.direction, pos.zoom,
-                                                              static_cast<std::int64_t>(std::time(nullptr))});
+    impl_->storage.replace(store_detail::ReaderPositionEntity{
+        .plugin = pos.plugin,
+        .slug = pos.slug,
+        .chapter_id = pos.chapter_id,
+        .chapter_number = pos.chapter_number,
+        .page = pos.page,
+        .mode = pos.mode,
+        .direction = pos.direction,
+        .zoom = pos.zoom,
+        .updated_at = static_cast<std::int64_t>(std::time(nullptr)),
+    });
 }
 
 std::optional<ReaderPosition> Store::position_get(const std::string& plugin, const std::string& slug) {
     auto rows = impl_->storage.get_all<store_detail::ReaderPositionEntity>(
         where(c(&store_detail::ReaderPositionEntity::plugin) == plugin &&
               c(&store_detail::ReaderPositionEntity::slug) == slug));
-    if (rows.empty())
+    if (rows.empty()) {
         return std::nullopt;
+    }
     const auto& r = rows[0];
-    return ReaderPosition{r.plugin, r.slug,      r.chapter_id, r.chapter_number, r.page,
-                          r.mode,   r.direction, r.zoom,       r.updated_at};
+    return ReaderPosition{
+        .plugin = r.plugin,
+        .slug = r.slug,
+        .chapter_id = r.chapter_id,
+        .chapter_number = r.chapter_number,
+        .page = r.page,
+        .mode = r.mode,
+        .direction = r.direction,
+        .zoom = r.zoom,
+        .updated_at = r.updated_at,
+    };
 }
 
 std::optional<ReaderPosition> Store::position_last() {
     auto rows = impl_->storage.get_all<store_detail::ReaderPositionEntity>(
         order_by(&store_detail::ReaderPositionEntity::updated_at).desc(), limit(1));
-    if (rows.empty())
+    if (rows.empty()) {
         return std::nullopt;
+    }
     const auto& r = rows[0];
-    return ReaderPosition{r.plugin, r.slug,      r.chapter_id, r.chapter_number, r.page,
-                          r.mode,   r.direction, r.zoom,       r.updated_at};
+    return ReaderPosition{
+        .plugin = r.plugin,
+        .slug = r.slug,
+        .chapter_id = r.chapter_id,
+        .chapter_number = r.chapter_number,
+        .page = r.page,
+        .mode = r.mode,
+        .direction = r.direction,
+        .zoom = r.zoom,
+        .updated_at = r.updated_at,
+    };
 }
 
 static store_detail::SavedMangaEntity saved_row(const SavedManga& m, std::int64_t added_at) {
     return store_detail::SavedMangaEntity{
-        m.plugin,       m.slug,       m.name,
-        m.cover,        added_at,     m.status.empty() ? std::string{"ongoing"} : m.status,
-        m.total_ch,     m.read_ch,    m.has_update,
-        m.last_read_at, m.updated_at, m.synopsis,
-        m.alt_titles,   m.dup_group};
+        .plugin = m.plugin,
+        .slug = m.slug,
+        .name = m.name,
+        .cover = m.cover,
+        .added_at = added_at,
+        .status = m.status.empty() ? std::string{"ongoing"} : m.status,
+        .total_ch = m.total_ch,
+        .read_ch = m.read_ch,
+        .has_update = m.has_update,
+        .last_read_at = m.last_read_at,
+        .updated_at = m.updated_at,
+        .synopsis = m.synopsis,
+        .alt_titles = m.alt_titles,
+        .dup_group = m.dup_group,
+    };
 }
 
 void Store::save_manga(const SavedManga& m) {
@@ -561,18 +669,22 @@ void Store::saved_stats_update(const std::string& plugin, const std::string& slu
                                int total_ch) {
     auto rows = impl_->storage.get_all<store_detail::SavedMangaEntity>(where(
         c(&store_detail::SavedMangaEntity::plugin) == plugin && c(&store_detail::SavedMangaEntity::slug) == slug));
-    if (rows.empty())
+    if (rows.empty()) {
         return;
+    }
     auto& e = rows[0];
     const bool changed = (!status.empty() && e.status != status) || e.total_ch != total_ch;
-    if (!status.empty())
+    if (!status.empty()) {
         e.status = status;
-    const std::int64_t now = static_cast<std::int64_t>(std::time(nullptr));
-    if (total_ch > e.total_ch)
+    }
+    const auto now = static_cast<std::int64_t>(std::time(nullptr));
+    if (total_ch > e.total_ch) {
         e.has_update = 1; // growth → mark New
+    }
     e.total_ch = total_ch;
-    if (changed)
+    if (changed) {
         e.updated_at = now;
+    }
     // FTS NOT re-synced here (library-dedup 1.4): stats path touches no indexed column (name/alt_titles/synopsis).
     impl_->storage.replace(e);
 }
@@ -581,8 +693,9 @@ void Store::saved_signal_update(const std::string& plugin, const std::string& sl
                                 const std::string& alt_titles_json) {
     auto rows = impl_->storage.get_all<store_detail::SavedMangaEntity>(where(
         c(&store_detail::SavedMangaEntity::plugin) == plugin && c(&store_detail::SavedMangaEntity::slug) == slug));
-    if (rows.empty())
+    if (rows.empty()) {
         return;
+    }
     auto& e = rows[0];
     bool changed = false;
     if (!synopsis.empty() && e.synopsis != synopsis) {
@@ -604,24 +717,27 @@ void Store::saved_read_rollup(const std::string& plugin, const std::string& slug
                               std::int64_t last_read_at) {
     auto rows = impl_->storage.get_all<store_detail::SavedMangaEntity>(where(
         c(&store_detail::SavedMangaEntity::plugin) == plugin && c(&store_detail::SavedMangaEntity::slug) == slug));
-    if (rows.empty())
+    if (rows.empty()) {
         return;
+    }
     auto& e = rows[0];
     e.read_ch = read_ch;
-    if (last_read_at > 0)
+    if (last_read_at > 0) {
         e.last_read_at = last_read_at;
+    }
     impl_->storage.replace(e);
 }
 
 void Store::saved_clear_update(const std::string& plugin, const std::string& slug) {
     auto rows = impl_->storage.get_all<store_detail::SavedMangaEntity>(where(
         c(&store_detail::SavedMangaEntity::plugin) == plugin && c(&store_detail::SavedMangaEntity::slug) == slug));
-    if (rows.empty())
+    if (rows.empty()) {
         return;
+    }
     auto& e = rows[0];
     const auto now = static_cast<std::int64_t>(std::time(nullptr));
     e.last_read_at = now; // reader touch (library-grid-stats 2.4), flag or not
-    if (e.has_update) {
+    if (e.has_update != 0) {
         e.has_update = 0;
         e.updated_at = now;
     }
@@ -641,8 +757,23 @@ std::vector<SavedManga> Store::saved_list() {
         order_by(&store_detail::SavedMangaEntity::added_at).desc());
     std::vector<SavedManga> out;
     out.reserve(rows.size());
-    for (const auto& r : rows)
-        out.push_back(SavedManga{r.plugin, r.slug, r.name, r.cover, r.added_at, r.status, r.total_ch, r.read_ch,
-                                 r.has_update, r.last_read_at, r.updated_at, r.synopsis, r.alt_titles, r.dup_group});
+    for (const auto& r : rows) {
+        out.push_back(SavedManga{
+            .plugin = r.plugin,
+            .slug = r.slug,
+            .name = r.name,
+            .cover = r.cover,
+            .added_at = r.added_at,
+            .status = r.status,
+            .total_ch = r.total_ch,
+            .read_ch = r.read_ch,
+            .has_update = r.has_update,
+            .last_read_at = r.last_read_at,
+            .updated_at = r.updated_at,
+            .synopsis = r.synopsis,
+            .alt_titles = r.alt_titles,
+            .dup_group = r.dup_group,
+        });
+    }
     return out;
 }

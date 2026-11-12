@@ -80,7 +80,7 @@ struct UpdateAttempt {
     std::string outcome;            // ok|error|skipped
     std::string error;              // short error text; '' on success
     int consecutive_errors{};
-    std::int64_t backoff_until{};   // 0 = not backed off
+    std::int64_t backoff_until{}; // 0 = not backed off
 };
 
 struct StoreImpl;
@@ -101,6 +101,12 @@ public:
     /** \brief Gate for call paths; absent row (unregistered id) counts as
      *  enabled. */
     bool plugin_enabled(const std::string& plugin_id);
+    /** \brief plugin-lifecycle 2.1: folder-removal GC -- every registry id
+     *  absent from keep_ids loses its child traces (title via the registry
+     *  row, plugin_state, reader_positions, saved_manga, title_meta,
+     *  update_attempts, api_cache) and its plugin row, one transaction per
+     *  plugin. Returns the removed ids. */
+    std::vector<std::string> plugin_prune_absent(const std::vector<std::string>& keep_ids);
     int count(const std::string& plugin, const std::string& query);
     std::vector<Title> search(const std::string& plugin, const std::string& query, int limit, int offset);
 

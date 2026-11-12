@@ -1,5 +1,5 @@
-#include "plugin/url_codec.hpp"
 #include "bridge.hpp"
+#include "plugin/url_codec.hpp"
 
 #include "plugin/htmltext.hpp" // host.re2/html core (task 1.3)
 #include "plugin/http_client.hpp"
@@ -87,7 +87,6 @@ end
     // decode leaves '+' verbatim (queryEncode semantics, goIsekai parity).
     fs_tab["url_encode"] = [](const std::string& s) { return plugin::url_encode(s); };
     fs_tab["url_decode"] = [](const std::string& s) { return plugin::url_decode(s); };
-
 
     // ponytail: io shim is read-only via istream; widen only when a plugin
     // needs incremental reads (io.lines multi-arg / formats).
@@ -262,18 +261,20 @@ end
     // like http.fetch so plugins can distinguish bad input from a site 403.
     sol::table crypto = sv.create_table();
     crypto["vrf_sign"] = [id](const std::string& api_path, const sol::optional<sol::table>& params,
-                              const sol::optional<sol::table>& stages, sol::this_state ts)
-        -> std::pair<sol::object, std::optional<std::string>> {
+                              const sol::optional<sol::table>& stages,
+                              sol::this_state ts) -> std::pair<sol::object, std::optional<std::string>> {
         const auto fail = [&](std::string why) {
             spdlog::warn("[plugin:{}] vrf_sign {} failed: {}", id, api_path, why);
             return std::make_pair(sol::make_object(ts, sol::lua_nil), std::optional(std::move(why)));
         };
-        if (api_path.empty()) return fail("vrf_sign: api_path is empty");
+        if (api_path.empty())
+            return fail("vrf_sign: api_path is empty");
 
         std::map<std::string, std::string> prm;
         if (params) {
             for (auto& [k, v] : *params) {
-                if (!k.is<std::string>()) return fail("vrf_sign: params keys must be strings");
+                if (!k.is<std::string>())
+                    return fail("vrf_sign: params keys must be strings");
                 if (v.is<std::string>()) {
                     prm[k.as<std::string>()] = v.as<std::string>();
                 } else if (v.is<bool>()) {
@@ -287,15 +288,18 @@ end
         }
 
         std::vector<VrfStage> vstages;
-        if (!stages || stages->size() == 0) return fail("vrf_sign: stages must be a non-empty array");
+        if (!stages || stages->size() == 0)
+            return fail("vrf_sign: stages must be a non-empty array");
         for (size_t i = 0; i < stages->size(); ++i) {
             const size_t idx = i + 1;
             const sol::optional<sol::table> st = (*stages)[idx];
-            if (!st) return fail("vrf_sign: stage " + std::to_string(idx) + ": missing");
+            if (!st)
+                return fail("vrf_sign: stage " + std::to_string(idx) + ": missing");
             const sol::optional<double> iv = (*st)["iv"];
             const sol::optional<std::string> key = (*st)["key"];
             const sol::optional<std::string> tbl = (*st)["tbl"];
-            if (!iv || !key || !tbl) return fail("vrf_sign: stage " + std::to_string(idx) + ": needs iv, key, tbl");
+            if (!iv || !key || !tbl)
+                return fail("vrf_sign: stage " + std::to_string(idx) + ": needs iv, key, tbl");
             const double fid = *iv;
             const int ivv = static_cast<int>(fid);
             if (fid != static_cast<double>(ivv) || ivv < 0 || ivv > 255) {

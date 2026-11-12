@@ -26,7 +26,7 @@ inline std::optional<std::string> fs_read(const std::filesystem::path& dir, cons
     const fs::path full = (base / fs::path(rel)).lexically_normal();
     const std::string base_s = base.generic_string();
     const std::string full_s = full.generic_string();
-    if (full_s.compare(0, base_s.size(), base_s) != 0) {
+    if (!full_s.starts_with(base_s)) {
         return std::nullopt; // outside the root
     }
     if (full_s.size() > base_s.size() && full_s[base_s.size()] != '/') {

@@ -88,11 +88,13 @@ crow::json::wvalue home_context(Store& store, BS::thread_pool<>& db, const crow:
     std::vector<reader::CoverJob> jobs;
     for (std::size_t i = 0; i < saved.size(); ++i) {
         const std::string& c = ovl[i].has_value() ? *ovl[i] : saved[i].cover;
-        if (!c.empty())
-            jobs.push_back({c, saved[i].plugin});
+        if (!c.empty()) {
+            jobs.push_back({.url = c, .plugin = saved[i].plugin});
+        }
     }
-    if (!jobs.empty())
+    if (!jobs.empty()) {
         covers.nudge(std::move(jobs));
+    }
     ctx["saved_mode"] = !saved.empty();
     ctx["empty_saved"] = saved.empty();
     std::vector<crow::json::wvalue> saved_rows;
@@ -158,29 +160,35 @@ void register_pages(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, L
     CROW_ROUTE(app, "/read/<string>/<string>")
     ([&](const crow::request&, const std::string& plugin, const std::string& slug) {
         const auto pos = on_pool(db, [&] { return store.position_get(plugin, slug); });
-        int ch = 1, page = 1;
-        std::string mode, dir, zoom;
+        int ch = 1;
+        int page = 1;
+        std::string mode;
+        std::string dir;
+        std::string zoom;
         if (pos) {
             ch = std::max(0, static_cast<int>(pos->chapter_number)); // ch 0 is valid
             page = std::max(1, pos->page);
-            mode = std::move(pos->mode);
-            dir = std::move(pos->direction);
-            zoom = std::move(pos->zoom);
+            mode = pos->mode;
+            dir = pos->direction;
+            zoom = pos->zoom;
         }
         auto ctx = layout(store, db, "library");
         ctx["resume_ch"] = ch;
         ctx["resume_page"] = page;
-        ctx["resume_mode"] = std::move(mode);
-        ctx["resume_dir"] = std::move(dir);
-        ctx["resume_zoom"] = std::move(zoom);
-        return html("reader.mustache", std::move(ctx));
+        ctx["resume_mode"] = mode;
+        ctx["resume_dir"] = dir;
+        ctx["resume_zoom"] = zoom;
+        return html("reader.mustache", ctx);
     });
 
     // manga-detail: the shelf page (metadata + chapter list, hydrating from
     // /api/*). Reader is at /read.
     CROW_ROUTE(app, "/view/manga/<string>/<string>")
-    ([&](const crow::request&, std::string, std::string) {
-        return html("detail.mustache", layout(store, db, "library"));
+    ([&](const crow::request&, std::string plugin, const std::string&) {
+        auto ctx = layout(store, db, "library");
+        // 0 = disabled: the page's manual-update button renders dead (plugin-lifecycle 1.3)
+        ctx["pe"] = on_pool(db, [&] { return store.plugin_enabled(plugin); }) ? 1 : 0;
+        return html("detail.mustache", ctx);
     });
 
     CROW_ROUTE(app, "/plugins")([&] { return html("plugins.mustache", layout(store, db, "plugins")); });
@@ -195,7 +203,7 @@ void register_pages(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, L
             lines.emplace_back(line);
         }
         ctx["lines"] = std::move(lines);
-        return html("logs.mustache", std::move(ctx));
+        return html("logs.mustache", ctx);
     });
 
     CROW_WEBSOCKET_ROUTE(app, "/ws/log").onopen([&](crow::websocket::connection& conn) {
@@ -217,7 +225,7 @@ void br_asset(const crow::request& req, crow::response& res, const char* path, c
     // `compressed` flag, so a response returned by value would get gzip'd on
     // top of the brotli body (browser decodes gzip, gets brotli, JS explodes).
     const std::string ae = req.get_header_value("Accept-Encoding");
-    const bool wants_br = ae.find("br") != std::string::npos;
+    const bool wants_br = ae.contains("br");
     // Vendored assets ship .br only; fall back to it even for clients that
     // did not advertise br (brotli is universal in modern browsers).
     std::string file = wants_br ? std::string(path) + ".br" : std::string(path);
@@ -238,8 +246,9 @@ void br_asset(const crow::request& req, crow::response& res, const char* path, c
     res.body = ss.str();
     res.compressed = false; // precompressed (br or plain bytes) — never re-deflate
     res.set_header("Content-Type", mime);
-    if (served_br)
+    if (served_br) {
         res.set_header("Content-Encoding", "br");
+    }
     res.set_header("Cache-Control", "public, max-age=31536000, immutable");
     res.end();
 }

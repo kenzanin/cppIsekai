@@ -37,34 +37,42 @@ std::optional<std::string> build_pages_response(const std::string& chs_env, cons
     // Chapter list is number-ascending: last strictly-less = closest prev,
     // first strictly-greater = closest next.
     std::string target_id;
-    double prev = 0, next = 0;
+    double prev = 0;
+    double next = 0;
     const auto fmt_ch = [](double v) {
-        const long long t = static_cast<long long>(v);
-        if (v == static_cast<double>(t))
-            return std::to_string(t);      // integral: "2"
+        const auto t = static_cast<long long>(v);
+        if (v == static_cast<double>(t)) {
+            return std::to_string(t); // integral: "2"
+        }
         std::string s = std::to_string(v); // "1.500000"
         s.erase(s.find_last_not_of('0') + 1);
-        if (s.back() == '.')
+        if (s.back() == '.') {
             s.pop_back();
+        }
         return s;
     };
-    bool have_prev = false, have_next = false;
+    bool have_prev = false;
+    bool have_next = false;
     if (const auto chs = envelope_data(chs_env)) {
         for (const auto& item : *chs) {
-            if (!item.is_object())
+            if (!item.is_object()) {
                 continue;
+            }
             const auto& entry = item.get_object();
-            const auto num = entry.find("number");
-            if (num == entry.end())
+            const auto* const num = entry.find("number");
+            if (num == entry.end()) {
                 continue;
+            }
             const auto* d = std::get_if<double>(&num->second.data);
-            if (!d)
+            if (d == nullptr) {
                 continue;
+            }
             if (*d == ctx.ch && target_id.empty()) {
-                const auto idf = entry.find("id");
+                const auto* const idf = entry.find("id");
                 if (idf != entry.end()) {
-                    if (const auto* s = std::get_if<std::string>(&idf->second.data))
+                    if (const auto* s = std::get_if<std::string>(&idf->second.data)) {
                         target_id = *s;
+                    }
                 }
             } else if (*d < ctx.ch) {
                 prev = *d;
@@ -75,12 +83,14 @@ std::optional<std::string> build_pages_response(const std::string& chs_env, cons
             }
         }
     }
-    if (target_id.empty())
+    if (target_id.empty()) {
         return std::nullopt;
+    }
 
     const auto pages = envelope_data(pages_env);
-    if (!pages || pages->empty())
+    if (!pages || pages->empty()) {
         return std::nullopt;
+    }
 
     crow::json::wvalue out;
     out["plugin"] = ctx.plugin;
@@ -91,15 +101,17 @@ std::optional<std::string> build_pages_response(const std::string& chs_env, cons
     for (const auto& el : *pages) {
         if (const auto* s = std::get_if<std::string>(&el.data)) {
             ++page; // 1-based page number, index stays 0-based
-            page_urls.emplace_back("/cache/img?url=" + url_encode(*s) + "&plugin=" + url_encode(ctx.plugin) + "&slug=" +
-                                       url_encode(ctx.slug) + "&ch=" + fmt_ch(ctx.ch) + "&page=" + std::to_string(page) +
-                                       "&ch_id=" + url_encode(target_id));
+            page_urls.emplace_back("/cache/img?url=" + url_encode(*s) + "&plugin=" + url_encode(ctx.plugin) +
+                                   "&slug=" + url_encode(ctx.slug) + "&ch=" + fmt_ch(ctx.ch) +
+                                   "&page=" + std::to_string(page) + "&ch_id=" + url_encode(target_id));
         }
     }
     out["pages"] = std::move(page_urls);
-    if (have_prev)
+    if (have_prev) {
         out["prev_ch"] = prev;
-    if (have_next)
+    }
+    if (have_next) {
         out["next_ch"] = next;
+    }
     return out.dump();
 }

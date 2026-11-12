@@ -532,4 +532,57 @@ TEST_CASE("Store: update_candidates per-plugin cap, ordering, backoff exclusion 
         for (const auto& a : c)
             CHECK(a.slug != "a0");
     }
+    SUBCASE("disabled plugin skipped (plugin-lifecycle 1.1)") {
+        store.upsert_plugin("Asura", "Asura Scans", "1.0", "", "lua");
+        std::int64_t wid = 0;
+        for (const auto& p : store.plugins())
+            if (p.plugin_id == "Asura")
+                wid = p.id;
+        REQUIRE(wid != 0);
+        store.set_plugin_enabled(wid, false);
+        for (const auto& a : store.update_candidates(now, 30))
+            CHECK(a.plugin != "Asura");
+        store.set_plugin_enabled(wid, true);
+        int asura = 0;
+        for (const auto& a : store.update_candidates(now, 30))
+            if (a.plugin == "Asura")
+                ++asura;
+        CHECK(asura == 30);
+    }
+}
+
+TEST_CASE("Store: plugin_prune_absent cascade (plugin-lifecycle 2.1)") {
+    TestStoreDb fixture;
+    Store store(fixture.path);
+
+    store.upsert_plugin("Asura", "Asura Scans", "1.0", "search", "lua");
+    store.upsert_plugin("Flame", "Flame Scans", "1.0", "search", "js");
+
+    SavedManga m;
+    m.plugin = "Asura"; m.slug = "m1"; m.name = "m1"; m.cover = ""; m.read_ch = 1;
+    store.save_manga(m);
+    store.state_set("Asura", "host/pos", "1");
+    store.upsert_update_attempt("Asura", "m1", "ok", "");
+    store.title_meta_put_fetched("Asura", "m1", "[]", 1);
+    store.api_cache_put("Asura", "k1", "{}", "payload", 1, 60);
+    ReaderPosition r;
+    r.plugin = "Asura"; r.slug = "m1"; r.chapter_id = "c1"; r.chapter_number = 1; r.page = 1;
+    store.position_set(r);
+
+    const auto removed = store.plugin_prune_absent({"Flame"});
+    REQUIRE(removed.size() == 1);
+    CHECK(removed[0] == "Asura");
+
+    // every trace gone, the survivor untouched, re-run is a no-op
+    CHECK_FALSE(store.state_get("Asura", "host/pos").has_value());
+    CHECK_FALSE(store.update_attempt_get("Asura", "m1").has_value());
+    CHECK_FALSE(store.title_meta_get("Asura", "m1").has_value());
+    CHECK_FALSE(store.api_cache_get("Asura", "k1").has_value());
+    CHECK_FALSE(store.position_get("Asura", "m1").has_value());
+    for (const auto& s : store.saved_list())
+        CHECK(s.plugin != "Asura");
+    for (const auto& p : store.plugins())
+        CHECK(p.plugin_id != "Asura");
+    CHECK(store.plugin_enabled("Flame"));
+    CHECK(store.plugin_prune_absent({"Asura", "Flame"}).empty());
 }

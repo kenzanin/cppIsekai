@@ -39,22 +39,25 @@ inline bool stale_optin(const std::string& method) {
  *  to serve. */
 inline bool envelope_ok(const glz::generic& g) {
     const auto* obj = std::get_if<glz::generic::object_t>(&g.data);
-    if (!obj)
+    if (obj == nullptr) {
         return false;
-    const auto ok = obj->find("ok");
+    }
+    const auto* const ok = obj->find("ok");
     const auto* b = ok == obj->end() ? nullptr : std::get_if<bool>(&ok->second.data);
-    return b && *b;
+    return (b != nullptr) && *b;
 }
 
 /** \brief `data` of an ok ABI envelope, copied; nullopt on any malformed
  *  shape. Consumers: the reader window composition and the prefetch worker. */
 inline std::optional<glz::generic::array_t> envelope_data(const std::string& envelope) {
     glz::generic parsed;
-    if (glz::read_json(parsed, envelope) || !envelope_ok(parsed) || !parsed.is_object())
+    if (glz::read_json(parsed, envelope) || !envelope_ok(parsed) || !parsed.is_object()) {
         return std::nullopt;
-    const auto data = parsed.get_object().find("data");
-    if (data == parsed.get_object().end() || !data->second.is_array())
+    }
+    auto* const data = parsed.get_object().find("data");
+    if (data == parsed.get_object().end() || !data->second.is_array()) {
         return std::nullopt;
+    }
     return data->second.get_array();
 }
 
@@ -69,8 +72,9 @@ inline std::string stale_key(const std::string& plugin, const std::string& metho
     std::string canon = params_json;
     glz::generic_sorted params;
     if (!glz::read_json(params, params_json)) {
-        if (auto s = glz::write_json(params))
+        if (auto s = glz::write_json(params)) {
             canon = std::move(*s);
+        }
     }
     return sha1_hex(plugin + '|' + method + '|' + canon);
 }
@@ -81,11 +85,15 @@ inline std::string stale_key(const std::string& plugin, const std::string& metho
 template <class Call> // std::string() -- the ABI call seam
 std::string call_cached(Store& store, const std::string& id, const std::string& method, const std::string& params_json,
                         Call&& call) {
-    if (!stale_optin(method))
-        return call();
+    // plugin-lifecycle 1.x: a disabled plugin is read-only -- cached envelopes
+    // still serve; no cache at all answers with this and the net stays quiet.
+    static constexpr const char* kDisabledEnv = R"({"ok":false,"error":"plugin disabled"})";
+    if (!stale_optin(method)) {
+        return store.plugin_enabled(id) ? call() : kDisabledEnv;
+    }
 
     const std::string key = stale_key(id, method, params_json);
-    const std::int64_t now = static_cast<std::int64_t>(std::time(nullptr));
+    const auto now = static_cast<std::int64_t>(std::time(nullptr));
 
     // Local-first: any cached row wins, regardless of age. The cache TTL is
     // only written for the refresh button / test hooks to interpret; page
@@ -99,20 +107,26 @@ std::string call_cached(Store& store, const std::string& id, const std::string& 
             // cold hit carries no flag; an expired row is marked cached so the
             // UI can show ⬇/Update is meaningful.
             const bool fresh = row->ttl_s > 0 && row->fetched_at + row->ttl_s > now;
-            if (!fresh)
+            if (!fresh) {
                 served.get_object()["cached"].data = true;
-            if (auto out = glz::write_json(served))
+            }
+            if (auto out = glz::write_json(served)) {
                 return std::move(*out);
+            }
         }
         return row->payload;
     }
     spdlog::debug("[plugin:{}] {} api_cache MISS", id, method);
 
+    if (!store.plugin_enabled(id)) {
+        return kDisabledEnv; // disabled and nothing cached: stay quiet
+    }
     std::string res = call();
 
     glz::generic env;
-    if (glz::read_json(env, res))
+    if (glz::read_json(env, res)) {
         return res; // malformed: no shape to key on
+    }
 
     if (envelope_ok(env)) {
         spdlog::debug("[plugin:{}] {} fresh envelope cached", id, method);
@@ -127,8 +141,9 @@ std::string call_cached(Store& store, const std::string& id, const std::string& 
         glz::generic served;
         if (!glz::read_json(served, row->payload) && served.is_object()) {
             served.get_object()["cached"].data = true; // top-level flag, via glaze
-            if (auto out = glz::write_json(served))
+            if (auto out = glz::write_json(served)) {
                 return std::move(*out);
+            }
         }
         return row->payload; // unshapeable last-good still beats a fresh error
     }

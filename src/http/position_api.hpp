@@ -20,19 +20,23 @@
  *  chapter 1). */
 inline double resolve_chapter_number(const std::optional<ReaderPosition>& stored,
                                      const std::optional<double>& incoming) {
-    if (incoming)
+    if (incoming) {
         return *incoming;
+    }
     return stored ? stored->chapter_number : 0.0;
 }
 
 inline ReaderPosition merge_position(const std::optional<ReaderPosition>& stored, ReaderPosition next) {
     if (stored) {
-        if (next.mode.empty())
+        if (next.mode.empty()) {
             next.mode = stored->mode;
-        if (next.direction.empty())
+        }
+        if (next.direction.empty()) {
             next.direction = stored->direction;
-        if (next.zoom.empty())
+        }
+        if (next.zoom.empty()) {
             next.zoom = stored->zoom;
+        }
     }
     return next;
 }

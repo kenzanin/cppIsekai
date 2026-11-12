@@ -3,7 +3,7 @@ function detailPage() {
   const parts = location.pathname.split('/').filter(Boolean); // view manga <plugin> <slug...>
   return {
     plugin: parts[2] || '', slug: parts.slice(3).join('/') || '',
-    detail: {}, chapters: [], cached: false, loading: true, refreshing: false,
+    detail: {}, chapters: [], cached: false, loading: true, refreshing: false, pe: {{#pe}}1{{/pe}}{{^pe}}0{{/pe}},
     err: '', coverBroken: false, hint: null, related: [], pluginName: '', pluginLogoOk: true, pluginCaps: '',
     inLibrary: false, libraryBusy: false,
     enrichment: null, enrichLastFetched: 0, enrichSources: [],

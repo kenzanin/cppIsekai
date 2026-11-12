@@ -35,7 +35,7 @@ public:
 
     void nudge(std::vector<CoverJob> jobs) {
         {
-            const std::lock_guard lock(mu_);
+            const std::scoped_lock lock(mu_);
             pending_ = std::move(jobs);
         }
         cv_.notify_one();
@@ -43,12 +43,13 @@ public:
 
     void stop() {
         {
-            const std::lock_guard lock(mu_);
+            const std::scoped_lock lock(mu_);
             stop_ = true;
         }
         cv_.notify_all();
-        if (thread_.joinable())
+        if (thread_.joinable()) {
             thread_.join();
+        }
     }
 
 private:
@@ -56,8 +57,9 @@ private:
         std::unique_lock lock(mu_);
         while (true) {
             cv_.wait(lock, [&] { return stop_ || pending_; });
-            if (!pending_)
+            if (!pending_) {
                 return; // stop_ and nothing left to drain
+            }
             const std::vector<CoverJob> batch = std::move(*pending_);
             pending_.reset();
             lock.unlock();

@@ -67,10 +67,9 @@ std::optional<std::string> Cache::img_ensure(const std::string& key, const Cover
         const std::lock_guard lock(mu_);
         if (!cover_ctx.cover && !page_ctx.plugin.empty() && !page_ctx.slug.empty() && page_ctx.chapter >= 1 &&
             page_ctx.page >= 1) {
-            const std::string prefix =
-                internal::page_rel(page_ctx.plugin, page_ctx.slug, page_ctx.chapter, page_ctx.page,
-                                   page_ctx.chapter_id) +
-                ".";
+            const std::string prefix = internal::page_rel(page_ctx.plugin, page_ctx.slug, page_ctx.chapter,
+                                                          page_ctx.page, page_ctx.chapter_id) +
+                                       ".";
             for (const auto& [path, _] : entries_)
                 if (path.find(prefix) != std::string::npos && !path.ends_with(".json")) {
                     hit = path;

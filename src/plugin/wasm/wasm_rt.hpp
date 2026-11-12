@@ -43,9 +43,9 @@ namespace plugin::wasm {
 // Shared runtime types (RawReply/Services and the state/fetch signatures) live
 // in plugin::runtime_common.hpp; aliased here so the wasm seam keeps its
 // spelling. The lua seam consumes the same via plugin::lua, the core directly.
-using RawReply = plugin::RawReply;
-using Services = plugin::Services;
-using HttpFetch = plugin::HttpFetch;
+using plugin::HttpFetch;
+using plugin::RawReply;
+using plugin::Services;
 
 /** \brief One loaded module: runtime + parsed image + resolved imports. The
  *  wasm bytes must outlive the module (m3 keeps pointers into them), hence

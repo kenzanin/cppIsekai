@@ -64,7 +64,7 @@ inline const glz::generic* member(const glz::generic::object_t* obj, const char*
     if (obj == nullptr) {
         return nullptr;
     }
-    const auto it = obj->find(std::string(key));
+    const auto* const it = obj->find(std::string(key));
     return it != obj->end() ? &it->second : nullptr;
 }
 

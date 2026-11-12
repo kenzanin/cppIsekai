@@ -91,7 +91,7 @@ public:
     std::string call(const std::string& id, const std::string& method, const std::string& params_json);
 
     /** \brief True when id is an enrichment source (capability `enrichment`). */
-    bool is_enrichment(const std::string& id) const;
+    [[nodiscard]] bool is_enrichment(const std::string& id) const;
 
     /** \brief Enrichment call (task 1.3): kind ∈ `detail` | `covers`. Gates
      *  on the plugin's `enrichment` capability, routes through the shared
@@ -101,7 +101,7 @@ public:
     std::string enrich(const std::string& id, const std::string& title, const std::string& kind);
 
     /** \brief Loaded enrichment sources (id + display name), for the detail-page picker. */
-    std::vector<std::pair<std::string, std::string>> enrichment_sources() const;
+    [[nodiscard]] std::vector<std::pair<std::string, std::string>> enrichment_sources() const;
 
     /** \brief Loaded enrichment sources with full display info (name, version,
      *  runtime, caps, website, last-call health), rendered identically to scraper
@@ -112,10 +112,10 @@ public:
         std::string error;
         std::int64_t checked_at{};
     };
-    std::vector<EnrichmentRow> enrichment_rows() const;
+    [[nodiscard]] std::vector<EnrichmentRow> enrichment_rows() const;
 
     /** \brief Website URL from the plugin manifest; empty when unknown id or absent. */
-    std::string website(const std::string& id) const;
+    [[nodiscard]] std::string website(const std::string& id) const;
 
     /** \brief Last-call outcome for id; ok-when-unknown when never called. */
     [[nodiscard]] CallHealth health(const std::string& id) const;

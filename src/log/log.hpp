@@ -36,8 +36,9 @@ public:
 
     void drain() {
         std::string line;
-        while (g_log_queue.try_dequeue(line))
+        while (g_log_queue.try_dequeue(line)) {
             push(std::move(line));
+        }
     }
 
     std::vector<std::string> snapshot() const {
@@ -50,8 +51,9 @@ private:
         file_ << line << std::flush;
         std::scoped_lock lock(mu_);
         lines_.push_back(std::move(line));
-        if (lines_.size() > 200)
+        if (lines_.size() > 200) {
             lines_.pop_front();
+        }
     }
 
     std::ofstream file_;

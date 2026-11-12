@@ -28,8 +28,9 @@ std::optional<std::string> zip_of(const fs::path& tmp, const std::map<std::strin
     std::optional<std::string> out;
     {
         libzippp::ZipArchive zip(tmp.string());
-        if (!zip.open(libzippp::ZipArchive::New))
+        if (!zip.open(libzippp::ZipArchive::New)) {
             return std::nullopt;
+        }
         for (const auto& [name, path] : entries) {
             if (!zip.addFile(name, path.string())) {
                 zip.discard();
@@ -48,22 +49,26 @@ std::optional<std::string> zip_of(const fs::path& tmp, const std::map<std::strin
     const auto sz = fs::file_size(tmp, ec);
     if (ec || sz == 0) {
         // Empty archive -> emit raw EOCD (spec scenario: "empty zip")
-        constexpr char kEocd[22] = {0x50, 0x4b, 0x05, 0x06, // sig
-                                    0,    0,                // disk num
-                                    0,    0,                // disk w/central-dir
-                                    0,    0,                // entries on disk
-                                    0,    0,                // total entries
-                                    0,    0,    0,    0,    // central-dir size
-                                    0,    0,    0,    0,    // central-dir offset
-                                    0,    0};               // comment len
+        constexpr char kEocd[22] = {
+            0x50, 0x4b, 0x05, 0x06, // sig
+            0,    0,                // disk num
+            0,    0,                // disk w/central-dir
+            0,    0,                // entries on disk
+            0,    0,                // total entries
+            0,    0,    0,    0,    // central-dir size
+            0,    0,    0,    0,    // central-dir offset
+            0,    0,
+        }; // comment len
         out = std::string(kEocd, sizeof(kEocd));
     } else {
         std::ifstream in(tmp, std::ios::binary | std::ios::ate);
-        if (!in)
+        if (!in) {
             return std::nullopt;
+        }
         const std::streamoff fSz = in.tellg();
-        if (fSz < 0)
+        if (fSz < 0) {
             return std::nullopt;
+        }
         in.seekg(0, std::ios::beg);
         out = std::string(static_cast<std::size_t>(fSz), '\0');
         if (!in.read(out->data(), fSz)) {
@@ -89,16 +94,20 @@ std::optional<std::string> build(const std::string& cache_root, const std::strin
         const fs::path base = fs::path(cache_root) / "img" / plugin / "manga" / manga;
         std::error_code ec;
         for (const auto& ch : fs::directory_iterator(base, ec)) {
-            if (ec)
+            if (ec) {
                 break;
-            if (!ch.is_directory(ec))
+            }
+            if (!ch.is_directory(ec)) {
                 continue;
+            }
             const auto name = ch.path().filename().string();
-            if (!ch_filter.empty() && name.rfind(ch_filter, 0) != 0)
+            if (!ch_filter.empty() && !name.starts_with(ch_filter)) {
                 continue;
+            }
             for (const auto& page : fs::directory_iterator(ch.path(), ec)) {
-                if (!ec && page.is_regular_file(ec))
+                if (!ec && page.is_regular_file(ec)) {
                     entries.emplace((ch.path().filename() / page.path().filename()).generic_string(), page.path());
+                }
             }
         }
     }

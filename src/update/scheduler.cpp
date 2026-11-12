@@ -25,7 +25,9 @@ Scheduler::Scheduler(Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plu
     jitter_seconds_ = std::rand() % (15 * 60 + 1); // <=15 min; scheduler is advisory, not precise
 }
 
-Scheduler::~Scheduler() { stop(); }
+Scheduler::~Scheduler() {
+    stop();
+}
 
 void Scheduler::start() {
     spdlog::info("[auto-update] scheduler started (60s tick)");
@@ -52,7 +54,8 @@ void Scheduler::run_once() {
     const std::int64_t now = static_cast<std::int64_t>(std::time(nullptr));
 
     const std::int64_t interval_s = static_cast<std::int64_t>(cfg.update_interval_days) * 86400;
-    const std::optional<std::string> last = http::on_pool(db_, [&] { return store_.state_get(kStateHost, kLastRunKey); });
+    const std::optional<std::string> last =
+        http::on_pool(db_, [&] { return store_.state_get(kStateHost, kLastRunKey); });
     std::int64_t last_run = 0;
     if (last && !last->empty())
         last_run = std::strtoll(last->c_str(), nullptr, 10);
@@ -62,7 +65,10 @@ void Scheduler::run_once() {
     auto batch = http::on_pool(db_, [&] { return store_.update_candidates(now, cfg.update_per_plugin_limit); });
     if (batch.empty()) {
         spdlog::info("[auto-update] run: 0 eligible titles");
-        http::on_pool(db_, [&] { store_.state_set(kStateHost, kLastRunKey, std::to_string(now)); return 0; });
+        http::on_pool(db_, [&] {
+            store_.state_set(kStateHost, kLastRunKey, std::to_string(now));
+            return 0;
+        });
         return;
     }
 
@@ -78,7 +84,10 @@ void Scheduler::run_once() {
         if (&t != &batch.back() && cfg.update_request_delay_ms > 0)
             std::this_thread::sleep_for(std::chrono::milliseconds(cfg.update_request_delay_ms));
     }
-    http::on_pool(db_, [&] { store_.state_set(kStateHost, kLastRunKey, std::to_string(now)); return 0; });
+    http::on_pool(db_, [&] {
+        store_.state_set(kStateHost, kLastRunKey, std::to_string(now));
+        return 0;
+    });
     spdlog::info("[auto-update] run: checked={} ok={} error={}", batch.size(), ok, err);
 }
 

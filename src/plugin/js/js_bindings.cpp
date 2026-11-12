@@ -1,10 +1,10 @@
 #include "js_internal.hpp"
 #include "js_rt.hpp"
 
-#include "plugin/fs.hpp"       // plugin::fs_read -- the fs.read body
-#include "plugin/htmltext.hpp" // host.re2/html core (task 1.3)
+#include "plugin/fs.hpp"        // plugin::fs_read -- the fs.read body
+#include "plugin/htmltext.hpp"  // host.re2/html core (task 1.3)
 #include "plugin/url_codec.hpp" // plugin::url_{encode,decode} -- host.url_* body
-#include "plugin/vrf.hpp"      // plugin::vrf_sign -- the host.crypto body
+#include "plugin/vrf.hpp"       // plugin::vrf_sign -- the host.crypto body
 
 #include <glaze/glaze.hpp>
 
@@ -124,9 +124,17 @@ JSValue js_require(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst
 
     // resolve relative to plugin dir: "./x" / "x/y" / "a.b" -> x/y.js (try .js, /index.js)
     std::string rel = name;
-    if (rel.rfind("./", 0) == 0) rel = rel.substr(2);  // ./util -> util
-    for (auto& c : rel) if (c == '.') c = '/';          // dotted form a.b -> a/b
-    if (!rel.empty() && rel[0] == '/') rel = rel.substr(1);
+    if (rel.starts_with("./")) {
+        rel = rel.substr(2); // ./util -> util
+    }
+    for (auto& c : rel) {
+        if (c == '.') {
+            c = '/'; // dotted form a.b -> a/b
+        }
+    }
+    if (!rel.empty() && rel[0] == '/') {
+        rel = rel.substr(1);
+    }
     // strip leading "./" pieces and reject escapes
     {
         size_t pos = 0;
@@ -134,10 +142,13 @@ JSValue js_require(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst
             const size_t slash = rel.find('/', pos);
             const std::string seg = rel.substr(pos, slash == std::string::npos ? slash : slash - pos);
             if (seg.empty() || seg == "." || seg == "..") {
-                JS_FreeValue(ctx, g); JS_FreeValue(ctx, cache);
+                JS_FreeValue(ctx, g);
+                JS_FreeValue(ctx, cache);
                 return JS_ThrowTypeError(ctx, "require: bad module name");
             }
-            if (slash == std::string::npos) break;
+            if (slash == std::string::npos) {
+                break;
+            }
             pos = slash + 1;
         }
     }
@@ -148,14 +159,16 @@ JSValue js_require(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst
         res_name = rel + "/index.js";
     }
     if (!src) {
-        JS_FreeValue(ctx, g); JS_FreeValue(ctx, cache);
+        JS_FreeValue(ctx, g);
+        JS_FreeValue(ctx, cache);
         return JS_ThrowReferenceError(ctx, "require: module '%s' not found", name.c_str());
     }
     // CommonJS wrapper: (function(exports, module, require) { ... })
     const std::string wrapped = "(function(exports, module, require){\n" + *src + "\n})";
     JSValue fn = JS_Eval(ctx, wrapped.data(), wrapped.size(), res_name.c_str(), JS_EVAL_TYPE_GLOBAL);
     if (JS_IsException(fn)) {
-        JS_FreeValue(ctx, g); JS_FreeValue(ctx, cache);
+        JS_FreeValue(ctx, g);
+        JS_FreeValue(ctx, cache);
         return JS_Throw(ctx, JS_GetException(ctx)); // propagate compile error
     }
     JSValue module = JS_NewObject(ctx);
@@ -166,10 +179,15 @@ JSValue js_require(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst
     JSValue args[3] = {JS_DupValue(ctx, exports), JS_DupValue(ctx, module), require_fn};
     JS_SetPropertyStr(ctx, cache, name.c_str(), JS_DupValue(ctx, exports)); // may be replaced by module.exports below
     JSValue ret = JS_Call(ctx, fn, JS_UNDEFINED, 3, args);
-    for (auto& a : args) JS_FreeValue(ctx, a);
+    for (auto& a : args) {
+        JS_FreeValue(ctx, a);
+    }
     JS_FreeValue(ctx, fn);
     if (JS_IsException(ret)) {
-        JS_FreeValue(ctx, exports); JS_FreeValue(ctx, module); JS_FreeValue(ctx, g); JS_FreeValue(ctx, cache);
+        JS_FreeValue(ctx, exports);
+        JS_FreeValue(ctx, module);
+        JS_FreeValue(ctx, g);
+        JS_FreeValue(ctx, cache);
         return JS_Throw(ctx, JS_GetException(ctx));
     }
     JS_FreeValue(ctx, ret);
@@ -353,7 +371,7 @@ JSValue js_vrf_sign(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueCons
             return fail("vrf_sign: params must be an object");
         }
         const auto* obj = std::get_if<glz::generic::object_t>(&root.data);
-        if (!obj) {
+        if (obj == nullptr) {
             return fail("vrf_sign: params must be an object");
         }
         for (const auto& [k, v] : *obj) {
@@ -372,32 +390,32 @@ JSValue js_vrf_sign(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueCons
             return fail("vrf_sign: stages must be a non-empty array");
         }
         const auto* arr = std::get_if<glz::generic::array_t>(&root.data);
-        if (!arr || arr->empty()) {
+        if ((arr == nullptr) || arr->empty()) {
             return fail("vrf_sign: stages must be a non-empty array");
         }
         size_t idx = 0;
         for (const auto& el : *arr) {
             ++idx;
             const auto* so = std::get_if<glz::generic::object_t>(&el.data);
-            if (!so) {
+            if (so == nullptr) {
                 return fail("vrf_sign: stage " + std::to_string(idx) + ": missing");
             }
-            const auto iv = so->find("iv");
-            const auto key = so->find("key");
-            const auto tbl = so->find("tbl");
+            const auto* const iv = so->find("iv");
+            const auto* const key = so->find("key");
+            const auto* const tbl = so->find("tbl");
             if (iv == so->end() || key == so->end() || tbl == so->end()) {
                 return fail("vrf_sign: stage " + std::to_string(idx) + ": needs iv, key, tbl");
             }
             const auto* ivd = std::get_if<double>(&iv->second.data);
-            if (!ivd || *ivd < 0 || *ivd > 255 || *ivd != (double)(int)*ivd) {
+            if ((ivd == nullptr) || *ivd < 0 || *ivd > 255 || *ivd != static_cast<double>(static_cast<int>(*ivd))) {
                 return fail("vrf_sign: stage " + std::to_string(idx) + ": iv must be integer 0-255");
             }
             const auto* k = std::get_if<std::string>(&key->second.data);
             const auto* t = std::get_if<std::string>(&tbl->second.data);
-            if (!k || !t) {
+            if ((k == nullptr) || (t == nullptr)) {
                 return fail("vrf_sign: stage " + std::to_string(idx) + ": needs iv, key, tbl");
             }
-            vstages.push_back({static_cast<uint8_t>(*ivd), *k, *t});
+            vstages.push_back({.iv = static_cast<uint8_t>(*ivd), .key = *k, .tbl = *t});
         }
     }
 

@@ -3,8 +3,7 @@
 #include <algorithm>
 #include <optional>
 
-namespace http {
-namespace api {
+namespace http::api {
 
 // The reader window composition (image-cache): chapter list + pages through
 // the cached ABI path (stale-serve included), skip flags from plugin_state,
@@ -26,18 +25,22 @@ std::vector<std::string> reader_window(Store& store, BS::thread_pool<>& db, BS::
     std::vector<reader::Chapter> chapters;
     if (const auto data = envelope_data(envelope)) {
         for (const auto& item : *data) {
-            if (!item.is_object())
+            if (!item.is_object()) {
                 continue;
+            }
             const auto& entry = item.get_object();
-            const auto id = entry.find("id");
+            const auto* const id = entry.find("id");
             const auto* id_s = id == entry.end() ? nullptr : std::get_if<std::string>(&id->second.data);
-            if (!id_s)
+            if (id_s == nullptr) {
                 continue;
+            }
             double number = 0; // fractional chapter numbers are a thing
-            if (const auto num = entry.find("number"); num != entry.end())
-                if (const auto* d = std::get_if<double>(&num->second.data))
+            if (const auto* const num = entry.find("number"); num != entry.end()) {
+                if (const auto* d = std::get_if<double>(&num->second.data)) {
                     number = *d;
-            chapters.push_back(reader::Chapter{*id_s, number});
+                }
+            }
+            chapters.push_back(reader::Chapter{.id = *id_s, .number = number});
         }
     }
     if (chapters.empty()) {
@@ -47,9 +50,11 @@ std::vector<std::string> reader_window(Store& store, BS::thread_pool<>& db, BS::
 
     reader::Skipped skip;
     on_pool(db, [&] {
-        for (const auto& ch : chapters)
-            if (const std::optional<std::string> v = store.state_get(kStateHost, std::string(kSkipPrefix) + ch.id))
+        for (const auto& ch : chapters) {
+            if (const std::optional<std::string> v = store.state_get(kStateHost, std::string(kSkipPrefix) + ch.id)) {
                 skip[ch.id] = *v == "1";
+            }
+        }
         return 0; // on_pool is value-based
     });
 
@@ -62,10 +67,13 @@ std::vector<std::string> reader_window(Store& store, BS::thread_pool<>& db, BS::
                                [&] { return plugins.call(plugin_id, "pages", pages_query); });
         });
         std::vector<std::string> urls;
-        if (const auto data = envelope_data(env))
-            for (const auto& el : *data)
-                if (const auto* s = std::get_if<std::string>(&el.data))
+        if (const auto data = envelope_data(env)) {
+            for (const auto& el : *data) {
+                if (const auto* s = std::get_if<std::string>(&el.data)) {
                     urls.emplace_back(*s);
+                }
+            }
+        }
         return urls;
     };
 
@@ -112,7 +120,9 @@ void register_reader(Ctx& c) {
     CROW_ROUTE(app, "/reader/position")
         .methods(crow::HTTPMethod::POST)([&](const crow::request& req) -> crow::response {
             const auto body = crow::json::load(req.body);
-            std::string chapter, manga, plugin;
+            std::string chapter;
+            std::string manga;
+            std::string plugin;
             if (body) {
                 chapter = str_field(body, "chapter");
                 manga = str_field(body, "manga");
@@ -124,11 +134,14 @@ void register_reader(Ctx& c) {
                 r.set_header("Content-Type", "application/json");
                 return r;
             }
-            const reader::Position pos{chapter, static_cast<int>(std::max(1L, num_field(body, "page", 1)))};
+            const reader::Position pos{.chapter_id = chapter,
+                                       .page = static_cast<int>(std::max(1L, num_field(body, "page", 1)))};
 
             // reader-page 2.2: optional mode/direction -- absent keeps the stored
             // value (the same db hop stamps updated_at and stores the result).
-            std::string mode, direction, zoom;
+            std::string mode;
+            std::string direction;
+            std::string zoom;
             if (body) {
                 mode = str_field(body, "mode");
                 direction = str_field(body, "direction");
@@ -139,25 +152,36 @@ void register_reader(Ctx& c) {
             // and the prefetch worker's v3 placement.
             // ch 0 is valid; absence is signaled by the optional, not by 0.
             std::optional<double> chapter_number;
-            if (body && body.has("chapter_number") && body["chapter_number"].t() == crow::json::type::Number)
+            if (body && body.has("chapter_number") && body["chapter_number"].t() == crow::json::type::Number) {
                 chapter_number = body["chapter_number"].d();
+            }
             on_pool(db, [&] {
                 const auto stored = store.position_get(plugin, manga);
-                ReaderPosition next{plugin,   manga, chapter,   resolve_chapter_number(stored, chapter_number),
-                                    pos.page, mode,  direction, zoom,
-                                    0};
+                ReaderPosition next{
+                    .plugin = plugin,
+                    .slug = manga,
+                    .chapter_id = chapter,
+                    .chapter_number = resolve_chapter_number(stored, chapter_number),
+                    .page = pos.page,
+                    .mode = mode,
+                    .direction = direction,
+                    .zoom = zoom,
+                    .updated_at = 0,
+                };
                 if (stored) {
                     // same chapter, no page sent -> keep the page
-                    if (chapter == stored->chapter_id)
+                    if (chapter == stored->chapter_id) {
                         next.page = pos.page > 1 ? pos.page : stored->page;
+                    }
                 }
                 store.position_set(merge_position(stored, next));
                 // detail-enrichment 1.1 (chapter-list-controls): max pages-read per chapter for the row counter/check.
                 if (!chapter.empty()) {
                     int prev = 0;
                     if (const auto s = store.state_get(kStateHost, std::string(kReadPrefix) + chapter);
-                        s && !s->empty())
+                        s && !s->empty()) {
                         prev = std::atoi(s->c_str()); // state_get returns the stored "N"
+                    }
                     const int p = pos.page > 1 ? pos.page : 1;
                     const int now = std::max(prev, p);
                     store.state_set(kStateHost, std::string(kReadPrefix) + chapter, std::to_string(now));
@@ -171,13 +195,18 @@ void register_reader(Ctx& c) {
 
             const std::vector<std::string> found = reader_window(store, db, plugin_pool, plugins, plugin, manga, pos);
             std::vector<crow::json::wvalue> window;
-            for (const auto& url : found)
+            for (const auto& url : found) {
                 window.emplace_back(url);
+            }
             if (!found.empty()) {
                 if (chapter_number) { // v3 placement; else the sha fallback
                     spdlog::debug("nudge {} urls, ctx {}.{} ch{} base-p{}", found.size(), plugin, manga,
                                   *chapter_number, pos.page + 1);
-                    prefetch.nudge(found, {plugin, manga, int(*chapter_number), pos.page + 1, pos.chapter_id});
+                    prefetch.nudge(found, {.plugin = plugin,
+                                           .slug = manga,
+                                           .chapter = static_cast<int>(*chapter_number),
+                                           .page_base = pos.page + 1,
+                                           .chapter_id = pos.chapter_id});
                 } else {
                     spdlog::debug("nudge {} urls, no chapter number -> sha fallback", found.size());
                     prefetch.nudge(found); // background delta fetch (3.3)
@@ -192,5 +221,4 @@ void register_reader(Ctx& c) {
         });
 }
 
-} // namespace api
-} // namespace http
+} // namespace http::api

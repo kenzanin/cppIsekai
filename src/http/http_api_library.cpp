@@ -1,8 +1,7 @@
 #include "api_ctx.hpp"
 #include "enrich_internal.hpp"
 
-namespace http {
-namespace api {
+namespace http::api {
 
 // library-save 2.1: saved-manga routes (split from the http_api monolith;
 // bodies verbatim). POST-only writes (codebase convention); GET is the grid
@@ -45,8 +44,9 @@ void register_library(Ctx& c) {
     CROW_ROUTE(app, "/api/library").methods(crow::HTTPMethod::POST)([&](const crow::request& req) -> crow::response {
         const std::string body = req.body;
         const auto json = crow::json::load(body);
-        if (!json || !json.has("plugin") || !json.has("slug"))
+        if (!json || !json.has("plugin") || !json.has("slug")) {
             return crow::response{R"({"ok":false,"error":"missing plugin/slug"})"};
+        }
         SavedManga m;
         m.plugin = json["plugin"].s();
         m.slug = json["slug"].s();
@@ -67,8 +67,9 @@ void register_library(Ctx& c) {
     CROW_ROUTE(app, "/api/library/remove")
         .methods(crow::HTTPMethod::POST)([&](const crow::request& req) -> crow::response {
             const auto json = crow::json::load(req.body);
-            if (!json || !json.has("plugin") || !json.has("slug"))
+            if (!json || !json.has("plugin") || !json.has("slug")) {
                 return crow::response{R"({"ok":false,"error":"missing plugin/slug"})"};
+            }
             const std::string plugin = json["plugin"].s();
             const std::string slug = json["slug"].s();
             on_pool(db, [&] {
@@ -82,5 +83,4 @@ void register_library(Ctx& c) {
         });
 }
 
-} // namespace api
-} // namespace http
+} // namespace http::api

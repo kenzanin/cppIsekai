@@ -9,16 +9,15 @@
 #include <sstream>
 #include <vector>
 
+#include <cerrno>
 #include <chrono>
+#include <csignal>
 #include <cstdlib>
-#include <errno.h>
-#include <signal.h>
 #include <sys/wait.h>
 #include <thread>
 #include <unistd.h>
 
-namespace http {
-namespace api {
+namespace http::api {
 
 // Plugin registry/admin + config endpoints (split from the http_api
 // monolith; route bodies verbatim).
@@ -29,8 +28,8 @@ void register_admin(Ctx& c) {
     auto& plugin_pool = c.plugin_pool;
     auto& plugins = c.plugins;
     auto& covers = c.covers;
-    auto& ini_path = c.ini_path;
-    auto& overrides_ref = c.overrides;
+    const auto& ini_path = c.ini_path;
+    const auto& overrides_ref = c.overrides;
 
     // Dev endpoint: rescan the plugin dir, re-register, no restart.
     CROW_ROUTE(app, "/plugins/reload").methods(crow::HTTPMethod::POST)([&] {
@@ -159,24 +158,28 @@ void register_admin(Ctx& c) {
             glz::generic parsed;
             if (glz::read_json(parsed, r.body) == glz::error_code{} && parsed.is_object()) {
                 const auto& root = parsed.get_object();
-                const auto d = root.find("data");
+                const auto* const d = root.find("data");
                 if (d != root.end() && d->second.is_object()) {
-                    const auto it = d->second.get_object().find("items");
+                    const auto* const it = d->second.get_object().find("items");
                     if (it != d->second.get_object().end() && it->second.is_array()) {
                         std::vector<reader::CoverJob> jobs;
                         for (const auto& el : it->second.get_array()) {
-                            if (!el.is_object())
+                            if (!el.is_object()) {
                                 continue;
+                            }
                             const auto& obj = el.get_object();
-                            const auto c2 = obj.find("cover");
-                            if (c2 == obj.end())
+                            const auto* const c2 = obj.find("cover");
+                            if (c2 == obj.end()) {
                                 continue;
+                            }
                             const auto* s = std::get_if<std::string>(&c2->second.data);
-                            if (s && !s->empty())
-                                jobs.push_back({*s, id});
+                            if (s && !s->empty()) {
+                                jobs.push_back({.url = *s, .plugin = id});
+                            }
                         }
-                        if (!jobs.empty())
+                        if (!jobs.empty()) {
                             covers.nudge(std::move(jobs));
+                        }
                     }
                 }
             }
@@ -202,22 +205,30 @@ void register_admin(Ctx& c) {
                                 fetch_profiles.push_back(tok);
                                 tok.clear();
                             }
-                        } else if (c != ' ' && c != '\t')
-                            tok += c;
+                        } else if (c != ' ' && c != '\t') {
+                            {
+                                tok += c;
+                            }
+                        }
                     }
-                    if (!tok.empty())
+                    if (!tok.empty()) {
                         fetch_profiles.push_back(tok);
+                    }
                 }
             }
         }
-        if (fetch_profiles.empty())
-            fetch_profiles = {"chrome99",  "chrome100", "chrome101", "chrome104",  "chrome107",  "chrome110",
-                              "chrome116", "edge99",    "edge101",   "safari15_3", "safari15_5", "ff91esr",
-                              "ff95",      "ff98",      "ff100",     "ff102",      "ff109",      "ff117"};
+        if (fetch_profiles.empty()) {
+            fetch_profiles = {
+                "chrome99",  "chrome100", "chrome101", "chrome104",  "chrome107",  "chrome110",
+                "chrome116", "edge99",    "edge101",   "safari15_3", "safari15_5", "ff91esr",
+                "ff95",      "ff98",      "ff100",     "ff102",      "ff109",      "ff117",
+            };
+        }
         crow::json::wvalue list(crow::json::type::List);
         int p = 0;
-        for (const auto& x : fetch_profiles)
+        for (const auto& x : fetch_profiles) {
             list[p++] = x;
+        }
 
         crow::json::wvalue knobs(crow::json::type::List);
         int i = 0;
@@ -247,10 +258,10 @@ void register_admin(Ctx& c) {
     // Config save (D5): validation-first merge, comments/ordering survive.
     // Body {"section.key": string|number} in resolved full-key form.
     CROW_ROUTE(app, "/config").methods(crow::HTTPMethod::POST)([&](const crow::request& req) -> crow::response {
-        auto fail = [](int code, std::string msg) {
+        auto fail = [](int code, const std::string& msg) {
             crow::json::wvalue e;
             e["ok"] = false;
-            e["error"] = std::move(msg);
+            e["error"] = msg;
             crow::response r{std::move(e)};
             r.code = code;
             r.set_header("Content-Type", "application/json");
@@ -259,13 +270,15 @@ void register_admin(Ctx& c) {
 
         std::map<std::string, std::string> updates;
         std::string parse_err;
-        if (!config::parse_updates(req.body, updates, parse_err))
+        if (!config::parse_updates(req.body, updates, parse_err)) {
             return fail(400, std::move(parse_err));
+        }
 
         std::string err;
         const int written = config::save(updates, ini_path, &err);
-        if (written < 0)
+        if (written < 0) {
             return fail(written == -2 ? 500 : 400, std::move(err));
+        }
 
         // Live default (task 1.2): the running Host picks up the new
         // plugin.fetch_profile without a restart.
@@ -299,28 +312,32 @@ void register_admin(Ctx& c) {
         if (pid == 0) {
             // The watchdog inherits every fd, including crow's listen socket;
             // hold it and the re-exec'd instance can never bind. Drop them all.
-            for (int fd = 3; fd < 1024; ++fd)
+            for (int fd = 3; fd < 1024; ++fd) {
                 close(fd);
+            }
             // Watchdog child: wait for the parent to actually exit (ESRCH), not
             // EPERM from reparenting under init; then exec with the original argv.
             for (;;) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
-                if (kill(parent, 0) != 0 && errno == ESRCH)
+                if (kill(parent, 0) != 0 && errno == ESRCH) {
                     break;
+                }
             }
             // Parent is gone but the kernel may still hold the listening
             // socket briefly; give the port a beat to free before re-exec.
             std::this_thread::sleep_for(std::chrono::milliseconds(1500));
             char exe_buf[4096];
             const ssize_t n = readlink("/proc/self/exe", exe_buf, sizeof(exe_buf) - 1);
-            if (n <= 0)
+            if (n <= 0) {
                 _exit(1);
+            }
             std::string exe(exe_buf, static_cast<std::size_t>(n));
             // Rebuilt binary since boot: kernel marks the old path " (deleted)".
             // Strip it and re-exec the current file on disk instead.
             const std::string deleted = " (deleted)";
-            if (exe.size() > deleted.size() && exe.compare(exe.size() - deleted.size(), deleted.size(), deleted) == 0)
+            if (exe.size() > deleted.size() && exe.ends_with(deleted)) {
                 exe.erase(exe.size() - deleted.size());
+            }
             // Rebuild argv from /proc/self/cmdline (NUL-separated).
             std::ifstream cl("/proc/self/cmdline", std::ios::binary);
             std::string raw((std::istreambuf_iterator<char>(cl)), std::istreambuf_iterator<char>());
@@ -349,5 +366,4 @@ void register_admin(Ctx& c) {
     });
 }
 
-} // namespace api
-} // namespace http
+} // namespace http::api

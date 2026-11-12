@@ -242,19 +242,52 @@ task("format")
     end)
 
 task("tidy")
-    set_menu {usage = "xmake tidy", description = "clang-tidy report on prod sources (src/** only)"}
+    set_menu {usage = "xmake tidy", description = "clang-tidy report on prod sources changed vs HEAD"}
     on_run(function()
         os.exec("xmake project -k compile_commands")
-        for _, f in ipairs(os.files("src/**.cpp")) do
+        -- ponytail: sweep only sources changed vs HEAD -- a full-tree crawl
+        -- burns ~20min re-instantiating vendor templates (sol2/quickjs/wasm3)
+        -- inside untouched TUs. Widen by hand for a one-off tree-wide pass.
+        local files, seen = {}, {}
+        local function collect(text)
+            if not text then
+                return
+            end
+            for f in text:gmatch("[^\r\n]+") do
+                if f:match("%.cpp$") and not seen[f] then
+                    seen[f] = true
+                    table.insert(files, path.absolute(f))
+                end
+            end
+        end
+        collect(os.iorun("git diff --name-only HEAD -- src/"))
+        collect(os.iorun("git ls-files -o --exclude-standard src/"))
+        for _, f in ipairs(files) do
             os.execv("clang-tidy", {"-p", ".", f})
         end
     end)
 
 task("fix")
-    set_menu {usage = "xmake fix", description = "clang-tidy -fix -fix-errors on prod sources (src/** only)"}
+    set_menu {usage = "xmake fix", description = "clang-tidy -fix on prod sources changed vs HEAD"}
     on_run(function()
         os.exec("xmake project -k compile_commands")
-        for _, f in ipairs(os.files("src/**.cpp")) do
+        -- ponytail: same changed-only scope as tidy (vendor template TUs
+        -- dominate the crawl); widen by hand for a one-off tree-wide pass.
+        local files, seen = {}, {}
+        local function collect(text)
+            if not text then
+                return
+            end
+            for f in text:gmatch("[^\r\n]+") do
+                if f:match("%.cpp$") and not seen[f] then
+                    seen[f] = true
+                    table.insert(files, path.absolute(f))
+                end
+            end
+        end
+        collect(os.iorun("git diff --name-only HEAD -- src/"))
+        collect(os.iorun("git ls-files -o --exclude-standard src/"))
+        for _, f in ipairs(files) do
             os.execv("clang-tidy", {"-p", ".", "-fix", "-fix-errors", f})
         end
     end)

@@ -36,12 +36,12 @@ struct Config {
     std::string db;
     std::string log_file;
     std::string data_dir;
-    std::string log_level;      // [log] level: trace|debug|info|warning|error
-    std::string templates_dir;  // [paths] templates_dir: mustache template root
-    std::string enrichment_dir; // [paths] enrichment_dir: metadata-only enrichment plugins (NOT scraper plugins)
-    int update_interval_days{};      // [update] interval_days: days between auto-update runs
-    int update_per_plugin_limit{};   // [update] per_plugin_limit: max chapter-list refreshes per plugin per run
-    int update_request_delay_ms{};   // [update] request_delay_ms: pause between auto-update requests
+    std::string log_level;         // [log] level: trace|debug|info|warning|error
+    std::string templates_dir;     // [paths] templates_dir: mustache template root
+    std::string enrichment_dir;    // [paths] enrichment_dir: metadata-only enrichment plugins (NOT scraper plugins)
+    int update_interval_days{};    // [update] interval_days: days between auto-update runs
+    int update_per_plugin_limit{}; // [update] per_plugin_limit: max chapter-list refreshes per plugin per run
+    int update_request_delay_ms{}; // [update] request_delay_ms: pause between auto-update requests
 };
 
 // Per-knob CLI state. Explicit = opt->count() > 0 (D7), never value comparison;
@@ -98,14 +98,17 @@ inline Config to_config(const std::array<std::string, kEntryCount>& v) {
     c.enrichment_dir = v[13];
     c.log_level = v[14];
     c.update_interval_days = num_or<int>(v[15], kEntries[15].def);
-    if (c.update_interval_days < 1)
+    if (c.update_interval_days < 1) {
         c.update_interval_days = num_or<int>(kEntries[15].def, kEntries[15].def); // min 1 (task 1.2)
+    }
     c.update_per_plugin_limit = num_or<int>(v[16], kEntries[16].def);
-    if (c.update_per_plugin_limit < 1)
+    if (c.update_per_plugin_limit < 1) {
         c.update_per_plugin_limit = num_or<int>(kEntries[16].def, kEntries[16].def); // min 1
+    }
     c.update_request_delay_ms = num_or<int>(v[17], kEntries[17].def);
-    if (c.update_request_delay_ms < 0)
+    if (c.update_request_delay_ms < 0) {
         c.update_request_delay_ms = num_or<int>(kEntries[17].def, kEntries[17].def); // min 0
+    }
     if (c.port <= 0) {
         c.port = num_or<int>(kEntries[0].def, kEntries[0].def); // design ceiling: port > 0
     }
@@ -164,8 +167,9 @@ inline std::vector<Describe> describe(
             try {
                 std::size_t used = 0;
                 std::stoll(d.value, &used);
-                if (used != d.value.size())
+                if (used != d.value.size()) {
                     throw 0;
+                }
             } catch (...) {
                 d.value = e.def; // lenient fallback (same as to_config)
                 d.source = "default";
@@ -187,12 +191,16 @@ inline bool parse_updates(const std::string& body, std::map<std::string, std::st
         return false;
     }
     for (const auto& [key, val] : root.get_object()) {
-        if (const auto* s = std::get_if<std::string>(&val.data))
-            out[key] = *s;
-        else if (const auto* n = std::get_if<double>(&val.data)) // glz::generic: f64 numbers
-            out[key] = (*n == std::floor(*n) && std::fabs(*n) < 1e18) ? std::to_string(static_cast<long long>(*n))
-                                                                      : std::to_string(*n);
-        else {
+        if (const auto* s = std::get_if<std::string>(&val.data)) {
+            {
+                out[key] = *s;
+            }
+        } else if (const auto* n = std::get_if<double>(&val.data)) {
+            { // glz::generic: f64 numbers
+                out[key] = (*n == std::floor(*n) && std::fabs(*n) < 1e18) ? std::to_string(static_cast<long long>(*n))
+                                                                          : std::to_string(*n);
+            }
+        } else {
             err = "value of '" + key + "' must be a string or number";
             return false;
         }
@@ -233,8 +241,9 @@ inline Config resolve(
  *  trimmed, so only quote when surrounding whitespace must survive. Registry
  *  defaults are single-line; nothing else needs escaping (D4). */
 inline std::string ini_literal(std::string_view v) {
-    if (!v.empty() && (v.front() == ' ' || v.back() == ' '))
+    if (!v.empty() && (v.front() == ' ' || v.back() == ' ')) {
         return '"' + std::string(v) + '"';
+    }
     return std::string(v);
 }
 
@@ -247,8 +256,9 @@ inline std::string dump() {
     std::string section;
     for (const Entry& e : kEntries) {
         if (e.section != section) { // content compare, const char* vs string
-            if (!out.empty())
+            if (!out.empty()) {
                 out += '\n'; // blank line between groups
+            }
             section = e.section;
             out += '[';
             out += section;
@@ -276,8 +286,9 @@ inline std::string dump() {
 inline int save(const std::map<std::string, std::string>& updates, const std::string& ini_path,
                 std::string* err = nullptr) {
     auto reject = [&](std::string why, int rc) {
-        if (err != nullptr)
+        if (err != nullptr) {
             *err = std::move(why);
+        }
         return rc;
     };
 
@@ -287,44 +298,52 @@ inline int save(const std::map<std::string, std::string>& updates, const std::st
     plan.reserve(updates.size());
     for (const auto& [full, value] : updates) {
         const Entry* e = nullptr;
-        for (const Entry& c : kEntries)
+        for (const Entry& c : kEntries) {
             if (full == std::string(c.section) + '.' + c.key) {
                 e = &c;
                 break;
             }
-        if (e == nullptr)
+        }
+        if (e == nullptr) {
             return reject("unknown config key: " + full, -1);
+        }
         if (e->type != Type::Str) {
             long long parsed = 0;
             try {
                 std::size_t used = 0;
                 parsed = std::stoll(value, &used);
-                if (used != value.size())
+                if (used != value.size()) {
                     return reject("value of " + full + " is not an integer", -1);
+                }
             } catch (...) { // empty / non-numeric: same 400-class reject
                 return reject("value of " + full + " is not an integer", -1);
             }
-            if (parsed < e->min_value)
+            if (parsed < e->min_value) {
                 return reject("value of " + full + " is below the minimum of " + std::to_string(e->min_value), -1);
+            }
         }
-        plan.push_back({e, &value});
+        plan.emplace_back(e, &value);
     }
-    if (plan.empty())
+    if (plan.empty()) {
         return 0; // nothing to merge: no load, no rewrite
+    }
 
     CSimpleIniA ini;
     if (std::filesystem::exists(ini_path)) {
-        if (ini.LoadFile(ini_path.c_str()) < 0)
+        if (ini.LoadFile(ini_path.c_str()) < 0) {
             return reject("cannot parse " + ini_path, -1); // corrupt: never clobber
+        }
     } else {
         ini.LoadData(dump()); // D5: absent file starts from the documented template
     }
 
-    for (const auto& [e, value] : plan)
+    for (const auto& [e, value] : plan) {
         ini.SetValue(e->section, e->key, value->c_str());
+    }
 
-    if (ini.SaveFile(ini_path.c_str(), false) < 0) // no BOM: plain template shape
+    if (ini.SaveFile(ini_path.c_str(), false) < 0) { // no BOM: plain template shape
         return reject("cannot write " + ini_path, -2);
+    }
     return static_cast<int>(plan.size());
 }
 

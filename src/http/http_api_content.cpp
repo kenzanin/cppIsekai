@@ -14,8 +14,9 @@ namespace {
 // cache-full check for one chapter: <root>/img/<plugin>/manga/<slug>/<chdir>/pNNN.ext
 // count >= pages. ch-dir matched by chNNN prefix (collision id8 variant counts too).
 bool chapter_cached(const std::string& plugin, const std::string& slug, int chapter, int pages) {
-    if (chapter <= 0 || pages <= 0)
+    if (chapter <= 0 || pages <= 0) {
         return false;
+    }
     const fs::path base = fs::path("data/cache") / "img" / plugin / "manga" / slug;
     const std::string prefix = "ch" +
                                (chapter < 10    ? std::string("00")
@@ -23,19 +24,24 @@ bool chapter_cached(const std::string& plugin, const std::string& slug, int chap
                                                 : std::string()) +
                                std::to_string(chapter);
     std::error_code ec;
-    if (!fs::is_directory(base, ec))
+    if (!fs::is_directory(base, ec)) {
         return false;
+    }
     for (const auto& ch : fs::directory_iterator(base, ec)) {
-        if (ec)
+        if (ec) {
             return false;
-        if (!ch.is_directory(ec))
+        }
+        if (!ch.is_directory(ec)) {
             continue;
-        if (ch.path().filename().string().rfind(prefix, 0) != 0)
+        }
+        if (!ch.path().filename().string().starts_with(prefix)) {
             continue;
+        }
         int n = 0;
         for (const auto& p : fs::directory_iterator(ch.path(), ec)) {
-            if (!ec && p.is_regular_file(ec))
+            if (!ec && p.is_regular_file(ec)) {
                 ++n;
+            }
         }
         return n >= pages;
     }
@@ -44,15 +50,13 @@ bool chapter_cached(const std::string& plugin, const std::string& slug, int chap
 
 } // namespace
 
-namespace http {
-namespace api {
+namespace http::api {
 
 // Content-serving routes: the reader page list, the pass-through image cache
 // and the CBZ export (split from the http_api monolith; bodies verbatim).
 void register_content(Ctx& c) {
     auto& app = c.app;
     auto& store = c.store;
-    auto& db = c.db;
     auto& plugin_pool = c.plugin_pool;
     auto& plugins = c.plugins;
     auto& images = c.images;
@@ -68,12 +72,6 @@ void register_content(Ctx& c) {
         if (!valid_title_pair(plugin, slug)) {
             return crow::response{404, R"({"ok":false,"error":"unknown title"})"};
         }
-        const bool enabled = on_pool(db, [&] { return store.plugin_enabled(plugin); });
-        if (!enabled) {
-            crow::response r{R"({"ok":false,"error":"plugin disabled"})"};
-            r.set_header("Content-Type", "application/json");
-            return r;
-        }
         crow::json::wvalue q;
         q["id"] = slug;
         const std::string chs_params = q.dump();
@@ -85,16 +83,19 @@ void register_content(Ctx& c) {
             std::string chapter_id;
             if (const auto chs = envelope_data(chs_env)) {
                 for (const auto& item : *chs) {
-                    if (!item.is_object())
+                    if (!item.is_object()) {
                         continue;
+                    }
                     const auto& entry = item.get_object();
-                    const auto num = entry.find("number");
-                    if (num == entry.end())
+                    const auto* const num = entry.find("number");
+                    if (num == entry.end()) {
                         continue;
+                    }
                     const auto* d = std::get_if<double>(&num->second.data);
-                    if (!d || *d != chd)
+                    if (!d || *d != chd) {
                         continue;
-                    const auto idf = entry.find("id");
+                    }
+                    const auto* const idf = entry.find("id");
                     if (idf != entry.end()) {
                         if (const auto* s = std::get_if<std::string>(&idf->second.data)) {
                             chapter_id = *s;
@@ -103,21 +104,23 @@ void register_content(Ctx& c) {
                     }
                 }
             }
-            if (chapter_id.empty())
+            if (chapter_id.empty()) {
                 return std::string{};
+            }
             crow::json::wvalue pages_q;
             pages_q["id"] = chapter_id;
             const std::string pages_params = pages_q.dump();
             const std::string pages_env = call_cached(store, plugin, "pages", pages_params,
                                                       [&] { return plugins.call(plugin, "pages", pages_params); });
-            return build_pages_response(chs_env, pages_env, PagesCtx{plugin, slug, chd}).value_or(std::string{});
+            return build_pages_response(chs_env, pages_env, PagesCtx{.plugin = plugin, .slug = slug, .ch = chd})
+                .value_or(std::string{});
         });
         crow::response r;
         if (body.empty()) {
             r.code = 404;
             r.body = R"({"ok":false,"error":"unknown chapter"})";
         } else {
-            r.body = std::move(body);
+            r.body = body;
         }
         r.set_header("Content-Type", "application/json");
         return r;
@@ -144,16 +147,17 @@ void register_content(Ctx& c) {
             cctx.plugin = plugin;
             cctx.url = url;
         } else if (!plugin.empty() && !slug.empty() && ch >= 1 && page >= 1) {
-            pctx = {plugin, slug, ch, page, ch_id};
+            pctx = {.plugin = plugin, .slug = slug, .chapter = ch, .page = page, .chapter_id = ch_id};
         }
         const ImgReply r = serve_cached_image(images, url, cctx, pctx);
         crow::response res;
         res.code = r.code;
-        res.body = std::move(r.body);
+        res.body = r.body;
         res.compressed = false; // images are already compressed bytes
         res.set_header("Content-Type", std::string(r.mime));
-        if (r.ratio_header)
+        if (r.ratio_header) {
             res.set_header("X-Image-Ratio", *r.ratio_header);
+        }
         return res;
     });
 
@@ -186,7 +190,7 @@ void register_content(Ctx& c) {
             res.body = "export failed";
             return res;
         }
-        res.body = std::move(*zip);
+        res.body = *zip;
         res.compressed = false; // zip container, already deflate-packed
         res.set_header("Content-Type", "application/zip");
         res.set_header("Content-Disposition", "attachment; filename=\"" + param(req, "slug") + ".cbz\"");
@@ -194,5 +198,4 @@ void register_content(Ctx& c) {
     });
 }
 
-} // namespace api
-} // namespace http
+} // namespace http::api

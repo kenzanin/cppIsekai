@@ -54,21 +54,23 @@ struct ImgReply {
  *  v3 layout + transcode + sidecar (D1-D3); empty context keeps the v2
  *  sha fallback. cover=true adds the X-Image-Ratio header from the
  *  stored sidecar (D3). */
-inline ImgReply serve_cached_image(cache::Cache& images, std::string_view url,
-                                   const cache::Cache::CoverCtx& cover_ctx = {},
-                                   const cache::Cache::PageCtx& page_ctx = {}) {
+inline ImgReply serve_cached_image(
+    cache::Cache& images, std::string_view url,
+    const cache::Cache::CoverCtx& cover_ctx = {},
+    const cache::Cache::PageCtx& page_ctx = {}) {
     const auto path = images.img_ensure(std::string(url), cover_ctx, page_ctx);
     if (!path) {
-        return {404, {}, "application/octet-stream", std::nullopt};
+        return {.code = 404, .body = {}, .mime = "application/octet-stream", .ratio_header = std::nullopt};
     }
     std::ifstream f(*path, std::ios::binary);
     std::stringstream ss;
     ss << f.rdbuf();
-    auto reply = ImgReply{200, ss.str(), image_mime(*path), std::nullopt};
+    auto reply = ImgReply{.code = 200, .body = ss.str(), .mime = image_mime(*path), .ratio_header = std::nullopt};
     if (cover_ctx.cover) {
         const double ratio = cache::Cache::ratio_of_name(std::filesystem::path(*path).filename().string());
-        if (ratio > 0.0)
+        if (ratio > 0.0) {
             reply.ratio_header = std::to_string(ratio);
+        }
     }
     return reply;
 }

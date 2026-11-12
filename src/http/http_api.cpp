@@ -11,7 +11,16 @@ namespace http {
 void register_api(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool,
                   plugin::Host& plugins, cache::Cache& images, reader::Worker& prefetch, reader::CoverWorker& covers,
                   const std::string& ini_path, const config::Overrides& overrides_ref) {
-    api::Ctx c{app, store, db, plugin_pool, plugins, images, prefetch, covers, ini_path, overrides_ref};
+    api::Ctx c{.app = app,
+               .store = store,
+               .db = db,
+               .plugin_pool = plugin_pool,
+               .plugins = plugins,
+               .images = images,
+               .prefetch = prefetch,
+               .covers = covers,
+               .ini_path = ini_path,
+               .overrides = overrides_ref};
     api::register_admin(c);
     api::register_library(c);
     api::register_title(c);

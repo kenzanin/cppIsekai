@@ -118,7 +118,7 @@
                 class="px-3 py-1.5 text-sm border rounded-md disabled:opacity-40"
                 :class="inLibrary ? 'border-emerald-700 bg-emerald-900/40 text-emerald-300 hover:bg-emerald-900/60' : 'border-zinc-700 text-zinc-300 hover:bg-zinc-800'"
                 x-text="inLibrary ? 'In library' : 'Add to library'"></button>
-        <button @click="refresh()" :disabled="refreshing"
+        <button @click="refresh()" :disabled="refreshing || !pe"
                 class="px-3 py-1.5 text-sm border border-zinc-700 text-zinc-300 hover:bg-zinc-800 rounded-md disabled:opacity-40"
                 x-text="refreshing ? '…' : '⟳ Update'"></button>
       </div>
@@ -291,7 +291,7 @@ function detailPage() {
   const parts = location.pathname.split('/').filter(Boolean); // view manga <plugin> <slug...>
   return {
     plugin: parts[2] || '', slug: parts.slice(3).join('/') || '',
-    detail: {}, chapters: [], cached: false, loading: true, refreshing: false,
+    detail: {}, chapters: [], cached: false, loading: true, refreshing: false, pe: 0,
     err: '', coverBroken: false, hint: null, related: [], pluginName: '', pluginLogoOk: true, pluginCaps: '',
     inLibrary: false, libraryBusy: false,
     enrichment: null, enrichLastFetched: 0, enrichSources: [],

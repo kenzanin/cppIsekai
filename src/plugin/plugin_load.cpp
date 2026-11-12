@@ -3,6 +3,7 @@
 
 #include <filesystem>
 #include <functional>
+#include <spdlog/spdlog.h>
 
 namespace fs = std::filesystem;
 
@@ -310,6 +311,18 @@ int Host::load_all(Store& store) {
     scan_dir(conf_, impl_->live_profile, store, sget, sset, conf_.dir, false, fresh);
     if (!conf_.enrichment_dir.empty()) {
         scan_dir(conf_, impl_->live_profile, store, sget, sset, conf_.enrichment_dir, true, fresh);
+    }
+
+    // folder-removal GC (plugin-lifecycle 2.2): registry ids absent from this
+    // scan are purged. A missing scan dir short-circuits the prune so a mount
+    // glitch cannot wipe the library; an emptied dir legitimately does.
+    if (std::filesystem::exists(conf_.dir)) {
+        std::vector<std::string> keep;
+        keep.reserve(fresh.size());
+        for (const auto& entry : fresh)
+            keep.push_back(entry.first);
+        for (const auto& gone : store.plugin_prune_absent(keep))
+            spdlog::info("[plugin] {}: folder gone, registry + traces purged", gone);
     }
 
     const std::scoped_lock lock(impl_->mu);

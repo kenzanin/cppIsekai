@@ -18,10 +18,8 @@
 
 #include <cstdint>
 #include <optional>
-#include <string>
 
-namespace http {
-namespace api {
+namespace http::api {
 
 // Serve the per-source entry of the stored `fetched` array shaped as the
 // enrichment envelope; nullopt when this source has nothing stored.
@@ -32,33 +30,38 @@ inline std::optional<crow::json::wvalue> stored_source(const std::string& fetche
         return std::nullopt;
     }
     for (const auto& entry : fetched.get_array()) {
-        if (!entry.is_object())
+        if (!entry.is_object()) {
             continue;
+        }
         const auto& obj = entry.get_object();
-        const auto src = obj.find("source");
-        if (src == obj.end())
+        const auto* const src = obj.find("source");
+        if (src == obj.end()) {
             continue;
+        }
         const auto* s = std::get_if<std::string>(&src->second.data);
-        if (s == nullptr || *s != id)
+        if (s == nullptr || *s != id) {
             continue;
+        }
         // entries are keyed (source, kind); a missing kind is a legacy detail entry
-        const auto k = obj.find("kind");
+        const auto* const k = obj.find("kind");
         const auto* ks = k != obj.end() ? std::get_if<std::string>(&k->second.data) : nullptr;
-        if ((ks ? *ks : std::string("detail")) != kind)
+        if (((ks != nullptr) ? *ks : std::string("detail")) != kind) {
             continue;
+        }
         crow::json::wvalue out;
         out["ok"] = true;
         out["cached"] = true;
         out["source"] = id;
-        const auto at = obj.find("fetched_at");
+        const auto* const at = obj.find("fetched_at");
         double at_d = 0;
         if (at != obj.end()) {
-            if (const auto* d = std::get_if<double>(&at->second.data))
+            if (const auto* d = std::get_if<double>(&at->second.data)) {
                 at_d = *d;
+            }
         }
         out_fetched_at = static_cast<std::int64_t>(at_d);
         out["fetched_at"] = at_d;
-        const auto data = obj.find("data");
+        const auto* const data = obj.find("data");
         out["data"] = data != obj.end() ? crow::json::load(glz::write_json(data->second).value_or(std::string{}))
                                         : crow::json::wvalue();
         return out;
@@ -70,28 +73,35 @@ inline std::optional<crow::json::wvalue> stored_source(const std::string& fetche
 // nullopt on any shape violation (caller returns 400). Exact key whitelist;
 // artist/author accept String or List<String> and normalize to array.
 inline std::optional<std::string> normalize_chosen(const crow::json::rvalue& ch) {
-    if (ch.t() != crow::json::type::Object)
+    if (ch.t() != crow::json::type::Object) {
         return std::nullopt;
-    static const char* allowed[] = {"title", "synopsis", "artist",      "author",
-                                    "cover", "tags_add", "tags_hidden", "related_add"};
+    }
+    static const char* allowed[] = {
+        "title", "synopsis", "artist", "author", "cover", "tags_add", "tags_hidden", "related_add",
+    };
     for (const auto& member : ch) {
         const std::string k = std::string(member.key());
         bool ok = false;
-        for (const char* a : allowed)
+        for (const char* a : allowed) {
             if (k == a) {
                 ok = true;
                 break;
             }
-        if (!ok)
+        }
+        if (!ok) {
             return std::nullopt;
+        }
     }
     crow::json::wvalue out;
-    for (const char* key : {"title", "synopsis", "cover"})
-        if (ch.has(key) && ch[key].t() == crow::json::type::String)
+    for (const char* key : {"title", "synopsis", "cover"}) {
+        if (ch.has(key) && ch[key].t() == crow::json::type::String) {
             out[key] = ch[key];
+        }
+    }
     for (const char* key : {"artist", "author"}) {
-        if (!ch.has(key))
+        if (!ch.has(key)) {
             continue;
+        }
         if (ch[key].t() == crow::json::type::String) {
             crow::json::wvalue one(crow::json::type::List);
             one[0] = ch[key];
@@ -100,40 +110,51 @@ inline std::optional<std::string> normalize_chosen(const crow::json::rvalue& ch)
             crow::json::wvalue arr(crow::json::type::List);
             int n = 0;
             for (const auto& item : ch[key]) {
-                if (item.t() != crow::json::type::String)
+                if (item.t() != crow::json::type::String) {
                     return std::nullopt;
+                }
                 arr[n++] = item;
             }
             out[key] = std::move(arr);
-        } else
-            return std::nullopt;
+        } else {
+            {
+                return std::nullopt;
+            }
+        }
     }
     if (ch.has("related_add")) {
         const auto& arr = ch["related_add"];
-        if (arr.t() != crow::json::type::List)
+        if (arr.t() != crow::json::type::List) {
             return std::nullopt;
+        }
         crow::json::wvalue out_arr(crow::json::type::List);
         int n = 0;
         for (const auto& item : arr) {
-            if (item.t() != crow::json::type::Object)
+            if (item.t() != crow::json::type::Object) {
                 return std::nullopt;
+            }
             // extra keys rejected; name/url required non-empty, id optional non-empty string
             for (const auto& member : item) {
                 const std::string k = std::string(member.key());
-                if (k != "name" && k != "url" && k != "id")
+                if (k != "name" && k != "url" && k != "id") {
                     return std::nullopt;
+                }
             }
-            if (!item.has("name") || !item.has("url"))
+            if (!item.has("name") || !item.has("url")) {
                 return std::nullopt;
+            }
             crow::json::wvalue row;
             for (const char* key : {"name", "url", "id"}) {
-                if (!item.has(key))
+                if (!item.has(key)) {
                     continue;
-                if (item[key].t() != crow::json::type::String)
+                }
+                if (item[key].t() != crow::json::type::String) {
                     return std::nullopt;
+                }
                 const std::string v = item[key].s();
-                if (v.empty() || v.size() > 512)
+                if (v.empty() || v.size() > 512) {
                     return std::nullopt;
+                }
                 row[key] = v;
             }
             out_arr[n++] = std::move(row);
@@ -141,16 +162,19 @@ inline std::optional<std::string> normalize_chosen(const crow::json::rvalue& ch)
         out["related_add"] = std::move(out_arr);
     }
     for (const char* key : {"tags_add", "tags_hidden"}) {
-        if (!ch.has(key))
+        if (!ch.has(key)) {
             continue;
+        }
         const auto& arr = ch[key];
-        if (arr.t() != crow::json::type::List)
+        if (arr.t() != crow::json::type::List) {
             return std::nullopt;
+        }
         crow::json::wvalue out_arr(crow::json::type::List);
         int n = 0;
         for (const auto& item : arr) {
-            if (item.t() != crow::json::type::String)
+            if (item.t() != crow::json::type::String) {
                 return std::nullopt;
+            }
             out_arr[n++] = item;
         }
         out[key] = std::move(out_arr);
@@ -200,19 +224,22 @@ inline crow::response enrichment_source_response(plugin::Host& plugins, BS::thre
         std::string err = "enrich failed";
         const auto* o = std::get_if<glz::generic::object_t>(&env.data);
         if (o != nullptr) {
-            if (auto it = o->find("error"); it != o->end()) {
-                if (const auto* s = std::get_if<std::string>(&it->second.data))
+            if (const auto* it = o->find("error"); it != o->end()) {
+                if (const auto* s = std::get_if<std::string>(&it->second.data)) {
                     err = *s;
+                }
             }
         }
         std::string safe;
         safe.reserve(err.size());
         for (unsigned char ch : err) {
-            if (ch >= 32 && ch != '"' && ch != '\\')
+            if (ch >= 32 && ch != '"' && ch != '\\') {
                 safe += static_cast<char>(ch);
+            }
         }
-        if (safe.empty())
+        if (safe.empty()) {
             safe = "enrich failed";
+        }
         crow::response r{502};
         r.set_header("Content-Type", "application/json");
         r.body = std::string(R"({"ok":false,"error":")") + safe + R"("})";
@@ -220,11 +247,12 @@ inline crow::response enrichment_source_response(plugin::Host& plugins, BS::thre
     }
 
     // Plugin succeeded: merge the source's entry into stored `fetched`.
-    const std::int64_t now = static_cast<std::int64_t>(std::time(nullptr));
+    const auto now = static_cast<std::int64_t>(std::time(nullptr));
     glz::generic fetched;
     if (existing) {
-        if (glz::read_json(fetched, existing->fetched))
+        if (glz::read_json(fetched, existing->fetched)) {
             fetched = glz::generic{};
+        }
     }
     if (!fetched.is_array()) {
         fetched = glz::generic{};
@@ -238,15 +266,16 @@ inline crow::response enrichment_source_response(plugin::Host& plugins, BS::thre
             continue;
         }
         const auto& o = obj.get_object();
-        const auto src = o.find("source");
+        const auto* const src = o.find("source");
         const auto* s = src != o.end() ? std::get_if<std::string>(&src->second.data) : nullptr;
-        const auto kk = o.find("kind");
+        const auto* const kk = o.find("kind");
         const auto* ks = kk != o.end() ? std::get_if<std::string>(&kk->second.data) : nullptr;
-        const std::string entry_kind = ks ? *ks : "detail"; // legacy entries are detail
-        if (s != nullptr && *s == id && entry_kind == kind)
+        const std::string entry_kind = (ks != nullptr) ? *ks : "detail"; // legacy entries are detail
+        if (s != nullptr && *s == id && entry_kind == kind) {
             arr.erase(arr.begin() + i);
-        else
+        } else {
             ++i;
+        }
     }
     glz::generic entry;
     auto& obj = entry.data.emplace<glz::generic::object_t>();
@@ -257,8 +286,9 @@ inline crow::response enrichment_source_response(plugin::Host& plugins, BS::thre
     obj["fetched_at"] = glz::generic{};
     obj["fetched_at"].data = static_cast<double>(now);
     if (const auto* o = std::get_if<glz::generic::object_t>(&env.data)) {
-        if (auto it = o->find("data"); it != o->end())
+        if (const auto* it = o->find("data"); it != o->end()) {
             obj["data"] = it->second;
+        }
     }
     arr.push_back(entry);
     const std::string fetched_json = glz::write_json(fetched).value_or("[]");
@@ -270,9 +300,9 @@ inline crow::response enrichment_source_response(plugin::Host& plugins, BS::thre
     // saved_manga when a detail envelope lands. Shape: [{title, lang, main}].
     if (kind == "detail") {
         if (const auto* o = std::get_if<glz::generic::object_t>(&env.data)) {
-            if (auto it = o->find("data"); it != o->end() && it->second.is_object()) {
+            if (const auto* it = o->find("data"); it != o->end() && it->second.is_object()) {
                 const auto& d = it->second.get_object();
-                if (auto jt = d.find("alt_titles"); jt != d.end() && jt->second.is_array()) {
+                if (const auto* jt = d.find("alt_titles"); jt != d.end() && jt->second.is_array()) {
                     glz::generic::array_t titles;
                     for (const auto& t : jt->second.get_array()) {
                         // accept plain strings or {title: ...} entries
@@ -283,13 +313,14 @@ inline crow::response enrichment_source_response(plugin::Host& plugins, BS::thre
                                 titles.push_back(std::move(v));
                             }
                         } else if (t.is_object()) {
-                            if (auto tt = t.get_object().find("title"); tt != t.get_object().end())
+                            if (const auto* tt = t.get_object().find("title"); tt != t.get_object().end()) {
                                 if (const auto* s = std::get_if<std::string>(&tt->second.data);
                                     s != nullptr && !s->empty()) {
                                     glz::generic v;
                                     v.data = *s;
                                     titles.push_back(std::move(v));
                                 }
+                            }
                         }
                     }
                     if (!titles.empty()) {
@@ -317,7 +348,7 @@ inline crow::response enrichment_source_response(plugin::Host& plugins, BS::thre
     out["source"] = id;
     out["fetched_at"] = static_cast<double>(now);
     if (const auto* o = std::get_if<glz::generic::object_t>(&env.data)) {
-        if (auto it = o->find("data"); it != o->end()) {
+        if (const auto* it = o->find("data"); it != o->end()) {
             out["data"] = crow::json::load(glz::write_json(it->second).value_or(std::string{}));
         } else {
             out["data"] = crow::json::wvalue();
@@ -330,51 +361,56 @@ inline crow::response enrichment_source_response(plugin::Host& plugins, BS::thre
     return r;
 }
 
-} // namespace api
-} // namespace http
+} // namespace http::api
 
-namespace http {
-namespace api {
+namespace http::api {
 
 // Chosen display title from title_meta.chosen; nullopt when unset/empty.
 inline std::optional<std::string> chosen_title(Store& store, BS::thread_pool<>& db, const std::string& plugin,
                                                const std::string& slug) {
     const auto row = on_pool(db, [&] { return store.title_meta_get(plugin, slug); });
-    if (!row)
+    if (!row) {
         return std::nullopt;
+    }
     glz::generic chosen;
-    if (glz::read_json(chosen, row->chosen) || !chosen.is_object())
+    if (glz::read_json(chosen, row->chosen) || !chosen.is_object()) {
         return std::nullopt;
-    const auto it = chosen.get_object().find("title");
-    if (it == chosen.get_object().end())
+    }
+    auto* const it = chosen.get_object().find("title");
+    if (it == chosen.get_object().end()) {
         return std::nullopt;
-    if (const auto* s = std::get_if<std::string>(&it->second.data); s != nullptr && !s->empty())
+    }
+    if (const auto* s = std::get_if<std::string>(&it->second.data); s != nullptr && !s->empty()) {
         return *s;
+    }
     return std::nullopt;
 }
 
 inline std::optional<std::string> chosen_cover(Store& store, BS::thread_pool<>& db, const std::string& plugin,
                                                const std::string& slug) {
     const auto row = on_pool(db, [&] { return store.title_meta_get(plugin, slug); });
-    if (!row)
+    if (!row) {
         return std::nullopt;
+    }
     glz::generic chosen;
-    if (glz::read_json(chosen, row->chosen) || !chosen.is_object())
+    if (glz::read_json(chosen, row->chosen) || !chosen.is_object()) {
         return std::nullopt;
+    }
     const auto& cd = chosen.get_object();
-    const auto it = cd.find("cover");
-    if (it == cd.end())
+    const auto* const it = cd.find("cover");
+    if (it == cd.end()) {
         return std::nullopt;
-    if (const auto* s = std::get_if<std::string>(&it->second.data); s != nullptr && !s->empty())
+    }
+    if (const auto* s = std::get_if<std::string>(&it->second.data); s != nullptr && !s->empty()) {
         return *s;
+    }
     return std::nullopt;
 }
 
 namespace {
 inline std::string lower_copy(const std::string& s) {
     std::string out = s;
-    std::transform(out.begin(), out.end(), out.begin(),
-                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    std::ranges::transform(out, out.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return out;
 }
 } // namespace
@@ -386,37 +422,44 @@ inline std::string lower_copy(const std::string& s) {
 inline std::string apply_chosen(Store& store, BS::thread_pool<>& db, const std::string& plugin, const std::string& slug,
                                 const std::string& envelope) {
     const auto row = on_pool(db, [&] { return store.title_meta_get(plugin, slug); });
-    if (!row)
+    if (!row) {
         return envelope;
+    }
     glz::generic env;
-    if (glz::read_json(env, envelope) || !envelope_ok(env) || !env.is_object())
+    if (glz::read_json(env, envelope) || !envelope_ok(env) || !env.is_object()) {
         return envelope;
+    }
     glz::generic chosen;
-    if (glz::read_json(chosen, row->chosen) || !chosen.is_object())
+    if (glz::read_json(chosen, row->chosen) || !chosen.is_object()) {
         return envelope;
+    }
     auto& obj = env.get_object();
     const auto& cd = chosen.get_object();
 
-    if (auto data = obj.find("data"); data != obj.end() && data->second.is_object()) {
+    if (auto* data = obj.find("data"); data != obj.end() && data->second.is_object()) {
         auto& d = data->second.get_object();
         const auto set_str = [&](const char* chosen_key, const char* data_key) {
-            const auto it = cd.find(chosen_key);
-            if (it == cd.end())
+            const auto* const it = cd.find(chosen_key);
+            if (it == cd.end()) {
                 return;
+            }
             const auto* s = std::get_if<std::string>(&it->second.data);
-            if (s != nullptr && !s->empty())
+            if (s != nullptr && !s->empty()) {
                 d[data_key] = it->second;
+            }
         };
         set_str("title", "name");
         set_str("synopsis", "description");
         set_str("cover", "cover");
         const auto set_names = [&](const char* chosen_key, const char* data_key) {
-            const auto it = cd.find(chosen_key);
-            if (it == cd.end())
+            const auto* const it = cd.find(chosen_key);
+            if (it == cd.end()) {
                 return;
+            }
             if (const auto* s = std::get_if<std::string>(&it->second.data)) {
-                if (s->empty())
+                if (s->empty()) {
                     return;
+                }
                 glz::generic::array_t arr;
                 arr.emplace_back().data = *s;
                 d[data_key].data = std::move(arr);
@@ -426,34 +469,43 @@ inline std::string apply_chosen(Store& store, BS::thread_pool<>& db, const std::
         };
         set_names("artist", "artists");
         set_names("author", "authors");
-        if (const auto it = cd.find("cover"); it != cd.end()) {
+        if (const auto* const it = cd.find("cover"); it != cd.end()) {
             if (const auto* s = std::get_if<std::string>(&it->second.data); s != nullptr && !s->empty()) {
                 d["chosen_cover"] = it->second; // page hydrates from this too
             }
         }
 
-        const auto tadd = cd.find("tags_add");
-        const auto thid = cd.find("tags_hidden");
+        const auto* const tadd = cd.find("tags_add");
+        const auto* const thid = cd.find("tags_hidden");
         if (tadd != cd.end() || thid != cd.end()) {
             std::vector<std::string> tags;
-            if (const auto it = d.find("tags"); it != d.end() && it->second.is_array()) {
-                for (const auto& t : it->second.get_array())
-                    if (const auto* s = std::get_if<std::string>(&t.data))
+            if (auto* const it = d.find("tags"); it != d.end() && it->second.is_array()) {
+                for (const auto& t : it->second.get_array()) {
+                    if (const auto* s = std::get_if<std::string>(&t.data)) {
                         tags.push_back(*s);
+                    }
+                }
             }
-            if (tadd != cd.end() && tadd->second.is_array())
-                for (const auto& t : tadd->second.get_array())
-                    if (const auto* s = std::get_if<std::string>(&t.data))
+            if (tadd != cd.end() && tadd->second.is_array()) {
+                for (const auto& t : tadd->second.get_array()) {
+                    if (const auto* s = std::get_if<std::string>(&t.data)) {
                         tags.push_back(*s);
+                    }
+                }
+            }
             if (thid != cd.end() && thid->second.is_array()) {
                 std::vector<std::string> hidden;
-                for (const auto& t : thid->second.get_array())
-                    if (const auto* s = std::get_if<std::string>(&t.data))
+                for (const auto& t : thid->second.get_array()) {
+                    if (const auto* s = std::get_if<std::string>(&t.data)) {
                         hidden.push_back(lower_copy(*s));
+                    }
+                }
                 std::erase_if(tags, [&](const std::string& t) {
-                    for (const auto& h : hidden)
-                        if (h == lower_copy(t))
+                    for (const auto& h : hidden) {
+                        if (h == lower_copy(t)) {
                             return true;
+                        }
+                    }
                     return false;
                 });
             }
@@ -479,5 +531,4 @@ inline std::string apply_chosen(Store& store, BS::thread_pool<>& db, const std::
     return glz::write_json(env).value_or(envelope);
 }
 
-} // namespace api
-} // namespace http
+} // namespace http::api

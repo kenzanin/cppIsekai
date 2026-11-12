@@ -21,8 +21,7 @@
 #include <string>
 #include <vector>
 
-namespace http {
-namespace api {
+namespace http::api {
 
 /** Service handles every route group needs; built once in register_api. */
 struct Ctx {
@@ -66,7 +65,7 @@ inline bool valid_title_pair(const std::string& plugin, const std::string& slug)
                 s.substr(0, s.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_."))) {
             return false;
         }
-        if (s.find("..") != std::string::npos) {
+        if (s.contains("..")) {
             return false;
         }
         return true;
@@ -84,41 +83,45 @@ std::vector<std::string> reader_window(Store& store, BS::thread_pool<>& db, BS::
                                        const reader::Position& pos);
 
 // Route-group registration, one TU each (http_api_*.cpp).
-void register_admin(Ctx&);   // plugin registry/admin + config endpoints
-void register_library(Ctx&); // saved-library CRUD
-void register_title(Ctx&);   // detail/related/chapters/refresh envelopes
-void register_reader(Ctx&);  // reader window + position routes
-void register_state(Ctx&);   // chapter skip/read/state flags
-void register_content(Ctx&); // reader pages, image cache, cbz export
-void register_enrich(Ctx&);  // enrichment fetch/chosen/reset
+void register_admin(Ctx& /*c*/); // plugin registry/admin + config endpoints
+void register_library(Ctx& /*c*/); // saved-library CRUD
+void register_title(Ctx& /*c*/);   // detail/related/chapters/refresh envelopes
+void register_reader(Ctx& /*c*/); // reader window + position routes
+void register_state(Ctx& /*c*/); // chapter skip/read/state flags
+void register_content(Ctx& /*c*/); // reader pages, image cache, cbz export
+void register_enrich(Ctx& /*c*/); // enrichment fetch/chosen/reset
 
-} // namespace api
-} // namespace http
+} // namespace http::api
 
 // --- saved-manga stats sync (library-grid-stats 2.x) ---
 namespace detail {
 inline std::optional<glz::generic::object_t> envelope_object(const std::string& env) {
     glz::generic parsed;
-    if (glz::read_json(parsed, env) || !envelope_ok(parsed) || !parsed.is_object())
+    if (glz::read_json(parsed, env) || !envelope_ok(parsed) || !parsed.is_object()) {
         return std::nullopt;
-    const auto data = parsed.get_object().find("data");
-    if (data == parsed.get_object().end() || !data->second.is_object())
+    }
+    auto* const data = parsed.get_object().find("data");
+    if (data == parsed.get_object().end() || !data->second.is_object()) {
         return std::nullopt;
+    }
     return data->second.get_object();
 }
 inline std::string envelope_str(const glz::generic::object_t& obj, const char* key) {
-    const auto it = obj.find(key);
-    if (it == obj.end())
+    const auto* const it = obj.find(key);
+    if (it == obj.end()) {
         return {};
-    if (const auto* s = std::get_if<std::string>(&it->second.data))
+    }
+    if (const auto* s = std::get_if<std::string>(&it->second.data)) {
         return *s;
+    }
     return {};
 }
 // library-dedup 1.2: alt_titles re-serialized verbatim (source envelope only)
 inline std::string envelope_raw_json(const glz::generic::object_t& obj, const char* key) {
-    const auto it = obj.find(key);
-    if (it == obj.end() || it->second.is_null())
+    const auto* const it = obj.find(key);
+    if (it == obj.end() || it->second.is_null()) {
         return {};
+    }
     return glz::write_json(it->second).value_or(std::string{});
 }
 } // namespace detail
@@ -132,12 +135,14 @@ inline void sync_saved_stats(Store& store, BS::thread_pool<>& db, const std::str
     if (const auto d = detail::envelope_object(detail_env)) {
         const std::string status = detail::envelope_str(*d, "status");
         int total = 0;
-        if (const auto chs = envelope_data(chapters_env))
+        if (const auto chs = envelope_data(chapters_env)) {
             total = static_cast<int>(chs->size());
+        }
         // library-dedup 1.2: synopsis (or 'description') + alt_titles from the SOURCE envelope
         std::string syn = detail::envelope_str(*d, "synopsis");
-        if (syn.empty())
+        if (syn.empty()) {
             syn = detail::envelope_str(*d, "description");
+        }
         const std::string alts = detail::envelope_raw_json(*d, "alt_titles");
         http::on_pool(db, [&] {
             store.saved_stats_update(plugin, slug, status, total);
@@ -155,30 +160,38 @@ inline void sync_saved_stats(Store& store, BS::thread_pool<>& db, const std::str
     }
     // chapters envelope -> total_ch + read_ch rollup
     const auto chs = envelope_data(chapters_env);
-    if (!chs)
+    if (!chs) {
         return;
+    }
     int completed = 0;
     for (const auto& item : *chs) {
-        if (!item.is_object())
+        if (!item.is_object()) {
             continue;
+        }
         const auto& entry = item.get_object();
-        const auto id_it = entry.find("id");
-        if (id_it == entry.end())
+        const auto* const id_it = entry.find("id");
+        if (id_it == entry.end()) {
             continue;
+        }
         const auto* id_s = std::get_if<std::string>(&id_it->second.data);
-        if (!id_s)
+        if (id_s == nullptr) {
             continue;
+        }
         int pages = 0;
-        if (const auto p = entry.find("pages"); p != entry.end())
-            if (const auto* d = std::get_if<double>(&p->second.data))
+        if (const auto* const p = entry.find("pages"); p != entry.end()) {
+            if (const auto* d = std::get_if<double>(&p->second.data)) {
                 pages = static_cast<int>(*d);
+            }
+        }
         const auto stored = http::on_pool(
             db, [&] { return store.state_get(http::api::kStateHost, std::string(http::api::kReadPrefix) + *id_s); });
-        if (!stored || stored->empty())
+        if (!stored || stored->empty()) {
             continue;
+        }
         const int read = std::atoi(stored->c_str());
-        if (pages > 0 ? read >= pages : read > 0)
+        if (pages > 0 ? read >= pages : read > 0) {
             ++completed;
+        }
     }
     http::on_pool(db, [&] {
         store.saved_read_rollup(plugin, slug, completed, 0);
@@ -194,13 +207,15 @@ inline void sync_saved_stats(Store& store, BS::thread_pool<>& db, const std::str
 inline std::string refresh_error_text(const std::string& method, const std::string& envelope) {
     // Prefer the plugin's own error string; fall back to the method name.
     glz::generic env;
-    if (!glz::read_json(env, envelope) || !env.is_object())
+    if (!glz::read_json(env, envelope) || !env.is_object()) {
         return "refresh failed: " + method;
-    const auto it = env.get_object().find("error");
-    if (it != env.get_object().end())
-        if (const auto* s = std::get_if<std::string>(&it->second.data))
-            if (!s->empty())
-                return *s;
+    }
+    auto* const it = env.get_object().find("error");
+    if (it != env.get_object().end()) {
+        if (const auto* s = std::get_if<std::string>(&it->second.data); (s != nullptr) && (!s->empty())) {
+            return *s;
+        }
+    }
     return "refresh failed: " + method;
 }
 
@@ -215,8 +230,8 @@ struct RefreshOutcome {
 /** \brief `chapters_only`: skip the detail call (auto-update runs cheap
  *  freshness checks). The detail-page path passes false and refreshes both. */
 inline RefreshOutcome refresh_title(Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool,
-                                     plugin::Host& plugins, const std::string& plugin, const std::string& slug,
-                                     bool chapters_only = false) {
+                                    plugin::Host& plugins, const std::string& plugin, const std::string& slug,
+                                    bool chapters_only = false) {
     RefreshOutcome out;
     if (!http::api::valid_title_pair(plugin, slug)) {
         out.result = RefreshResult::kRejected; // not an attempt: nothing upstream was hit
@@ -230,8 +245,8 @@ inline RefreshOutcome refresh_title(Store& store, BS::thread_pool<>& db, BS::thr
     crow::json::wvalue p;
     p["id"] = slug;
     const std::string params = p.dump();
-    const std::vector<const char*> methods = chapters_only ? std::vector<const char*>{"chapters"}
-                                                          : std::vector<const char*>{"detail", "chapters"};
+    const std::vector<const char*> methods =
+        chapters_only ? std::vector<const char*>{"chapters"} : std::vector<const char*>{"detail", "chapters"};
     std::string fresh[2];
     for (std::size_t i = 0; i < methods.size(); ++i) {
         fresh[i] = http::on_pool(plugin_pool, [&] { return plugins.call(plugin, methods[i], params); });
@@ -252,8 +267,7 @@ inline RefreshOutcome refresh_title(Store& store, BS::thread_pool<>& db, BS::thr
         const std::string key = stale_key(plugin, methods[i], params);
         const std::string body = fresh[i];
         http::on_pool(db, [&] {
-            store.api_cache_put(plugin, key, params, body, static_cast<std::int64_t>(std::time(nullptr)),
-                                kApiCacheTtl);
+            store.api_cache_put(plugin, key, params, body, static_cast<std::int64_t>(std::time(nullptr)), kApiCacheTtl);
             return 0;
         });
     }

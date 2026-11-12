@@ -26,24 +26,37 @@ struct VrfStage {
 // the host tool needs, so decode is local and strict here.
 inline std::optional<std::string> vrf_b64_decode(const std::string& s) {
     int8_t table[256];
-    for (int i = 0; i < 256; ++i) table[i] = -1;
+    for (signed char& i : table) {
+        i = -1;
+    }
     const char* alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    for (int i = 0; i < 64; ++i) table[static_cast<uint8_t>(alpha[i])] = static_cast<int8_t>(i);
+    for (int i = 0; i < 64; ++i) {
+        table[static_cast<uint8_t>(alpha[i])] = static_cast<int8_t>(i);
+    }
 
     // validate (padding only trailing, max two)
     size_t end = s.size();
     size_t pad = 0;
-    while (end > 0 && s[end - 1] == '=') { --end; ++pad; }
-    if (pad > 2) return std::nullopt;
+    while (end > 0 && s[end - 1] == '=') {
+        --end;
+        ++pad;
+    }
+    if (pad > 2) {
+        return std::nullopt;
+    }
     const size_t len = end; // payload length excluding '='
-    if (len % 4 == 1) return std::nullopt; // impossible base64 quantum
+    if (len % 4 == 1) {
+        return std::nullopt; // impossible base64 quantum
+    }
     std::string out;
-    out.reserve(len * 3 / 4 + 1);
+    out.reserve((len * 3 / 4) + 1);
     uint32_t val = 0;
     int bits = 0;
     for (size_t i = 0; i < len; ++i) {
         const int d = table[static_cast<uint8_t>(s[i])];
-        if (d < 0) return std::nullopt;
+        if (d < 0) {
+            return std::nullopt;
+        }
         val = (val << 6) | static_cast<uint32_t>(d);
         bits += 6;
         if (bits >= 8) {
@@ -65,17 +78,20 @@ inline std::string vrf_b64url_encode(const std::string& in) {
         const uint32_t n = (a << 16) | (b << 8) | c;
         out.push_back(alpha[(n >> 18) & 0x3F]);
         out.push_back(alpha[(n >> 12) & 0x3F]);
-        if (i + 1 < in.size()) out.push_back(alpha[(n >> 6) & 0x3F]);
-        if (i + 2 < in.size()) out.push_back(alpha[n & 0x3F]);
+        if (i + 1 < in.size()) {
+            out.push_back(alpha[(n >> 6) & 0x3F]);
+        }
+        if (i + 2 < in.size()) {
+            out.push_back(alpha[n & 0x3F]);
+        }
     }
     return out;
 }
 
 /** \brief VRF-sign `api_path` per the mangafire contract. Empty on bad input; `err` carries the reason. */
 inline std::optional<std::string> vrf_sign(const std::string& api_path,
-                                          const std::map<std::string, std::string>& params,
-                                          const std::vector<VrfStage>& stages,
-                                          std::string& err) {
+                                           const std::map<std::string, std::string>& params,
+                                           const std::vector<VrfStage>& stages, std::string& err) {
     if (api_path.empty()) {
         err = "vrf_sign: api_path is empty";
         return std::nullopt;
@@ -98,19 +114,23 @@ inline std::optional<std::string> vrf_sign(const std::string& api_path,
             err = "vrf_sign: stage " + std::to_string(i + 1) + ": tbl: invalid base64 (need 256 bytes)";
             return std::nullopt;
         }
-        decoded.push_back({st.iv, std::move(*key), std::move(*tbl)});
+        decoded.push_back({.iv = st.iv, .key = std::move(*key), .tbl = std::move(*tbl)});
     }
 
     std::string sign = api_path;
-    if (sign.starts_with("/api")) sign.erase(0, 4); // Go TrimPrefix semantics: literal prefix, not path segment
+    if (sign.starts_with("/api")) {
+        sign.erase(0, 4); // Go TrimPrefix semantics: literal prefix, not path segment
+    }
     if (!params.empty()) {
-        sign += "?";
+        sign += '?';
         bool first = true;
         for (const auto& [k, v] : params) {
-            if (!first) sign += "&";
+            if (!first) {
+                sign += '&';
+            }
             first = false;
             sign += k;
-            sign += "=";
+            sign += '=';
             sign += v;
         }
     }

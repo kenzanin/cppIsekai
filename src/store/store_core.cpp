@@ -23,12 +23,14 @@ Store::Store(const std::string& path) : impl_(std::make_unique<StoreImpl>(path))
     {
         const auto cols = impl_->storage.pragma.table_info("api_cache");
         bool has_payload = false;
-        for (const auto& c : cols)
+        for (const auto& c : cols) {
             has_payload = has_payload || c.name == "payload";
+        }
         sqlite3* db = nullptr;
         if (sqlite3_open(path.c_str(), &db) == SQLITE_OK) {
-            if (!has_payload)
+            if (!has_payload) {
                 sqlite3_exec(db, "ALTER TABLE api_cache ADD COLUMN payload BLOB", nullptr, nullptr, nullptr);
+            }
             // jsonb_valid CHECK can't be added post-hoc to an existing column
             // cheaply; enforce at write time (jsonb() rejects malformed input).
             sqlite3_close(db);
@@ -38,8 +40,9 @@ Store::Store(const std::string& path) : impl_(std::make_unique<StoreImpl>(path))
     {
         const auto cols = impl_->storage.pragma.table_info("reader_positions");
         bool has_zoom = false;
-        for (const auto& c : cols)
+        for (const auto& c : cols) {
             has_zoom = has_zoom || c.name == "zoom";
+        }
         if (!has_zoom) {
             sqlite3* db = nullptr;
             sqlite3_open(path.c_str(), &db);
@@ -51,8 +54,9 @@ Store::Store(const std::string& path) : impl_(std::make_unique<StoreImpl>(path))
     {
         const auto cols = impl_->storage.pragma.table_info("saved_manga");
         std::unordered_set<std::string> have;
-        for (const auto& c : cols)
+        for (const auto& c : cols) {
             have.insert(c.name);
+        }
         sqlite3* db = nullptr;
         if (sqlite3_open(path.c_str(), &db) == SQLITE_OK) {
             constexpr std::string_view stmts[] = {
@@ -66,11 +70,15 @@ Store::Store(const std::string& path) : impl_(std::make_unique<StoreImpl>(path))
                 "ALTER TABLE saved_manga ADD COLUMN alt_titles TEXT NOT NULL DEFAULT ''",
                 "ALTER TABLE saved_manga ADD COLUMN dup_group INTEGER NOT NULL DEFAULT 0",
             };
-            constexpr std::string_view names[] = {"status",     "total_ch", "read_ch",    "has_update", "last_read_at",
-                                                  "updated_at", "synopsis", "alt_titles", "dup_group"};
-            for (std::size_t i = 0; i < std::size(stmts); ++i)
-                if (have.find(std::string(names[i])) == have.end())
+            constexpr std::string_view names[] = {
+                "status",     "total_ch", "read_ch",    "has_update", "last_read_at",
+                "updated_at", "synopsis", "alt_titles", "dup_group",
+            };
+            for (std::size_t i = 0; i < std::size(stmts); ++i) {
+                if (!have.contains(std::string(names[i]))) {
                     sqlite3_exec(db, stmts[i].data(), nullptr, nullptr, nullptr);
+                }
+            }
             sqlite3_close(db); // one-shot migration alongside the ORM connection
         }
     }
@@ -87,7 +95,7 @@ Store::Store(const std::string& path) : impl_(std::make_unique<StoreImpl>(path))
                 impl_->fts5_ok = true;
             } else {
                 spdlog::warn("[store] FTS5 unavailable ({}); library dedup disabled, dup_group stays 0",
-                             err ? err : "unknown error");
+                             (err != nullptr) ? err : "unknown error");
                 sqlite3_free(err);
             }
             sqlite3_close(db);

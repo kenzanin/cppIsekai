@@ -3,24 +3,17 @@
 
 #include <ctime>
 
-namespace http {
-namespace api {
+namespace http::api {
 namespace {
 
-// The shared body of the detail/chapters endpoints: enabled-gate, stale-serve,
-// json envelope. `method` is the plugin method; `id_key` the query param the
+// The shared body of the detail/chapters endpoints: disabled = cache-only via
+// the stale layer, json envelope. `method` is the plugin method; `id_key` the query param the
 // plugin's contract names for the title key.
 crow::response title_data_response(plugin::Host& plugins, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool,
                                    Store& store, const std::string& plugin, const std::string& slug,
                                    const std::string& method) {
     if (!valid_title_pair(plugin, slug)) {
         return crow::response{404, R"({"ok":false,"error":"unknown title"})"};
-    }
-    const bool enabled = on_pool(db, [&] { return store.plugin_enabled(plugin); });
-    if (!enabled) {
-        crow::response r{R"({"ok":false,"error":"plugin disabled"})"};
-        r.set_header("Content-Type", "application/json");
-        return r;
     }
     crow::json::wvalue p;
     p["id"] = slug; // the slug IS the title key the cache layout and plugins mint
@@ -51,16 +44,17 @@ void register_title(Ctx& c) {
     // /plugin/<id>/<method>; keyed by our own slug, which is the title key the
     // cache layout and plugins mint. The page's Alpine layer consumes these.
     CROW_ROUTE(app, "/api/detail/<string>/<string>")
-    ([&](const crow::request& /*req*/, std::string plugin, std::string slug) {
+    ([&](const crow::request& /*req*/, std::string plugin, const std::string& slug) {
         crow::response r = title_data_response(plugins, db, plugin_pool, store, plugin, slug, "detail");
         if (r.code == 200) {
             // library-grid-stats 2.2: saved-manga stat sync on detail open.
             // Reuse the stale-served envelopes already in api_cache (no extra
             // network); failures leave the last-known stats untouched.
-            const std::string params = std::string("{\"id\":\"") + slug + "\"}";
+            const std::string params = std::string(R"({"id":")") + slug + "\"}";
             const std::string chs_body = on_pool(db, [&] {
-                if (auto row = store.api_cache_get(plugin, stale_key(plugin, "chapters", params)))
+                if (auto row = store.api_cache_get(plugin, stale_key(plugin, "chapters", params))) {
                     return row->payload;
+                }
                 return std::string{};
             });
             // detail body is r.body; chapters may be absent (not cached) — skip then
@@ -72,12 +66,12 @@ void register_title(Ctx& c) {
     // detail-enrichment 2.1: related readings; same envelope and stale-serve
     // rules as /api/detail, plugin method "related".
     CROW_ROUTE(app, "/api/related/<string>/<string>")
-    ([&](const crow::request& /*req*/, std::string plugin, std::string slug) {
+    ([&](const crow::request& /*req*/, const std::string& plugin, const std::string& slug) {
         return title_data_response(plugins, db, plugin_pool, store, plugin, slug, "related");
     });
 
     CROW_ROUTE(app, "/api/chapters/<string>/<string>")
-    ([&](const crow::request& /*req*/, std::string plugin, std::string slug) {
+    ([&](const crow::request& /*req*/, const std::string& plugin, const std::string& slug) {
         return title_data_response(plugins, db, plugin_pool, store, plugin, slug, "chapters");
     });
 
@@ -86,7 +80,7 @@ void register_title(Ctx& c) {
     // leaves every cached entry untouched.
     CROW_ROUTE(app, "/api/refresh/<string>/<string>")
         .methods(crow::HTTPMethod::POST)(
-            [&](const crow::request& /*req*/, std::string plugin, std::string slug) -> crow::response {
+            [&](const crow::request& /*req*/, const std::string& plugin, const std::string& slug) -> crow::response {
                 const RefreshOutcome rr = refresh_title(store, db, plugin_pool, plugins, plugin, slug);
                 auto json = [&](int code, const std::string& body) {
                     crow::response r{code, body};
@@ -94,21 +88,20 @@ void register_title(Ctx& c) {
                     return r;
                 };
                 switch (rr.result) {
-                    case RefreshResult::kRejected:
-                        return crow::response{404, R"({"ok":false,"error":"unknown title"})"};
-                    case RefreshResult::kDisabled:
-                        return json(200, R"({"ok":false,"error":"plugin disabled"})");
-                    case RefreshResult::kUpstreamFailed: {
-                        const std::string body =
-                            std::string("{\"ok\":false,\"error\":\"refresh failed: ") + rr.failed_method + "\"}";
-                        return json(502, body); // upstream plugin call failed, not the route
-                    }
-                    case RefreshResult::kOk:
-                        return json(200, R"({"ok":true})");
+                case RefreshResult::kRejected:
+                    return crow::response{404, R"({"ok":false,"error":"unknown title"})"};
+                case RefreshResult::kDisabled:
+                    return json(200, R"({"ok":false,"error":"plugin disabled"})");
+                case RefreshResult::kUpstreamFailed: {
+                    const std::string body =
+                        std::string(R"({"ok":false,"error":"refresh failed: )") + rr.failed_method + "\"}";
+                    return json(502, body); // upstream plugin call failed, not the route
+                }
+                case RefreshResult::kOk:
+                    return json(200, R"({"ok":true})");
                 }
                 return json(500, R"({"ok":false,"error":"refresh failed"})");
             });
 }
 
-} // namespace api
-} // namespace http
+} // namespace http::api

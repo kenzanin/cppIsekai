@@ -5,8 +5,7 @@
 #include <string>
 #include <vector>
 
-namespace http {
-namespace api {
+namespace http::api {
 
 // Per-chapter host flags (skip / read progress / batched state) -- the
 // reader-window rerun on skip keeps the response honest (bodies verbatim
@@ -29,15 +28,18 @@ void register_state(Ctx& c) {
     CROW_ROUTE(app, "/api/display/dim-blur")
         .methods(crow::HTTPMethod::POST)([&](const crow::request& req) -> crow::response {
             const auto body = crow::json::load(req.body);
-            if (!body || !body.has("plugin") || !body.has("slug"))
+            if (!body || !body.has("plugin") || !body.has("slug")) {
                 return crow::response{400};
+            }
             const std::string plugin = body["plugin"].s();
             const std::string slug = body["slug"].s();
-            if (plugin.empty() || plugin.find('/') != std::string::npos || slug.empty())
+            if (plugin.empty() || plugin.contains('/') || slug.empty()) {
                 return crow::response{400};
+            }
             bool on = false;
-            if (body.has("on"))
+            if (body.has("on")) {
                 on = body["on"].t() == crow::json::type::True;
+            }
             on_pool(db, [&] {
                 store.state_set(kStateHost, dim_key(plugin, slug), on ? "1" : "0");
                 return 0;
@@ -54,8 +56,9 @@ void register_state(Ctx& c) {
         for (const auto& k : keys) {
             const auto rest = k.substr(std::string(kDimPrefix).size());
             const auto slash = rest.find('/');
-            if (slash == std::string::npos || slash == 0)
+            if (slash == std::string::npos || slash == 0) {
                 continue;
+            }
             crow::json::wvalue pair(crow::json::type::List);
             pair[0] = rest.substr(0, slash);
             pair[1] = rest.substr(slash + 1);
@@ -77,8 +80,9 @@ void register_state(Ctx& c) {
             bool skipped = false;
             if (const auto body = crow::json::load(req.body); body && body.has("skipped")) {
                 const auto t = body["skipped"].t();
-                if (t == crow::json::type::True || t == crow::json::type::False)
+                if (t == crow::json::type::True || t == crow::json::type::False) {
                     skipped = body["skipped"].b();
+                }
             }
 
             on_pool(db, [&] {
@@ -93,13 +97,15 @@ void register_state(Ctx& c) {
                 const std::string& manga = last->slug;
                 const std::string& chapter = last->chapter_id;
                 if (!plugin.empty() && !manga.empty() && !chapter.empty()) {
-                    const reader::Position where{chapter, last->page};
+                    const reader::Position where{.chapter_id = chapter, .page = last->page};
                     const std::vector<std::string> found =
                         reader_window(store, db, plugin_pool, plugins, plugin, manga, where);
-                    for (const auto& url : found)
+                    for (const auto& url : found) {
                         window.emplace_back(url);
-                    if (!found.empty())
+                    }
+                    if (!found.empty()) {
                         prefetch.nudge(found); // rerun delta (3.3)
+                    }
                 }
             }
 
@@ -135,18 +141,23 @@ void register_state(Ctx& c) {
     CROW_ROUTE(app, "/chapter/state").methods(crow::HTTPMethod::POST)([&](const crow::request& req) -> crow::response {
         const auto body = crow::json::load(req.body);
         std::vector<std::string> ids;
-        if (body && body.has("ids") && body["ids"].t() == crow::json::type::List)
-            for (const auto& v : body["ids"])
-                if (v.t() == crow::json::type::String)
+        if (body && body.has("ids") && body["ids"].t() == crow::json::type::List) {
+            for (const auto& v : body["ids"]) {
+                if (v.t() == crow::json::type::String) {
                     ids.push_back(v.s());
+                }
+            }
+        }
         crow::json::wvalue out;
         on_pool(db, [&] {
             for (const auto& id : ids) {
-                if (const auto s = store.state_get(kStateHost, std::string(kSkipPrefix) + id); s && *s == "1")
+                if (const auto s = store.state_get(kStateHost, std::string(kSkipPrefix) + id); s && *s == "1") {
                     out[id]["skip"] = true;
+                }
                 if (const auto r = store.state_get(kStateHost, std::string(kReadPrefix) + id);
-                    r && !r->empty() && *r != "0")
+                    r && !r->empty() && *r != "0") {
                     out[id]["read"] = std::atoi(r->c_str());
+                }
             }
             return 0;
         });
@@ -156,5 +167,4 @@ void register_state(Ctx& c) {
     });
 }
 
-} // namespace api
-} // namespace http
+} // namespace http::api

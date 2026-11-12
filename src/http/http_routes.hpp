@@ -80,5 +80,5 @@ void register_api(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, BS:
 } // namespace http
 
 namespace http {
-void register_static(crow::SimpleApp&);
+void register_static(crow::SimpleApp& /*app*/);
 } // namespace http

@@ -16,7 +16,7 @@
 // CLI (OpenSSL) is the only engine proven to handshake there; promote to a
 // dedicated out-of-process fetch helper if anything heavier than images
 // ever needs it.
-cache::Fetcher makeCurlFetcher(std::string /*proxy*/) {
+cache::Fetcher makeCurlFetcher(const std::string& /*proxy*/) {
     return [](const std::string& url) -> std::optional<std::string> {
         // Shell-safe single quoting for the URL.
         std::string quoted;
@@ -26,7 +26,9 @@ cache::Fetcher makeCurlFetcher(std::string /*proxy*/) {
         // -f: HTTP errors become non-zero exits, never cached bodies.
         // MangaFire CDN 403s without a mangafire.to Referer; site hosts only.
         std::string referer;
-        if (url.find("mfcdn") != std::string::npos) referer = " -e https://mangafire.to/";
+        if (url.contains("mfcdn")) {
+            referer = " -e https://mangafire.to/";
+        }
         FILE* pipe = popen(("curl -sfL --max-time 30" + referer + " '" + quoted + "' 2>/dev/null").c_str(), "r");
         if (!pipe) {
             return std::nullopt;
