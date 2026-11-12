@@ -161,6 +161,7 @@ methods.chapters = function(params)
           number = num,
           title = label,
           release_at = epoch_ms(c.createdAt),
+          pages = tonumber(c.pageCount) or 0, -- read_ch rollup needs page count
         }
       end
     end
