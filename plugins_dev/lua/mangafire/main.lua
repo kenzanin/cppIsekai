@@ -196,13 +196,15 @@ methods.chapters = function(params)
           id = cid and string.format("%.0f", cid) or tostring(c.id),
           number = num,
           title = c.name or "",
-          release_at = tonumber(c.created_at) or 0,
+          release_at = tonumber(c.createdAt or c.created_at) or 0,
           pages = tonumber(c.pages) or tonumber(c.pageCount) or 0,
         }
       end
     end
     local meta = body.meta or {}
-    if not meta.has_next or page >= (tonumber(meta.last_page) or 1) then break end
+    local has_next = meta.hasNext or meta.has_next
+    local last_page = tonumber(meta.lastPage or meta.last_page) or 1
+    if not has_next or page >= last_page then break end
     page = page + 1
   end
   table.sort(out, function(a, b) return (a.number or 0) < (b.number or 0) end)

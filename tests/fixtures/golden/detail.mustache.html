@@ -524,8 +524,9 @@ function detailPage() {
       } catch (e) { this.err = String(e); }
       this.refreshing = false;
     },
-    chLabel(ch) { const n = Number(ch.number); return Number.isFinite(n) ? 'ch ' + String(n).padStart(3, '0') : (ch.title || 'ch'); },
-    chSlug(ch) { const n = Number(ch.number); return Number.isFinite(n) && n > 0 ? 'ch' + String(n).padStart(3, '0') : 'chx'; },
+    chNum(n) { const [i, f] = String(n).split('.'); return i.padStart(3, '0') + (f ? '.' + f : ''); },
+    chLabel(ch) { const n = Number(ch.number); return Number.isFinite(n) ? 'ch ' + this.chNum(n) : (ch.title || 'ch'); },
+    chSlug(ch) { const n = Number(ch.number); return Number.isFinite(n) ? 'ch' + this.chNum(n) : 'chx'; },
     async checkCbz() {
       // per-chapter cache-full probe for the cbz button gate.
       for (const ch of this.chapters) {
