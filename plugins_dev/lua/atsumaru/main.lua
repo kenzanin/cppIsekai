@@ -10,26 +10,7 @@ local HEADERS = { accept = "application/json" }
 
 -- Site's own category slugs; the search filter consumes genreIds:=[...].
 -- Adult entries left out: the search filter already caps content rating.
-local GENRES = {
-  { name = "Action", slug = "39" },
-  { name = "Adventure", slug = "37" },
-  { name = "Comedy", slug = "6" },
-  { name = "Drama", slug = "31" },
-  { name = "Fantasy", slug = "36" },
-  { name = "Historical", slug = "45" },
-  { name = "Horror", slug = "44" },
-  { name = "Martial Arts", slug = "29" },
-  { name = "Mystery", slug = "32" },
-  { name = "Psychological", slug = "18" },
-  { name = "Romance", slug = "9" },
-  { name = "Sci-Fi", slug = "1" },
-  { name = "Slice of Life", slug = "7" },
-  { name = "Supernatural", slug = "22" },
-  { name = "Thriller", slug = "19" },
-  { name = "Tragedy", slug = "5" },
-}
-local GENRE_SLUGS = {}
-for _, g in ipairs(GENRES) do GENRE_SLUGS[g.name] = g.slug end
+local GENRE_SLUGS = require("genres").map
 
 -- Relative image paths come in three shapes ("/static/posters/x.jpg" from search,
 -- "posters/x.jpg" from payloads, already-absolute URLs); only relative need CDN.
@@ -192,9 +173,7 @@ methods.pages = function(params)
 end
 
 methods.genres = function()
-  local names = {}
-  for _, g in ipairs(GENRES) do names[#names + 1] = g.name end
-  table.sort(names)
+  local names = require("genres").names
   return { ok = true, data = names }
 end
 

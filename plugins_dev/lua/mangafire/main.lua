@@ -88,64 +88,8 @@ local function normalize_status(s)
   return s
 end
 
-local GENRES = {
-    { name = "Action",         slug = "1" },
-    { name = "Adult",          slug = "268929" },
-    { name = "Adventure",      slug = "78" },
-    { name = "Avant Garde",    slug = "3" },
-    { name = "Boys Love",      slug = "4" },
-    { name = "Comedy",         slug = "5" },
-    { name = "Crime",          slug = "268921" },
-    { name = "Demons",         slug = "77" },
-    { name = "Drama",          slug = "6" },
-    { name = "Ecchi",          slug = "7" },
-    { name = "Fantasy",        slug = "79" },
-    { name = "Girls Love",     slug = "9" },
-    { name = "Gourmet",        slug = "10" },
-    { name = "Harem",          slug = "11" },
-    { name = "Hentai",         slug = "268930" },
-    { name = "Historical",     slug = "268922" },
-    { name = "Horror",         slug = "530" },
-    { name = "Isekai",         slug = "13" },
-    { name = "Iyashikei",      slug = "531" },
-    { name = "Josei",          slug = "15" },
-    { name = "Kids",           slug = "532" },
-    { name = "Magic",          slug = "539" },
-    { name = "Magical Girls",  slug = "268923" },
-    { name = "Mahou Shoujo",   slug = "533" },
-    { name = "Martial Arts",   slug = "534" },
-    { name = "Mature",         slug = "268931" },
-    { name = "Mecha",          slug = "19" },
-    { name = "Medical",        slug = "268924" },
-    { name = "Military",       slug = "535" },
-    { name = "Music",          slug = "21" },
-    { name = "Mystery",        slug = "22" },
-    { name = "Parody",         slug = "23" },
-    { name = "Philosophical",  slug = "268925" },
-    { name = "Psychological",  slug = "536" },
-    { name = "Reverse Harem",  slug = "25" },
-    { name = "Romance",        slug = "26" },
-    { name = "School",         slug = "73" },
-    { name = "Sci-Fi",         slug = "28" },
-    { name = "Seinen",         slug = "537" },
-    { name = "Shoujo",         slug = "30" },
-    { name = "Shounen",        slug = "31" },
-    { name = "Slice of Life",  slug = "538" },
-    { name = "Smut",           slug = "268932" },
-    { name = "Space",          slug = "33" },
-    { name = "Sports",         slug = "34" },
-    { name = "Super Power",    slug = "75" },
-    { name = "Superhero",      slug = "268926" },
-    { name = "Supernatural",   slug = "76" },
-    { name = "Suspense",       slug = "37" },
-    { name = "Thriller",       slug = "38" },
-    { name = "Tragedy",        slug = "268927" },
-    { name = "Vampire",        slug = "39" },
-    { name = "Wuxia",          slug = "268928" },
-}
 
-local GENRE_IDS = {}
-for _, g in ipairs(GENRES) do GENRE_IDS[g.name] = g.slug end
+local GENRE_IDS = require("genres").map
 
 -- host pages envelope is a plain list of URL strings; per-page Referer headers
 -- (img-r1.2xstorage.com requires Referer: https://mangafire.to/) cannot be
@@ -284,9 +228,7 @@ methods.pages = function(params)
 end
 
 methods.genres = function()
-  local names = {}
-  for _, g in ipairs(GENRES) do names[#names + 1] = g.name end
-  table.sort(names)
+  local names = require("genres").names
   return { ok = true, data = names }
 end
 
