@@ -1,9 +1,9 @@
 ---
 type: Decision
 title: "library-grid-stats: saved_manga stat columns + envelope-derived sync"
-description: "saved_manga carries plugin-derived stats (status/total_ch/read_ch/has_update/last_read_at/updated_at); refresh+detail-open sync reuses stale-served envelopes; reader touch clears has_update; read_ch recomputed on open/refresh only, never per page-turn."
+description: "saved_manga carries plugin-derived stats (status/total_ch/read_ch/has_update/last_read_at/updated_at); refresh+detail-open sync reuses stale-served envelopes; reader touch clears has_update; read_ch recomputed on open/refresh only via chapters envelope pages — requires plugin to emit pages (atsumaru fixed 2026-11-12; envelope without pages falls back to read>0, causing false Done)."
 tags: [store, library, sqlite, sync, has-update, openspec, grid]
-generated: { by: agent/cli, at: "2026-11-12T00:59:24Z" }
+generated: { by: agent/cli, at: "2026-11-12T01:03:30Z" }
 status: stable
 ---
 

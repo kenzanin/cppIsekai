@@ -1,9 +1,9 @@
 ---
 type: Fact
 title: "Atsumaru plugin (atsu.moe): Typesense search, CDN images, composite chapter ids"
-description: "Atsumaru (atsu.moe) plugin: Typesense search, CDN images (origin 410), composite mangaId:chapterId ids, epoch-ms createdAt, chapter-number dedupe (host routes by number), uppercase-id guard fix; live-verified."
+description: "Atsumaru (atsu.moe) plugin: Typesense search, CDN images, composite mangaId:chapterId ids, epoch-ms createdAt, chapter-number dedupe, uppercase-id guard; chapters envelope now emits pages from pageCount (2026-11-12) so host read_ch rollup works."
 tags: [atsumaru, plugin, lua, typesense, cdn, goisekai, live-verified]
-generated: { by: agent/mcp, at: "2026-11-11T13:15:01Z" }
+generated: { by: agent/cli, at: "2026-11-12T01:03:29Z" }
 status: stable
 ---
 
