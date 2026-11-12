@@ -92,6 +92,91 @@ JSValue js_http_fetch(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueCo
     return parsed; // {status, body, headers} -- the lua-shaped reply
 }
 
+JSValue js_require(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
+    if (argc < 1) {
+        return JS_ThrowTypeError(ctx, "require(path)");
+    }
+    Instance& inst = self(ctx);
+    const std::string name = arg_str(ctx, argv[0]);
+    if (name.empty()) {
+        return JS_ThrowTypeError(ctx, "require: empty module name");
+    }
+    // cache on the realm's global object: globalThis.__modules
+    JSValue g = JS_GetGlobalObject(ctx);
+    JSValue cache = JS_GetPropertyStr(ctx, g, "__modules");
+    if (JS_IsUndefined(cache)) {
+        JS_FreeValue(ctx, cache);
+        cache = JS_NewObject(ctx);
+        JS_SetPropertyStr(ctx, g, "__modules", JS_DupValue(ctx, cache));
+    }
+    JSValue cached = JS_GetPropertyStr(ctx, cache, name.c_str());
+    if (!JS_IsUndefined(cached)) {
+        JS_FreeValue(ctx, g);
+        JS_FreeValue(ctx, cache);
+        return cached; // dup'd below via GetPropertyStr refcount semantics: JS_GetPropertyStr returns new ref
+    }
+    JS_FreeValue(ctx, cached);
+
+    // resolve relative to plugin dir: "./x" / "x/y" / "a.b" -> x/y.js (try .js, /index.js)
+    std::string rel = name;
+    if (rel.rfind("./", 0) == 0) rel = rel.substr(2);  // ./util -> util
+    for (auto& c : rel) if (c == '.') c = '/';          // dotted form a.b -> a/b
+    if (!rel.empty() && rel[0] == '/') rel = rel.substr(1);
+    // strip leading "./" pieces and reject escapes
+    {
+        size_t pos = 0;
+        while (true) {
+            const size_t slash = rel.find('/', pos);
+            const std::string seg = rel.substr(pos, slash == std::string::npos ? slash : slash - pos);
+            if (seg.empty() || seg == "." || seg == "..") {
+                JS_FreeValue(ctx, g); JS_FreeValue(ctx, cache);
+                return JS_ThrowTypeError(ctx, "require: bad module name");
+            }
+            if (slash == std::string::npos) break;
+            pos = slash + 1;
+        }
+    }
+    std::optional<std::string> src = plugin::fs_read(inst.dir, rel + ".js");
+    std::string res_name = rel + ".js";
+    if (!src) {
+        src = plugin::fs_read(inst.dir, rel + "/index.js");
+        res_name = rel + "/index.js";
+    }
+    if (!src) {
+        JS_FreeValue(ctx, g); JS_FreeValue(ctx, cache);
+        return JS_ThrowReferenceError(ctx, "require: module '%s' not found", name.c_str());
+    }
+    // CommonJS wrapper: (function(exports, module, require) { ... })
+    const std::string wrapped = "(function(exports, module, require){\n" + *src + "\n})";
+    JSValue fn = JS_Eval(ctx, wrapped.data(), wrapped.size(), res_name.c_str(), JS_EVAL_TYPE_GLOBAL);
+    if (JS_IsException(fn)) {
+        JS_FreeValue(ctx, g); JS_FreeValue(ctx, cache);
+        return JS_Throw(ctx, JS_GetException(ctx)); // propagate compile error
+    }
+    JSValue module = JS_NewObject(ctx);
+    JSValue exports = JS_NewObject(ctx);
+    JS_SetPropertyStr(ctx, module, "exports", JS_DupValue(ctx, exports));
+    // cache placeholder before running (circular requires)
+    JSValue require_fn = JS_GetPropertyStr(ctx, g, "require");
+    JSValue args[3] = {JS_DupValue(ctx, exports), JS_DupValue(ctx, module), require_fn};
+    JS_SetPropertyStr(ctx, cache, name.c_str(), JS_DupValue(ctx, exports)); // may be replaced by module.exports below
+    JSValue ret = JS_Call(ctx, fn, JS_UNDEFINED, 3, args);
+    for (auto& a : args) JS_FreeValue(ctx, a);
+    JS_FreeValue(ctx, fn);
+    if (JS_IsException(ret)) {
+        JS_FreeValue(ctx, exports); JS_FreeValue(ctx, module); JS_FreeValue(ctx, g); JS_FreeValue(ctx, cache);
+        return JS_Throw(ctx, JS_GetException(ctx));
+    }
+    JS_FreeValue(ctx, ret);
+    JSValue module_exports = JS_GetPropertyStr(ctx, module, "exports");
+    JS_SetPropertyStr(ctx, cache, name.c_str(), JS_DupValue(ctx, module_exports)); // overwrite placeholder
+    JS_FreeValue(ctx, exports);
+    JS_FreeValue(ctx, module);
+    JS_FreeValue(ctx, g);
+    JS_FreeValue(ctx, cache);
+    return module_exports;
+}
+
 JSValue js_fs_read(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
     if (argc < 1) {
         return JS_ThrowTypeError(ctx, "fs.read(path)");
@@ -218,6 +303,10 @@ void bind_host_globals(JSContext* c) {
     JSValue fs = JS_NewObject(c);
     bind(fs, "read", JS_NewCFunction(c, js_fs_read, "read", 1));
     bind(host, "fs", fs);
+
+    // require(): CommonJS-style, confined to the plugin dir; modules cached
+    // on globalThis.__modules so repeat requires are free.
+    bind(g, "require", JS_NewCFunction(c, js_require, "require", 1));
 
     JSValue storage = JS_NewObject(c);
     bind(storage, "get", JS_NewCFunction(c, js_storage_get, "get", 1));

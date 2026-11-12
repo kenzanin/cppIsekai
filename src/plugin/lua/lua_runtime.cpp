@@ -37,13 +37,42 @@ void install_host_tools(lua_State* L, const std::string& id, const Config& conf,
                         const LiveProfile& live_profile) {
     sol::state_view sv(L);
 
-    // Routed through the default logger, whose sinks include the queue sink
-    // feeding the log page (wired in main).
-    // fs.read: confined read-only access into this plugin's own folder (D5).
     sol::table fs_tab = sv.create_named_table("host");
     sol::table fs = sv.create_table();
     fs["read"] = [dir](const std::string& rel) -> std::optional<std::string> { return fs_read(dir, rel); };
     fs_tab["fs"] = fs;
+
+    // Confined require() as a pure-Lua helper on top of host.fs.read:
+    // no C++ stack/object lifetime to get wrong across state teardown.
+    // Resolves "a.b" -> <dir>/a/b.lua (or a/b/init.lua); per-state cache in a
+    // hidden global; path segments are checked for traversal in Lua.
+    sv.script(R"lua(
+local fs_read = host.fs.read
+local cache = {}
+local function fail(msg) error("require: " .. msg, 0) end
+function require(name)
+  if type(name) ~= "string" or name == "" then fail("empty module name") end
+  local hit = cache[name]
+  if hit ~= nil then return hit end
+  local rel = (name:gsub("%.", "/"))
+  if rel:sub(1, 1) == "/" then fail("bad module name '" .. name .. "'") end
+  for seg in rel:gmatch("[^/]+") do
+    if seg == "." or seg == ".." then fail("bad module name '" .. name .. "'") end
+  end
+  local src, chunkname = fs_read(rel .. ".lua"), "@" .. rel .. ".lua"
+  if src == nil then
+    src, chunkname = fs_read(rel .. "/init.lua"), "@" .. rel .. "/init.lua"
+  end
+  if src == nil then fail("module '" .. name .. "' not found") end
+  local chunk, err = load(src, chunkname)
+  if chunk == nil then fail(tostring(err)) end
+  local ok, result = pcall(chunk)
+  if not ok then fail(tostring(result)) end
+  if result == nil then result = true end
+  cache[name] = result
+  return result
+end
+)lua");
 
     sol::table log = sv.create_table();
     log["info"] = [id](const std::string& msg) { spdlog::info("[plugin:{}] {}", id, msg); };

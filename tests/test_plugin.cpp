@@ -323,3 +323,21 @@ TEST_CASE("fetch: cookie jar round-trip and per-plugin isolation") {
     CHECK(std::filesystem::exists(jar_b));
     CHECK(std::filesystem::exists(jar_a)); // alpha's jar untouched by beta's run
 }
+
+TEST_CASE("multi-file plugins: confined require() in lua and js") {
+    LogSetup ls;
+    Store store("test_modtest.db");
+    plugin::Host host(test_conf());
+    host.load_all(store);
+
+    const std::string lua_res = host.call("lua_modtest", "ping", "{}");
+    CHECK(lua_res.find("\"doubled\":42") != std::string::npos);
+    CHECK(lua_res.find("\"msg\":\"modul-ok\"") != std::string::npos);
+
+    const std::string js_res = host.call("js_modtest", "ping", "{}");
+    CHECK(js_res.find("\"doubled\":42") != std::string::npos);
+    CHECK(js_res.find("\"msg\":\"modul-ok\"") != std::string::npos);
+
+    std::error_code ec;
+    std::filesystem::remove("test_modtest.db", ec);
+}
