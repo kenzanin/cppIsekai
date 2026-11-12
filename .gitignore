@@ -9,4 +9,5 @@ test_*.log
 build/
 .serena/
 .superpowers/
-.xmake/compile_commands.json
+.xmake/
+compile_commands.json
