@@ -3,6 +3,7 @@
 
 #include "plugin/fs.hpp"
 #include "plugin/htmltext.hpp"
+#include "plugin/url_codec.hpp" // plugin::url_{encode,decode} -- host.url_* body
 
 #include <spdlog/spdlog.h>
 
@@ -250,6 +251,51 @@ const void* host_html_attr(IM3Runtime rt, IM3ImportContext ctx, uint64_t* sp, vo
     return host_html_call(rt, ctx, sp, mem, /*want_attr=*/true);
 }
 
+// host.url_*: the shared query-component codec (plugin/url_codec.hpp), raw
+// slot layout (in_off,in_len,out,cap) -> length; kNotFound on a bad guest
+// window, kTruncated when the result exceeds cap.
+const void* host_url_encode(IM3Runtime, IM3ImportContext ctx, uint64_t* sp, void*) {
+    auto& self = *static_cast<Instance*>(ctx->userdata);
+    uint64_t* args = sp + 1;
+    const uint32_t in_off = arg_i32(args);
+    const uint32_t in_len = arg_i32(args);
+    const uint32_t out = arg_i32(args);
+    const uint32_t cap = arg_i32(args);
+
+    int32_t rc = kNotFound;
+    if (const auto in = guest_str(self, in_off, in_len)) {
+        const std::string res = plugin::url_encode(*in);
+        if (guest_write(self, out, cap, res)) {
+            rc = static_cast<int32_t>(res.size());
+        } else {
+            rc = kTruncated;
+        }
+    }
+    *reinterpret_cast<int32_t*>(sp) = rc;
+    return m3Err_none;
+}
+
+const void* host_url_decode(IM3Runtime, IM3ImportContext ctx, uint64_t* sp, void*) {
+    auto& self = *static_cast<Instance*>(ctx->userdata);
+    uint64_t* args = sp + 1;
+    const uint32_t in_off = arg_i32(args);
+    const uint32_t in_len = arg_i32(args);
+    const uint32_t out = arg_i32(args);
+    const uint32_t cap = arg_i32(args);
+
+    int32_t rc = kNotFound;
+    if (const auto in = guest_str(self, in_off, in_len)) {
+        const std::string res = plugin::url_decode(*in);
+        if (guest_write(self, out, cap, res)) {
+            rc = static_cast<int32_t>(res.size());
+        } else {
+            rc = kTruncated;
+        }
+    }
+    *reinterpret_cast<int32_t*>(sp) = rc;
+    return m3Err_none;
+}
+
 constexpr std::array kImports{
     Import{"now", "I", host_now},
     Import{"log_info", "v(ii)", host_log_info},
@@ -261,6 +307,8 @@ constexpr std::array kImports{
     Import{"re2_find", "i(iiiiii)", host_re2_find},
     Import{"html_select", "i(iiiii)", host_html_select},
     Import{"html_attr", "i(iiiiiii)", host_html_attr},
+    Import{"url_encode", "i(iiii)", host_url_encode},
+    Import{"url_decode", "i(iiii)", host_url_decode},
 };
 
 } // namespace

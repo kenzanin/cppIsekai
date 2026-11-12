@@ -358,3 +358,15 @@ TEST_CASE("js host.url_*: shared codec, strings only") {
     CHECK(bad.find("\"ok\":true") != std::string::npos);
     CHECK(bad.find("url_encode(string)") != std::string::npos);
 }
+
+TEST_CASE("wasm host.url_*: imports round-trip via shared codec") {
+    LogSetup ls;
+    Store store("test_wasmurl.db");
+    plugin::Host host(test_conf());
+    host.load_all(store);
+
+    const std::string res = host.call("wasmurl", "url", "{}");
+    CHECK_MESSAGE(res.find("\"ok\":true") != std::string::npos, res);
+    CHECK(res.find("\"enc\":\"a%20b%26c%3Dd%25%3F\"") != std::string::npos);
+    CHECK(res.find("\"rt\":\"a b&c=d%?\"") != std::string::npos);
+}
