@@ -247,8 +247,9 @@ methods.chapters = function(params)
     for _, c in ipairs(items) do
       if type(c) == "table" and c.id then
         local num = tonumber(c.number) or 0
+        local cid = tonumber(c.id)
         out[#out + 1] = {
-          id = tostring(c.id),
+          id = cid and string.format("%.0f", cid) or tostring(c.id),
           number = num,
           title = c.name or "",
           release_at = tonumber(c.created_at) or 0,

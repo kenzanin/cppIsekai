@@ -24,7 +24,10 @@ cache::Fetcher makeCurlFetcher(std::string /*proxy*/) {
             quoted += c == '\'' ? "'\\''" : std::string(1, c);
         }
         // -f: HTTP errors become non-zero exits, never cached bodies.
-        FILE* pipe = popen(("curl -sfL --max-time 30 '" + quoted + "' 2>/dev/null").c_str(), "r");
+        // MangaFire CDN 403s without a mangafire.to Referer; site hosts only.
+        std::string referer;
+        if (url.find("mfcdn") != std::string::npos) referer = " -e https://mangafire.to/";
+        FILE* pipe = popen(("curl -sfL --max-time 30" + referer + " '" + quoted + "' 2>/dev/null").c_str(), "r");
         if (!pipe) {
             return std::nullopt;
         }
