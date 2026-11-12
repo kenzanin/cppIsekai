@@ -1,4 +1,5 @@
 ## 2026-11-12
+* **Update**: Updated concept `decisions/xmake-build-system.md`.
 * **Creation**: Documented concept `decisions/xmake-build-system.md` (xmake build system alongside cmake + prod-code gate tasks).
 * **Update**: Updated concept `architecture/http-layer-gotchas.md`.
 * **Update**: Updated concept `architecture/per-manga-dim-blur.md`.
