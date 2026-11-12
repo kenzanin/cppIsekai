@@ -17,7 +17,7 @@
 
 ## 4. http.fetch opts parity audit
 
-- [ ] 4.1 Audit `make_wasm_fetch` + JS binding + Lua front for opts `{timeout_ms, profile, method, body, accept, user_agent, headers, cookie}`: (a) keys identical across runtimes, (b) JS failed fetch → `null`, (c) reply `{status, body, headers}` parses in all three. Fix only real divergences inside this change; record the audit result in the apply session. Verify: `test_plugin` fetch/boundary cases still green; any fix comes with a test.
+- [x] 4.1 Audit `make_wasm_fetch` + JS binding + Lua front for opts `{timeout_ms, profile, method, body, accept, user_agent, headers, cookie}`: (a) keys identical across runtimes, (b) JS failed fetch → `null`, (c) reply `{status, body, headers}` parses in all three. Fix only real divergences inside this change; record the audit result in the apply session. Verify: `test_plugin` fetch/boundary cases still green; any fix comes with a test.
 
 ## 5. Integration check
 
