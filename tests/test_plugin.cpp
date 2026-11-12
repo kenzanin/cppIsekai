@@ -97,6 +97,12 @@ TEST_CASE("ABI envelope dispatch") {
         CHECK(res.find("\"ok\":false") != std::string::npos);
     }
 
+    SUBCASE("crypto vrf_sign via plugin returns golden signature") {
+        const std::string res = host.call("crypto", "vrf", "{\"path\":\"/titles\",\"params\":{}}");
+        CHECK(res.find("\"ok\":true") != std::string::npos);
+        CHECK(res.find("8sK3xtqdFQ") != std::string::npos);
+    }
+
     SUBCASE("infinite loop times out with detectable error") {
         const std::string res = host.call("loop", "ping", "{}");
         CHECK(res.find("\"ok\":false") != std::string::npos);

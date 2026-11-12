@@ -155,6 +155,12 @@ cxx_bin("test_slug", {
     test = true,
 })
 
+cxx_bin("test_vrf", {
+    files = {"tests/test_vrf.cpp"},
+    incs = {"src"},
+    test = true,
+})
+
 cxx_bin("test_config", {
     files = {"tests/test_config.cpp"},
     incs = {"src", TP .. "/simpleini", TP .. "/glaze"},

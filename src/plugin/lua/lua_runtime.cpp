@@ -3,6 +3,10 @@
 #include "plugin/htmltext.hpp" // host.re2/html core (task 1.3)
 #include "plugin/http_client.hpp"
 #include "plugin/plugin.hpp"
+#include "plugin/vrf.hpp"
+
+#include <map>
+#include <vector>
 
 #include <spdlog/spdlog.h>
 
@@ -262,6 +266,62 @@ void install_host_tools(lua_State* L, const std::string& id, const Config& conf,
         return out;
     };
     fs_tab["re2"] = re2;
+
+    // crypto: host-executed, plugin-declared transform. Returns (result, err) pair
+    // like http.fetch so plugins can distinguish bad input from a site 403.
+    sol::table crypto = sv.create_table();
+    crypto["vrf_sign"] = [id](const std::string& api_path, const sol::optional<sol::table>& params,
+                              const sol::optional<sol::table>& stages, sol::this_state ts)
+        -> std::pair<sol::object, std::optional<std::string>> {
+        const auto fail = [&](std::string why) {
+            spdlog::warn("[plugin:{}] vrf_sign {} failed: {}", id, api_path, why);
+            return std::make_pair(sol::make_object(ts, sol::lua_nil), std::optional(std::move(why)));
+        };
+        if (api_path.empty()) return fail("vrf_sign: api_path is empty");
+
+        std::map<std::string, std::string> prm;
+        if (params) {
+            for (auto& [k, v] : *params) {
+                if (!k.is<std::string>()) return fail("vrf_sign: params keys must be strings");
+                if (v.is<std::string>()) {
+                    prm[k.as<std::string>()] = v.as<std::string>();
+                } else if (v.is<bool>()) {
+                    prm[k.as<std::string>()] = v.as<bool>() ? "true" : "false";
+                } else if (v.is<int>() || v.is<double>() || v.is<float>()) {
+                    prm[k.as<std::string>()] = std::to_string(v.as<double>());
+                } else {
+                    return fail("vrf_sign: params[\"" + k.as<std::string>() + "\"] must be scalar");
+                }
+            }
+        }
+
+        std::vector<VrfStage> vstages;
+        if (!stages || stages->size() == 0) return fail("vrf_sign: stages must be a non-empty array");
+        for (size_t i = 0; i < stages->size(); ++i) {
+            const size_t idx = i + 1;
+            const sol::optional<sol::table> st = (*stages)[idx];
+            if (!st) return fail("vrf_sign: stage " + std::to_string(idx) + ": missing");
+            const sol::optional<double> iv = (*st)["iv"];
+            const sol::optional<std::string> key = (*st)["key"];
+            const sol::optional<std::string> tbl = (*st)["tbl"];
+            if (!iv || !key || !tbl) return fail("vrf_sign: stage " + std::to_string(idx) + ": needs iv, key, tbl");
+            const double fid = *iv;
+            const int ivv = static_cast<int>(fid);
+            if (fid != static_cast<double>(ivv) || ivv < 0 || ivv > 255) {
+                return fail("vrf_sign: stage " + std::to_string(idx) + ": iv must be integer 0-255");
+            }
+            vstages.push_back({static_cast<uint8_t>(ivv), *key, *tbl});
+        }
+
+        std::string err;
+        auto out = vrf_sign(api_path, prm, vstages, err);
+        if (!out) {
+            spdlog::warn("[plugin:{}] vrf_sign {} failed: {}", id, api_path, err);
+            return std::make_pair(sol::make_object(ts, sol::lua_nil), std::optional(std::move(err)));
+        }
+        return std::make_pair(sol::make_object(ts, *out), std::optional<std::string>{});
+    };
+    fs_tab["crypto"] = crypto;
 
     sol::table html = sv.create_table();
     const auto to_table = [](sol::this_state ts, const std::vector<std::string>& vals) {

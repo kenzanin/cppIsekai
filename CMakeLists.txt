@@ -168,6 +168,11 @@ target_include_directories(test_slug PRIVATE src)
 target_compile_options(test_slug PRIVATE -Wall -Wextra)
 add_test(NAME slug COMMAND test_slug)
 
+add_executable(test_vrf tests/test_vrf.cpp)
+target_include_directories(test_vrf PRIVATE src)
+target_compile_options(test_vrf PRIVATE -Wall -Wextra)
+add_test(NAME vrf COMMAND test_vrf)
+
 # config core (1.1): header-only registry + layered resolve; CLI11 parse, no env leakage
 add_executable(test_config tests/test_config.cpp)
 target_include_directories(test_config PRIVATE src ${TP}/simpleini ${TP}/glaze)

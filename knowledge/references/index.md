@@ -11,3 +11,4 @@
 * [goIsekai reference corpus: example plugins + HAR captures](goisekai-plugin-examples.md) - goIsekai (~/tmp/goIsekai) was the user's first golang experiment (test harness + stack trial); its example plugins and HAR captures are the reference corpus for writing cppIsekai site plugins.
 * [goIsekai to cppIsekai plugin ABI mapping](goisekai-abi-mapping.md) - How goIsekai Lua/WASM plugin ABI maps onto cppIsekai's handle()/envelope ABI, including host tool gaps that block direct ports.
 * [Mangafire VRF algorithm (port target for host.crypto.vrf_sign)](mangafire-vrf-algorithm.md) - Mangafire VRF signing algorithm as implemented in goIsekai pluginutil.VRFSign — port byte-for-byte into host crypto host tool.
+* [host.crypto.vrf_sign: host-executed VRF signing (tables plugin-side)](host-crypto-vrf-sign.md) - host.crypto.vrf_sign: mangafire-style VRF request signing host tool (Lua binding); tables plugin-side, host = transform only; vectors in tests/test_vrf.cpp.
