@@ -1,4 +1,5 @@
 ## 2026-11-13
+* **Creation**: Documented concept `findings/js-image-referer-gap.md` (Host image fetch is plugin-blind: no Referer (js mangatown pilot finding)).
 * **Update**: Linked `references/host-tool-gap-analysis.md` to `references/daemon-run-verify.md` (P1–P9 host tools verified live through the daemon restart documented there.).
 * **Update**: Linked `references/host-tool-gap-analysis.md` to `references/openspec-delta-spec-format.md` (The delta format gate blocked this change's first archive attempt (2026-11-13).).
 * **Creation**: Documented concept `references/daemon-run-verify.md` (Daemon run & verify (run-cppIsekai.sh)).
