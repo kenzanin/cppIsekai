@@ -2,19 +2,20 @@
 
 ## Phase 1: P1 — host.plugin.param + host.http.fetch_body (20 lines, std lib)
 
-- [ ] 1.1 **P1**: `host.plugin.param(key)` = read `main.json` `params` at load; store in `sol::table`; return `string`
-  - [ ] Lua binding in `src/plugin/lua/lua_runtime.cpp`
-  - [ ] JS binding in `src/plugin/js/js_bindings.cpp`
-  - [ ] WASM binding in `src/plugin/wasm/wasm_imports.cpp`
-- [ ] 1.2 **P1**: `host.http.fetch_body(url, opts)` = `host.http.fetch` + return `res.body` if `res.status == 200`, else `nil`
-  - [ ] Lua binding in `src/plugin/lua/lua_runtime.cpp`
-  - [ ] JS binding in `src/plugin/js/js_bindings.cpp`
-  - [ ] WASM binding in `src/plugin/wasm/wasm_imports.cpp`
-- [ ] 1.3 Build + test (17/17)
-- [ ] 1.4 Commit: `plugin: host.plugin.param + host.http.fetch_body (P1, 42+99 sites)`
+- [x] 1.1 **P1**: `host.plugin.param(key)` = read `main.json` `params` at load; store in `sol::table`; return `string`
+  - [x] Lua binding in `src/plugin/lua/lua_runtime.cpp`
+  - [x] JS binding in `src/plugin/js/js_bindings.cpp`
+  - [x] WASM binding in `src/plugin/wasm/wasm_imports.cpp`
+- [x] 1.2 **P1**: `host.http.fetch_body(url, opts)` = `host.http.fetch` + return `res.body` if `res.status == 200`, else `nil`
+  - [x] Lua binding in `src/plugin/lua/lua_runtime.cpp`
+  - [x] JS binding in `src/plugin/js/js_bindings.cpp`
+  - [x] WASM binding in `src/plugin/wasm/wasm_imports.cpp`
+- [x] 1.3 Build + test (17/17)
+- [x] 1.4 Commit: `plugin: host.plugin.param + host.http.fetch_body (P1, 42+99 sites)`
 
-## Phase 2: P2 — host.text.normalize_status / chapter_num / date_to_iso (150 lines, std + RE2)
+## Phase 2: P2 — host.text.normalize_status / chapter_num / date_to_iso (150 lines, std + RE2 + date)
 
+- [ ] 2.0 Add date dep in `xmake.lua`: `add_requires("date")` (v3.0.4, xrepo)
 - [ ] 2.1 **P2**: `host.text.normalize_status(str)` = port `pluginutil/status.go` map verbatim
   - [ ] Header-only `src/plugin/host_text.hpp`
 - [ ] 2.2 **P2**: `host.text.chapter_num(str)` = port `extract.go` regexes to RE2

@@ -10,7 +10,7 @@
 - `host.text.unescape(str)` = HTML entity decode (lexbor)
 - `host.text.strip_html(str)` = strip HTML tags, trim, unescape (lexbor)
 - **Applies to**: all three runtimes (Lua, JS, WASM)
-- **Library**: lexbor + utf8proc (already in xrepo)
+- **Library**: lexbor + utf8proc + date v3.0.4 (all in xrepo)
 - **Files**: `src/plugin/host_text.hpp`
 
 ### REQ-HOST-RE2: host.re2.* — Regex utilities

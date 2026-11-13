@@ -6,11 +6,12 @@
 - **Why**: 42 + 99 call sites; no new lib; porting becomes copy-paste
 - **Files**: `src/plugin/lua/lua_runtime.cpp`, `src/plugin/js/js_bindings.cpp`, `src/plugin/wasm/wasm_imports.cpp`
 
-## D1b — P2: host.text.normalize_status / chapter_num / date_to_iso (150 lines, std + RE2)
+## D1b — P2: host.text.normalize_status / chapter_num / date_to_iso (150 lines, std + RE2 + date)
 - `host.text.normalize_status(str)` = port `pluginutil/status.go` map verbatim: "ongoing"|"releasing"|"publishing" → "Ongoing"; "completed"|"finished" → "Completed"; "hiatus"|"on hiatus" → "Hiatus"; "dropped"|"cancelled" → "Dropped"; "upcoming"|"not yet released" → "Upcoming"; empty → "unknown"; else pass-through
 - `host.text.chapter_num(str)` = port `extract.go` regexes to RE2: `chapterMarker` + `firstNumber` + comma-decimal handling
-- `host.text.date_to_iso(str)` = port `dates.go` `dateLayouts` table (unix s/ms, RFC3339, "02 Jan 2006", "Jan 2, 2006") + `std::chrono` parse loop + relative phrase map ("3 days ago", "yesterday")
+- `host.text.date_to_iso(str)` = port `dates.go` `dateLayouts` table + **date library v3.0.4** (`date::parse()`) + relative phrase map ("3 days ago", "yesterday")
 - **Why**: 75 call sites; pure host vocab, kills `helpers.lua` copy-paste
+- **Library**: date v3.0.4 (xrepo) + RE2 (xrepo) + std
 - **Files**: `src/plugin/host_text.hpp` (new, header-only)
 
 ## D1c — P3: host.text.trim / unescape / strip_html (100 lines, lexbor + utf8proc)
