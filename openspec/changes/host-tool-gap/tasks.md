@@ -28,15 +28,15 @@
 
 ## Phase 3: P3 — host.text.trim / unescape / strip_html (100 lines, lexbor + utf8proc)
 
-- [ ] 3.1 **P3**: `host.text.trim(str)` = utf8proc-aware trim
-  - [ ] Header-only `src/plugin/host_text.hpp` (extend)
-- [ ] 3.2 **P3**: `host.text.unescape(str)` = lexbor entity tables
-  - [ ] Header-only `src/plugin/host_text.hpp` (extend)
-- [ ] 3.3 **P3**: `host.text.strip_html(str)` = lexbor parse + walk text nodes + trim + unescape
-  - [ ] Header-only `src/plugin/host_text.hpp` (extend)
-- [ ] 3.4 Lua + JS + WASM bindings
-- [ ] 3.5 Build + test (17/17)
-- [ ] 3.6 Commit: `plugin: host.text.trim/unescape/strip_html (P3, 134 sites)`
+- [x] 3.1 **P3**: `host.text.trim(str)` = utf8proc-aware trim
+  - [x] Header-only `src/plugin/host_text.hpp` (extend)
+- [x] 3.2 **P3**: `host.text.unescape(str)` = lexbor entity tables
+  - [x] Header-only `src/plugin/host_text.hpp` (extend)
+- [x] 3.3 **P3**: `host.text.strip_html(str)` = lexbor parse + walk text nodes + trim + unescape
+  - [x] Header-only `src/plugin/host_text.hpp` (extend)
+- [x] 3.4 Lua + JS + WASM bindings
+- [x] 3.5 Build + test (17/17)
+- [x] 3.6 Commit: `plugin: host.text.trim/unescape/strip_html (P3, 134 sites)`
 
 ## Phase 4: P4 — host.re2.find_all / gmatch / replace / quote / find_index (50 lines, RE2)
 
