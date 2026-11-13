@@ -299,6 +299,44 @@ end
         }
         return fr.body;
     };
+
+    // P5: get_json/post_json -- fetch + decode in one call; nil on any
+    // failure (transport, non-200, malformed JSON). headers is an optional
+    // string->string table; post_json sends body with method POST.
+    const auto json_call = [id, timeout_ms = conf.fetch_timeout_ms, live = &live_profile,
+                            proxy = conf.proxy](const std::string& url, const std::string& method,
+                                                const std::string& body,
+                                                const sol::optional<sol::table>& headers,
+                                                sol::this_state ts) -> sol::object {
+        std::string live_default;
+        if (auto p = live->load()) {
+            live_default = *p;
+        }
+        std::vector<std::pair<std::string, std::string>> extra_headers;
+        if (headers) {
+            headers->for_each([&](sol::object k, sol::object val) {
+                if (k.get_type() == sol::type::string && val.get_type() == sol::type::string) {
+                    extra_headers.emplace_back(k.as<std::string>(), val.as<std::string>());
+                }
+            });
+        }
+        const FetchResult fr = fetch_sync(url, timeout_ms, checked_profile(live_default, live_default), method, body, {},
+                                          {}, extra_headers, proxy);
+        if (fr.error.empty() && fr.status == 200) {
+            glz::generic g;
+            if (auto ec = glz::read_json(g, fr.body); !ec) {
+                return json_to_sol(ts, g);
+            }
+        }
+        return sol::make_object(ts, sol::lua_nil);
+    };
+    http["get_json"] = [json_call](const std::string& url, const sol::optional<sol::table>& headers, sol::this_state ts) {
+        return json_call(url, "GET", "", headers, ts);
+    };
+    http["post_json"] = [json_call](const std::string& url, const std::string& body,
+                                    const sol::optional<sol::table>& headers, sol::this_state ts) {
+        return json_call(url, "POST", body, headers, ts);
+    };
     fs_tab["http"] = http;
 
     // host.text: status normalization, chapter-number extraction, date→ISO

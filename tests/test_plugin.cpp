@@ -160,6 +160,33 @@ TEST_CASE("http.fetch via curl-impersonate") {
     }
 }
 
+TEST_CASE("host.http P5: get_json / post_json") {
+    LogSetup ls;
+    Store store("test_plugin_p5.db");
+    plugin::Host host(test_conf());
+    host.load_all(store);
+
+    SUBCASE("unreachable endpoint decodes to nil (data:null)") {
+        const std::string get = host.call("fetcher", "get_json", R"({"url":"http://127.0.0.1:9/nope"})");
+        CHECK(get.find("\"ok\":true") != std::string::npos);
+        CHECK(get.find("\"data\":null") != std::string::npos);
+
+        const std::string post =
+            host.call("fetcher", "post_json", R"({"url":"http://127.0.0.1:9/nope","body":"k=1"})");
+        CHECK(post.find("\"ok\":true") != std::string::npos);
+        CHECK(post.find("\"data\":null") != std::string::npos);
+    }
+
+    // Happy path mirrors the PLUGIN_SMOKE_URL smoke: opt-in, no CI flake.
+    if (const char* smoke = std::getenv("PLUGIN_JSON_URL"); smoke != nullptr) {
+        const std::string url = std::string("{\"url\":\"") + smoke + "\"}";
+        const std::string get = host.call("fetcher", "get_json", url);
+        INFO(get);
+        CHECK(get.find("\"ok\":true") != std::string::npos);
+        CHECK(get.find("\"data\":null") == std::string::npos); // decoded, not nil
+    }
+}
+
 TEST_CASE("health: last call outcome per plugin") {
     LogSetup ls;
     Store store("test_health.db");

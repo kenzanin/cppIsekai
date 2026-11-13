@@ -142,6 +142,71 @@ JSValue js_http_fetch_body(JSContext* ctx, JSValueConst /*this*/, int argc, JSVa
     return JS_NewStringLen(ctx, bs->data(), bs->size());
 }
 
+// P5: get_json/post_json -- fetch + JS_ParseJSON of the body; null on any
+// failure (transport, non-200, malformed JSON). opts envelope as in fetch.
+JSValue js_http_json_call(JSContext* ctx, JSValueConst* argv, int argc, bool post) {
+    if (argc < 1) {
+        return JS_ThrowTypeError(ctx, post ? "http.post_json(url, body, headers)" : "http.get_json(url, headers)");
+    }
+    Instance& inst = self(ctx);
+    if (!inst.services.http_fetch) {
+        return JS_NULL;
+    }
+    const std::string url = arg_str(ctx, argv[0]);
+    std::string opts = post ? "{\"method\":\"POST\"}" : "{}";
+    if (post) {
+        if (argc > 1 && JS_IsString(argv[1]) && !arg_str(ctx, argv[1]).empty()) {
+            JSValue s = JS_NewStringLen(ctx, arg_str(ctx, argv[1]).data(), arg_str(ctx, argv[1]).size());
+            const std::string enc = json_stringify(ctx, s);
+            JS_FreeValue(ctx, s);
+            opts.resize(opts.size() - 1); // drop trailing }
+            opts += ",\"body\":" + enc + "}";
+        }
+        if (argc > 2 && JS_IsObject(argv[2])) {
+            opts.resize(opts.size() - 1);
+            opts += ",\"headers\":" + json_stringify(ctx, argv[2]) + "}";
+        }
+    } else if (argc > 1 && JS_IsObject(argv[1])) {
+        opts = "{\"headers\":" + json_stringify(ctx, argv[1]) + "}";
+    }
+    const auto res = inst.services.http_fetch(url, opts);
+    if (!res) {
+        return JS_NULL;
+    }
+    glz::generic root;
+    if (auto ec = glz::read_json(root, res->data())) {
+        return JS_NULL;
+    }
+    const auto* obj = std::get_if<glz::generic::object_t>(&root.data);
+    if (obj == nullptr) {
+        return JS_NULL;
+    }
+    const auto* sit = obj->find("status");
+    const auto* sd = (sit != obj->end()) ? std::get_if<double>(&sit->second.data) : nullptr;
+    if (sd == nullptr || *sd != 200.0) {
+        return JS_NULL;
+    }
+    const auto* bit = obj->find("body");
+    const auto* bs = (bit != obj->end()) ? std::get_if<std::string>(&bit->second.data) : nullptr;
+    if (bs == nullptr) {
+        return JS_NULL;
+    }
+    JSValue parsed = JS_ParseJSON(ctx, bs->data(), bs->size(), "<json>");
+    if (JS_IsException(parsed)) {
+        JS_FreeValue(ctx, JS_GetException(ctx));
+        return JS_NULL;
+    }
+    return parsed;
+}
+
+JSValue js_http_get_json(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
+    return js_http_json_call(ctx, argv, argc, /*post=*/false);
+}
+
+JSValue js_http_post_json(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
+    return js_http_json_call(ctx, argv, argc, /*post=*/true);
+}
+
 JSValue js_plugin_param(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
     if (argc < 1 || !JS_IsString(argv[0])) {
         return JS_ThrowTypeError(ctx, "plugin.param(key)");
@@ -618,6 +683,8 @@ void bind_host_globals(JSContext* c) {
     JSValue http = JS_NewObject(c);
     bind(http, "fetch", JS_NewCFunction(c, js_http_fetch, "fetch", 2));
     bind(http, "fetch_body", JS_NewCFunction(c, js_http_fetch_body, "fetch_body", 2));
+    bind(http, "get_json", JS_NewCFunction(c, js_http_get_json, "get_json", 2));
+    bind(http, "post_json", JS_NewCFunction(c, js_http_post_json, "post_json", 3));
     bind(host, "http", http);
 
     JSValue fs = JS_NewObject(c);
