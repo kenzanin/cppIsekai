@@ -1,4 +1,11 @@
 ## 2026-11-13
+* **Update**: Linked `references/host-tool-gap-analysis.md` to `references/plugin-porting-matrix-goIsekai.md` (Gap analysis menginformasikan prioritas porting plugin (P1-P9) — matrix menentukan site mana yang di-port, analysis menentukan apa yang perlu ditambal di host dulu.).
+* **Creation**: Documented concept `references/host-tool-gap-analysis.md` (host-tool gap analysis (goIsekai → cppIsekai)).
+* **Creation**: Documented concept `references/plugin-porting-matrix-goIsekai.md` (goIsekai -> cppIsekai plugin porting matrix).
+* **Creation**: Documented concept `constraints/xmake-re2-pin.md` (re2 xrepo version pin).
+* **Creation**: Documented concept `constraints/xmake-install-interrupt.md` (xmake pkg-install interrupted leaves empty hash-dirs).
+* **Creation**: Documented concept `constraints/sol2-lua-version.md` (sol2 3.5.0 rejects Lua 5.5 from Arch pacman).
+* **Creation**: Documented concept `constraints/utf8proc-2.11-3-api.md` (utf8proc 2.11.3 C API surface).
 * **Creation**: Documented concept `decisions/xrepo-round-2-deps.md` (Second xrepo round: pkgconfig deps + utf8proc NFKD tokenizer).
 * **Update**: Updated concept `decisions/third-party-dependencies.md`.
 

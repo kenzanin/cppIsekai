@@ -2,6 +2,7 @@
 #include "js_rt.hpp"
 
 #include "plugin/fs.hpp"        // plugin::fs_read -- the fs.read body
+#include "plugin/host_text.hpp"
 #include "plugin/htmltext.hpp"  // host.re2/html core (task 1.3)
 #include "plugin/url_codec.hpp" // plugin::url_{encode,decode} -- host.url_* body
 #include "plugin/vrf.hpp"       // plugin::vrf_sign -- the host.crypto body
@@ -152,6 +153,39 @@ JSValue js_plugin_param(JSContext* ctx, JSValueConst /*this*/, int argc, JSValue
         return JS_NULL;
     }
     return JS_NewStringLen(ctx, it->second.data(), it->second.size());
+}
+
+// host.text: status normalization, chapter-number extraction, date→ISO
+// (P2, host_text.hpp — one core, three thin marshals; design D4).
+
+JSValue js_text_normalize_status(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
+    if (argc != 1 || !JS_IsString(argv[0])) {
+        return JS_ThrowTypeError(ctx, "text.normalize_status(string)");
+    }
+    const std::string out = plugin::host_text::normalize_status(arg_str(ctx, argv[0]));
+    return JS_NewStringLen(ctx, out.data(), out.size());
+}
+
+JSValue js_text_chapter_num(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
+    if (argc != 1 || !JS_IsString(argv[0])) {
+        return JS_ThrowTypeError(ctx, "text.chapter_num(string)");
+    }
+    const auto v = plugin::host_text::chapter_num(arg_str(ctx, argv[0]));
+    if (!v) {
+        return JS_NULL; // parity: lua nil on no number
+    }
+    return JS_NewFloat64(ctx, *v);
+}
+
+JSValue js_text_date_to_iso(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
+    if (argc != 1 || !JS_IsString(argv[0])) {
+        return JS_ThrowTypeError(ctx, "text.date_to_iso(string)");
+    }
+    const auto v = plugin::host_text::date_to_iso(arg_str(ctx, argv[0]));
+    if (!v) {
+        return JS_NULL; // parity: lua nil on unparseable
+    }
+    return JS_NewStringLen(ctx, v->data(), v->size());
 }
 
 JSValue js_require(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
@@ -550,6 +584,12 @@ void bind_host_globals(JSContext* c) {
     JSValue plugin_tbl = JS_NewObject(c);
     bind(plugin_tbl, "param", JS_NewCFunction(c, js_plugin_param, "param", 1));
     bind(host, "plugin", plugin_tbl);
+
+    JSValue text_tbl = JS_NewObject(c);
+    bind(text_tbl, "normalize_status", JS_NewCFunction(c, js_text_normalize_status, "normalize_status", 1));
+    bind(text_tbl, "chapter_num", JS_NewCFunction(c, js_text_chapter_num, "chapter_num", 1));
+    bind(text_tbl, "date_to_iso", JS_NewCFunction(c, js_text_date_to_iso, "date_to_iso", 1));
+    bind(host, "text", text_tbl);
 
     bind(g, "host", host); // consumes the host reference tree
 

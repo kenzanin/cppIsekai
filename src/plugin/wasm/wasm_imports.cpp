@@ -2,11 +2,13 @@
 #include "wasm_rt.hpp"
 
 #include "plugin/fs.hpp"
+#include "plugin/host_text.hpp"
 #include "plugin/htmltext.hpp"
 #include "plugin/url_codec.hpp" // plugin::url_{encode,decode} -- host.url_* body
 
 #include <spdlog/spdlog.h>
 
+#include <bit>
 #include <cstdint>
 #include <cstring>
 #include <ctime>
@@ -367,6 +369,72 @@ const void* host_url_decode(IM3Runtime, IM3ImportContext ctx, uint64_t* sp, void
     return m3Err_none;
 }
 
+// host.text: status normalization, chapter-number extraction, date→ISO
+// (P2, host_text.hpp — one core, three thin marshals; design D4).
+const void* host_text_normalize_status(IM3Runtime, IM3ImportContext ctx, uint64_t* sp, void*) {
+    auto& self = *static_cast<Instance*>(ctx->userdata);
+    uint64_t* args = sp + 1;
+    const uint32_t in_off = arg_i32(args);
+    const uint32_t in_len = arg_i32(args);
+    const uint32_t out = arg_i32(args);
+    const uint32_t cap = arg_i32(args);
+
+    int32_t rc = kNotFound;
+    if (const auto in = guest_str(self, in_off, in_len)) {
+        const std::string res = plugin::host_text::normalize_status(*in);
+        if (guest_write(self, out, cap, res)) {
+            rc = static_cast<int32_t>(res.size());
+        } else {
+            rc = kTruncated;
+        }
+    }
+    *reinterpret_cast<int32_t*>(sp) = rc;
+    return m3Err_none;
+}
+
+const void* host_text_chapter_num(IM3Runtime, IM3ImportContext ctx, uint64_t* sp, void*) {
+    auto& self = *static_cast<Instance*>(ctx->userdata);
+    uint64_t* args = sp + 1;
+    const uint32_t in_off = arg_i32(args);
+    const uint32_t in_len = arg_i32(args);
+
+    // Return slot: i64 (f64 bitcast). Write 0.0f when no number / volume-only.
+    int64_t f64_bits = 0;
+    if (const auto in = guest_str(self, in_off, in_len)) {
+        const auto v = plugin::host_text::chapter_num(*in);
+        if (v) {
+            const double d = *v;
+            const auto bits = std::bit_cast<int64_t>(d);
+            f64_bits = bits;
+        }
+        // No number / volume-only → 0.0f (bits=0) — parity with Go's 0.0.
+    }
+    *reinterpret_cast<int64_t*>(sp) = f64_bits;
+    return m3Err_none;
+}
+
+const void* host_text_date_to_iso(IM3Runtime, IM3ImportContext ctx, uint64_t* sp, void*) {
+    auto& self = *static_cast<Instance*>(ctx->userdata);
+    uint64_t* args = sp + 1;
+    const uint32_t in_off = arg_i32(args);
+    const uint32_t in_len = arg_i32(args);
+    const uint32_t out = arg_i32(args);
+    const uint32_t cap = arg_i32(args);
+
+    int32_t rc = kNotFound;
+    if (const auto in = guest_str(self, in_off, in_len)) {
+        if (const auto res = plugin::host_text::date_to_iso(*in)) {
+            if (guest_write(self, out, cap, *res)) {
+                rc = static_cast<int32_t>(res->size());
+            } else {
+                rc = kTruncated;
+            }
+        }
+    }
+    *reinterpret_cast<int32_t*>(sp) = rc;
+    return m3Err_none;
+}
+
 constexpr std::array kImports{
     Import{"now", "I", host_now},
     Import{"log_info", "v(ii)", host_log_info},
@@ -382,6 +450,9 @@ constexpr std::array kImports{
     Import{"html_attr", "i(iiiiiii)", host_html_attr},
     Import{"url_encode", "i(iiii)", host_url_encode},
     Import{"url_decode", "i(iiii)", host_url_decode},
+    Import{"text_normalize_status", "i(iiii)", host_text_normalize_status},
+    Import{"text_chapter_num", "I(ii)", host_text_chapter_num},
+    Import{"text_date_to_iso", "i(iiii)", host_text_date_to_iso},
 };
 
 } // namespace

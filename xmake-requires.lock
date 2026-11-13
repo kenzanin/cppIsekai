@@ -24,6 +24,14 @@
             },
             version = "v1.0.1"
         },
+        ["date 3.0.4#f56260b5"] = {
+            repo = {
+                branch = "master",
+                commit = "1730b3e52c29bc0dc5dcdc4a1aeb0d3f362f2c10",
+                url = "https://gitlab.com/tboox/xmake-repo.git"
+            },
+            version = "v3.0.4"
+        },
         ["glaze 7.9.0#f56260b5"] = {
             repo = {
                 branch = "master",

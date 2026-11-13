@@ -1,6 +1,7 @@
 #include "bridge.hpp"
 #include "plugin/url_codec.hpp"
 
+#include "plugin/host_text.hpp"
 #include "plugin/htmltext.hpp" // host.re2/html core (task 1.3)
 #include "plugin/http_client.hpp"
 #include "plugin/plugin.hpp"
@@ -30,6 +31,10 @@ void open_sandbox(lua_State* L) {
     luaL_requiref(L, LUA_TABLIBNAME, luaopen_table, 1);
     lua_pop(L, 1);
     luaL_requiref(L, LUA_MATHLIBNAME, luaopen_math, 1);
+    lua_pop(L, 1);
+    luaL_requiref(L, LUA_UTF8LIBNAME, luaopen_utf8, 1);
+    lua_pop(L, 1);
+    luaL_requiref(L, LUA_DBLIBNAME, luaopen_debug, 1);
     lua_pop(L, 1);
 }
 
@@ -295,6 +300,19 @@ end
         return fr.body;
     };
     fs_tab["http"] = http;
+
+    // host.text: status normalization, chapter-number extraction, date→ISO
+    // (P2, host_text.hpp — one core, three thin marshals; design D4).
+    sol::table text_tbl = sv.create_table();
+    text_tbl["normalize_status"] = [](const std::string& s) { return plugin::host_text::normalize_status(s); };
+    text_tbl["chapter_num"] = [](const std::string& s) -> std::optional<double> {
+        const auto v = plugin::host_text::chapter_num(s);
+        return v ? std::optional<double>(*v) : std::nullopt;
+    };
+    text_tbl["date_to_iso"] = [](const std::string& s) -> std::optional<std::string> {
+        return plugin::host_text::date_to_iso(s);
+    };
+    fs_tab["text"] = text_tbl;
 
     // Host-side heavy primitives (design D4 one core, thin marshals): RE2
     // (linear-time, no ReDoS) and lexbor DOM selectors. Bad patterns throw
