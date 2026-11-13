@@ -56,9 +56,8 @@ crow::json::wvalue home_context(Store& store, BS::thread_pool<>& db, const crow:
 
     std::vector<crow::json::wvalue> plugin_rows;
     for (const auto& item : plugins) {
-        if (!item.enabled) {
-            continue; // disabled: no sidebar entry, not searchable (user ruling)
-        }
+        // plugin-lifecycle: disabled stays listed in the library sidebar —
+        // only the search picker drops it (search_script.mustache p.enabled).
         crow::json::wvalue row;
         row["name"] = item.name;
         row["id"] = item.plugin_id; // client grid filter + ?plugin= deep-link key off plugin_id
