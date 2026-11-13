@@ -1,4 +1,7 @@
 ## 2026-11-13
+* **Update**: Linked `decisions/xrepo-packages-offline-workflow.md` to `decisions/xrepo-round-2-deps.md` (Round-2 pins are the package set exported by this offline workflow).
+* **Update**: Linked `decisions/xrepo-packages-offline-workflow.md` to `decisions/xmake-build-system.md` (Same build-system decision family: xmake primary, with this concept covering offline package pinning/export around it).
+* **Creation**: Documented concept `decisions/xrepo-packages-offline-workflow.md` (xrepo offline packages workflow: batch export + import -i packages (packages/ stays gitignored)).
 * **Update**: Linked `references/host-tool-gap-analysis.md` to `references/plugin-porting-matrix-goIsekai.md` (Gap analysis menginformasikan prioritas porting plugin (P1-P9) — matrix menentukan site mana yang di-port, analysis menentukan apa yang perlu ditambal di host dulu.).
 * **Creation**: Documented concept `references/host-tool-gap-analysis.md` (host-tool gap analysis (goIsekai → cppIsekai)).
 * **Creation**: Documented concept `references/plugin-porting-matrix-goIsekai.md` (goIsekai -> cppIsekai plugin porting matrix).
