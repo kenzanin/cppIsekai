@@ -4,6 +4,7 @@
 #include "log/log.hpp"
 #include "plugin/http_client.hpp"
 #include "plugin/plugin.hpp"
+#include "plugin/host_text.hpp"
 #include "store/store.hpp"
 
 #include <spdlog/sinks/stdout_color_sinks.h>
@@ -400,4 +401,29 @@ TEST_CASE("js host.crypto.vrf_sign: golden vector, null on failure") {
     CHECK(bad.find("\"badkey\":null") != std::string::npos); // core rejects bad base64
     CHECK(bad.find("\"nested\":null") != std::string::npos); // non-string param value
     CHECK(bad.find("\"noconf\":null") != std::string::npos); // absent config.json
+}
+
+TEST_CASE("host.text P3: trim / unescape / strip_html") {
+    // trim: leading/trailing whitespace + control chars
+    CHECK(plugin::host_text::trim("  hello  ") == "hello");
+    CHECK(plugin::host_text::trim("\t\n  a b  \r\n") == "a b");
+    CHECK(plugin::host_text::trim("") == "");
+    CHECK(plugin::host_text::trim("   ") == "");
+    // NFKD: fullwidth chars normalize to ASCII
+    CHECK(plugin::host_text::trim("\u3000h\u3000") == "h"); // ideographic spaces
+
+    // unescape: HTML entities
+    CHECK(plugin::host_text::unescape("&amp;") == "&");
+    CHECK(plugin::host_text::unescape("&lt;b&gt;") == "<b>");
+    CHECK(plugin::host_text::unescape("&quot;hello&quot;") == "\"hello\"");
+    CHECK(plugin::host_text::unescape("&copy; 2026") == "\u00a9 2026"); // ©
+    CHECK(plugin::host_text::unescape("no entities") == "no entities");
+
+    // strip_html: remove tags, keep text, decode entities
+    CHECK(plugin::host_text::strip_html("<div>hi</div>") == "hi");
+    CHECK(plugin::host_text::strip_html("<b>bold</b> <i>ital</i>") == "bold ital");
+    CHECK(plugin::host_text::strip_html("&lt;p&gt;&amp;lt;&lt;&lt;/&amp;gt;&lt;/p&gt;")
+          .find("<p>&lt;<") == 0); // entity-decoded then tag-stripped
+    CHECK(plugin::host_text::strip_html("<br>") == "");
+    CHECK(plugin::host_text::strip_html("") == "");
 }

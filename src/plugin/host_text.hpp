@@ -11,6 +11,9 @@
 
 #include <re2/re2.h>
 #include <date/date.h>
+#include <lexbor/dom/dom.h>
+#include <lexbor/html/html.h>
+#include <utf8proc.h>
 
 #include <algorithm>
 #include <chrono>
@@ -246,6 +249,121 @@ inline std::optional<std::string> date_to_iso(std::string_view raw) {
         }
     }
     return std::nullopt;
+}
+
+// ---------------------------------------------------------------------------
+// trim (P3, utf8proc)
+// ---------------------------------------------------------------------------
+
+/** \brief UTF-8-aware trim: NFKD normalize, casefold, strip leading/trailing
+ *         whitespace and control characters. */
+inline std::string trim(std::string_view raw) {
+    const std::string s{raw};
+    const utf8proc_ssize_t max_cp = static_cast<utf8proc_ssize_t>(s.size()) * 4 + 16;
+    std::vector<utf8proc_int32_t> buf(max_cp);
+    const utf8proc_ssize_t ncp = utf8proc_decompose(
+        reinterpret_cast<const utf8proc_uint8_t*>(s.data()),
+        static_cast<utf8proc_ssize_t>(s.size()),
+        buf.data(), max_cp,
+        static_cast<utf8proc_option_t>(UTF8PROC_COMPAT | UTF8PROC_DECOMPOSE | UTF8PROC_CASEFOLD | UTF8PROC_STRIPCC));
+    if (ncp < 0) {
+        return s; // undecomposable input: verbatim
+    }
+    auto is_ws = [](uint32_t cp) {
+        return cp == ' ' || cp == '\t' || cp == '\n' || cp == '\r' || cp == '\f' || cp == 0x3000 ||
+               (cp >= 0x2000 && cp <= 0x200F) || cp == 0x2028 || cp == 0x2029;
+    };
+    utf8proc_ssize_t b = 0, e = ncp;
+    while (b < e && is_ws(static_cast<uint32_t>(buf[b]))) {
+        ++b;
+    }
+    while (e > b && is_ws(static_cast<uint32_t>(buf[e - 1]))) {
+        --e;
+    }
+    const auto* in = buf.data() + b;
+    const utf8proc_ssize_t len = e - b;
+    char out[8];
+    std::string res;
+    for (utf8proc_ssize_t i = 0; i < len; ++i) {
+        utf8proc_ssize_t w = utf8proc_encode_char(in[i], reinterpret_cast<utf8proc_uint8_t*>(out));
+        res.append(out, static_cast<size_t>(w));
+    }
+    return res;
+}
+
+// ---------------------------------------------------------------------------
+// unescape + strip_html (P3, lexbor)
+// ---------------------------------------------------------------------------
+
+namespace detail {
+
+/// Parse `html` into a lexbor document; returns null on parse failure (lenient).
+inline lxb_html_document_t* parse_doc(const std::string& html) {
+    lxb_html_document_t* doc = lxb_html_document_create();
+    if (doc == nullptr) {
+        return nullptr;
+    }
+    const lxb_status_t st =
+        lxb_html_document_parse(doc, reinterpret_cast<const lxb_char_t*>(html.data()), html.size());
+    if (st != LXB_STATUS_OK) {
+        lxb_html_document_destroy(doc);
+        return nullptr;
+    }
+    return doc;
+}
+
+/// Get the text content of the parsed document's `<html>` element.
+/// The document root node has no text; the first child is `<html>`.
+inline std::string doc_text(lxb_html_document_t* doc, lxb_dom_document_t* ddoc) {
+    lxb_dom_node_t* root = lxb_dom_interface_node(doc);
+    lxb_dom_node_t* html_el = root->first_child;
+    if (html_el == nullptr) {
+        return {};
+    }
+    size_t tl = 0;
+    lxb_char_t* text = lxb_dom_node_text_content(html_el, &tl);
+    if (text == nullptr) {
+        return {};
+    }
+    const std::string out(reinterpret_cast<const char*>(text), tl);
+    lxb_dom_document_destroy_text(ddoc, text);
+    return out;
+}
+
+} // namespace detail
+
+/** \brief Decode HTML entities (`&amp;` → `&`, `&lt;` → `<`, numeric refs, etc.)
+ *         in `str` via lexbor's lenient HTML parse + text extraction. */
+inline std::string unescape(std::string_view str) {
+    const std::string s{str};
+    if (s.empty()) {
+        return s;
+    }
+    lxb_html_document_t* doc = detail::parse_doc(s);
+    if (doc == nullptr) {
+        return s; // undecodable: verbatim
+    }
+    lxb_dom_document_t* ddoc = lxb_dom_interface_document(doc);
+    const std::string out = detail::doc_text(doc, ddoc);
+    lxb_html_document_destroy(doc);
+    return out.empty() ? s : out;
+}
+
+/** \brief Strip all HTML tags from `html`, keeping text content; returns
+ *         trimmed text with entities decoded (via lexbor parse + text walk). */
+inline std::string strip_html(std::string_view html) {
+    const std::string s{html};
+    if (s.empty()) {
+        return s;
+    }
+    lxb_html_document_t* doc = detail::parse_doc(s);
+    if (doc == nullptr) {
+        return s; // undecodable: verbatim
+    }
+    lxb_dom_document_t* ddoc = lxb_dom_interface_document(doc);
+    const std::string out = detail::doc_text(doc, ddoc);
+    lxb_html_document_destroy(doc);
+    return trim(out);
 }
 
 } // namespace plugin::host_text

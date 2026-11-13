@@ -188,6 +188,30 @@ JSValue js_text_date_to_iso(JSContext* ctx, JSValueConst /*this*/, int argc, JSV
     return JS_NewStringLen(ctx, v->data(), v->size());
 }
 
+JSValue js_text_trim(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
+    if (argc != 1 || !JS_IsString(argv[0])) {
+        return JS_ThrowTypeError(ctx, "text.trim(string)");
+    }
+    const std::string out = plugin::host_text::trim(arg_str(ctx, argv[0]));
+    return JS_NewStringLen(ctx, out.data(), out.size());
+}
+
+JSValue js_text_unescape(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
+    if (argc != 1 || !JS_IsString(argv[0])) {
+        return JS_ThrowTypeError(ctx, "text.unescape(string)");
+    }
+    const std::string out = plugin::host_text::unescape(arg_str(ctx, argv[0]));
+    return JS_NewStringLen(ctx, out.data(), out.size());
+}
+
+JSValue js_text_strip_html(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
+    if (argc != 1 || !JS_IsString(argv[0])) {
+        return JS_ThrowTypeError(ctx, "text.strip_html(string)");
+    }
+    const std::string out = plugin::host_text::strip_html(arg_str(ctx, argv[0]));
+    return JS_NewStringLen(ctx, out.data(), out.size());
+}
+
 JSValue js_require(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
     if (argc < 1) {
         return JS_ThrowTypeError(ctx, "require(path)");
@@ -589,6 +613,9 @@ void bind_host_globals(JSContext* c) {
     bind(text_tbl, "normalize_status", JS_NewCFunction(c, js_text_normalize_status, "normalize_status", 1));
     bind(text_tbl, "chapter_num", JS_NewCFunction(c, js_text_chapter_num, "chapter_num", 1));
     bind(text_tbl, "date_to_iso", JS_NewCFunction(c, js_text_date_to_iso, "date_to_iso", 1));
+    bind(text_tbl, "trim", JS_NewCFunction(c, js_text_trim, "trim", 1));
+    bind(text_tbl, "unescape", JS_NewCFunction(c, js_text_unescape, "unescape", 1));
+    bind(text_tbl, "strip_html", JS_NewCFunction(c, js_text_strip_html, "strip_html", 1));
     bind(host, "text", text_tbl);
 
     bind(g, "host", host); // consumes the host reference tree

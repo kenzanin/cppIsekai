@@ -312,6 +312,9 @@ end
     text_tbl["date_to_iso"] = [](const std::string& s) -> std::optional<std::string> {
         return plugin::host_text::date_to_iso(s);
     };
+    text_tbl["trim"] = [](const std::string& s) { return plugin::host_text::trim(s); };
+    text_tbl["unescape"] = [](const std::string& s) { return plugin::host_text::unescape(s); };
+    text_tbl["strip_html"] = [](const std::string& s) { return plugin::host_text::strip_html(s); };
     fs_tab["text"] = text_tbl;
 
     // Host-side heavy primitives (design D4 one core, thin marshals): RE2
