@@ -4,6 +4,7 @@
 #include "plugin/host_text.hpp"
 #include "plugin/htmltext.hpp" // host.re2/html core (task 1.3)
 #include "plugin/http_client.hpp"
+#include "plugin/host_codecs.hpp"
 #include "plugin/plugin.hpp"
 #include "plugin/vrf.hpp"
 
@@ -354,6 +355,21 @@ end
     text_tbl["unescape"] = [](const std::string& s) { return plugin::host_text::unescape(s); };
     text_tbl["strip_html"] = [](const std::string& s) { return plugin::host_text::strip_html(s); };
     fs_tab["text"] = text_tbl;
+
+    // host.codecs: base64/hex encodings (P6, host_codecs.hpp one core, thin
+    // marshals); decode nil on invalid, the house optional contract.
+    sol::table codec_tbl = sv.create_table();
+    codec_tbl["base64_encode"] = [](const std::string& s) { return plugin::host_codec::base64_encode(s); };
+    codec_tbl["base64_decode"] = [](const std::string& s, sol::this_state ts) -> sol::object {
+        const auto v = plugin::host_codec::base64_decode(s);
+        return v ? sol::make_object(ts, *v) : sol::make_object(ts, sol::lua_nil);
+    };
+    codec_tbl["hex_encode"] = [](const std::string& s) { return plugin::host_codec::hex_encode(s); };
+    codec_tbl["hex_decode"] = [](const std::string& s, sol::this_state ts) -> sol::object {
+        const auto v = plugin::host_codec::hex_decode(s);
+        return v ? sol::make_object(ts, *v) : sol::make_object(ts, sol::lua_nil);
+    };
+    fs_tab["codecs"] = codec_tbl;
 
     // Host-side heavy primitives (design D4 one core, thin marshals): RE2
     // (linear-time, no ReDoS) and lexbor DOM selectors. Bad patterns throw

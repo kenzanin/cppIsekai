@@ -4,6 +4,7 @@
 #include "log/log.hpp"
 #include "plugin/http_client.hpp"
 #include "plugin/plugin.hpp"
+#include "plugin/host_codecs.hpp"
 #include "plugin/host_text.hpp"
 #include "plugin/htmltext.hpp"
 #include "store/store.hpp"
@@ -158,6 +159,27 @@ TEST_CASE("http.fetch via curl-impersonate") {
         CHECK(res.find("\"ok\":true") != std::string::npos);
         CHECK(res.find("\"status\":200") != std::string::npos);
     }
+}
+
+TEST_CASE("host.codecs P6: base64 / hex") {
+    // base64: known vector + roundtrip + strict decode
+    CHECK(plugin::host_codec::base64_encode("hello") == "aGVsbG8=");
+    CHECK(plugin::host_codec::base64_encode("ab") == "YWI=");
+    CHECK(plugin::host_codec::base64_encode("").empty());
+    CHECK(plugin::host_codec::base64_decode("aGVsbG8").value_or("!") == "hello"); // pad-tolerant
+    const std::string blob = "\x00\xff\x10 binary \n\r\t";
+    CHECK(plugin::host_codec::base64_decode(plugin::host_codec::base64_encode(blob)).value_or("!") == blob);
+    CHECK_FALSE(plugin::host_codec::base64_decode("aGVsb").has_value()); // 5 chars: impossible quantum
+    CHECK_FALSE(plugin::host_codec::base64_decode("a-b!").has_value()); // non-alphabet chars
+
+    // hex: lowercase out, case-insensitive in, roundtrip, strict
+    CHECK(plugin::host_codec::hex_encode("abc") == "616263");
+    CHECK(plugin::host_codec::hex_encode("").empty());
+    CHECK(plugin::host_codec::hex_decode("616263").value_or("!") == "abc");
+    CHECK(plugin::host_codec::hex_decode("ABCDEF").value_or("!") == std::string("\xAB\xCD\xEF", 3));
+    CHECK(plugin::host_codec::hex_decode(plugin::host_codec::hex_encode(blob)).value_or("!") == blob);
+    CHECK_FALSE(plugin::host_codec::hex_decode("abc").has_value()); // odd length
+    CHECK_FALSE(plugin::host_codec::hex_decode("zz").has_value());
 }
 
 TEST_CASE("host.http P5: get_json / post_json") {

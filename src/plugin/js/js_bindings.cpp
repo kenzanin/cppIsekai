@@ -2,6 +2,7 @@
 #include "js_rt.hpp"
 
 #include "plugin/fs.hpp"        // plugin::fs_read -- the fs.read body
+#include "plugin/host_codecs.hpp"
 #include "plugin/host_text.hpp"
 #include "plugin/htmltext.hpp"  // host.re2/html core (task 1.3)
 #include "plugin/url_codec.hpp" // plugin::url_{encode,decode} -- host.url_* body
@@ -275,6 +276,45 @@ JSValue js_text_strip_html(JSContext* ctx, JSValueConst /*this*/, int argc, JSVa
     }
     const std::string out = plugin::host_text::strip_html(arg_str(ctx, argv[0]));
     return JS_NewStringLen(ctx, out.data(), out.size());
+}
+
+// host.codecs (P6): string-in/string-out, decode null on invalid.
+JSValue js_codec_base64_encode(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
+    if (argc != 1 || !JS_IsString(argv[0])) {
+        return JS_ThrowTypeError(ctx, "codecs.base64_encode(string)");
+    }
+    const std::string out = plugin::host_codec::base64_encode(arg_str(ctx, argv[0]));
+    return JS_NewStringLen(ctx, out.data(), out.size());
+}
+
+JSValue js_codec_base64_decode(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
+    if (argc != 1 || !JS_IsString(argv[0])) {
+        return JS_ThrowTypeError(ctx, "codecs.base64_decode(string)");
+    }
+    const auto v = plugin::host_codec::base64_decode(arg_str(ctx, argv[0]));
+    if (!v) {
+        return JS_NULL;
+    }
+    return JS_NewStringLen(ctx, v->data(), v->size());
+}
+
+JSValue js_codec_hex_encode(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
+    if (argc != 1 || !JS_IsString(argv[0])) {
+        return JS_ThrowTypeError(ctx, "codecs.hex_encode(string)");
+    }
+    const std::string out = plugin::host_codec::hex_encode(arg_str(ctx, argv[0]));
+    return JS_NewStringLen(ctx, out.data(), out.size());
+}
+
+JSValue js_codec_hex_decode(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
+    if (argc != 1 || !JS_IsString(argv[0])) {
+        return JS_ThrowTypeError(ctx, "codecs.hex_decode(string)");
+    }
+    const auto v = plugin::host_codec::hex_decode(arg_str(ctx, argv[0]));
+    if (!v) {
+        return JS_NULL;
+    }
+    return JS_NewStringLen(ctx, v->data(), v->size());
 }
 
 JSValue js_require(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
@@ -742,6 +782,13 @@ void bind_host_globals(JSContext* c) {
     bind(text_tbl, "unescape", JS_NewCFunction(c, js_text_unescape, "unescape", 1));
     bind(text_tbl, "strip_html", JS_NewCFunction(c, js_text_strip_html, "strip_html", 1));
     bind(host, "text", text_tbl);
+
+    JSValue codec_tbl = JS_NewObject(c);
+    bind(codec_tbl, "base64_encode", JS_NewCFunction(c, js_codec_base64_encode, "base64_encode", 1));
+    bind(codec_tbl, "base64_decode", JS_NewCFunction(c, js_codec_base64_decode, "base64_decode", 1));
+    bind(codec_tbl, "hex_encode", JS_NewCFunction(c, js_codec_hex_encode, "hex_encode", 1));
+    bind(codec_tbl, "hex_decode", JS_NewCFunction(c, js_codec_hex_decode, "hex_decode", 1));
+    bind(host, "codecs", codec_tbl);
 
     bind(g, "host", host); // consumes the host reference tree
 
