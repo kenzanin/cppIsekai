@@ -81,16 +81,16 @@
 
 ## Phase 7: P7 — host.crypto.sha256_hex / md5_hex / hmac_sha256_hex / aes_gcm_decrypt (100 lines, hash-library + tiny-aes-c)
 
-- [ ] 7.1 Add deps in `xmake.lua`: `add_requires("hash-library", "tiny-aes-c")` (xrepo)
-- [ ] 7.2 **P7**: `host.crypto.sha256_hex(data)` + `host.crypto.md5_hex(data)` = hash-library `SHA256` / `MD5` + hex
-  - [ ] Header-only `src/plugin/host_crypto.hpp` (new)
-- [ ] 7.3 **P7**: `host.crypto.hmac_sha256_hex(data, key)` = hash-library `HMAC<SHA256>` + hex
-  - [ ] Header-only `src/plugin/host_crypto.hpp` (extend)
-- [ ] 7.4 **P7**: `host.crypto.aes_gcm_decrypt(iv, ct, tag, key)` = tiny-aes-c AES-256-GCM decrypt
-  - [ ] Header-only `src/plugin/host_crypto.hpp` (extend)
-- [ ] 7.5 Lua + JS + WASM bindings
-- [ ] 7.6 Build + test (17/17)
-- [ ] 7.7 Commit: `plugin: host.crypto.sha256/md5/hmac/aes_gcm (P7, 5+3 sites, hash-library + tiny-aes-c)`
+- [x] 7.1 Add deps in `xmake.lua`: `add_requires("hash-library", "tiny-aes-c")` (xrepo)
+- [x] 7.2 **P7**: `host.crypto.sha256_hex(data)` + `host.crypto.md5_hex(data)` = hash-library `SHA256` / `MD5` + hex
+  - [x] Header-only `src/plugin/host_crypto.hpp` (new)
+- [x] 7.3 **P7**: `host.crypto.hmac_sha256_hex(data, key)` = hash-library `HMAC<SHA256>` + hex
+  - [x] Header-only `src/plugin/host_crypto.hpp` (extend)
+- [x] 7.4 **P7**: `host.crypto.aes_gcm_decrypt(iv, ct, tag, key)` = tiny-aes-c AES-256-GCM decrypt
+  - [x] Header-only `src/plugin/host_crypto.hpp` (extend)
+- [x] 7.5 Lua + JS + WASM bindings
+- [x] 7.6 Build + test (17/17)
+- [x] 7.7 Commit: `plugin: host.crypto.sha256/md5/hmac/aes_gcm (P7, 5+3 sites, hash-library + tiny-aes-c)`
 
 ## Phase 8: P8 — SKIPPED + P9 — IMPLEMENT (pugixml)
 
