@@ -37,6 +37,7 @@ struct Services {
     StateGet state_get;   /**< per-plugin persistent read */
     StateSet state_set;   /**< per-plugin persistent write */
     HttpFetch http_fetch; /**< blocking fetch through the shared curl path */
+    std::map<std::string, std::string> params; /**< manifest params, empty when absent */
 };
 
 /** \brief Raw reply handed back to the shared core: the plugin's return value

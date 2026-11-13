@@ -181,6 +181,15 @@ void scan_dir(const Config& conf, LiveProfile& live_profile, Store& store, const
                 rt.info.capabilities.emplace_back("enrichment");
             }
         }
+        if (m.params) {
+            if (const auto* pobj = std::get_if<glz::generic::object_t>(&m.params->data)) {
+                for (const auto& [k, v] : *pobj) {
+                    if (const auto* s = std::get_if<std::string>(&v.data)) {
+                        rt.params.emplace(k, *s);
+                    }
+                }
+            }
+        }
         rt.info.dir = item.path().string();
 
         // User config lives beside the manifest, is never read by anyone else,
@@ -219,7 +228,7 @@ void scan_dir(const Config& conf, LiveProfile& live_profile, Store& store, const
             }
             rt.lua = {L, &lua_close};
             lua::open_sandbox(L);
-            lua::install_host_tools(L, rt.info.id, conf, rt.cfg, rt.has_cfg, sget, sset, rt.info.dir, live_profile);
+            lua::install_host_tools(L, rt.info.id, conf, rt.cfg, rt.has_cfg, sget, sset, rt.info.dir, live_profile, rt.params);
             // Entry scripts return nothing; run them, check validity explicitly.
             const sol::protected_function_result script =
                 sol::state_view(L).safe_script_file((fs::path(rt.info.dir) / rt.info.entry).string());
@@ -241,7 +250,7 @@ void scan_dir(const Config& conf, LiveProfile& live_profile, Store& store, const
             std::stringstream jbuf;
             jbuf << jf.rdbuf();
             js::Loaded loaded = js::load(rt.info.id, rt.info.dir, std::move(jbuf).str(),
-                                         wasm::Services{sget, sset, make_wasm_fetch(rt.info.id, conf, live_profile)});
+                                         wasm::Services{sget, sset, make_wasm_fetch(rt.info.id, conf, live_profile), rt.params});
             if (!loaded.instance) {
                 spdlog::warn("{} {}: js load failed: {}", kind, rt.info.id, loaded.error);
                 continue;
@@ -255,7 +264,7 @@ void scan_dir(const Config& conf, LiveProfile& live_profile, Store& store, const
                 continue;
             }
             std::vector<std::uint8_t> bytes{std::istreambuf_iterator<char>(wf), {}};
-            wasm::Services services{sget, sset, make_wasm_fetch(rt.info.id, conf, live_profile)};
+            wasm::Services services{sget, sset, make_wasm_fetch(rt.info.id, conf, live_profile), rt.params};
             wasm::Loaded loaded = wasm::load(rt.info.id, rt.info.dir, std::move(bytes), std::move(services));
             if (!loaded.instance) {
                 spdlog::warn("{} {}: wasm load failed: {}", kind, rt.info.id, loaded.error);

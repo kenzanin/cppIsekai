@@ -135,6 +135,77 @@ const void* host_http_fetch(IM3Runtime, IM3ImportContext ctx, uint64_t* sp, void
     return m3Err_none;
 }
 
+const void* host_plugin_param(IM3Runtime, IM3ImportContext ctx, uint64_t* sp, void*) {
+    auto& self = *static_cast<Instance*>(ctx->userdata);
+    uint64_t* args = sp + 1;
+    const uint32_t key_off = arg_i32(args);
+    const uint32_t key_len = arg_i32(args);
+    const uint32_t out = arg_i32(args);
+    const uint32_t cap = arg_i32(args);
+
+    int32_t rc = kNotFound;
+    if (const auto key = guest_str(self, key_off, key_len)) {
+        const auto it = self.services.params.find(*key);
+        if (it != self.services.params.end() && guest_write(self, out, cap, it->second)) {
+            rc = static_cast<int32_t>(it->second.size());
+        } else if (it != self.services.params.end()) {
+            rc = kTruncated;
+        }
+    }
+    *reinterpret_cast<int32_t*>(sp) = rc;
+    return m3Err_none;
+}
+
+const void* host_http_fetch_body(IM3Runtime, IM3ImportContext ctx, uint64_t* sp, void*) {
+    auto& self = *static_cast<Instance*>(ctx->userdata);
+    uint64_t* args = sp + 1;
+    const uint32_t url_off = arg_i32(args);
+    const uint32_t url_len = arg_i32(args);
+    const uint32_t opts_off = arg_i32(args);
+    const uint32_t opts_len = arg_i32(args);
+    const uint32_t out = arg_i32(args);
+    const uint32_t cap = arg_i32(args);
+
+    int32_t rc = kNotFound;
+    if (const auto url = guest_str(self, url_off, url_len)) {
+        if (const auto opts = guest_str(self, opts_off, opts_len)) {
+            if (self.services.http_fetch) {
+                if (auto reply = self.services.http_fetch(*url, *opts)) {
+                    // Parse status from the fetch reply JSON; write body on 200, else kNotFound.
+                    glz::generic root;
+                    if (glz::read_json(root, reply->data())) {
+                        rc = kNotFound;
+                    } else {
+                        const auto* obj = std::get_if<glz::generic::object_t>(&root.data);
+                        if (obj == nullptr) {
+                            rc = kNotFound;
+                        } else {
+                            auto sit = obj->find("status");
+                            const auto* bs = (sit == obj->end()) ? nullptr : std::get_if<double>(&sit->second.data);
+                            const bool is_200 = (bs != nullptr && *bs == 200.0);
+                            if (!is_200) {
+                                rc = kNotFound;
+                            } else {
+                                auto bit = obj->find("body");
+                                const auto* bv = (bit == obj->end()) ? nullptr : std::get_if<std::string>(&bit->second.data);
+                                if (bv == nullptr) {
+                                    rc = kNotFound;
+                                } else if (guest_write(self, out, cap, *bv)) {
+                                    rc = static_cast<int32_t>(bv->size());
+                                } else {
+                                    rc = kTruncated;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    *reinterpret_cast<int32_t*>(sp) = rc;
+    return m3Err_none;
+}
+
 struct Import {
     const char* name;
     const char* sig; // m3 link notation, m3_core.h ConvertTypeCharToTypeId
@@ -303,6 +374,8 @@ constexpr std::array kImports{
     Import{"storage_get", "i(iiii)", host_storage_get},
     Import{"storage_set", "v(iiii)", host_storage_set},
     Import{"http_fetch", "i(iiiiii)", host_http_fetch},
+    Import{"http_fetch_body", "i(iiiiii)", host_http_fetch_body},
+    Import{"plugin_param", "i(iiii)", host_plugin_param},
     Import{"re2_match", "i(iiiiii)", host_re2_match},
     Import{"re2_find", "i(iiiiii)", host_re2_find},
     Import{"html_select", "i(iiiii)", host_html_select},

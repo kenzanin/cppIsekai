@@ -38,7 +38,7 @@ void open_sandbox(lua_State* L);
  *  \p has_cfg; storage closures route through \p sget / \p sset. */
 void install_host_tools(lua_State* L, const std::string& id, const Config& conf, const glz::generic& cfg, bool has_cfg,
                         const StateGet& sget, const StateSet& sset, const std::string& dir,
-                        const LiveProfile& live_profile);
+                        const LiveProfile& live_profile, const std::map<std::string, std::string>& params);
 
 } // namespace lua
 } // namespace plugin

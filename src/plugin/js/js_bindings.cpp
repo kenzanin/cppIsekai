@@ -97,6 +97,63 @@ JSValue js_http_fetch(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueCo
     return parsed; // {status, body, headers} -- the lua-shaped reply
 }
 
+JSValue js_http_fetch_body(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
+    if (argc < 1) {
+        return JS_ThrowTypeError(ctx, "http.fetch_body(url, opts)");
+    }
+    Instance& inst = self(ctx);
+    if (!inst.services.http_fetch) {
+        return JS_ThrowTypeError(ctx, "http unavailable");
+    }
+    const std::string url = arg_str(ctx, argv[0]);
+    std::string opts = "{}";
+    if (argc > 1 && !JS_IsUndefined(argv[1]) && !JS_IsNull(argv[1])) {
+        opts = json_stringify(ctx, argv[1]);
+    }
+    const auto res = inst.services.http_fetch(url, opts);
+    if (!res) {
+        return JS_NULL;
+    }
+    glz::generic root;
+    if (auto ec = glz::read_json(root, res->data())) {
+        return JS_NULL;
+    }
+    const auto* obj = std::get_if<glz::generic::object_t>(&root.data);
+    if (obj == nullptr) {
+        return JS_NULL;
+    }
+    const auto* status_it = obj->find("status");
+    if (status_it == obj->end()) {
+        return JS_NULL;
+    }
+    const auto* sv = std::get_if<double>(&status_it->second.data);
+    if (sv == nullptr || *sv != 200.0) {
+        return JS_NULL;
+    }
+    const auto* body_it = obj->find("body");
+    if (body_it == obj->end()) {
+        return JS_NULL;
+    }
+    const auto* bs = std::get_if<std::string>(&body_it->second.data);
+    if (bs == nullptr) {
+        return JS_NULL;
+    }
+    return JS_NewStringLen(ctx, bs->data(), bs->size());
+}
+
+JSValue js_plugin_param(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
+    if (argc < 1 || !JS_IsString(argv[0])) {
+        return JS_ThrowTypeError(ctx, "plugin.param(key)");
+    }
+    const auto& inst = self(ctx);
+    const std::string key = arg_str(ctx, argv[0]);
+    const auto it = inst.services.params.find(key);
+    if (it == inst.services.params.end()) {
+        return JS_NULL;
+    }
+    return JS_NewStringLen(ctx, it->second.data(), it->second.size());
+}
+
 JSValue js_require(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
     if (argc < 1) {
         return JS_ThrowTypeError(ctx, "require(path)");
@@ -448,6 +505,7 @@ void bind_host_globals(JSContext* c) {
 
     JSValue http = JS_NewObject(c);
     bind(http, "fetch", JS_NewCFunction(c, js_http_fetch, "fetch", 2));
+    bind(http, "fetch_body", JS_NewCFunction(c, js_http_fetch_body, "fetch_body", 2));
     bind(host, "http", http);
 
     JSValue fs = JS_NewObject(c);
@@ -488,6 +546,10 @@ void bind_host_globals(JSContext* c) {
     JSValue crypto = JS_NewObject(c);
     bind(crypto, "vrf_sign", JS_NewCFunction(c, js_vrf_sign, "vrf_sign", 3));
     bind(host, "crypto", crypto);
+
+    JSValue plugin_tbl = JS_NewObject(c);
+    bind(plugin_tbl, "param", JS_NewCFunction(c, js_plugin_param, "param", 1));
+    bind(host, "plugin", plugin_tbl);
 
     bind(g, "host", host); // consumes the host reference tree
 

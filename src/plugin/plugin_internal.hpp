@@ -43,6 +43,7 @@ struct Runtime {
     std::mutex mu;    // one call at a time per runtime, whatever the backend
     glz::generic cfg; // parsed config.json; meaningful only when has_cfg
     bool has_cfg = false;
+    std::map<std::string, std::string> params; // manifest params; empty when absent
 
     // lua backend (info.runtime == "lua")
     std::unique_ptr<lua_State, decltype(&lua_close)> lua{nullptr, &lua_close};
@@ -59,6 +60,7 @@ struct Manifest {
     std::string name, version, runtime;
     std::optional<std::string> id, entry, website;
     std::optional<std::vector<std::string>> capabilities;
+    std::optional<glz::generic> params; // manifest params object
     int api{};
 };
 

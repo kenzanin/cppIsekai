@@ -35,7 +35,7 @@ void open_sandbox(lua_State* L) {
 
 void install_host_tools(lua_State* L, const std::string& id, const Config& conf, const glz::generic& cfg, bool has_cfg,
                         const StateGet& sget, const StateSet& sset, const std::string& dir,
-                        const LiveProfile& live_profile) {
+                        const LiveProfile& live_profile, const std::map<std::string, std::string>& params) {
     sol::state_view sv(L);
 
     sol::table fs_tab = sv.create_named_table("host");
@@ -149,6 +149,17 @@ end
     storage["set"] = [id, sset](const std::string& key, const std::string& val) { sset(id, key, val); };
     fs_tab["storage"] = storage;
 
+    // host.plugin.param: read manifest params; nil when absent.
+    sol::table plugin_tbl = sv.create_table();
+    plugin_tbl["param"] = [&params](const std::string& key, sol::this_state ts) -> sol::object {
+        const auto it = params.find(key);
+        if (it != params.end()) {
+            return sol::make_object(ts, it->second);
+        }
+        return sol::make_object(ts, sol::lua_nil);
+    };
+    fs_tab["plugin"] = plugin_tbl;
+
     // Blocking fetch on the calling (plugin-pool) worker; curl's own timeout
     // guards the network half, the instruction hook the CPU half.
     sol::table http = sv.create_table();
@@ -222,6 +233,66 @@ end
         }
         out["headers"] = sol::make_object(ts, hh);
         return {sol::make_object(ts, out), std::nullopt};
+    };
+
+    // host.http.fetch_body: returns body string when status == 200, else nil.
+    http["fetch_body"] = [id, timeout_ms = conf.fetch_timeout_ms, live = &live_profile,
+                          proxy = conf.proxy](const std::string& url, const sol::optional<sol::table>& opts) -> std::optional<std::string> {
+        long ms = timeout_ms;
+        std::string live_default;
+        if (auto p = live->load()) {
+            live_default = *p;
+        }
+        std::string profile_name = live_default;
+        std::string method = "GET";
+        std::string body;
+        std::string accept_header;
+        std::string ua_header;
+        bool use_cookies = false;
+        std::vector<std::pair<std::string, std::string>> extra_headers;
+        if (opts) {
+            if (sol::object v = (*opts)["timeout_ms"]; v.get_type() == sol::type::number) {
+                ms = static_cast<long>(v.as<double>());
+            }
+            if (sol::object v = (*opts)["profile"]; v.get_type() == sol::type::string) {
+                profile_name = v.as<std::string>();
+            }
+            if (sol::object v = (*opts)["method"]; v.get_type() == sol::type::string) {
+                method = v.as<std::string>();
+            }
+            if (sol::object v = (*opts)["body"]; v.get_type() == sol::type::string) {
+                body = v.as<std::string>();
+            }
+            if (sol::object v = (*opts)["accept"]; v.get_type() == sol::type::string) {
+                accept_header = v.as<std::string>();
+            }
+            if (sol::object v = (*opts)["user_agent"]; v.get_type() == sol::type::string) {
+                ua_header = v.as<std::string>();
+            }
+            if (sol::object v = (*opts)["cookie"]; v.get_type() == sol::type::boolean) {
+                use_cookies = v.as<bool>();
+            }
+            if (sol::object v = (*opts)["headers"]; v.get_type() == sol::type::table) {
+                v.as<sol::table>().for_each([&](sol::object k, sol::object val) {
+                    if (k.get_type() == sol::type::string && val.get_type() == sol::type::string) {
+                        extra_headers.emplace_back(k.as<std::string>(), val.as<std::string>());
+                    }
+                });
+            }
+        }
+
+        profile_name = checked_profile(std::move(profile_name), live_default);
+        const std::string cookie_jar = use_cookies ? cookie_jar_path(id) : std::string{};
+        const FetchResult fr =
+            fetch_sync(url, ms, profile_name, method, body, accept_header, ua_header, extra_headers, proxy, cookie_jar);
+        if (!fr.error.empty()) {
+            spdlog::warn("[plugin:{}] fetch_body {} failed: {}", id, url, fr.error);
+            return std::nullopt;
+        }
+        if (fr.status != 200) {
+            return std::nullopt;
+        }
+        return fr.body;
     };
     fs_tab["http"] = http;
 
