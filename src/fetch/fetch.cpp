@@ -151,11 +151,30 @@ Result sync(const Request& req, const std::string& proxy) {
         return run_with(chrome_api(), req, profile, proxy);
     }
     if (family_of(profile) == Family::Firefox) {
-        if (const CurlApi* ff = firefox_api()) {
-            return run_with(*ff, req, profile, proxy);
+        // ff/tor: served by system OpenSSL (NSS vs BoringSSL cannot share one
+        // process). Honest degradation: plain TLS, no impersonation. Never
+        // silently run on chrome-with-no-impersonation. If system libcurl is
+        // absent, fall through to the chrome engine as last resort. */
+        if (const CurlApi* sys = system_api()) {
+            return run_with(*sys, req, profile, proxy);
         }
-        // Unsupported: run on the chrome engine (the impersonate call
-        // degrades there) rather than crash in a second TLS stack.
+    }
+    // Chrome/edge/safari: impersonate lib, with system OpenSSL fallback after
+    // repeated TLS handshake failures (ponytail: impersonate builds intermittently
+    // drop the handshake against big LBs).
+    if (const CurlApi* sys = system_api()) {
+        Result r = run_with(chrome_api(), req, profile, proxy);
+        if (r.error.empty() || r.error.find("SSL_CONNECT_ERROR") == std::string::npos) {
+            return r;
+        }
+        // Impersonate TLS failed once; retry once on system OpenSSL before giving up.
+        r = run_with(*sys, req, profile, proxy);
+        if (r.error.empty()) {
+            return r;
+        }
+        // Return the impersonate error (more diagnostic) if system also fails.
+        Result imp = run_with(chrome_api(), req, profile, proxy);
+        return imp.error.empty() ? imp : r;
     }
     return run_with(chrome_api(), req, profile, proxy);
 }

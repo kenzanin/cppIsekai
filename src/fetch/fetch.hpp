@@ -60,7 +60,8 @@ inline void applyProxy(CURL* e, const std::string& proxy) {
 inline bool is_known_target(std::string_view t) {
     for (std::string_view k :
          {"chrome99", "chrome100", "chrome101", "chrome104", "chrome107", "chrome110", "chrome116", "edge99", "edge101",
-          "safari15_3", "safari15_5"}) { // ff*: unsupported (NSS vs BoringSSL); see fetch_curl.cpp
+          "safari15_3", "safari15_5",
+          "ff153", "ff154", "ff155", "firefox153", "firefox154", "firefox155", "tor145"}) { // ff/tor: served by system OpenSSL (NSS vs BoringSSL in-process)
         if (t == k) {
             return true;
         }
