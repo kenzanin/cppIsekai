@@ -1,0 +1,9 @@
+{
+  "name": "Mangafreak",
+  "id": "mangafreak",
+  "version": "1.0.0",
+  "website": "https://ww3.mangafreak.me",
+  "runtime": "wasm",
+  "capabilities": ["search", "detail", "chapters"],
+  "api": 1
+}
