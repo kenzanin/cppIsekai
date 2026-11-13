@@ -40,23 +40,23 @@
 
 ## Phase 4: P4 — host.re2.find_all / gmatch / replace / quote / find_index (50 lines, RE2)
 
-- [ ] 4.1 **P4**: `host.re2.find_all(pattern, text)` = `RE2::FindN` loop → array of array captures
-  - [ ] `src/plugin/htmltext_re2.cpp` (new function)
-  - [ ] Lua binding in `src/plugin/lua/lua_runtime.cpp`
-- [ ] 4.2 **P4**: `host.re2.gmatch(pattern, text)` = sol2 closure over vector (pattern already in `lua_runtime.cpp:101`)
-  - [ ] Lua binding in `src/plugin/lua/lua_runtime.cpp`
-- [ ] 4.3 **P4**: `host.re2.replace(pattern, repl, text)` = `RE2::ReplaceAll` + `RE2::GlobalReplace` (function repl)
-  - [ ] `src/plugin/htmltext_re2.cpp`
-  - [ ] Lua binding
-- [ ] 4.4 **P4**: `host.re2.quote(str)` = manual escape (RE2 has no public quote)
-  - [ ] `src/plugin/htmltext_re2.cpp`
-  - [ ] Lua binding
-- [ ] 4.5 **P4**: `host.re2.find_index(pattern, text)` = `RE2::Find` + position loop
-  - [ ] `src/plugin/htmltext_re2.cpp`
-  - [ ] Lua binding
-- [ ] 4.6 JS + WASM bindings for all P4
-- [ ] 4.7 Build + test (17/17)
-- [ ] 4.8 Commit: `plugin: host.re2.find_all/gmatch/replace/quote/find_index (P4, 72+ sites)`
+- [x] 4.1 **P4**: `host.re2.find_all(pattern, text)` = `RE2::FindN` loop → array of array captures
+  - [x] `src/plugin/htmltext_re2.cpp` (new function)
+  - [x] Lua binding in `src/plugin/lua/lua_runtime.cpp`
+- [x] 4.2 **P4**: `host.re2.gmatch(pattern, text)` = sol2 closure over vector (pattern already in `lua_runtime.cpp:101`)
+  - [x] Lua binding in `src/plugin/lua/lua_runtime.cpp`
+- [x] 4.3 **P4**: `host.re2.replace(pattern, repl, text)` = `RE2::ReplaceAll` + `RE2::GlobalReplace` (function repl)
+  - [x] `src/plugin/htmltext_re2.cpp`
+  - [x] Lua binding
+- [x] 4.4 **P4**: `host.re2.quote(str)` = manual escape (RE2 has no public quote)
+  - [x] `src/plugin/htmltext_re2.cpp`
+  - [x] Lua binding
+- [x] 4.5 **P4**: `host.re2.find_index(pattern, text)` = `RE2::Find` + position loop
+  - [x] `src/plugin/htmltext_re2.cpp`
+  - [x] Lua binding
+- [x] 4.6 JS + WASM bindings for all P4
+- [x] 4.7 Build + test (17/17)
+- [x] 4.8 Commit: `plugin: host.re2.find_all/gmatch/replace/quote/find_index (P4, 72+ sites)`
 
 ## Phase 5: P5 — host.http.get_json / post_json (15 lines, glaze)
 

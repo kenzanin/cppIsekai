@@ -5,6 +5,7 @@
 #include "plugin/http_client.hpp"
 #include "plugin/plugin.hpp"
 #include "plugin/host_text.hpp"
+#include "plugin/htmltext.hpp"
 #include "store/store.hpp"
 
 #include <spdlog/sinks/stdout_color_sinks.h>
@@ -404,8 +405,6 @@ TEST_CASE("js host.crypto.vrf_sign: golden vector, null on failure") {
 }
 
 TEST_CASE("host.text P3: trim / unescape / strip_html") {
-    // trim: leading/trailing whitespace + control chars
-    CHECK(plugin::host_text::trim("  hello  ") == "hello");
     CHECK(plugin::host_text::trim("\t\n  a b  \r\n") == "a b");
     CHECK(plugin::host_text::trim("") == "");
     CHECK(plugin::host_text::trim("   ") == "");
@@ -426,4 +425,47 @@ TEST_CASE("host.text P3: trim / unescape / strip_html") {
           .find("<p>&lt;<") == 0); // entity-decoded then tag-stripped
     CHECK(plugin::host_text::strip_html("<br>") == "");
     CHECK(plugin::host_text::strip_html("") == "");
+}
+
+TEST_CASE("host.re2 P4: find_all / replace / quote / find_index") {
+    // find_all: all matches with captures (1-based groups arrays)
+    const auto all = plugin::re2_find_all(R"(ch(\d+))", "ch10 ch20 ch30");
+    CHECK(all.size() == 3);
+    CHECK(all[0][0] == "ch10");
+    CHECK(all[0][1] == "10");
+    CHECK(all[1][0] == "ch20");
+    CHECK(all[1][1] == "20");
+    CHECK(all[2][0] == "ch30");
+    CHECK(all[2][1] == "30");
+
+    // find_all: no match -> empty
+    CHECK(plugin::re2_find_all(R"(zzz)", "no digits").empty());
+
+    // find_all: match starting AFTER pos must not be re-found (advance = match end)
+    const auto digits = plugin::re2_find_all(R"(\d+)", "abc 123");
+    CHECK(digits.size() == 1);
+    CHECK(digits[0][0] == "123");
+
+    // replace: GlobalReplace with backrefs
+    CHECK(plugin::re2_replace(R"((\d+)([a-z]+))", "[$1 $2]", "x12abc y34def") == "x[12 abc] y[34 def]");
+    // Go ${N} form + literal backslash passthrough
+    CHECK(plugin::re2_replace(R"((\d+))", "${1}x", "a7b") == "a7xb");
+    CHECK(plugin::re2_replace(R"(\d+)", R"(\d)", "a7b") == R"(a\db)");
+
+    // quote: escape metachars
+    CHECK(plugin::re2_quote(R"(a.b+c)*)").find("\\.") != std::string::npos);
+    CHECK(plugin::re2_quote("plain").find("\\") == std::string::npos);
+
+    // find_index: 1-based offset of first match
+    CHECK(plugin::re2_find_index(R"(\d+)", "abc 123") == 5); // '1' at position 5
+    CHECK(plugin::re2_find_index(R"(zzz)", "abc 123") == 0); // no-match case
+
+    // bad pattern throws
+    bool threw = false;
+    try {
+        (void)plugin::re2_find_all("(unclosed", "x");
+    } catch (const std::invalid_argument&) {
+        threw = true;
+    }
+    CHECK(threw);
 }

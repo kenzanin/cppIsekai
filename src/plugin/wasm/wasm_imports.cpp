@@ -269,6 +269,134 @@ const void* host_re2_find(IM3Runtime rt, IM3ImportContext ctx, uint64_t* sp, voi
     return host_re2_call(rt, ctx, sp, mem, /*full=*/false);
 }
 
+// P4: find_all, replace, quote, find_index (thin marshals over the core)
+const void* host_re2_find_all(IM3Runtime, IM3ImportContext ctx, uint64_t* sp, void*) {
+    auto& self = *static_cast<Instance*>(ctx->userdata);
+    uint64_t* args = sp + 1;
+    const uint32_t pat_off = arg_i32(args);
+    const uint32_t pat_len = arg_i32(args);
+    const uint32_t txt_off = arg_i32(args);
+    const uint32_t txt_len = arg_i32(args);
+    const uint32_t out = arg_i32(args);
+    const uint32_t cap = arg_i32(args);
+
+    int32_t rc = kNotFound;
+    const auto pat = guest_str(self, pat_off, pat_len);
+    const auto txt = guest_str(self, txt_off, txt_len);
+    if (pat && txt) {
+        try {
+            const auto all = plugin::re2_find_all(*pat, *txt);
+            // JSON: [[g0,g1,...], [g0,g1,...], ...] -- array of arrays of strings
+            std::string json = "[";
+            for (size_t i = 0; i < all.size(); ++i) {
+                if (i != 0) {
+                    json += ',';
+                }
+                json += '[';
+                for (size_t j = 0; j < all[i].size(); ++j) {
+                    if (j != 0) {
+                        json += ',';
+                    }
+                    json += '"';
+                    for (const char c : all[i][j]) {
+                        if (c == '"' || c == '\\') {
+                            json += '\\';
+                        }
+                        json += c;
+                    }
+                    json += '"';
+                }
+                json += ']';
+            }
+            json += ']';
+            if (guest_write(self, out, cap, json)) {
+                rc = static_cast<int32_t>(json.size());
+            } else {
+                rc = kTruncated;
+            }
+        } catch (const std::invalid_argument&) {
+            rc = kBadPattern;
+        }
+    }
+    *reinterpret_cast<int32_t*>(sp) = rc;
+    return m3Err_none;
+}
+
+const void* host_re2_replace(IM3Runtime, IM3ImportContext ctx, uint64_t* sp, void*) {
+    auto& self = *static_cast<Instance*>(ctx->userdata);
+    uint64_t* args = sp + 1;
+    const uint32_t pat_off = arg_i32(args);
+    const uint32_t pat_len = arg_i32(args);
+    const uint32_t rep_off = arg_i32(args);
+    const uint32_t rep_len = arg_i32(args);
+    const uint32_t txt_off = arg_i32(args);
+    const uint32_t txt_len = arg_i32(args);
+    const uint32_t out = arg_i32(args);
+    const uint32_t cap = arg_i32(args);
+
+    int32_t rc = kNotFound;
+    const auto pat = guest_str(self, pat_off, pat_len);
+    const auto rep = guest_str(self, rep_off, rep_len);
+    const auto txt = guest_str(self, txt_off, txt_len);
+    if (pat && rep && txt) {
+        try {
+            const std::string result = plugin::re2_replace(*pat, *rep, *txt);
+            if (guest_write(self, out, cap, result)) {
+                rc = static_cast<int32_t>(result.size());
+            } else {
+                rc = kTruncated;
+            }
+        } catch (const std::invalid_argument&) {
+            rc = kBadPattern;
+        }
+    }
+    *reinterpret_cast<int32_t*>(sp) = rc;
+    return m3Err_none;
+}
+
+const void* host_re2_quote(IM3Runtime, IM3ImportContext ctx, uint64_t* sp, void*) {
+    auto& self = *static_cast<Instance*>(ctx->userdata);
+    uint64_t* args = sp + 1;
+    const uint32_t s_off = arg_i32(args);
+    const uint32_t s_len = arg_i32(args);
+    const uint32_t out = arg_i32(args);
+    const uint32_t cap = arg_i32(args);
+
+    int32_t rc = kNotFound;
+    if (const auto s = guest_str(self, s_off, s_len)) {
+        const std::string result = plugin::re2_quote(*s);
+        if (guest_write(self, out, cap, result)) {
+            rc = static_cast<int32_t>(result.size());
+        } else {
+            rc = kTruncated;
+        }
+    }
+    *reinterpret_cast<int32_t*>(sp) = rc;
+    return m3Err_none;
+}
+
+const void* host_re2_find_index(IM3Runtime, IM3ImportContext ctx, uint64_t* sp, void*) {
+    auto& self = *static_cast<Instance*>(ctx->userdata);
+    uint64_t* args = sp + 1;
+    const uint32_t pat_off = arg_i32(args);
+    const uint32_t pat_len = arg_i32(args);
+    const uint32_t txt_off = arg_i32(args);
+    const uint32_t txt_len = arg_i32(args);
+
+    int32_t rc = 0; // 0 = not found
+    const auto pat = guest_str(self, pat_off, pat_len);
+    const auto txt = guest_str(self, txt_off, txt_len);
+    if (pat && txt) {
+        try {
+            rc = static_cast<int32_t>(plugin::re2_find_index(*pat, *txt));
+        } catch (const std::invalid_argument&) {
+            rc = kBadPattern;
+        }
+    }
+    *reinterpret_cast<int32_t*>(sp) = rc;
+    return m3Err_none;
+}
+
 const void* host_html_call(IM3Runtime, IM3ImportContext ctx, uint64_t* sp, void*, bool want_attr) {
     auto& self = *static_cast<Instance*>(ctx->userdata);
     uint64_t* args = sp + 1;
@@ -509,6 +637,10 @@ constexpr std::array kImports{
     Import{"plugin_param", "i(iiii)", host_plugin_param},
     Import{"re2_match", "i(iiiiii)", host_re2_match},
     Import{"re2_find", "i(iiiiii)", host_re2_find},
+    Import{"re2_find_all", "i(iiiiiiiiii)", host_re2_find_all},
+    Import{"re2_replace", "i(iiiiiiiiii)", host_re2_replace},
+    Import{"re2_quote", "i(iiii)", host_re2_quote},
+    Import{"re2_find_index", "i(iiiiii)", host_re2_find_index},
     Import{"html_select", "i(iiiii)", host_html_select},
     Import{"html_attr", "i(iiiiiii)", host_html_attr},
     Import{"url_encode", "i(iiii)", host_url_encode},

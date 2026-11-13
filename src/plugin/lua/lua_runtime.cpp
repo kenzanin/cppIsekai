@@ -347,6 +347,64 @@ end
         }
         return out;
     };
+    // P4: find_all, gmatch (closure), replace, quote, find_index
+    re2["find_all"] = [](sol::this_state ts, const std::string& p, const std::string& t) -> sol::object {
+        std::vector<std::vector<std::string>> all;
+        try {
+            all = re2_find_all(p, t);
+        } catch (const std::invalid_argument& e) {
+            throw std::runtime_error(e.what());
+        }
+        sol::table out(ts.lua_state(), sol::new_table());
+        for (size_t i = 0; i < all.size(); ++i) {
+            sol::table row(ts.lua_state(), sol::new_table());
+            for (size_t j = 0; j < all[i].size(); ++j) {
+                row[j + 1] = all[i][j]; // 1-based per existing find/match convention
+            }
+            out[i + 1] = sol::make_object(ts.lua_state(), row);
+        }
+        return out;
+    };
+    re2["gmatch"] = [](sol::this_state ts, const std::string& p, const std::string& t) -> sol::object {
+        // Closure iterator over matches (same 1-based groups array as find_all).
+        std::vector<std::vector<std::string>> all;
+        try {
+            all = re2_find_all(p, t);
+        } catch (const std::invalid_argument& e) {
+            throw std::runtime_error(e.what());
+        }
+        auto shared = std::make_shared<std::vector<std::vector<std::string>>>(std::move(all));
+        auto* idx = new size_t(0); // heap: outlives the call
+        lua_State* L = ts.lua_state();
+        return sol::make_object(L, [shared, idx, L]() -> std::optional<sol::table> {
+            if (*idx >= shared->size()) {
+                return std::nullopt; // end
+            }
+            ++(*idx);
+            // Build a 1-based sol::table from shared->[*idx - 1]
+            sol::table row(L, sol::new_table());
+            const auto& groups = (*shared)[*idx - 1];
+            for (size_t j = 0; j < groups.size(); ++j) {
+                row[j + 1] = groups[j];
+            }
+            return std::optional<sol::table>(std::move(row));
+        });
+    };
+    re2["replace"] = [](const std::string& p, const std::string& r, const std::string& t) {
+        try {
+            return re2_replace(p, r, t);
+        } catch (const std::invalid_argument& e) {
+            throw std::runtime_error(e.what());
+        }
+    };
+    re2["quote"] = [](const std::string& s) { return re2_quote(s); };
+    re2["find_index"] = [](const std::string& p, const std::string& t) {
+        try {
+            return static_cast<long long>(re2_find_index(p, t)); // 0 = not found
+        } catch (const std::invalid_argument& e) {
+            throw std::runtime_error(e.what());
+        }
+    };
     fs_tab["re2"] = re2;
 
     // crypto: host-executed, plugin-declared transform. Returns (result, err) pair
