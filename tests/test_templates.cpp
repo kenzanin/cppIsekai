@@ -140,3 +140,30 @@ TEST_CASE("templates: each top-level page renders to its golden file") {
     check_golden("settings.mustache", active("settings"));
     check_golden("logs.mustache", logs_ctx());
 }
+
+// Badge semantics lock (architecture/library-page, user clarification
+// 2026-11-12): Done = read>=total regardless of has_update -- New and Done
+// coexist. A golden regen could silently re-XOR the badge behind New; this
+// asserts the rule, not the bytes.
+TEST_CASE("templates: card done badge ignores has_update, new stays gated") {
+    crow::mustache::set_base(CPPISEKAI_TEMPLATES_DIR);
+    const std::string got = crow::mustache::load("home.mustache").render(home_ctx()).dump();
+
+    // open tag of the badge span (x-show + class), sans trailing '>'.
+    auto open_tag = [&got](const char* label) {
+        const auto at = got.find(std::string(">").append(label).append("</span>"));
+        if (at == std::string::npos) return std::string();
+        const auto start = got.rfind("<span", at);
+        return start == std::string::npos ? std::string() : got.substr(start, at - start);
+    };
+
+    const std::string done = open_tag("Done");
+    CHECK(done.find("x-show") != std::string::npos); // span matched, not a degenerate
+    CHECK(done.find("dataset.read") != std::string::npos);
+    CHECK(done.find("dataset.total") != std::string::npos);
+    CHECK(done.find("dataset.update") == std::string::npos); // no New-XOR gate
+
+    const std::string upd = open_tag("New");
+    CHECK(upd.find("x-show") != std::string::npos);
+    CHECK(upd.find("dataset.update") != std::string::npos); // New stays has_update-gated
+}
