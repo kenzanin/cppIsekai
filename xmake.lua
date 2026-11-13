@@ -32,7 +32,7 @@ add_requires("sol2 3.5.0", {configs = {includes_lua = false}})
 add_requires("glaze 7.9.0", "thread-pool 5.1.0", "readerwriterqueue 1.0.7", "lexbor 3.0.0",
     "libzippp 7.1", "quickjs-ng 0.15.1", "simpleini 4.27", "sqlite_orm 1.9.1",
     "spdlog 1.17.0", "zlib 1.3.2", "sqlite3 3.54.0+100", "utf8proc 2.11.3", "re2 2025.11.05",
-    "date 3.0.4", "hash-library 2021.09.29")
+    "date 3.0.4", "hash-library 2021.09.29", "pugixml 1.16")
 
 -- add_files needs flat strings; cfg.files may embed the shared groups above
 local function flatten(list)
@@ -102,7 +102,7 @@ cxx_bin("cppIsekai", {
     incs = {"src"},
     deps = {"wasm3", "tiny-aes256"},
     pkgs = {"vips", "lua54"},
-    reqs = {"glaze", "sol2", "thread-pool", "readerwriterqueue", "lexbor", "libzippp", "quickjs-ng", "simpleini", "sqlite_orm", "spdlog", "zlib", "sqlite3", "utf8proc", "re2", "date", "hash-library"},
+    reqs = {"glaze", "sol2", "thread-pool", "readerwriterqueue", "lexbor", "libzippp", "quickjs-ng", "simpleini", "sqlite_orm", "spdlog", "zlib", "sqlite3", "utf8proc", "re2", "date", "hash-library", "pugixml"},
     ldflags = {CURL_SO},
     rpath = {CURL_LIB},
     defs = {'CPPISEKAI_FETCH_LIB_DIR="' .. CURL_LIB .. '"', "CROW_USE_LOCALTIMEZONE", "CROW_ENABLE_COMPRESSION"},
@@ -122,7 +122,7 @@ cxx_bin("test_plugin", {
     deps = {"wasm3", "tiny-aes256"},
 
     pkgs = {"lua54"},
-    reqs = {"glaze", "sol2", "thread-pool", "lexbor", "sqlite_orm", "readerwriterqueue", "quickjs-ng", "spdlog", "sqlite3", "utf8proc", "re2", "date", "hash-library"},
+    reqs = {"glaze", "sol2", "thread-pool", "lexbor", "sqlite_orm", "readerwriterqueue", "quickjs-ng", "spdlog", "sqlite3", "utf8proc", "re2", "date", "hash-library", "pugixml"},
     ldflags = {CURL_SO},
     rpath = {CURL_LIB},
     defs = {'TEST_PLUGIN_FIXTURES="$(projectdir)/tests/fixtures/plugins"'},
@@ -135,7 +135,7 @@ cxx_bin("test_htmltext", {
     deps = {"wasm3", "tiny-aes256"},
 
     pkgs = {"lua54"},
-    reqs = {"glaze", "sol2", "thread-pool", "lexbor", "sqlite_orm", "readerwriterqueue", "quickjs-ng", "spdlog", "sqlite3", "utf8proc", "re2", "date", "hash-library"},
+    reqs = {"glaze", "sol2", "thread-pool", "lexbor", "sqlite_orm", "readerwriterqueue", "quickjs-ng", "spdlog", "sqlite3", "utf8proc", "re2", "date", "hash-library", "pugixml"},
     ldflags = {CURL_SO},
     rpath = {CURL_LIB},
     defs = {'TEST_PLUGIN_FIXTURES="$(projectdir)/tests/fixtures/plugins"'},

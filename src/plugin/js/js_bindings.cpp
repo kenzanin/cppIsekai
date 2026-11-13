@@ -5,6 +5,7 @@
 #include "plugin/host_codecs.hpp"
 #include "plugin/host_crypto.hpp"
 #include "plugin/host_text.hpp"
+#include "plugin/host_xpath.hpp"
 #include "plugin/htmltext.hpp"  // host.re2/html core (task 1.3)
 #include "plugin/url_codec.hpp" // plugin::url_{encode,decode} -- host.url_* body
 #include "plugin/vrf.hpp"       // plugin::vrf_sign -- the host.crypto body
@@ -742,6 +743,24 @@ JSValue js_crypto_aes_gcm_decrypt(JSContext* ctx, JSValueConst /*this*/, int arg
     return JS_NewStringLen(ctx, pt->data(), pt->size());
 }
 
+// P8/P9: host.html.xpath(expr, html) -- array of string values (attr value /
+// text), null on xpath or parse error.
+JSValue js_html_xpath(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
+    if (argc != 2 || !JS_IsString(argv[0]) || !JS_IsString(argv[1])) {
+        return JS_ThrowTypeError(ctx, "html.xpath(expr, html)");
+    }
+    const auto vals = plugin::host_xpath::xpath(arg_str(ctx, argv[1]), arg_str(ctx, argv[0]));
+    if (!vals) {
+        return JS_NULL;
+    }
+    JSValue arr = JS_NewArray(ctx);
+    for (size_t i = 0; i < vals->size(); ++i) {
+        JS_SetPropertyUint32(ctx, arr, static_cast<uint32_t>(i),
+                             JS_NewStringLen(ctx, (*vals)[i].data(), (*vals)[i].size()));
+    }
+    return arr;
+}
+
 void bind_host_globals(JSContext* c) {
     JSValue g = JS_GetGlobalObject(c);
     const auto bind = [&](JSValue obj, const char* name, JSValue fn) {
@@ -794,6 +813,7 @@ void bind_host_globals(JSContext* c) {
     JSValue html = JS_NewObject(c);
     bind(html, "select", JS_NewCFunction(c, js_html_select, "select", 2));
     bind(html, "attr", JS_NewCFunction(c, js_html_attr, "attr", 3));
+    bind(html, "xpath", JS_NewCFunction(c, js_html_xpath, "xpath", 2));
     bind(host, "html", html);
 
     // Query-component codec, same core lua's host.url_* delegate to.

@@ -6,6 +6,7 @@
 #include "plugin/http_client.hpp"
 #include "plugin/host_codecs.hpp"
 #include "plugin/host_crypto.hpp"
+#include "plugin/host_xpath.hpp"
 #include "plugin/plugin.hpp"
 #include "plugin/vrf.hpp"
 
@@ -547,6 +548,18 @@ end
     };
     html["attr"] = [to_table](sol::this_state ts, const std::string& h, const std::string& c,
                               const std::string& a) -> sol::object { return to_table(ts, html_attr(h, c, a)); };
+    // P8/P9: host.html.xpath(expr, html) -> string table; nil on bad expr.
+    html["xpath"] = [](const std::string& expr, const std::string& doc, sol::this_state ts) -> sol::object {
+        const auto vals = plugin::host_xpath::xpath(doc, expr);
+        if (!vals) {
+            return sol::make_object(ts, sol::lua_nil);
+        }
+        sol::table out(ts.lua_state(), sol::new_table());
+        for (size_t i = 0; i < vals->size(); ++i) {
+            out[i + 1] = (*vals)[i];
+        }
+        return sol::make_object(ts, out);
+    };
     fs_tab["html"] = html;
 }
 

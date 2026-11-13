@@ -7,6 +7,7 @@
 #include "plugin/host_codecs.hpp"
 #include "plugin/host_crypto.hpp"
 #include "plugin/host_text.hpp"
+#include "plugin/host_xpath.hpp"
 #include "plugin/htmltext.hpp"
 #include "store/store.hpp"
 
@@ -222,6 +223,40 @@ TEST_CASE("host.crypto P7: sha256 / md5 / hmac / aes_gcm") {
                                 "8cb08e48590dbb3da7b08b1056828838c5f61e6393ba7a0abcc9f662898015ad",
                                 "b094dac5d93471bdec1a502270e3cc6c", "00112233445566778899aabbccddeeff"));
     CHECK_FALSE(aes_gcm_decrypt("cafebabefacedbaddecaf888", "zz", "b094dac5d93471bdec1a502270e3cc6c", K));
+}
+
+TEST_CASE("host.html P8/P9: xpath") {
+    using plugin::host_xpath::xpath;
+    const std::string doc = "<div class=\"a\"><span>one</span><span data-x=\"2\">two</span></div>";
+
+    const auto spans = xpath(doc, "//span");
+    REQUIRE(spans.has_value());
+    CHECK(spans->size() == 2); // count via size; count() is no node-set
+    CHECK((*spans)[0] == "one");
+    CHECK((*spans)[1] == "two");
+
+    const auto cls = xpath(doc, "//div/@class");
+    REQUIRE(cls.has_value());
+    CHECK(cls->size() == 1);
+    CHECK((*cls)[0] == "a");
+
+    const auto img = xpath("<div><img src=x.png></div>", "//img/@src"); // void-close path
+    REQUIRE(img.has_value());
+    CHECK(img->size() == 1);
+    CHECK((*img)[0] == "x.png");
+
+    const auto parts = xpath("<div><p>br<br>sep &amp; ok&nbsp;!</p></div>", "//p/text()");
+    REQUIRE(parts.has_value());
+    CHECK(parts->size() == 2); // <br> splits the pcdata in two
+    // &amp; decoded by pugixml, &nbsp; folded to UTF-8 by the fixup
+    CHECK((*parts)[1] == "sep & ok\xC2\xA0!");
+
+    const auto none = xpath(doc, "//missing");
+    REQUIRE(none.has_value());
+    CHECK(none->empty());
+
+    CHECK_FALSE(xpath(doc, "//[")); // bad expr -> nullopt
+    CHECK_FALSE(xpath(doc, "normalize-space(//p)")); // non-node-set -> nullopt
 }
 
 TEST_CASE("host.http P5: get_json / post_json") {
