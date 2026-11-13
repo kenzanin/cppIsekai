@@ -1,0 +1,8 @@
+{
+  "name": "MangaTown",
+  "id": "mangatown",
+  "version": "1.0.0",
+  "website": "https://m.mangatown.com",
+  "runtime": "js",
+  "capabilities": ["search", "detail", "chapters"], "api": 1
+}

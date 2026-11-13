@@ -19,8 +19,9 @@
 
 ## Phase 2 — JS (quickjs-ng): port goIsekai JS sites
 
-- [ ] 2.1 JS loader host-tool bindings confirmed present (`src/plugin/js/js_bindings.cpp`: http.fetch/fetch_body/get_json/post_json, re2.*, html.*, text.*, codecs.*, crypto.* (vrf+sha256/md5/hmac/aes_gcm), config.get, storage, log, require, url_*). NOT re-wire. Smoke-test one JS site.
-- [ ] 2.2 Smoke-test one JS site end-to-end
+- [x] 2.1 JS loader host-tool bindings confirmed present (`src/plugin/js/js_bindings.cpp`: http.fetch/fetch_body/get_json/post_json, re2.*, html.*, text.*, codecs.*, crypto.* (vrf+sha256/md5/hmac/aes_gcm), config.get, storage, log, require, url_*). NOT re-wire. Smoke-test one JS site.
+- [x] 2.2 Smoke-test one JS site end-to-end
+  pilot: mangatown
 - [ ] 2.3 Port remaining goIsekai JS sites to `plugins_dev/js/<site>/` (main.json + main.js)
 - [ ] 2.4 HAR-verify each JS ported plugin
 - [ ] 2.5 Full test suite green; JS runtime loads plugins
