@@ -1,4 +1,8 @@
 ## 2026-11-13
+* **Update**: Linked `references/host-tool-gap-analysis.md` to `references/daemon-run-verify.md` (P1–P9 host tools verified live through the daemon restart documented there.).
+* **Update**: Linked `references/host-tool-gap-analysis.md` to `references/openspec-delta-spec-format.md` (The delta format gate blocked this change's first archive attempt (2026-11-13).).
+* **Creation**: Documented concept `references/daemon-run-verify.md` (Daemon run & verify (run-cppIsekai.sh)).
+* **Creation**: Documented concept `references/openspec-delta-spec-format.md` (openspec delta spec format (archive gate)).
 * **Update**: Updated concept `references/host-tool-gap-analysis.md`.
 * **Update**: Linked `decisions/xrepo-packages-offline-workflow.md` to `decisions/xrepo-round-2-deps.md` (Round-2 pins are the package set exported by this offline workflow).
 * **Update**: Linked `decisions/xrepo-packages-offline-workflow.md` to `decisions/xmake-build-system.md` (Same build-system decision family: xmake primary, with this concept covering offline package pinning/export around it).

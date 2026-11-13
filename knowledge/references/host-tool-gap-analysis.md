@@ -1,9 +1,9 @@
 ---
 type: reference
 title: host-tool gap analysis (goIsekai → cppIsekai)
-description: "goIsekai→cppIsekai host-tool gap map (P1–P9) with implementation status: P1–P7 landed with commits, P8 skipped (CDP), P9 pugixml in progress."
+description: "goIsekai→cppIsekai host-tool gap map (P1–P9): ALL phases landed, change ARCHIVED 2026-11-13, main spec openspec/specs/host-tools/spec.md (7 requirements); P8 skipped (CDP)."
 tags: [host-tools, gap-analysis, goisekai-porting, priority]
-generated: { by: agent/mcp, at: "2026-11-13T10:27:48Z" }
+generated: { by: agent/mcp, at: "2026-11-13T11:23:44Z" }
 status: draft
 ---
 
@@ -23,8 +23,10 @@ Mapping lengkap host-tools yang goIsekai Lua plugin pakai (38 sites, ~1400 call 
 | P6 codecs base64/hex (reuse vrf_b64_decode) | ✅ done | 3e2d6cd |
 | P7 crypto sha256/md5/hmac/aes_gcm (hash-library + tiny-aes256 local target) | ✅ done | 45a1f5f |
 | P8 browser.* | ⏭️ skipped — CDP cookie duration too short | — |
-| P9 html.xpath (pugixml v1.16) | 🔄 in progress | — |
-| Phase 9 docs | pending | — |
+| P9 html.xpath (pugixml v1.16) | ✅ done | e56415c |
+| Phase 9 docs (knowledge + plugin-port parity sync) | ✅ done | 780dc73, 87bc2c2 |
+
+ARCHIVED 2026-11-13 as `openspec/changes/archive/2026-11-13-host-tool-gap/`; main spec created at `openspec/specs/host-tools/spec.md` (7 requirements merged by `openspec archive`). Archive commit `679f51f`.
 
 All phases gated: zero-warning build + 17/17 tests. Bindings are thin marshals over one shared core per rule (host helpers written once, linked into sol2/quickjs-ng/wasm3).
 
@@ -56,7 +58,7 @@ All phases gated: zero-warning build + 17/17 tests. Bindings are thin marshals o
 | P6 | `host.codecs.*` (base64/hex; base64url covered by vrf_b64url) | 12 | ✅ | std |
 | P7 | `host.crypto.*` (sha256/md5/hmac/aes_gcm) | 5+3 | ✅ | hash-library + tiny-aes256 (local target; xrepo recipe is AES128-only) |
 | P8 | `host.browser.*` | 3 | ⏭️ skipped | CDP cookie duration too short; curl-impersonate covers request-fingerprint half |
-| P9 | `host.html.xpath` | 6 | 🔄 | pugixml v1.16 (lexbor parse → XML serialize → select_nodes) |
+| P9 | `host.html.xpath` | 6 | ✅ | pugixml v1.16 (lexbor parse → HTML5 serialize + void-self-close + 10-entity fold → select_nodes) |
 
 ## Fetch repeats
 - `kaliscan` pake 5 fetch per search (walk pages) → cache LRU per-query
@@ -84,3 +86,5 @@ All phases gated: zero-warning build + 17/17 tests. Bindings are thin marshals o
 
 # Related Concepts
 - [goIsekai -> cppIsekai plugin porting matrix](plugin-porting-matrix-goIsekai.md): Gap analysis menginformasikan prioritas porting plugin (P1-P9) — matrix menentukan site mana yang di-port, analysis menentukan apa yang perlu ditambal di host dulu.
+- [openspec delta spec format (archive gate)](openspec-delta-spec-format.md): The delta format gate blocked this change's first archive attempt (2026-11-13).
+- [Daemon run & verify (run-cppIsekai.sh)](daemon-run-verify.md): P1–P9 host tools verified live through the daemon restart documented there.
