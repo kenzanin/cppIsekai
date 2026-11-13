@@ -109,7 +109,7 @@ function gridPage() {
              style="{{#cover}}display:none;{{/cover}}">{{name}}</div>
         <div class="absolute left-2 top-2 flex items-center gap-1">
           <span x-show="(+$el.closest('li').dataset.update) > 0" class="rounded bg-red-600/70 px-2 py-0.5 text-[12px] font-semibold uppercase tracking-wide text-white">New</span>
-          <span x-show="!((+$el.closest('li').dataset.update) > 0) && (+$el.closest('li').dataset.total || 0) > 0 && (+$el.closest('li').dataset.read || 0) >= (+$el.closest('li').dataset.total || 0)" class="rounded bg-emerald-600/70 px-2 py-0.5 text-[12px] font-semibold uppercase tracking-wide text-white">Done</span>
+          <span x-show="(+$el.closest('li').dataset.total || 0) > 0 && (+$el.closest('li').dataset.read || 0) >= (+$el.closest('li').dataset.total || 0)" class="rounded bg-emerald-600/70 px-2 py-0.5 text-[12px] font-semibold uppercase tracking-wide text-white">Done</span>
           <span x-show="$el.closest('li').dataset.status" class="rounded bg-black/40 px-2 py-0.5 text-[12px] font-medium uppercase tracking-wide text-zinc-100" x-text="$el.closest('li').dataset.status"></span>
         </div>
         <button class="absolute left-2 bottom-2 rounded bg-black/40 px-2 py-0.5 text-[12px] text-zinc-100 hover:bg-black/60 flex items-center gap-1.5" @click.prevent="setPlugin('{{plugin}}')"><img src="/plugin/{{plugin}}/logo" alt="" class="w-5 h-5 rounded-sm" onerror="this.style.display='none'">{{plugin}}</button>
