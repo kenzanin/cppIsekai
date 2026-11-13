@@ -1,0 +1,1 @@
+{ "name": "AnisaScan", "id": "anisascans", "version": "1.0.0", "website": "https://anisascans.in", "runtime": "lua", "capabilities": ["search", "detail", "chapters"], "api": 1 }
