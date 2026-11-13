@@ -40,6 +40,9 @@ Pilot first: one site per language (1 Lua, 1 JS, 1 WASM) as smoke test, then bul
 **D6. Verification = HAR replay.**
 Each ported plugin verified against `~/tmp/goIsekai/tmp/*.har` + `~/tmp/goIsekai/tmp/har/` real traffic. No live site dependence for CI.
 
+**D7. WASM toolchain = wasi-sdk (clang → wasm32-wasi).**
+Host already ships `wasi-sdk-git` + `odin` (pacman); xrepo has neither. wasm3 imports (`env.*`) are a plain C ABI — wasi-sdk maps 1:1 with no runtime baggage; odin's wasm story is dev-channel and its runtime assumes more than bare wasm3 provides. Plugin authors write C against `src/plugin/wasm/wasm_imports.cpp` decls, compile `clang --target=wasm32-wasi -nostdlib -Wl,--no-entry` → `main.wasm`. Revisit only if a port needs odin-specific sources.
+
 ## Risks / Trade-offs
 
 - [quickjs-ng host bindings new surface] → JS loader already exists (`src/plugin/js/js_bindings.cpp`); start with one site smoke test before bulk port.

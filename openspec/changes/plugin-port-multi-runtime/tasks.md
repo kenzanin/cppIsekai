@@ -27,7 +27,7 @@
 
 ## Phase 3 — WASM (wasm3): port goIsekai WASM sites
 
-- [ ] 3.1 Choose toolchain: wasi-sdk vs odin (record decision) — wasm3 loader + imports present (`src/plugin/wasm/wasm_imports.cpp`); site plugins mostly Go/odin compiled → toolchain decision matters
+- [x] 3.1 Choose toolchain: wasi-sdk vs odin (record decision) — **DECIDED: wasi-sdk** (design D7; host pacman `wasi-sdk-git`, clang → wasm32-wasi, C ABI maps 1:1 to wasm3 `env.*` imports; odin dev-channel risk) — wasm3 loader + imports present (`src/plugin/wasm/wasm_imports.cpp`); site plugins mostly Go/odin compiled → toolchain decision matters
 - [ ] 3.2 wasm3 loader host-tool bindings confirmed present (http.fetch/fetch_body/get_json/post_json, re2.*, html.*, text.*, codecs.*, crypto.* (vrf+sha256/md5/hmac/aes_gcm), url_*)
 - [ ] 3.3 Smoke-test one WASM site end-to-end
 - [ ] 3.4 Port goIsekai WASM sites to `plugins_dev/wasm/<site>/` (main.json + main.wasm)
