@@ -1,4 +1,5 @@
 ## 2026-11-13
+* **Update**: Updated concept `references/host-tool-gap-analysis.md`.
 * **Update**: Linked `decisions/xrepo-packages-offline-workflow.md` to `decisions/xrepo-round-2-deps.md` (Round-2 pins are the package set exported by this offline workflow).
 * **Update**: Linked `decisions/xrepo-packages-offline-workflow.md` to `decisions/xmake-build-system.md` (Same build-system decision family: xmake primary, with this concept covering offline package pinning/export around it).
 * **Creation**: Documented concept `decisions/xrepo-packages-offline-workflow.md` (xrepo offline packages workflow: batch export + import -i packages (packages/ stays gitignored)).
