@@ -7,6 +7,11 @@
         <span class="block text-lg font-semibold text-zinc-100">{{saved_total_all}}</span>
         <span class="block text-xs text-zinc-500">titles · reset filters</span>
       </button>
+      <button onclick="window.dispatchEvent(new CustomEvent('grid:toggle-dup'))"
+              class="block w-full text-left px-3 py-2 rounded border border-zinc-700 bg-zinc-900 hover:bg-zinc-800">
+        <span class="block text-lg font-semibold text-zinc-100">{{dup_total}}</span>
+        <span class="block text-xs text-zinc-500">duplicates · filter clusters</span>
+      </button>
       {{/saved_mode}}
       <nav class="space-y-1">
         <a href="/" data-grid-plugin="" class="block px-2 py-1 rounded {{^filtered}}bg-zinc-800{{/filtered}}"

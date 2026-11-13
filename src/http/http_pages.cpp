@@ -75,6 +75,7 @@ crow::json::wvalue home_context(Store& store, BS::thread_pool<>& db, const crow:
     // library-save 4.1: saved entries are the Library — when any are saved,
     // the grid renders them (added_at desc) instead of the search-cache titles.
     const int saved_total_all = static_cast<int>(saved.size());
+    const int dup_total = static_cast<int>(std::count_if(saved.begin(), saved.end(), [](const SavedManga& m) { return m.dup_group > 0; }));
     // Cover prefetch: hand the saved covers to the cover worker; cache-first,
     // so entries already on disk are not re-fetched.
     // overlay chosen enrichment covers so the grid matches the detail page
@@ -119,6 +120,7 @@ crow::json::wvalue home_context(Store& store, BS::thread_pool<>& db, const crow:
         saved_rows.push_back(std::move(row));
     }
     ctx["saved_list"] = std::move(saved_rows);
+    ctx["dup_total"] = std::to_string(dup_total); // library-dedup 4.1: sidebar duplicate count card
     ctx["saved_total"] = std::to_string(saved.size());
     ctx["saved_total_all"] = std::to_string(saved_total_all); // controls 2.1: sidebar total card
 

@@ -81,6 +81,11 @@
         <span class="block text-lg font-semibold text-zinc-100"></span>
         <span class="block text-xs text-zinc-500">titles · reset filters</span>
       </button>
+      <button onclick="window.dispatchEvent(new CustomEvent('grid:toggle-dup'))"
+              class="block w-full text-left px-3 py-2 rounded border border-zinc-700 bg-zinc-900 hover:bg-zinc-800">
+        <span class="block text-lg font-semibold text-zinc-100"></span>
+        <span class="block text-xs text-zinc-500">duplicates · filter clusters</span>
+      </button>
       <nav class="space-y-1">
         <a href="/" data-grid-plugin="" class="block px-2 py-1 rounded bg-zinc-800"
            onclick="event.preventDefault();window.dispatchEvent(new CustomEvent('grid:plugin',{detail:''}))"
@@ -130,6 +135,7 @@
               if (p) this.plugin = p;
               window.addEventListener('grid:reset', () => this.reset());
               window.addEventListener('grid:plugin', (e) => { this.plugin = e.detail || ''; this.page = 1; this.apply(); });
+              window.addEventListener('grid:toggle-dup', () => this.toggleFilter('dup'));
               document.body.addEventListener('htmx:afterSwap', () => { this.rescan(); this.apply(); });
               this.apply();
             },

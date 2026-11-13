@@ -11,6 +11,7 @@ function gridPage() {
       if (p) this.plugin = p;
       window.addEventListener('grid:reset', () => this.reset());
       window.addEventListener('grid:plugin', (e) => { this.plugin = e.detail || ''; this.page = 1; this.apply(); });
+      window.addEventListener('grid:toggle-dup', () => this.toggleFilter('dup'));
       document.body.addEventListener('htmx:afterSwap', () => { this.rescan(); this.apply(); });
       this.apply();
     },
