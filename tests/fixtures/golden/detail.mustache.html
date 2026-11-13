@@ -341,7 +341,6 @@ function detailPage() {
       await this.load();
       // cover img renders via x-if after load(); paintDim at DOMContentLoaded missed it
       this.$nextTick(() => window.paintDim && window.paintDim());
-      this.loadChapterState();
     },
     normAltTitle(s) { return String(s || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim(); },
     altTitleCandidates() {
@@ -513,6 +512,7 @@ function detailPage() {
         this.chapters = (c.data || []).slice().sort((a, b) => (b.number ?? 0) - (a.number ?? 0));
         this.mergeSavedRelated(); // re-merge chosen.related_add now that /api/detail is in
         this.checkCbz();
+        await this.loadChapterState(); // chapters are fresh objects -- re-apply done/read flags
       } catch (e) { this.err = String(e); }
       this.loading = false;
     },
