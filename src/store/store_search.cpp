@@ -2,10 +2,13 @@
 #include "store_internal.hpp"
 
 #include <algorithm>
+#include <cstdlib>
 #include <cstdint>
 #include <ctime>
 #include <map>
+#include <vector>
 #include <sqlite3.h>
+#include <utf8proc.h>
 #include <stdexcept>
 #include <utility>
 using namespace sqlite_orm;
@@ -71,57 +74,12 @@ void fts_delete(StoreImpl& impl, const std::string& plugin, const std::string& s
     }
     sqlite3_close(db);
 }
-// --- library-dedup 2.1: tokeniser (design D5) -----------------------
-// unicode-aware lowercase + mark strip + punctuation strip, collapse runs.
-// No new dep (design D5): covers ASCII + Latin Ext A/B folding + kana folding.
-// ponytail: full NFKD needs ICU — if arbitrary combining classes become an
-// issue, swap fold_codepoint for ICU. Mark strip covers Mn ranges we care about.
-uint32_t decode_utf8(const char*& p, const char* end) {
-    const auto b0 = static_cast<unsigned char>(*p++);
-    if (b0 < 0x80) {
-        return b0;
-    }
-    if ((b0 & 0xE0) == 0xC0 && p < end) {
-        return ((b0 & 0x1F) << 6) | (static_cast<unsigned char>(*p++) & 0x3F);
-    }
-    if ((b0 & 0xF0) == 0xE0 && end - p >= 2) {
-        uint32_t cp = (b0 & 0x0F) << 12;
-        cp |= (static_cast<unsigned char>(*p++) & 0x3F) << 6;
-        cp |= static_cast<unsigned char>(*p++) & 0x3F;
-        return cp;
-    }
-    if ((b0 & 0xF8) == 0xF0 && end - p >= 3) {
-        uint32_t cp = (b0 & 0x07) << 18;
-        cp |= (static_cast<unsigned char>(*p++) & 0x3F) << 12;
-        cp |= (static_cast<unsigned char>(*p++) & 0x3F) << 6;
-        cp |= static_cast<unsigned char>(*p++) & 0x3F;
-        return cp;
-    }
-    return 0xFFFD; // replacement char: token boundary
-}
-void encode_utf8(uint32_t cp, std::string& out) {
-    if (cp < 0x80) {
-        {
-            out.push_back(static_cast<char>(cp));
-        }
-    } else if (cp < 0x800) {
-        out.push_back(static_cast<char>(0xC0 | (cp >> 6)));
-        out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
-    } else if (cp < 0x10000) {
-        out.push_back(static_cast<char>(0xE0 | (cp >> 12)));
-        out.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
-        out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
-    } else {
-        out.push_back(static_cast<char>(0xF0 | (cp >> 18)));
-        out.push_back(static_cast<char>(0x80 | ((cp >> 12) & 0x3F)));
-        out.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
-        out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
-    }
-}
-bool is_mark(uint32_t cp) { // Mn ranges: combining diacritics + kana dakuten/handakuten
-    return (cp >= 0x0300 && cp <= 0x036F) || (cp == 0x3099 || cp == 0x309A) || (cp >= 0x20D0 && cp <= 0x20FF) ||
-           (cp >= 0xFE20 && cp <= 0xFE2F);
-}
+// --- library-dedup 2.1 tokeniser (design D5) -----------------------
+// utf8proc pipeline: NFKD + casefold + strip combining marks; per-cp
+// katakana->hiragana fold plus a tiny no-decomposition letter table.
+// (ponytail upgrade of the hand-rolled Latin tables: full-Unicode
+// folding without ICU. Tokens are runtime-only: dup groups recompute
+// from titles on the next pass, no stored-token migration.)
 bool is_separator(uint32_t cp) {
     if (cp < 0x21) {
         return true; // C0 controls + space
@@ -141,56 +99,37 @@ bool is_separator(uint32_t cp) {
     return cp == 0xFF0C || cp == 0xFF0E || cp == 0xFF1A || cp == 0xFF1B || cp == 0xFF08 || cp == 0xFF09 ||
            cp == 0xFF5B || cp == 0xFF5D;
 }
-// Latin letters with diacritics -> ASCII base (lowercase input only).
-uint32_t fold_latin(uint32_t cp) {
-    struct Pair {
-        uint32_t from, to;
-    };
-    static constexpr Pair kTable[] = {
-        {.from = 0xE1, .to = 'a'},   {.from = 0xE0, .to = 'a'},   {.from = 0xE2, .to = 'a'},
-        {.from = 0xE4, .to = 'a'},   {.from = 0xE3, .to = 'a'},   {.from = 0xE5, .to = 'a'},
-        {.from = 0x0101, .to = 'a'}, {.from = 0x0103, .to = 'a'}, {.from = 0x0105, .to = 'a'},
-        {.from = 0xE9, .to = 'e'},   {.from = 0xE8, .to = 'e'},   {.from = 0xEA, .to = 'e'},
-        {.from = 0xEB, .to = 'e'},   {.from = 0x0113, .to = 'e'}, {.from = 0x0115, .to = 'e'},
-        {.from = 0x0117, .to = 'e'}, {.from = 0x0119, .to = 'e'}, {.from = 0x011B, .to = 'e'},
-        {.from = 0xED, .to = 'i'},   {.from = 0xEC, .to = 'i'},   {.from = 0xEE, .to = 'i'},
-        {.from = 0xEF, .to = 'i'},   {.from = 0x012B, .to = 'i'}, {.from = 0x012D, .to = 'i'},
-        {.from = 0x012F, .to = 'i'}, {.from = 0x0131, .to = 'i'}, {.from = 0xF3, .to = 'o'},
-        {.from = 0xF2, .to = 'o'},   {.from = 0xF4, .to = 'o'},   {.from = 0xF6, .to = 'o'},
-        {.from = 0xF5, .to = 'o'},   {.from = 0xF8, .to = 'o'},   {.from = 0x014D, .to = 'o'},
-        {.from = 0x014F, .to = 'o'}, {.from = 0x0151, .to = 'o'}, {.from = 0xFA, .to = 'u'},
-        {.from = 0xF9, .to = 'u'},   {.from = 0xFB, .to = 'u'},   {.from = 0xFC, .to = 'u'},
-        {.from = 0x016B, .to = 'u'}, {.from = 0x016D, .to = 'u'}, {.from = 0x016F, .to = 'u'},
-        {.from = 0x0171, .to = 'u'}, {.from = 0xF1, .to = 'n'},   {.from = 0x0144, .to = 'n'},
-        {.from = 0x0146, .to = 'n'}, {.from = 0x0148, .to = 'n'}, {.from = 0x014A, .to = 'n'},
-        {.from = 0xE7, .to = 'c'},   {.from = 0x0107, .to = 'c'}, {.from = 0x0109, .to = 'c'},
-        {.from = 0x010B, .to = 'c'}, {.from = 0x010D, .to = 'c'}, {.from = 0x015B, .to = 's'},
-        {.from = 0x015D, .to = 's'}, {.from = 0x015F, .to = 's'}, {.from = 0x0161, .to = 's'},
-        {.from = 0x017F, .to = 's'}, {.from = 0x00DF, .to = 's'}, {.from = 0x017A, .to = 'z'},
-        {.from = 0x017C, .to = 'z'}, {.from = 0x017E, .to = 'z'}, {.from = 0xFD, .to = 'y'},
-        {.from = 0xFF, .to = 'y'},   {.from = 0x0177, .to = 'y'}, {.from = 0x00FD, .to = 'y'},
-        {.from = 0x00E6, .to = 'a'}, {.from = 0x0153, .to = 'o'}, {.from = 0x00FE, .to = 't'},
-        {.from = 0x0111, .to = 'd'}, {.from = 0x0139, .to = 'l'}, {.from = 0x013E, .to = 'l'},
-        {.from = 0x0142, .to = 'l'}, {.from = 0x0154, .to = 'r'}, {.from = 0x0156, .to = 'r'},
-        {.from = 0x0158, .to = 'r'}, {.from = 0x0162, .to = 't'}, {.from = 0x0164, .to = 't'},
-        {.from = 0x0165, .to = 't'},
-    };
-    for (const auto& p : kTable) {
-        if (p.from == cp) {
-            return p.to;
-        }
+// Letters utf8proc NFKD leaves intact (no decomposition) -> ASCII base,
+// mirroring the old fold table's coverage.
+uint32_t fold_residual(uint32_t cp) {
+    switch (cp) {
+        case 0x00F8: return 'o'; // ø
+        case 0x00E6: return 'a'; // æ
+        case 0x0111: return 'd'; // đ
+        case 0x0131: return 'i'; // ı
+        case 0x0142: return 'l'; // ł
+        case 0x014A: return 'n'; // ŋ
+        case 0x0153: return 'o'; // œ
+        case 0x00FE: return 't'; // þ
+        default: return cp;
     }
-    return cp;
 }
-uint32_t fold_codepoint(uint32_t cp) {
+void encode_utf8(uint32_t cp, std::string& out) {
     if (cp < 0x80) {
-        return (cp >= 'A' && cp <= 'Z') ? cp + 32 : cp;
+        out.push_back(static_cast<char>(cp));
+    } else if (cp < 0x800) {
+        out.push_back(static_cast<char>(0xC0 | (cp >> 6)));
+        out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    } else if (cp < 0x10000) {
+        out.push_back(static_cast<char>(0xE0 | (cp >> 12)));
+        out.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+        out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    } else {
+        out.push_back(static_cast<char>(0xF0 | (cp >> 18)));
+        out.push_back(static_cast<char>(0x80 | ((cp >> 12) & 0x3F)));
+        out.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+        out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
     }
-    cp = fold_latin(cp);
-    if (cp >= 0x30A1 && cp <= 0x30F6) {
-        return cp - 0x60; // katakana -> hiragana
-    }
-    return cp;
 }
 using TokenMultiset = std::map<std::string, int>;
 TokenMultiset tokenize(const std::string& s) {
@@ -203,18 +142,26 @@ TokenMultiset tokenize(const std::string& s) {
         out[std::move(cur)] += 1;
         cur.clear();
     };
-    const char* p = s.data();
-    const char* end = p + s.size();
-    while (p < end) {
-        const uint32_t cp = decode_utf8(p, end);
+    const utf8proc_ssize_t max_cp = static_cast<utf8proc_ssize_t>(s.size()) * 4 + 16;
+    std::vector<utf8proc_int32_t> buffer(max_cp);
+    const utf8proc_ssize_t ncp = utf8proc_decompose(
+        reinterpret_cast<const utf8proc_uint8_t*>(s.data()),
+        static_cast<utf8proc_ssize_t>(s.size()),
+        buffer.data(), max_cp,
+        static_cast<utf8proc_option_t>(UTF8PROC_COMPAT | UTF8PROC_DECOMPOSE | UTF8PROC_CASEFOLD | UTF8PROC_STRIPMARK));
+    if (ncp < 0) {
+        return out; // undecomposable input: no tokens
+    }
+    for (utf8proc_ssize_t i = 0; i < ncp; ++i) {
+        const uint32_t cp = static_cast<uint32_t>(buffer[i]);
         if (is_separator(cp)) {
             flush();
             continue;
         }
-        if (is_mark(cp)) {
-            continue; // NFKD + strip marks (drop dakuten-class marks)
+        uint32_t folded = fold_residual(cp);
+        if (folded >= 0x30A1 && folded <= 0x30F6) {
+            folded -= 0x60; // katakana -> hiragana
         }
-        const uint32_t folded = fold_codepoint(cp);
         if ((folded >= 'a' && folded <= 'z') || (folded >= '0' && folded <= '9')) {
             cur.push_back(static_cast<char>(folded));
         } else if (folded >= 0x1100) {

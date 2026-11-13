@@ -5,19 +5,18 @@ Local C++23 daemon.
 ## Build
 
 ```bash
-cmake -S . -B build -G Ninja
-cmake --build build
-./build/cppIsekai
+xmake -y
+xmake test
+./run-cppIsekai.sh
 ```
 
-System prerequisites (Arch): `sudo pacman -S libvips lua54 curl crow asio ninja`.
+System prerequisites (Arch): `sudo pacman -S libvips curl crow asio`.
 
 ## System dependencies (shared, not vendored)
 
 | Lib | Version | License | Role |
 |---|---|---|---|
 | libvips | 8.18.7 | LGPL-2.1 | image processing (WebP/AVIF) |
-| lua54 | 5.4.9 | MIT | Lua runtime for sol2 |
 | crow | 1.3.4 | BSD-3-Clause | micro web framework (HTTP/WebSocket) |
 | asio | 1.38.2 | BSL-1.0 | async networking under Crow |
 | curl (headers) | 8.23 | MIT-like | ABI headers for curl-impersonate |
@@ -40,6 +39,12 @@ System prerequisites (Arch): `sudo pacman -S libvips lua54 curl crow asio ninja`
 | readerwriterqueue | 1.0.7 | SPSC queues |
 | lexbor | 3.0.0 | HTML parse (plugin htmltext) |
 | libzippp | 7.1 | CBZ export wrapper |
+| lua | 5.4.8 | MIT | Lua 5.4 runtime (plugin VM) |
+| spdlog | 1.17.0 | MIT | logging |
+| zlib | 1.3.2 | zlib | crow HTTP compression |
+| sqlite3 | 3.54.0 | Public Domain | store engine |
+| utf8proc | 2.11.3 | MIT | Unicode NFKD tokeniser (library-dedup) |
+| re2 | 2025.11.05 | BSD-3-Clause | regex (html text extraction) |
 | quickjs-ng | 0.15.1 | JS plugin runtime |
 | simpleini | 4.27 | ini config read/write |
 | sqlite_orm | 1.9.1 | store ORM |

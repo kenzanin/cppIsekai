@@ -21,13 +21,17 @@ local PLUGIN_SRC = {"src/plugin/plugin_core.cpp", "src/plugin/plugin_load.cpp", 
                     "src/plugin/htmltext_html.cpp"}
 local FETCH_SRC = {"src/fetch/fetch.cpp", "src/fetch/fetch_curl.cpp"}
 
--- pacman system shared libs via pkg-config (README system-deps table)
-add_requires("pkgconfig::sqlite3", "pkgconfig::vips", "pkgconfig::lua5.4", "pkgconfig::re2", "pkgconfig::spdlog",
-             "pkgconfig::fmt", "pkgconfig::libzip", "pkgconfig::zlib", {system = true})
+-- system shared libs via pkg-config; the rest pinned from xrepo (locked in xmake-requires.lock)
+add_requires("pkgconfig::vips", {system = true})
+add_requires("pkgconfig::lua54", {system = true})
 
--- xrepo pins; formerly vendored under third_party/ (wasm3 + curl-impersonate remain vendored)
-add_requires("glaze 7.9.0", "sol2 3.5.0", "thread-pool 5.1.0", "readerwriterqueue 1.0.7", "lexbor 3.0.0",
-             "libzippp 7.1", "quickjs-ng 0.15.1", "simpleini 4.27", "sqlite_orm 1.9.1")
+-- xrepo pins; formerly vendored/system. wasm3 + curl-impersonate remain vendored.
+-- sol2 is header-only: tell its recipe not to pull a Lua dep (Arch's system lua54 covers runtime + headers),
+-- because xmake resolves bare "lua" to Arch's pacman lua 5.5 which sol2 3.5.0 rejects.
+add_requires("sol2 3.5.0", {configs = {includes_lua = false}})
+add_requires("glaze 7.9.0", "thread-pool 5.1.0", "readerwriterqueue 1.0.7", "lexbor 3.0.0",
+    "libzippp 7.1", "quickjs-ng 0.15.1", "simpleini 4.27", "sqlite_orm 1.9.1",
+    "spdlog 1.17.0", "zlib 1.3.2", "sqlite3 3.54.0+100", "utf8proc 2.11.3", "re2 2025.11.05")
 
 -- add_files needs flat strings; cfg.files may embed the shared groups above
 local function flatten(list)
@@ -86,8 +90,8 @@ cxx_bin("cppIsekai", {
     files = {"src/**.cpp"},
     incs = {"src"},
     deps = {"wasm3"},
-    pkgs = {"sqlite3", "vips", "lua5.4", "re2", "spdlog", "fmt", "zlib"},
-    reqs = {"glaze", "sol2", "thread-pool", "readerwriterqueue", "lexbor", "libzippp", "quickjs-ng", "simpleini", "sqlite_orm"},
+    pkgs = {"vips", "lua54"},
+    reqs = {"glaze", "sol2", "thread-pool", "readerwriterqueue", "lexbor", "libzippp", "quickjs-ng", "simpleini", "sqlite_orm", "spdlog", "zlib", "sqlite3", "utf8proc", "re2"},
     ldflags = {CURL_SO},
     rpath = {CURL_LIB},
     defs = {'CPPISEKAI_FETCH_LIB_DIR="' .. CURL_LIB .. '"', "CROW_USE_LOCALTIMEZONE", "CROW_ENABLE_COMPRESSION"},
@@ -97,8 +101,7 @@ cxx_bin("cppIsekai", {
 cxx_bin("test_store", {
     files = {"tests/test_store.cpp", STORE_SRC},
     incs = {"src"},
-    pkgs = {"spdlog", "fmt", "sqlite3"},
-    reqs = {"glaze", "sqlite_orm"},
+    reqs = {"glaze", "sqlite_orm", "spdlog", "sqlite3", "utf8proc"},
     test = true,
 })
 
@@ -106,8 +109,9 @@ cxx_bin("test_plugin", {
     files = {"tests/test_plugin.cpp", PLUGIN_SRC, STORE_SRC, FETCH_SRC},
     incs = {"src"},
     deps = {"wasm3"},
-    pkgs = {"sqlite3", "lua5.4", "re2", "spdlog", "fmt"},
-    reqs = {"glaze", "sol2", "thread-pool", "lexbor", "sqlite_orm", "readerwriterqueue", "quickjs-ng"},
+
+    pkgs = {"lua54"},
+    reqs = {"glaze", "sol2", "thread-pool", "lexbor", "sqlite_orm", "readerwriterqueue", "quickjs-ng", "spdlog", "sqlite3", "utf8proc", "re2"},
     ldflags = {CURL_SO},
     rpath = {CURL_LIB},
     defs = {'TEST_PLUGIN_FIXTURES="$(projectdir)/tests/fixtures/plugins"'},
@@ -118,8 +122,9 @@ cxx_bin("test_htmltext", {
     files = {"tests/test_htmltext.cpp", PLUGIN_SRC, STORE_SRC, FETCH_SRC},
     incs = {"src"},
     deps = {"wasm3"},
-    pkgs = {"sqlite3", "lua5.4", "re2", "spdlog", "fmt"},
-    reqs = {"glaze", "sol2", "thread-pool", "lexbor", "sqlite_orm", "readerwriterqueue", "quickjs-ng"},
+
+    pkgs = {"lua54"},
+    reqs = {"glaze", "sol2", "thread-pool", "lexbor", "sqlite_orm", "readerwriterqueue", "quickjs-ng", "spdlog", "sqlite3", "utf8proc", "re2"},
     ldflags = {CURL_SO},
     rpath = {CURL_LIB},
     defs = {'TEST_PLUGIN_FIXTURES="$(projectdir)/tests/fixtures/plugins"'},
@@ -129,7 +134,8 @@ cxx_bin("test_htmltext", {
 cxx_bin("test_cache", {
     files = {"tests/test_cache.cpp", CACHE_SRC},
     incs = {"src"},
-    pkgs = {"spdlog", "fmt", "vips"},
+    pkgs = {"vips"},
+    reqs = {"spdlog"},
     test = true,
 })
 
@@ -162,7 +168,8 @@ cxx_bin("test_config", {
 cxx_bin("test_http_img", {
     files = {"tests/test_http_img.cpp", CACHE_SRC},
     incs = {"src"},
-    pkgs = {"spdlog", "fmt", "vips"},
+    pkgs = {"vips"},
+    reqs = {"spdlog"},
     test = true,
 })
 
@@ -176,24 +183,23 @@ cxx_bin("test_export", {
 cxx_bin("test_stale", {
     files = {"tests/test_stale.cpp", STORE_SRC},
     incs = {"src"},
-    pkgs = {"spdlog", "fmt", "vips", "sqlite3"},
-    reqs = {"glaze", "sqlite_orm"},
+    pkgs = {"vips"},
+    reqs = {"glaze", "sqlite_orm", "spdlog", "sqlite3", "utf8proc"},
     test = true,
 })
 
 cxx_bin("test_http_enrich", {
     files = {"tests/test_http_enrich.cpp", STORE_SRC},
     incs = {"src"},
-    pkgs = {"spdlog", "fmt", "vips", "sqlite3"},
-    reqs = {"glaze", "sqlite_orm", "thread-pool", "simpleini", "readerwriterqueue"},
+    pkgs = {"vips"},
+    reqs = {"glaze", "sqlite_orm", "thread-pool", "simpleini", "readerwriterqueue", "spdlog", "sqlite3", "utf8proc"},
     test = true,
 })
 
 cxx_bin("test_pages", {
     files = {"tests/test_pages.cpp", "src/http/pages_api.cpp"},
     incs = {"src"},
-    reqs = {"glaze"},
-    pkgs = {"spdlog", "fmt"},
+    reqs = {"glaze", "spdlog"},
     test = true,
 })
 
@@ -212,7 +218,8 @@ cxx_bin("test_window", {
 cxx_bin("test_worker", {
     files = {"tests/test_worker.cpp", CACHE_SRC},
     incs = {"src"},
-    pkgs = {"spdlog", "fmt", "vips"},
+    pkgs = {"vips"},
+    reqs = {"spdlog"},
     test = true,
 })
 

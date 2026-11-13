@@ -1,3 +1,7 @@
+## 2026-11-13
+* **Creation**: Documented concept `decisions/xrepo-round-2-deps.md` (Second xrepo round: pkgconfig deps + utf8proc NFKD tokenizer).
+* **Update**: Updated concept `decisions/third-party-dependencies.md`.
+
 ## 2026-11-12
 * **Update**: Updated concept `decisions/third-party-dependencies.md`.
 * **Creation**: Documented concept `decisions/plugin-lifecycle.md` (Plugin lifecycle: disabled = cache-only reads; folder-removal GC purges every trace).

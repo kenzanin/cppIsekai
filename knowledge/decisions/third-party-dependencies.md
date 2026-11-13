@@ -1,8 +1,9 @@
 ---
 type: decision
 title: "Dependency vendoring: system-shared first, minimal vendoring"
-description: "Dependencies: crow/asio/libvips/lua54/curl-headers/cli11 from pacman; sol2, BS::thread_pool, readerwriterqueue, glaze, wasm3, libsql amalgamation, curl-impersonate and simpleini vendored minimal; pin hashes in README"
-generated: { by: agent/mcp, at: "2026-11-12T17:25:19Z" }
+description: Third-party dependency surface after xmake xrepo migration round 2
+tags: [dependencies, xrepo, vendoring, lua, utf8proc, re2]
+generated: { by: agent/mcp, at: "2026-11-13T00:40:08Z" }
 status: stable
 ---
 
