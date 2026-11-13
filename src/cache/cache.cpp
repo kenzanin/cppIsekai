@@ -131,7 +131,7 @@ std::optional<std::string> Cache::ensure(const std::string& key, const std::stri
         return path;
     }
 
-    const std::optional<std::string> body = fetch_ ? fetch_(key) : std::nullopt;
+    const std::optional<std::string> body = fetch_ ? fetch_(key, {}) : std::nullopt;
     if (!body)
         return std::nullopt;
 

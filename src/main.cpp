@@ -108,7 +108,7 @@ int main(int argc, char** argv) {
     cache::Config ccfg{"data/cache", cache_max_bytes};
     ccfg.image_format = cfg.image_format; // ponytail: must ride Config, else ini knob silently ignored
     ccfg.cover_max_px = cfg.cover_max_px;
-    cache::Cache images{ccfg, makeCurlFetcher(cfg.proxy)};
+    cache::Cache images{ccfg, makeCurlFetcher(cfg.proxy, plugins)};
 
     // auto-update scheduler: started after pools/store are up, joined before drain
     update::Scheduler scheduler{store, db_pool, plugin_pool, plugins, ini_path, overrides};

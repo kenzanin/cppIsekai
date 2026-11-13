@@ -18,9 +18,11 @@ namespace {
 struct FakeState {
     std::map<std::string, std::string> bodies;
     int calls{};
+    std::string last_plugin; // request-capture seam: plugin identity at fetch time
 
-    std::optional<std::string> get(const std::string& key) {
+    std::optional<std::string> get(const std::string& key, const std::string& plugin) {
         ++calls;
+        last_plugin = plugin;
         const auto it = bodies.find(key);
         if (it == bodies.end()) return std::nullopt;
         return it->second;
@@ -43,7 +45,7 @@ struct TempRoot {
 
 cache::Cache fake_cache(const std::string& root, const std::shared_ptr<FakeState>& state) {
     return cache::Cache(cache::Config{root, 1 << 20},
-                        [state](const std::string& k) { return state->get(k); });
+                        [state](const std::string& k, const std::string& plugin) { return state->get(k, plugin); });
 }
 
 } // namespace
@@ -119,4 +121,21 @@ TEST_CASE("img: page-context miss fetches and lands in the v3 tree") {
     CHECK(again.code == 200);
     CHECK(again.body == "PAGEBYTES");
     CHECK(state->calls == 1);
+}
+
+TEST_CASE("img: plugin identity rides the fetch (referer plumbing)") {
+    TempRoot root;
+    auto state = std::make_shared<FakeState>();
+    state->bodies = {{"http://x/p1.jpg", "PAGEBYTES"}};
+    cache::Cache cache = fake_cache(root.path.string(), state);
+
+    // Page-context fetch: the fetcher sees the owning plugin (referer source).
+    const cache::Cache::PageCtx ctx{"mangadex", "slug-x", 2, 1};
+    REQUIRE(serve_cached_image(cache, "http://x/p1.jpg", {}, ctx).code == 200);
+    CHECK(state->last_plugin == "mangadex");
+
+    // Contextless sha-fallback: no plugin, no referer -- as before the fix.
+    state->bodies = {{"http://x/bare.jpg", "BYTES"}};
+    REQUIRE(serve_cached_image(cache, "http://x/bare.jpg").code == 200);
+    CHECK(state->last_plugin.empty());
 }

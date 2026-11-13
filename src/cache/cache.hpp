@@ -32,8 +32,9 @@ namespace cache {
 
 /** \brief Body for key -- an URL for the img pool, an opaque key
  *  ("plugin|method|q") for the api pool. nullopt = failure (offline,
- *  transport error). */
-using Fetcher = std::function<std::optional<std::string>(const std::string& key)>;
+ *  transport error). plugin: owning plugin id ("" contextless), so the
+ *  fetcher can attach per-site headers (image Referer). */
+using Fetcher = std::function<std::optional<std::string>(const std::string& key, const std::string& plugin)>;
 
 struct Config {
     std::string root = "data/cache";

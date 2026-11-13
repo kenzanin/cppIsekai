@@ -38,6 +38,25 @@ std::string Host::website(const std::string& id) const {
     return it != impl_->plugins.end() ? it->second->info.website : std::string{};
 }
 
+std::string Host::image_referer(const std::string& id) const {
+    const std::scoped_lock lock(impl_->mu);
+    const auto it = impl_->plugins.find(id);
+    if (it == impl_->plugins.end()) {
+        return {};
+    }
+    if (!it->second->info.image_referer.empty()) {
+        return it->second->info.image_referer;
+    }
+    // Default: the origin (scheme://host) of the manifest website.
+    const std::string& site = it->second->info.website;
+    const auto scheme = site.find("://");
+    if (scheme == std::string::npos) {
+        return site;
+    }
+    const auto path = site.find('/', scheme + 3);
+    return path == std::string::npos ? site : site.substr(0, path);
+}
+
 std::string Host::logo_path(const std::string& id) const {
     std::shared_ptr<Runtime> rt;
     {

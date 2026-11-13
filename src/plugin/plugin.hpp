@@ -50,7 +50,7 @@ struct Config {
 };
 
 struct PluginInfo {
-    std::string id, name, version, runtime, entry, website;
+    std::string id, name, version, runtime, entry, website, image_referer;
     std::vector<std::string> capabilities;
     int api{};
     std::string dir;
@@ -116,6 +116,11 @@ public:
 
     /** \brief Website URL from the plugin manifest; empty when unknown id or absent. */
     [[nodiscard]] std::string website(const std::string& id) const;
+
+    /** \brief Referer for this plugin's image fetches: the manifest
+     *  `image_referer` override when set, else the origin of `website`.
+     *  Empty on unknown id / nothing to derive (js-image-referer-gap). */
+    [[nodiscard]] std::string image_referer(const std::string& id) const;
 
     /** \brief Last-call outcome for id; ok-when-unknown when never called. */
     [[nodiscard]] CallHealth health(const std::string& id) const;

@@ -78,7 +78,7 @@ TEST_CASE("cache: miss fetch+store, hit serves without refetch") {
     auto state = std::make_shared<FakeState>();
     state->bodies = {{"http://x/a.jpg", forty('a')}, {"http://x/p.PNG?w=100", forty('p')}};
     cache::Cache cache(cache::Config{root.path.string(), 1 << 20},
-                       [state](const std::string& k) { return state->get(k); });
+                       [state](const std::string& k, const std::string&) { return state->get(k); });
 
     const auto a = cache.ensure("http://x/a.jpg", "img");
     REQUIRE(ok(a));
@@ -99,7 +99,7 @@ TEST_CASE("cache: evict on insert follows LRU, survivors stay readable") {
     auto state = std::make_shared<FakeState>();
     state->bodies = {{"a", forty('a')}, {"b", forty('b')}, {"c", forty('c')}};
     cache::Cache cache(cache::Config{root.path.string(), 100}, // tiny cap
-                       [state](const std::string& k) { return state->get(k); });
+                       [state](const std::string& k, const std::string&) { return state->get(k); });
 
     const auto a = cache.ensure("a", "img");
     const auto b = cache.ensure("b", "img");
@@ -125,7 +125,7 @@ TEST_CASE("cache: restart rescans disk, counts toward cap, keeps recency") {
     auto state = std::make_shared<FakeState>();
     state->bodies = {{"a", forty('a')}, {"c", forty('c')}, {"d", forty('d')}};
     const cache::Config conf{root.path.string(), 100};
-    cache::Cache first(conf, [state](const std::string& k) { return state->get(k); });
+    cache::Cache first(conf, [state](const std::string& k, const std::string&) { return state->get(k); });
 
     const auto a = first.ensure("a", "img");
     const auto c = first.ensure("c", "img");
@@ -136,7 +136,7 @@ TEST_CASE("cache: restart rescans disk, counts toward cap, keeps recency") {
     fs::last_write_time(*a, fs::last_write_time(*a) - std::chrono::hours(2), ec);
     REQUIRE(!ec);
 
-    cache::Cache again(conf, [state](const std::string& k) { return state->get(k); });
+    cache::Cache again(conf, [state](const std::string& k, const std::string&) { return state->get(k); });
     const int calls = state->calls;
     CHECK(again.ensure("a", "img") == a); // rebooted entries serve from disk
     CHECK(state->calls == calls);
@@ -153,7 +153,7 @@ TEST_CASE("cache: failed fetch leaves nothing behind") {
     TempRoot root;
     auto state = std::make_shared<FakeState>();
     cache::Cache cache(cache::Config{root.path.string(), 1 << 20},
-                       [state](const std::string& k) { return state->get(k); });
+                       [state](const std::string& k, const std::string&) { return state->get(k); });
 
     CHECK(cache.ensure("http://x/none.jpg", "img") == std::nullopt);
     std::size_t files = 0;
@@ -170,7 +170,7 @@ TEST_CASE("cache: rel_path nests the file, peek/ensure honor it") {
     auto state = std::make_shared<FakeState>();
     state->bodies = {{"http://x/a.jpg", forty('a')}};
     cache::Cache cache(cache::Config{root.path.string(), 1 << 20},
-                       [state](const std::string& k) { return state->get(k); });
+                       [state](const std::string& k, const std::string&) { return state->get(k); });
 
     const std::string rel = "mangadex/slug-x/ch003/p002.jpg";
     const auto p = cache.store("http://x/a.jpg", "img", forty('a'), rel);
@@ -204,7 +204,7 @@ TEST_CASE("cache: boot walk spans tree depth; trim evicts across pools by mtime"
     auto state = std::make_shared<FakeState>();
     state->bodies = {{"n", forty('n')}};
     cache::Cache cache(cache::Config{root.path.string(), 100},
-                       [state](const std::string& k) { return state->get(k); });
+                       [state](const std::string& k, const std::string&) { return state->get(k); });
 
     const auto n = cache.ensure("n", "img"); // 160B > 100B: oldest evicted
     REQUIRE(ok(n));
@@ -244,7 +244,7 @@ TEST_CASE("cache v3: page landing paths + duplicate chapter disambiguation") {
     TempRoot root;
     auto state = std::make_shared<FakeState>();
     cache::Cache cache(cache::Config{root.path.string(), 1 << 20},
-                       [state](const std::string& k) { return state->get(k); });
+                       [state](const std::string& k, const std::string&) { return state->get(k); });
 
     cache::Cache::PageCtx pg{.plugin = "mangadex", .slug = "solo-leveling",
                              .chapter = 12, .page = 3};
@@ -284,7 +284,7 @@ TEST_CASE("cache v3: cover landing + sidecar round-trip") {
     TempRoot root;
     auto state = std::make_shared<FakeState>();
     cache::Cache cache(cache::Config{root.path.string(), 1 << 20},
-                       [state](const std::string& k) { return state->get(k); });
+                       [state](const std::string& k, const std::string&) { return state->get(k); });
 
     cache::Cache::CoverCtx cv{.url = "http://x/cover.png", .w = 800, .h = 1200, .cover = true};
     const auto c = cache.img_store("http://x/cover.png", "F", cv, {});
@@ -308,7 +308,7 @@ TEST_CASE("cache v3: cover_serve is extension-free; absent -> nullopt") {
     auto state = std::make_shared<FakeState>();
     state->bodies = {{"http://x/cv.jpg", forty('i')}};
     cache::Cache cache(cache::Config{root.path.string(), 1 << 20},
-                       [state](const std::string& k) { return state->get(k); });
+                       [state](const std::string& k, const std::string&) { return state->get(k); });
 
     cache::Cache::CoverCtx cv{.url = "http://x/cv.jpg", .plugin = "mangadex",
                               .w = 100, .h = 200, .cover = true};
@@ -330,7 +330,7 @@ TEST_CASE("cache v3: stale index entry after manual wipe falls through to refetc
     auto state = std::make_shared<FakeState>();
     state->bodies = {{"http://x/p1.jpg", forty('a')}, {"http://x/plain.gif", forty('c')}};
     cache::Cache cache(cache::Config{root.path.string(), 1 << 20},
-                       [state](const std::string& k) { return state->get(k); });
+                       [state](const std::string& k, const std::string&) { return state->get(k); });
 
     cache::Cache::PageCtx pg{.plugin = "mangadex", .slug = "solo", .chapter = 1, .page = 1};
 

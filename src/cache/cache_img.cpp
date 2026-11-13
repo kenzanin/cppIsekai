@@ -112,7 +112,8 @@ std::optional<std::string> Cache::img_ensure(const std::string& key, const Cover
         spdlog::debug("cache: img cover-miss, fetching {} (plugin={})", key, cover_ctx.plugin);
     }
 
-    const std::optional<std::string> raw = fetch_ ? fetch_(key) : std::nullopt;
+    const std::string plugin = !cover_ctx.plugin.empty() ? cover_ctx.plugin : page_ctx.plugin;
+    const std::optional<std::string> raw = fetch_ ? fetch_(key, plugin) : std::nullopt;
     if (!raw) {
         spdlog::debug("cache: img fetch failed {} (cover={} plugin={} slug={} ch{} p{})", key, cover_ctx.cover,
                       cover_ctx.plugin, page_ctx.slug, page_ctx.chapter, page_ctx.page);

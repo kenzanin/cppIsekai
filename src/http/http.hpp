@@ -13,8 +13,10 @@
 
 /** \brief Production fetcher for cache misses: one curl GET, body on 2xx,
  *  else nullopt. Single choke point by design -- proxy (ini [server] proxy)
- *  rides on every handle via the fetch gate (src/fetch); keep it that way. */
-cache::Fetcher makeCurlFetcher(const std::string& proxy);
+ *  rides on every handle via the fetch gate (src/fetch); keep it that way.
+ *  plugin (when non-empty) attaches that plugin's image Referer -- manifest
+ *  `image_referer` override, else the origin of `website`. */
+cache::Fetcher makeCurlFetcher(const std::string& proxy, const plugin::Host& plugins);
 
 /** \brief Composition root: registers every route on a fresh crow app and
  *  blocks in run() until shutdown. */

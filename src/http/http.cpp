@@ -16,20 +16,26 @@
 // CLI (OpenSSL) is the only engine proven to handshake there; promote to a
 // dedicated out-of-process fetch helper if anything heavier than images
 // ever needs it.
-cache::Fetcher makeCurlFetcher(const std::string& /*proxy*/) {
-    return [](const std::string& url) -> std::optional<std::string> {
-        // Shell-safe single quoting for the URL.
-        std::string quoted;
-        for (const char c : url) {
-            quoted += c == '\'' ? "'\\''" : std::string(1, c);
-        }
+cache::Fetcher makeCurlFetcher(const std::string& /*proxy*/, const plugin::Host& plugins) {
+    return [&plugins](const std::string& url, const std::string& plugin) -> std::optional<std::string> {
+        // Shell-safe single-quote for argv fragments (URL and Referer alike).
+        const auto quote = [](const std::string& s) {
+            std::string out;
+            for (const char c : s) {
+                out += c == '\'' ? "'\\''" : std::string(1, c);
+            }
+            return out;
+        };
         // -f: HTTP errors become non-zero exits, never cached bodies.
-        // MangaFire CDN 403s without a mangafire.to Referer; site hosts only.
+        // Per-site image Referer, data-driven (js-image-referer-gap): the
+        // plugin's manifest `image_referer` override, else `website` origin.
         std::string referer;
-        if (url.contains("mfcdn")) {
-            referer = " -e https://mangafire.to/";
+        if (!plugin.empty()) {
+            if (const std::string ref = plugins.image_referer(plugin); !ref.empty()) {
+                referer = " -e '" + quote(ref) + "'";
+            }
         }
-        FILE* pipe = popen(("curl -sfL --max-time 30" + referer + " '" + quoted + "' 2>/dev/null").c_str(), "r");
+        FILE* pipe = popen(("curl -sfL --max-time 30" + referer + " '" + quote(url) + "' 2>/dev/null").c_str(), "r");
         if (!pipe) {
             return std::nullopt;
         }

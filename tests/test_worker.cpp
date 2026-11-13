@@ -46,7 +46,7 @@ struct Rig {
     TempRoot dir;
     FakeState fake;
     cache::Cache cache{cache::Config{dir.path.string(), 1 << 20},
-                       [this](const std::string& k) { return fake.get(k); }};
+                       [this](const std::string& k, const std::string&) { return fake.get(k); }};
 
     void seed(const std::string& key) { REQUIRE(cache.store(key, "img", "body:" + key).has_value()); }
     bool on_disk(const std::string& key) { return cache.peek(key, "img").has_value(); }
