@@ -71,13 +71,13 @@
 
 ## Phase 6: P6 — host.codecs.base64_encode / decode + hex_encode / decode (30 lines, std)
 
-- [ ] 6.1 **P6**: `host.codecs.base64_encode(data)` + `host.codecs.base64_decode(str)` = manual base64
-  - [ ] Header-only `src/plugin/host_codecs.hpp` (new)
-- [ ] 6.2 **P6**: `host.codecs.hex_encode(data)` + `host.codecs.hex_decode(str)` = manual hex
-  - [ ] Header-only `src/plugin/host_codecs.hpp` (extend)
-- [ ] 6.3 Lua + JS + WASM bindings
-- [ ] 6.4 Build + test (17/17)
-- [ ] 6.5 Commit: `plugin: host.codecs.base64/hex encode/decode (P6, 12 sites)`
+- [x] 6.1 **P6**: `host.codecs.base64_encode(data)` + `host.codecs.base64_decode(str)` = manual base64
+  - [x] Header-only `src/plugin/host_codecs.hpp` (new)
+- [x] 6.2 **P6**: `host.codecs.hex_encode(data)` + `host.codecs.hex_decode(str)` = manual hex
+  - [x] Header-only `src/plugin/host_codecs.hpp` (extend)
+- [x] 6.3 Lua + JS + WASM bindings
+- [x] 6.4 Build + test (17/17)
+- [x] 6.5 Commit: `plugin: host.codecs.base64/hex encode/decode (P6, 12 sites)`
 
 ## Phase 7: P7 — host.crypto.sha256_hex / md5_hex / hmac_sha256_hex / aes_gcm_decrypt (100 lines, hash-library + tiny-aes-c)
 
