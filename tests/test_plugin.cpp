@@ -5,6 +5,7 @@
 #include "plugin/http_client.hpp"
 #include "plugin/plugin.hpp"
 #include "plugin/host_codecs.hpp"
+#include "plugin/host_crypto.hpp"
 #include "plugin/host_text.hpp"
 #include "plugin/htmltext.hpp"
 #include "store/store.hpp"
@@ -180,6 +181,47 @@ TEST_CASE("host.codecs P6: base64 / hex") {
     CHECK(plugin::host_codec::hex_decode(plugin::host_codec::hex_encode(blob)).value_or("!") == blob);
     CHECK_FALSE(plugin::host_codec::hex_decode("abc").has_value()); // odd length
     CHECK_FALSE(plugin::host_codec::hex_decode("zz").has_value());
+}
+
+TEST_CASE("host.crypto P7: sha256 / md5 / hmac / aes_gcm") {
+    using namespace plugin::host_crypto;
+    // KATs: FIPS 180/132 + RFC 4231 #2, confirmed.
+    CHECK(sha256_hex("abc") == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+    CHECK(md5_hex("abc") == "900150983cd24fb0d6963f7d28e17f72");
+    CHECK(hmac_sha256_hex("what do ya want for nothing?", "Jefe") ==
+          "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843");
+
+    // AES-256-GCM KAT, empty AAD: GCM-spec vector family (key/IV/PT), ct/tag
+    // cross-verified with python-cryptography. 12B IV => J0 direct.
+    constexpr const char* K =
+        "feffe9928665731c6d6a8f9467308308feffe9928665731c6d6a8f9467308308";
+    const auto pt = aes_gcm_decrypt(
+        "cafebabefacedbaddecaf888",
+        "522dc1f099567d07f47f37a32a84427d643a8cdcbfe5c0c97598a2bd2555d1aa"
+        "8cb08e48590dbb3da7b08b1056828838c5f61e6393ba7a0abcc9f662898015ad",
+        "b094dac5d93471bdec1a502270e3cc6c", K);
+    REQUIRE(pt.has_value());
+    CHECK(plugin::host_codec::hex_encode(*pt) ==
+          "d9313225f88406e5a55909c5aff5269a86a7a9531534f7da2e4c303d8a318a72"
+          "1c3c0c95956809532fcf0e2449a6b525b16aedf5aa0de657ba637b391aafd255");
+
+    // 8B IV => J0 via the GHASH derivation branch (vector oracle-generated).
+    const auto pt8 = aes_gcm_decrypt("0000000000000000",
+                                     "7aabc150fd83b6954b5189e66ea80bc8308df7d6ea55918ec18cbb",
+                                     "1b2e55706befb4d572c390b1402b1902", K);
+    REQUIRE(pt8.has_value());
+    CHECK(*pt8 == "hello gcm long block test!!");
+
+    // Failures: corrupted tag; 16-byte key on a 256-only build; bad hex.
+    CHECK_FALSE(aes_gcm_decrypt("cafebabefacedbaddecaf888",
+                                "522dc1f099567d07f47f37a32a84427d643a8cdcbfe5c0c97598a2bd2555d1aa"
+                                "8cb08e48590dbb3da7b08b1056828838c5f61e6393ba7a0abcc9f662898015ad",
+                                "c094dac5d93471bdec1a502270e3cc6c", K));
+    CHECK_FALSE(aes_gcm_decrypt("cafebabefacedbaddecaf888",
+                                "522dc1f099567d07f47f37a32a84427d643a8cdcbfe5c0c97598a2bd2555d1aa"
+                                "8cb08e48590dbb3da7b08b1056828838c5f61e6393ba7a0abcc9f662898015ad",
+                                "b094dac5d93471bdec1a502270e3cc6c", "00112233445566778899aabbccddeeff"));
+    CHECK_FALSE(aes_gcm_decrypt("cafebabefacedbaddecaf888", "zz", "b094dac5d93471bdec1a502270e3cc6c", K));
 }
 
 TEST_CASE("host.http P5: get_json / post_json") {

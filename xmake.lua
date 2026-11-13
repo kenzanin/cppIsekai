@@ -86,13 +86,23 @@ target("wasm3")
     add_includedirs(TP .. "/wasm3/src", {public = true})
     add_defines("_GNU_SOURCE") -- strict c23 hides POSIX (strnlen); cmake built with gnu23
 
+-- Pinned tiny-AES source (same upstream commit as the xmake package on the
+-- add_requires line) rebuilt with AES256: the prebuilt package lib is 128-only
+-- and host.crypto needs AES-256-GCM. Single-keylen library, hence the define.
+target("tiny-aes256")
+    set_kind("static")
+    set_languages("c23")
+    add_files(TP .. "/tiny-aes/aes.c")
+    add_includedirs(TP .. "/tiny-aes", {public = true})
+    add_defines("AES256=1")
+
 -- --- daemon ---
 cxx_bin("cppIsekai", {
     files = {"src/**.cpp"},
     incs = {"src"},
-    deps = {"wasm3"},
+    deps = {"wasm3", "tiny-aes256"},
     pkgs = {"vips", "lua54"},
-    reqs = {"glaze", "sol2", "thread-pool", "readerwriterqueue", "lexbor", "libzippp", "quickjs-ng", "simpleini", "sqlite_orm", "spdlog", "zlib", "sqlite3", "utf8proc", "re2", "date", "hash-library", "tiny-aes-c"},
+    reqs = {"glaze", "sol2", "thread-pool", "readerwriterqueue", "lexbor", "libzippp", "quickjs-ng", "simpleini", "sqlite_orm", "spdlog", "zlib", "sqlite3", "utf8proc", "re2", "date", "hash-library"},
     ldflags = {CURL_SO},
     rpath = {CURL_LIB},
     defs = {'CPPISEKAI_FETCH_LIB_DIR="' .. CURL_LIB .. '"', "CROW_USE_LOCALTIMEZONE", "CROW_ENABLE_COMPRESSION"},
@@ -109,10 +119,10 @@ cxx_bin("test_store", {
 cxx_bin("test_plugin", {
     files = {"tests/test_plugin.cpp", PLUGIN_SRC, STORE_SRC, FETCH_SRC},
     incs = {"src"},
-    deps = {"wasm3"},
+    deps = {"wasm3", "tiny-aes256"},
 
     pkgs = {"lua54"},
-    reqs = {"glaze", "sol2", "thread-pool", "lexbor", "sqlite_orm", "readerwriterqueue", "quickjs-ng", "spdlog", "sqlite3", "utf8proc", "re2", "date", "hash-library", "tiny-aes-c"},
+    reqs = {"glaze", "sol2", "thread-pool", "lexbor", "sqlite_orm", "readerwriterqueue", "quickjs-ng", "spdlog", "sqlite3", "utf8proc", "re2", "date", "hash-library"},
     ldflags = {CURL_SO},
     rpath = {CURL_LIB},
     defs = {'TEST_PLUGIN_FIXTURES="$(projectdir)/tests/fixtures/plugins"'},
@@ -122,10 +132,10 @@ cxx_bin("test_plugin", {
 cxx_bin("test_htmltext", {
     files = {"tests/test_htmltext.cpp", PLUGIN_SRC, STORE_SRC, FETCH_SRC},
     incs = {"src"},
-    deps = {"wasm3"},
+    deps = {"wasm3", "tiny-aes256"},
 
     pkgs = {"lua54"},
-    reqs = {"glaze", "sol2", "thread-pool", "lexbor", "sqlite_orm", "readerwriterqueue", "quickjs-ng", "spdlog", "sqlite3", "utf8proc", "re2", "date", "hash-library", "tiny-aes-c"},
+    reqs = {"glaze", "sol2", "thread-pool", "lexbor", "sqlite_orm", "readerwriterqueue", "quickjs-ng", "spdlog", "sqlite3", "utf8proc", "re2", "date", "hash-library"},
     ldflags = {CURL_SO},
     rpath = {CURL_LIB},
     defs = {'TEST_PLUGIN_FIXTURES="$(projectdir)/tests/fixtures/plugins"'},

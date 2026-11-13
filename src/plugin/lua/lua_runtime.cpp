@@ -5,6 +5,7 @@
 #include "plugin/htmltext.hpp" // host.re2/html core (task 1.3)
 #include "plugin/http_client.hpp"
 #include "plugin/host_codecs.hpp"
+#include "plugin/host_crypto.hpp"
 #include "plugin/plugin.hpp"
 #include "plugin/vrf.hpp"
 
@@ -519,6 +520,17 @@ end
             return std::make_pair(sol::make_object(ts, sol::lua_nil), std::optional(std::move(err)));
         }
         return std::make_pair(sol::make_object(ts, *out), std::optional<std::string>{});
+    };
+    // host.crypto P7 (host_crypto.hpp): hex in/out; nil on tag/hex/key failure.
+    crypto["sha256_hex"] = [](const std::string& s) { return plugin::host_crypto::sha256_hex(s); };
+    crypto["md5_hex"] = [](const std::string& s) { return plugin::host_crypto::md5_hex(s); };
+    crypto["hmac_sha256_hex"] = [](const std::string& data, const std::string& key) {
+        return plugin::host_crypto::hmac_sha256_hex(data, key);
+    };
+    crypto["aes_gcm_decrypt"] = [](const std::string& iv, const std::string& ct, const std::string& tag,
+                                   const std::string& key, sol::this_state ts) -> sol::object {
+        const auto pt = plugin::host_crypto::aes_gcm_decrypt(iv, ct, tag, key);
+        return pt ? sol::make_object(ts, *pt) : sol::make_object(ts, sol::lua_nil);
     };
     fs_tab["crypto"] = crypto;
 

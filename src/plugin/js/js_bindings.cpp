@@ -3,6 +3,7 @@
 
 #include "plugin/fs.hpp"        // plugin::fs_read -- the fs.read body
 #include "plugin/host_codecs.hpp"
+#include "plugin/host_crypto.hpp"
 #include "plugin/host_text.hpp"
 #include "plugin/htmltext.hpp"  // host.re2/html core (task 1.3)
 #include "plugin/url_codec.hpp" // plugin::url_{encode,decode} -- host.url_* body
@@ -703,6 +704,44 @@ JSValue js_vrf_sign(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueCons
 
 } // namespace
 
+// host.crypto (P7): hex-in/hex-out; null on tag/hex/key failure.
+JSValue js_crypto_sha256_hex(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
+    if (argc != 1 || !JS_IsString(argv[0])) {
+        return JS_ThrowTypeError(ctx, "crypto.sha256_hex(string)");
+    }
+    const std::string out = plugin::host_crypto::sha256_hex(arg_str(ctx, argv[0]));
+    return JS_NewStringLen(ctx, out.data(), out.size());
+}
+
+JSValue js_crypto_md5_hex(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
+    if (argc != 1 || !JS_IsString(argv[0])) {
+        return JS_ThrowTypeError(ctx, "crypto.md5_hex(string)");
+    }
+    const std::string out = plugin::host_crypto::md5_hex(arg_str(ctx, argv[0]));
+    return JS_NewStringLen(ctx, out.data(), out.size());
+}
+
+JSValue js_crypto_hmac_sha256_hex(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
+    if (argc != 2 || !JS_IsString(argv[0]) || !JS_IsString(argv[1])) {
+        return JS_ThrowTypeError(ctx, "crypto.hmac_sha256_hex(data, key)");
+    }
+    const std::string out = plugin::host_crypto::hmac_sha256_hex(arg_str(ctx, argv[0]), arg_str(ctx, argv[1]));
+    return JS_NewStringLen(ctx, out.data(), out.size());
+}
+
+JSValue js_crypto_aes_gcm_decrypt(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
+    if (argc != 4 || !JS_IsString(argv[0]) || !JS_IsString(argv[1]) || !JS_IsString(argv[2]) ||
+        !JS_IsString(argv[3])) {
+        return JS_ThrowTypeError(ctx, "crypto.aes_gcm_decrypt(iv, ct, tag, key)");
+    }
+    const auto pt = plugin::host_crypto::aes_gcm_decrypt(arg_str(ctx, argv[0]), arg_str(ctx, argv[1]),
+                                                         arg_str(ctx, argv[2]), arg_str(ctx, argv[3]));
+    if (!pt) {
+        return JS_NULL;
+    }
+    return JS_NewStringLen(ctx, pt->data(), pt->size());
+}
+
 void bind_host_globals(JSContext* c) {
     JSValue g = JS_GetGlobalObject(c);
     const auto bind = [&](JSValue obj, const char* name, JSValue fn) {
@@ -766,8 +805,13 @@ void bind_host_globals(JSContext* c) {
     bind(config, "get", JS_NewCFunction(c, js_config_get, "get", 1));
     bind(host, "config", config);
 
+    // host.crypto (P7) bindings below; cores are file-scope fns.
     JSValue crypto = JS_NewObject(c);
     bind(crypto, "vrf_sign", JS_NewCFunction(c, js_vrf_sign, "vrf_sign", 3));
+    bind(crypto, "sha256_hex", JS_NewCFunction(c, js_crypto_sha256_hex, "sha256_hex", 1));
+    bind(crypto, "md5_hex", JS_NewCFunction(c, js_crypto_md5_hex, "md5_hex", 1));
+    bind(crypto, "hmac_sha256_hex", JS_NewCFunction(c, js_crypto_hmac_sha256_hex, "hmac_sha256_hex", 2));
+    bind(crypto, "aes_gcm_decrypt", JS_NewCFunction(c, js_crypto_aes_gcm_decrypt, "aes_gcm_decrypt", 4));
     bind(host, "crypto", crypto);
 
     JSValue plugin_tbl = JS_NewObject(c);
