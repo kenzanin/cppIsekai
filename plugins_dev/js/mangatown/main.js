@@ -26,7 +26,7 @@ function decode_id(p) {
 // only; the mobile search path renders nothing. Pass 1: cover rows; pass 2:
 // title rows (covers may be lazy/absent); numeric redirect slugs skipped.
 function search_manga(p) {
-  const query = p && (p.query || p.q);
+  const query = p && (p.title || p.query || p.q); // house: title first (parity lua)
   if (typeof query !== "string" || query === "") {
     return { ok: true, data: { items: [], total: 0 } };
   }

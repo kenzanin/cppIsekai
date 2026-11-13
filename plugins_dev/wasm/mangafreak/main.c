@@ -104,6 +104,13 @@ static unsigned int find(const char *pat, const char *txt, unsigned int txt_len)
     int n = find_raw(pat, txt, txt_len);
     return n > 0 ? (unsigned int)n : 0;
 }
+// find into TMP2: for use while iterating a find_n result living in TMP
+static unsigned int find2(const char *pat, const char *txt, unsigned int txt_len) {
+    int n = re2_find((unsigned int)(unsigned long)pat, (unsigned int)strlen(pat),
+                     (unsigned int)(unsigned long)txt, txt_len,
+                     (unsigned int)(unsigned long)TMP2, sizeof TMP2 - 1u);
+    return n > 0 ? (unsigned int)n : 0;
+}
 static unsigned int find_n(const char *pat, const char *txt, unsigned int txt_len) {
     int n = re2_find_all((unsigned int)(unsigned long)pat, (unsigned int)strlen(pat),
                           (unsigned int)(unsigned long)txt, txt_len,
@@ -238,8 +245,8 @@ static void search_reply(const char *q, unsigned int qn) {
         reply_err("fetch failed");
         return;
     }
-    emits("{\"ok\":true,\"data\":[");
     unsigned int bn = find_n(PAT_BLOCK, BODY, body_len);
+    emits("{\"ok\":true,\"data\":{\"items\":[");
     char seen[64][128];
     unsigned int nseen = 0, emitted = 0;
     for (unsigned int bi = 0; bi < 200; ++bi) { // blocks come one call at a time
@@ -248,22 +255,32 @@ static void search_reply(const char *q, unsigned int qn) {
         if (!block) {
             break;
         }
-        unsigned int tn = find(PAT_TITLE, block, blen);
+        static char HBUF[8][256], SBUF[8][128]; // locals: pool aliasing across iters
+        static unsigned hslot;
+        unsigned int tn = find2(PAT_TITLE, block, blen);
         unsigned int t0 = 0, t1 = 0;
-        const char *href = json_elem(TMP, tn, 1, &t0);
-        const char *title = json_elem(TMP, tn, 2, &t1);
-        if (!href) {
-            tn = find(PAT_TITLE2, block, blen);
-            href = json_elem(TMP, tn, 1, &t0);
-            title = json_elem(TMP, tn, 2, &t1);
+        char *href = HBUF[hslot++ & 7u], *title = HBUF[hslot++ & 7u];
+        unsigned hl = 0;
+        const char *ph = json_elem(TMP2, tn, 1, &hl);
+        if (ph) { t0 = hl < 255u ? hl : 255u; memcpy(href, ph, t0); href[t0] = 0; } else t0 = 0;
+        const char *pt = json_elem(TMP2, tn, 2, &hl);
+        if (pt) { t1 = hl < 255u ? hl : 255u; memcpy(title, pt, t1); title[t1] = 0; } else t1 = 0;
+        if (!t0) {
+            tn = find2(PAT_TITLE2, block, blen);
+            ph = json_elem(TMP2, tn, 1, &hl);
+            if (ph) { t0 = hl < 255u ? hl : 255u; memcpy(href, ph, t0); href[t0] = 0; } else t0 = 0;
+            pt = json_elem(TMP2, tn, 2, &hl);
+            if (pt) { t1 = hl < 255u ? hl : 255u; memcpy(title, pt, t1); title[t1] = 0; } else t1 = 0;
         }
-        if (!href || !title) {
+        if (!t0 || !t1) {
             continue;
         }
-        unsigned int sn = find(PAT_SLUG, href, t0);
+        unsigned int sn = find2(PAT_SLUG, href, t0);
         unsigned int s0 = 0;
-        const char *slug = json_elem(TMP, sn, 1, &s0);
-        if (!slug || !s0) {
+        char *slug = SBUF[hslot++ & 7u];
+        const char *ps = json_elem(TMP2, sn, 1, &hl);
+        if (ps) { s0 = hl < 127u ? hl : 127u; memcpy(slug, ps, s0); slug[s0] = 0; }
+        if (!s0) {
             continue;
         }
         int dup = 0;
@@ -277,10 +294,10 @@ static void search_reply(const char *q, unsigned int qn) {
         }
         memcpy(seen[nseen++], slug, s0 < 128 ? s0 : 127);
         unsigned int t2 = 0;
-        unsigned int cn = find(PAT_COVER, block, blen);
-        const char *cover = json_elem(TMP, cn, 1, &t2);
+        unsigned int cn = find2(PAT_COVER, block, blen);
+        const char *cover = json_elem(TMP2, cn, 1, &t2);
         if (!cover) {
-            cn = find(PAT_COVER2, block, blen);
+            cn = find2(PAT_COVER2, block, blen);
             cover = json_elem(TMP, cn, 1, &t2);
         }
         if (emitted++) {
@@ -298,7 +315,9 @@ static void search_reply(const char *q, unsigned int qn) {
         }
         emit("}", 1);
     }
-    emit("]}", 2);
+    char tail[32];
+    snprintf(tail, sizeof tail, "],\"total\":%u}}", emitted);
+    emits(tail); // house envelope {items,total} for the search UI
 }
 
 // ── detail ─────────────────────────────────────────────────────────────────
@@ -631,9 +650,10 @@ unsigned int handle(unsigned int in_ptr, unsigned int in_len) {
         memcpy(method, mv, ml);
         method[ml] = 0;
     }
-    char arg[512] = ""; // params.query / params.id (unescaped)
+    char arg[512] = ""; // params.title/query/id (unescaped; house: title first)
     unsigned int al = 0;
-    if ((al = jstr_field(env, n, "query", &mv))) {
+    if ((al = jstr_field(env, n, "title", &mv)) ||
+        (al = jstr_field(env, n, "query", &mv))) {
         al = unesc(mv, al < 512 ? al : 511, arg, sizeof arg - 1u);
     } else if ((al = jstr_field(env, n, "id", &mv))) {
         al = unesc(mv, al < 512 ? al : 511, arg, sizeof arg - 1u);
