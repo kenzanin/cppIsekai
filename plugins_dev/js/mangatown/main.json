@@ -4,5 +4,5 @@
   "version": "1.0.0",
   "website": "https://m.mangatown.com",
   "runtime": "js",
-  "capabilities": ["search", "detail", "chapters"], "api": 1
+  "capabilities": ["search", "detail", "chapters", "pages", "genres"], "api": 1
 }

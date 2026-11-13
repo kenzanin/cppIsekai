@@ -101,6 +101,15 @@ function get_manga_detail(p) {
 }
 
 // ─── chapters ──────────────────────────────────────────────────────────────
+const MONTHS = { Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11 };
+// "Jul 22,2014" (mobile chapter <span class=time>) -> epoch seconds; 0 if absent
+function ts_of(s) {
+  const m = /^([A-Z][a-z]{2}) (\d{1,2}),(\d{4})$/.exec((s || "").trim());
+  if (!m) return 0;
+  const t = Date.UTC(+m[3], MONTHS[m[1]], +m[2]) / 1000;
+  return isFinite(t) ? t : 0;
+}
+
 // Same detail page. Links: /manga/{slug}/v09/c011.5/ or /manga/{slug}/c070/.
 // Decimal-safe: c([0-9][0-9.]*)$ anchored at path end (c011.5 AND c012.1).
 // Ascending order = cppIsekai reading-order convention (host re-sorts too).
@@ -111,7 +120,8 @@ function get_chapter_list(p) {
     const html = get_body("https://m.mangatown.com/manga/" + id + "/");
     const seen = {};
     if (html !== "") {
-      const pat = 'href="/manga/' + host.re2.quote(id) + '/((?:v[0-9]+/)?c[0-9.]+)/"';
+      const pat =
+        '(?s)href="/manga/' + host.re2.quote(id) + '/((?:v[0-9]+/)?c[0-9.]+)/".*?class="time">([^<]+)<';
       for (const m of host.re2.find_all(pat, html)) {
         const rest = m[1];
         const num = parseFloat(grp(host.re2.find("c([0-9][0-9.]*)$", rest), 1));
@@ -121,7 +131,7 @@ function get_chapter_list(p) {
           id: id + "/" + rest,
           number: num,
           title: "Chapter " + num,
-          release_at: 0,
+          release_at: ts_of(m[2]),
           pages: 0,
         });
       }
@@ -248,6 +258,10 @@ function handle(req) {
     case "chapters":
       return get_chapter_list(p);
     case "pages":
+    case "genres":
+      return { ok: true, data: [
+        "4 Koma", "Action", "Adventure", "Comedy", "Cooking", "Doujinshi", "Drama", "Ecchi", "Fantasy", "Gender Bender", "Harem", "Historical", "Horror", "Martial Arts", "Mature", "Mecha", "Music", "Mystery", "One Shot", "Psychological", "Reverse Harem", "Romance", "School Life", "Sci Fi", "Shotacon", "Slice Of Life", "Smut", "Sports", "Supernatural", "Suspense", "Tragedy", "Vampire", "Webtoons", "Youkai",
+      ] };
       return get_page_list(p);
     default:
       return { ok: false, error: "unknown method " + ((req && req.method) || "") };
