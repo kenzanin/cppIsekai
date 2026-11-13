@@ -158,14 +158,6 @@
             },
             version = "v5.1.0"
         },
-        ["tiny-aes-c 2021.12.22#f56260b5"] = {
-            repo = {
-                branch = "master",
-                commit = "1730b3e52c29bc0dc5dcdc4a1aeb0d3f362f2c10",
-                url = "https://gitlab.com/tboox/xmake-repo.git"
-            },
-            version = "2021.12.22"
-        },
         ["utf8proc 2.11.3#f56260b5"] = {
             repo = {
                 branch = "master",
