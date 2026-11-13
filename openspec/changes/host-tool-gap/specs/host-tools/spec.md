@@ -46,7 +46,7 @@
 - `host.crypto.hmac_sha256_hex(data, key)` = HMAC-SHA256 as hex
 - `host.crypto.aes_gcm_decrypt(iv, ct, tag, key)` = AES-256-GCM decrypt → plaintext or nil
 - **Applies to**: all three runtimes (Lua, JS, WASM)
-- **Library**: OpenSSL (system Arch)
+- **Library**: hash-library 2021.09.29 + tiny-aes-c 2021.12.22 (xrepo)
 - **Files**: `src/plugin/host_crypto.hpp`
 
 ### REQ-HOST-PLUGIN: host.plugin.* — Plugin metadata

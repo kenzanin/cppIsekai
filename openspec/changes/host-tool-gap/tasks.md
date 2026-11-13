@@ -15,16 +15,16 @@
 
 ## Phase 2: P2 — host.text.normalize_status / chapter_num / date_to_iso (150 lines, std + RE2 + date)
 
-- [ ] 2.0 Add date dep in `xmake.lua`: `add_requires("date")` (v3.0.4, xrepo)
-- [ ] 2.1 **P2**: `host.text.normalize_status(str)` = port `pluginutil/status.go` map verbatim
-  - [ ] Header-only `src/plugin/host_text.hpp`
-- [ ] 2.2 **P2**: `host.text.chapter_num(str)` = port `extract.go` regexes to RE2
-  - [ ] Header-only `src/plugin/host_text.hpp`
-- [ ] 2.3 **P2**: `host.text.date_to_iso(str)` = port `dates.go` `dateLayouts` + `std::chrono` parse loop + relative phrase map
-  - [ ] Header-only `src/plugin/host_text.hpp`
-- [ ] 2.4 Lua + JS + WASM bindings in `src/plugin/lua/lua_runtime.cpp`, `src/plugin/js/js_bindings.cpp`, `src/plugin/wasm/wasm_imports.cpp`
-- [ ] 2.5 Build + test (17/17)
-- [ ] 2.6 Commit: `plugin: host.text.normalize_status/chapter_num/date_to_iso (P2, 75 sites)`
+- [x] 2.0 Add date dep in `xmake.lua`: `add_requires("date")` (v3.0.4, xrepo)
+- [x] 2.1 **P2**: `host.text.normalize_status(str)` = port `pluginutil/status.go` map verbatim
+  - [x] Header-only `src/plugin/host_text.hpp`
+- [x] 2.2 **P2**: `host.text.chapter_num(str)` = port `extract.go` regexes to RE2
+  - [x] Header-only `src/plugin/host_text.hpp`
+- [x] 2.3 **P2**: `host.text.date_to_iso(str)` = port `dates.go` `dateLayouts` + `std::chrono` parse loop + relative phrase map
+  - [x] Header-only `src/plugin/host_text.hpp`
+- [x] 2.4 Lua + JS + WASM bindings in `src/plugin/lua/lua_runtime.cpp`, `src/plugin/js/js_bindings.cpp`, `src/plugin/wasm/wasm_imports.cpp`
+- [x] 2.5 Build + test (17/17)
+- [x] 2.6 Commit: `plugin: host.text.normalize_status/chapter_num/date_to_iso (P2, 75 sites)`
 
 ## Phase 3: P3 — host.text.trim / unescape / strip_html (100 lines, lexbor + utf8proc)
 
@@ -79,18 +79,18 @@
 - [ ] 6.4 Build + test (17/17)
 - [ ] 6.5 Commit: `plugin: host.codecs.base64/hex encode/decode (P6, 12 sites)`
 
-## Phase 7: P7 — host.crypto.sha256_hex / md5_hex / hmac_sha256_hex / aes_gcm_decrypt (100 lines, OpenSSL)
+## Phase 7: P7 — host.crypto.sha256_hex / md5_hex / hmac_sha256_hex / aes_gcm_decrypt (100 lines, hash-library + tiny-aes-c)
 
-- [ ] 7.1 Add OpenSSL dep in `xmake.lua`: `add_requires("openssl")` (system Arch already has it)
-- [ ] 7.2 **P7**: `host.crypto.sha256_hex(data)` + `host.crypto.md5_hex(data)` = OpenSSL `EVP_Digest` + hex
+- [ ] 7.1 Add deps in `xmake.lua`: `add_requires("hash-library", "tiny-aes-c")` (xrepo)
+- [ ] 7.2 **P7**: `host.crypto.sha256_hex(data)` + `host.crypto.md5_hex(data)` = hash-library `SHA256` / `MD5` + hex
   - [ ] Header-only `src/plugin/host_crypto.hpp` (new)
-- [ ] 7.3 **P7**: `host.crypto.hmac_sha256_hex(data, key)` = OpenSSL `EVP_MAC` + hex
+- [ ] 7.3 **P7**: `host.crypto.hmac_sha256_hex(data, key)` = hash-library `HMAC<SHA256>` + hex
   - [ ] Header-only `src/plugin/host_crypto.hpp` (extend)
-- [ ] 7.4 **P7**: `host.crypto.aes_gcm_decrypt(iv, ct, tag, key)` = OpenSSL `EVP_Decrypt` AES-GCM + hex
+- [ ] 7.4 **P7**: `host.crypto.aes_gcm_decrypt(iv, ct, tag, key)` = tiny-aes-c AES-256-GCM decrypt
   - [ ] Header-only `src/plugin/host_crypto.hpp` (extend)
 - [ ] 7.5 Lua + JS + WASM bindings
 - [ ] 7.6 Build + test (17/17)
-- [ ] 7.7 Commit: `plugin: host.crypto.sha256/md5/hmac/aes_gcm (P7, 5+3 sites, OpenSSL dep)`
+- [ ] 7.7 Commit: `plugin: host.crypto.sha256/md5/hmac/aes_gcm (P7, 5+3 sites, hash-library + tiny-aes-c)`
 
 ## Phase 8: P8 — SKIPPED + P9 — IMPLEMENT (pugixml)
 

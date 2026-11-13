@@ -44,15 +44,16 @@
 - **Why**: 12 call sites; no new lib needed
 - **Files**: `src/plugin/host_codecs.hpp` (new, header-only)
 
-## D1g — P7: host.crypto.sha256_hex / md5_hex / hmac_sha256_hex / aes_gcm_decrypt (100 lines, OpenSSL)
-- `host.crypto.sha256_hex(data)` = OpenSSL `EVP_Digest` + hex
-- `host.crypto.md5_hex(data)` = OpenSSL `EVP_Digest` + hex
-- `host.crypto.hmac_sha256_hex(data, key)` = OpenSSL `EVP_MAC` + hex
-- `host.crypto.aes_gcm_decrypt(iv, ct, tag, key)` = OpenSSL `EVP_Decrypt` AES-GCM + hex
+## D1g — P7: host.crypto.sha256_hex / md5_hex / hmac_sha256_hex / aes_gcm_decrypt (100 lines, hash-library + tiny-aes-c)
+- `host.crypto.sha256_hex(data)` = hash-library `SHA256` + hex
+- `host.crypto.md5_hex(data)` = hash-library `MD5` + hex
+- `host.crypto.hmac_sha256_hex(data, key)` = hash-library `HMAC<SHA256>` + hex
+- `host.crypto.aes_gcm_decrypt(iv, ct, tag, key)` = tiny-aes-c AES-256-GCM decrypt
 - **Why**: 5+3 call sites (comix, 1manga, mangahub); unblocks 3 sites that currently cannot be ported
-- **Decision**: **OpenSSL** (system Arch) — already linked via `libcurl-impersonate-chrome.so` (BoringSSL), but need explicit `add_requires("openssl")` in `xmake.lua` for clean API access
+- **Decision**: **hash-library 2021.09.29 + tiny-aes-c 2021.12.22** (xrepo) — avoids OpenSSL overkill (sandbox install pain); both libs tiny, no external deps
+- **Alternative rejected**: OpenSSL (system Arch) — overkill, sandbox install pain, only using tiny fraction of features
 - **Alternative rejected**: libsodium (xrepo) — more dep, no AES-GCM in libsodium's AEAD (only ChaCha20-Poly1305)
-- **Files**: `src/plugin/host_crypto.hpp` (new, header-only), `xmake.lua` (add openssl dep)
+- **Files**: `src/plugin/host_crypto.hpp` (new, header-only), `xmake.lua` (add hash-library + tiny-aes-c deps)
 
 ## D1h — P8: host.browser.* — SKIPPED
 - **Reason**: CDP cookie duration too short (session cookies expire in seconds); curl-impersonate already covers request fingerprint for token-signing sites
