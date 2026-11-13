@@ -1,4 +1,10 @@
 ## 2026-11-13
+* **Update**: Updated concept `findings/js-image-referer-gap.md`.
+* **Update**: Linked `references/site-quirks-mangatown-mangafreak.md` to `references/wasm-guest-pitfalls.md`.
+* **Update**: Linked `references/site-quirks-mangatown-mangafreak.md` to `references/plugin-porting-matrix-goIsekai.md`.
+* **Update**: Linked `references/wasm-guest-pitfalls.md` to `references/plugin-porting-matrix-goIsekai.md`.
+* **Creation**: Documented concept `references/site-quirks-mangatown-mangafreak.md` (Site quirks: mangatown + mangafreak (porting notes)).
+* **Creation**: Documented concept `references/wasm-guest-pitfalls.md` (WASM guest authoring pitfalls (wasm3, from mangafreak pilot)).
 * **Creation**: Documented concept `findings/js-image-referer-gap.md` (Host image fetch is plugin-blind: no Referer (js mangatown pilot finding)).
 * **Update**: Linked `references/host-tool-gap-analysis.md` to `references/daemon-run-verify.md` (P1–P9 host tools verified live through the daemon restart documented there.).
 * **Update**: Linked `references/host-tool-gap-analysis.md` to `references/openspec-delta-spec-format.md` (The delta format gate blocked this change's first archive attempt (2026-11-13).).

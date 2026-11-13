@@ -16,3 +16,5 @@
 * [host-tool gap analysis (goIsekai → cppIsekai)](host-tool-gap-analysis.md) - goIsekai→cppIsekai host-tool gap map (P1–P9): ALL phases landed, change ARCHIVED 2026-11-13, main spec openspec/specs/host-tools/spec.md (7 requirements); P8 skipped (CDP).
 * [openspec delta spec format (archive gate)](openspec-delta-spec-format.md) - openspec archive/validate only parses delta specs written as '### Requirement:' + SHALL prose + '#### Scenario:' WHEN/THEN blocks; other shapes are rejected.
 * [Daemon run & verify (run-cppIsekai.sh)](daemon-run-verify.md) - How to (re)start the cppIsekai daemon and verify library state live — correct binary path, stale-CMake-binary trap, and two grep false-alarm patterns.
+* [WASM guest authoring pitfalls (wasm3, from mangafreak pilot)](wasm-guest-pitfalls.md) - Repeated failure modes when writing cppIsekai WASM guests: shared-scratch clobber, static pool aliasing, reply envelope shape, silent zero on truncation.
+* [Site quirks: mangatown + mangafreak (porting notes)](site-quirks-mangatown-mangafreak.md) - Per-site endpoint/markup facts learned while porting: mirrors, param names, date and genre markup, cache behavior.

@@ -3,8 +3,8 @@ type: Fact
 title: "Host image fetch is plugin-blind: no Referer (js mangatown pilot finding)"
 description: Image CDNs that require Referer 403 through the host cache/reader path; fix = per-plugin image-referer plumbed to the img fetcher.
 tags: [image-cache, fetch, js-runtime, mangatown, followup]
-generated: { by: agent/mcp, at: "2026-11-13T12:07:46Z" }
-status: implemented (65dc207)
+generated: { by: agent/mcp, at: "2026-11-13T15:04:51Z" }
+status: stable
 ---
 
 Found while porting mangatown to the JS runtime (pilot 2.1/2.2, commit 39dbed4).
