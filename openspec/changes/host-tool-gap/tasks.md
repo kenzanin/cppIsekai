@@ -60,14 +60,14 @@
 
 ## Phase 5: P5 — host.http.get_json / post_json (15 lines, glaze)
 
-- [ ] 5.1 **P5**: `host.http.get_json(url, headers)` = `host.http.fetch` + `glz::read` + return table-or-nil
-  - [ ] Lua binding in `src/plugin/lua/lua_runtime.cpp`
-  - [ ] JS binding in `src/plugin/js/js_bindings.cpp`
-  - [ ] WASM binding in `src/plugin/wasm/wasm_imports.cpp`
-- [ ] 5.2 **P5**: `host.http.post_json(url, body, headers)` = same with method POST
-  - [ ] Lua + JS + WASM bindings
-- [ ] 5.3 Build + test (17/17)
-- [ ] 5.4 Commit: `plugin: host.http.get_json/post_json (P5, 99 sites)`
+- [x] 5.1 **P5**: `host.http.get_json(url, headers)` = `host.http.fetch` + `glz::read` + return table-or-nil
+  - [x] Lua binding in `src/plugin/lua/lua_runtime.cpp`
+  - [x] JS binding in `src/plugin/js/js_bindings.cpp`
+  - [x] WASM binding in `src/plugin/wasm/wasm_imports.cpp`
+- [x] 5.2 **P5**: `host.http.post_json(url, body, headers)` = same with method POST
+  - [x] Lua + JS + WASM bindings
+- [x] 5.3 Build + test (17/17)
+- [x] 5.4 Commit: `plugin: host.http.get_json/post_json (P5, 99 sites)`
 
 ## Phase 6: P6 — host.codecs.base64_encode / decode + hex_encode / decode (30 lines, std)
 
