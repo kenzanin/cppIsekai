@@ -8,7 +8,7 @@
 - Cloudflare-affected (skip): onisaga, weebcentral, fenyk, mangade, zeroscann, mangataro, lhtranslation (per goIsekai knowledge log: CF challenge 403, empty-search, mid-request failures).
 - Non-CF, ready to port: 1manga, anisascans, batcave, comico, comik, comix, comizy, dynastyscan, en-thunderscan, fanfox, harimanga, htmlscrape, kaliscan, madaradex, mangabay, mangabuddy, mangafreak, mangahere, mangahome, mangahub, mangakatana, mangaread, mangasushi, mangataro(?), mangatown, sanascans, topmanhua, valirscans, violetmanga, zeroscann(?).
 - dummy, htmlscrape are test/scaffold sites.
-- **Host-tool parity gap (per D1a):** goIsekai Lua plugins use `host.text.*`, `host.regex.*`, `host.http.get_body/post_body`, `host.plugin.param`; cppIsekai exposes `host.http.fetch`, `host.html.select/attr`, `host.re2.find/match`, `host.url_encode/decode`, `config.get`. Porting adapts the helper layer, not copy-paste.
+- **Host-tool parity gap (per D1a): CLOSED by host-tool-gap change** — P1–P7 landed (`host.plugin.param`, `host.http.fetch_body/get_json/post_json`, `host.text.*`, `host.re2.find_all/gmatch/replace/quote/find_index`, `host.codecs.*`, `host.crypto.sha256/md5/hmac/aes_gcm`; P9 `host.html.xpath` in progress). Porting now reduces to copy-paste + prefix substitution (see `references/host-tool-gap-analysis`).
 
 - [x] 1.1 List goIsekai `lua/` sites; cross-reference cppIsekai `plugins_dev/lua/`; mark Cloudflare-blocked
 - [ ] 1.2 Port each remaining Lua site to `plugins_dev/lua/<site>/` (main.json + main.lua + genres.lua + logo.png)
@@ -19,7 +19,7 @@
 
 ## Phase 2 — JS (quickjs-ng): port goIsekai JS sites
 
-- [ ] 2.1 JS loader host-tool bindings confirmed present (`src/plugin/js/js_bindings.cpp`: http.fetch, re2, html, crypto.vrf_sign, config.get, storage, log, require, url_*). NOT re-wire. Smoke-test one JS site.
+- [ ] 2.1 JS loader host-tool bindings confirmed present (`src/plugin/js/js_bindings.cpp`: http.fetch/fetch_body/get_json/post_json, re2.*, html.*, text.*, codecs.*, crypto.* (vrf+sha256/md5/hmac/aes_gcm), config.get, storage, log, require, url_*). NOT re-wire. Smoke-test one JS site.
 - [ ] 2.2 Smoke-test one JS site end-to-end
 - [ ] 2.3 Port remaining goIsekai JS sites to `plugins_dev/js/<site>/` (main.json + main.js)
 - [ ] 2.4 HAR-verify each JS ported plugin
@@ -28,7 +28,7 @@
 ## Phase 3 — WASM (wasm3): port goIsekai WASM sites
 
 - [ ] 3.1 Choose toolchain: wasi-sdk vs odin (record decision) — wasm3 loader + imports present (`src/plugin/wasm/wasm_imports.cpp`); site plugins mostly Go/odin compiled → toolchain decision matters
-- [ ] 3.2 wasm3 loader host-tool bindings confirmed present (http.fetch, re2, html, crypto.vrf_sign, url_*)
+- [ ] 3.2 wasm3 loader host-tool bindings confirmed present (http.fetch/fetch_body/get_json/post_json, re2.*, html.*, text.*, codecs.*, crypto.* (vrf+sha256/md5/hmac/aes_gcm), url_*)
 - [ ] 3.3 Smoke-test one WASM site end-to-end
 - [ ] 3.4 Port goIsekai WASM sites to `plugins_dev/wasm/<site>/` (main.json + main.wasm)
 - [ ] 3.5 HAR-verify each WASM ported plugin
