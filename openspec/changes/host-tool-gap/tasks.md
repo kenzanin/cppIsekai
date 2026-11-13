@@ -94,15 +94,15 @@
 
 ## Phase 8: P8 — SKIPPED + P9 — IMPLEMENT (pugixml)
 
-- [ ] 8.1 **P8**: `host.browser.*` — SKIPPED (CDP cookie duration too short)
-- [ ] 8.2 **P9**: Add pugixml dep in `xmake.lua`: `add_requires("pugixml")` (v1.16, xrepo)
-- [ ] 8.3 **P9**: `host.html.xpath(expr)` = lexbor parse HTML → serialize as XML → pugixml `select_nodes` → return text/attr nodes
-  - [ ] Header-only `src/plugin/host_xpath.hpp` (new)
-- [ ] 8.4 Lua + JS + WASM bindings
-- [ ] 8.5 Build + test (17/17)
-- [ ] 8.6 Commit: `plugin: host.html.xpath (P9, pugixml v1.16, 6 sites)`
+- [x] 8.1 **P8**: `host.browser.*` — SKIPPED (CDP cookie duration too short)
+- [x] 8.2 **P9**: Add pugixml dep in `xmake.lua`: `add_requires("pugixml")` (v1.16, xrepo)
+- [x] 8.3 **P9**: `host.html.xpath(expr)` = lexbor parse HTML → serialize as XML → pugixml `select_nodes` → return text/attr nodes
+  - [x] Header-only `src/plugin/host_xpath.hpp` (new)
+- [x] 8.4 Lua + JS + WASM bindings
+- [x] 8.5 Build + test (17/17)
+- [x] 8.6 Commit: `plugin: host.html.xpath (P9, pugixml v1.16, 6 sites)`
 
 ## Phase 9: Documentation
 
-- [ ] 9.1 Update `knowledge/references/host-tool-gap-analysis.md` to reflect implemented P1-P7
-- [ ] 9.2 Update `openspec/changes/plugin-port-multi-runtime/tasks.md` to mark Phase 2/3 as complete
+- [x] 9.1 Update `knowledge/references/host-tool-gap-analysis.md` to reflect implemented P1-P7
+- [x] 9.2 Update `openspec/changes/plugin-port-multi-runtime/tasks.md` Phase 2/3 host-tool note (parity gap closed by P1-P7; porting itself still pending)
