@@ -3,17 +3,25 @@
 <script>
 function gridPage() {
   return {
-    q: '', plugin: '', sort: 'added', filters: [], page: 1, perPage: 12,
+    q: '', plugin: '', sort: 'added', sortDir: {}, dup: false,
+    filterState: { new: 'off', done: 'off', complete: 'off' },
+    page: 1, perPage: 30,
     pages: 1, count: 0, total: 0, hasDup: false, hasStats: false,
     init() {
       this.rescan();
+      this.updatePerPage();
       const p = new URLSearchParams(location.search).get('plugin');
       if (p) this.plugin = p;
       window.addEventListener('grid:reset', () => this.reset());
       window.addEventListener('grid:plugin', (e) => { this.plugin = e.detail || ''; this.page = 1; this.apply(); });
-      window.addEventListener('grid:toggle-dup', () => this.toggleFilter('dup'));
+      window.addEventListener('grid:toggle-dup', () => { this.dup = !this.dup; this.page = 1; this.apply(); });
+      window.addEventListener('resize', () => this.updatePerPage());
       document.body.addEventListener('htmx:afterSwap', () => { this.rescan(); this.apply(); });
       this.apply();
+    },
+    updatePerPage() { // 6 cols × 5 rows = 30; scales with responsive grid columns
+      const cols = window.innerWidth >= 1024 ? 6 : window.innerWidth >= 768 ? 4 : 2;
+      this.perPage = cols * 5;
     },
     syncSidebar() { document.querySelectorAll('[data-grid-plugin]').forEach(el => el.classList.toggle('bg-zinc-800', (el.dataset.gridPlugin || '') === this.plugin)); },
     rescan() {
@@ -24,43 +32,56 @@ function gridPage() {
       this.hasDup = this.cards.some(c => (+c.dataset.dup || 0) > 0);
       this.hasStats = this.cards.some(c => (+c.dataset.total || 0) > 0);
     },
-    toggleFilter(f) {
-      const i = this.filters.indexOf(f);
-      if (i < 0) {
-        this.filters.push(f);
-        if (f === 'dup') this.sort = 'dup'; // auto-engage cluster order (library-dedup spec)
-      } else {
-        this.filters.splice(i, 1);
-        if (f === 'dup') this.sort = 'added';
-      }
+    toggleBadge(kind) { // 3-state per badge: off -> show -> hide -> off
+      const st = this.filterState;
+      const cur = st[kind] || 'off';
+      st[kind] = cur === 'off' ? 'show' : cur === 'show' ? 'hide' : 'off';
       this.page = 1; this.apply();
     },
+    toggleDup() { this.dup = !this.dup; this.page = 1; this.apply(); },
     setPlugin(p) { this.plugin = (this.plugin === p ? '' : p); this.page = 1; this.apply(); },
-    setSort(s) { this.sort = s; this.page = 1; this.apply(); },
-    reset() { this.q = ''; this.plugin = ''; this.sort = 'added'; this.filters = []; this.page = 1; this.apply(); },
+    setSort(s) {
+      if (this.sort !== s) { this.sort = s; this.sortDir[s] = 'asc'; }
+      else { this.sortDir[s] = this.sortDir[s] === 'asc' ? 'desc' : 'asc'; }
+      this.page = 1; this.apply();
+    },
+    reset() { this.q = ''; this.plugin = ''; this.sort = 'added'; this.sortDir = {}; this.dup = false;
+      this.filterState = { new: 'off', done: 'off', complete: 'off' }; this.page = 1; this.apply(); },
     ratio(c) { const t = +c.dataset.total || 0; return t > 0 ? (+c.dataset.read || 0) / t : -1; },
+    badge(c) { // New/Done are mutually exclusive on a card
+      const t = +c.dataset.total || 0;
+      const r = +c.dataset.read || 0;
+      const u = +c.dataset.update || 0;
+      const done = t > 0 && r >= t;
+      const news = u > 0;
+      return { news, done: done && !news };
+    },
     matches(c) {
       if (this.plugin && c.dataset.plugin !== this.plugin) return false;
       const q = this.q.trim().toLowerCase();
       if (q && !c.dataset.name.toLowerCase().includes(q)) return false;
-      if (this.filters.includes('dup') && !((+c.dataset.dup || 0) > 0)) return false;
-      if (this.filters.includes('new') && !((+c.dataset.update || 0) > 0)) return false;
-      if (this.filters.includes('done') && !((+c.dataset.total || 0) > 0 && (+c.dataset.read || 0) >= (+c.dataset.total || 0))) return false;
-      if (this.filters.includes('complete') && (c.dataset.status || '').toLowerCase() !== 'completed') return false;
+      if (this.dup && !((+c.dataset.dup || 0) > 0)) return false;
+      const { news, done } = this.badge(c);
+      const ns = this.filterState;
+      if (ns.new === 'show' && !news) return false;
+      if (ns.new === 'hide' && news) return false;
+      if (ns.done === 'show' && !done) return false;
+      if (ns.done === 'hide' && done) return false;
+      if (ns.complete === 'show' && (c.dataset.status || '').toLowerCase() !== 'completed') return false;
+      if (ns.complete === 'hide' && (c.dataset.status || '').toLowerCase() === 'completed') return false;
       return true;
     },
+    dir(sortKey) { return (this.sortDir[sortKey] || 'asc') === 'desc' ? -1 : 1; },
     apply() {
       const ul = document.getElementById('saved-cards');
       if (!ul) return;
       let vis = this.cards.filter(c => this.matches(c));
-      if (this.sort === 'title') vis.sort((a, b) => a.dataset.name.localeCompare(b.dataset.name));
-      else if (this.sort === 'progress') vis.sort((a, b) => this.ratio(b) - this.ratio(a));
-      else if (this.sort === 'read') vis.sort((a, b) => (+b.dataset.lastread || 0) - (+a.dataset.lastread || 0));
-      else if (this.sort === 'update') vis.sort((a, b) => (+b.dataset.updated || 0) - (+a.dataset.updated || 0));
-      else if (this.sort === 'dup') vis.sort((a, b) => {
-        const da = +a.dataset.dup || 0, db = +b.dataset.dup || 0;
-        return (da === 0) - (db === 0) || da - db || a.dataset.name.localeCompare(b.dataset.name);
-      });
+      const d = this.dir(this.sort);
+      if (this.sort === 'title') vis.sort((a, b) => d * a.dataset.name.localeCompare(b.dataset.name) || (+b.dataset.added || 0) - (+a.dataset.added || 0));
+      else if (this.sort === 'progress') vis.sort((a, b) => d * (this.ratio(b) - this.ratio(a)) || (+b.dataset.added || 0) - (+a.dataset.added || 0));
+      else if (this.sort === 'read') vis.sort((a, b) => d * ((+b.dataset.lastread || 0) - (+a.dataset.lastread || 0)) || (+b.dataset.added || 0) - (+a.dataset.added || 0));
+      else if (this.sort === 'update') vis.sort((a, b) => d * ((+b.dataset.updated || 0) - (+a.dataset.updated || 0)) || (+b.dataset.added || 0) - (+a.dataset.added || 0));
+      else if (this.sort === 'dup') vis.sort((a, b) => d * ((+a.dataset.dup || 0) === 0 ? -1 : (+b.dataset.dup || 0) === 0 ? 1 : (+b.dataset.dup || 0) - (+a.dataset.dup || 0)) || a.dataset.name.localeCompare(b.dataset.name));
       else vis.sort((a, b) => (+b.dataset.added || 0) - (+a.dataset.added || 0)); // 'added'
       this.count = vis.length;
       const pages = Math.max(1, Math.ceil(vis.length / this.perPage));
@@ -76,18 +97,20 @@ function gridPage() {
 }
 </script>
 <div class="flex flex-wrap items-center gap-2 mb-3">
-  <button x-show="hasDup" @click="toggleFilter('dup')" class="px-2.5 py-1 text-xs rounded-full border" :class="filters.includes('dup') ? 'border-violet-500 bg-violet-900/40 text-violet-300' : 'border-zinc-700 text-zinc-400 hover:bg-zinc-800'">Duplicates</button>
-  <button x-show="hasStats" @click="toggleFilter('new')" class="px-2.5 py-1 text-xs rounded-full border" :class="filters.includes('new') ? 'border-red-500 bg-red-900/40 text-red-300' : 'border-zinc-700 text-zinc-400 hover:bg-zinc-800'">New</button>
-  <button x-show="hasStats" @click="toggleFilter('done')" class="px-2.5 py-1 text-xs rounded-full border" :class="filters.includes('done') ? 'border-emerald-500 bg-emerald-900/40 text-emerald-300' : 'border-zinc-700 text-zinc-400 hover:bg-zinc-800'">Done</button>
-  <button x-show="hasStats" @click="toggleFilter('complete')" class="px-2.5 py-1 text-xs rounded-full border" :class="filters.includes('complete') ? 'border-green-500 bg-green-900/40 text-green-300' : 'border-zinc-700 text-zinc-400 hover:bg-zinc-800'">Complete</button>
-  <select x-model="sort" @change="apply()" class="text-xs bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-zinc-300">
-    <option value="added">Sort: recently added</option>
-    <option value="title">Sort: title</option>
-    <option value="progress">Sort: progress</option>
-    <option value="read">Sort: recent read</option>
-    <option value="update">Sort: recent update</option>
-    <option value="dup" x-show="hasDup">Sort: duplicate group</option>
-  </select>
+  <button x-show="hasDup" @click="toggleDup()" class="px-2.5 py-1 text-xs rounded-full border" :class="dup ? 'border-violet-500 bg-violet-900/40 text-violet-300' : 'border-zinc-700 text-zinc-400 hover:bg-zinc-800'">Duplicates</button>
+  <button x-show="hasStats" @click="toggleBadge('new')" class="px-2.5 py-1 text-xs rounded-full border" :class="filterState.new === 'show' ? 'border-red-500 bg-red-900/40 text-red-300' : filterState.new === 'hide' ? 'border-red-700 bg-red-500/10 text-red-400/70' : 'border-zinc-700 text-zinc-400 hover:bg-zinc-800'" :title="filterState.new === 'show' ? 'show new' : filterState.new === 'hide' ? 'hide new' : 'new off'">New</button>
+  <button x-show="hasStats" @click="toggleBadge('done')" class="px-2.5 py-1 text-xs rounded-full border" :class="filterState.done === 'show' ? 'border-emerald-500 bg-emerald-900/40 text-emerald-300' : filterState.done === 'hide' ? 'border-emerald-700 bg-emerald-500/10 text-emerald-400/70' : 'border-zinc-700 text-zinc-400 hover:bg-zinc-800'" :title="filterState.done === 'show' ? 'show done' : filterState.done === 'hide' ? 'hide done' : 'done off'">Done</button>
+  <button x-show="hasStats" @click="toggleBadge('complete')" class="px-2.5 py-1 text-xs rounded-full border" :class="filterState.complete === 'show' ? 'border-green-500 bg-green-900/40 text-green-300' : filterState.complete === 'hide' ? 'border-green-700 bg-green-500/10 text-green-400/70' : 'border-zinc-700 text-zinc-400 hover:bg-zinc-800'" :title="filterState.complete === 'show' ? 'show complete' : filterState.complete === 'hide' ? 'hide complete' : 'complete off'">Complete</button>
+ <div class="flex items-center gap-1 text-xs border border-zinc-700 rounded px-1 py-0.5">
+   <span class="text-zinc-500 px-1">Sort:</span>
+   <button @click="setSort('added')" class="px-1 py-0.5 text-zinc-400 hover:text-white" :title="sort==='added' ? ('added ' + (sortDir.added || 'asc')) : 'sort added'">added</button>
+   <button @click="setSort('title')" class="px-1 py-0.5 text-zinc-400 hover:text-white" :title="sort==='title' ? ('title ' + (sortDir.title || 'asc')) : 'sort title'">title</button>
+   <button @click="setSort('progress')" class="px-1 py-0.5 text-zinc-400 hover:text-white" :title="sort==='progress' ? ('progress ' + (sortDir.progress || 'asc')) : 'sort progress'">progress</button>
+   <button @click="setSort('read')" class="px-1 py-0.5 text-zinc-400 hover:text-white" :title="sort==='read' ? ('read ' + (sortDir.read || 'asc')) : 'sort read'">recent read</button>
+   <button @click="setSort('update')" class="px-1 py-0.5 text-zinc-400 hover:text-white" :title="sort==='update' ? ('update ' + (sortDir.update || 'asc')) : 'sort update'">recent update</button>
+   <button x-show="hasDup" @click="setSort('dup')" class="px-1 py-0.5 text-zinc-400 hover:text-white" :title="sort==='dup' ? ('dup ' + (sortDir.dup || 'asc')) : 'sort dup'">dup</button>
+   <span v-if="sortDir[sort]" x-show="sortDir[sort]" class="text-zinc-300 px-1">{{ sortDir[sort] === 'asc' ? '↑' : '↓' }}</span>
+ </div>
   <button @click="reset()" class="px-2.5 py-1 text-xs rounded-full border border-zinc-700 text-zinc-400 hover:bg-zinc-800">Reset</button>
   <span class="text-xs text-zinc-500" x-text="count + ' / ' + total + ' shown'"></span>
 </div>
@@ -108,8 +131,8 @@ function gridPage() {
         <div class="aspect-[2/3] w-full rounded-lg flex items-center justify-center text-center text-2xl text-zinc-400 bg-zinc-800" data-fallback
              style="{{#cover}}display:none;{{/cover}}">{{name}}</div>
         <div class="absolute left-2 top-2 flex items-center gap-1">
-          <span x-show="(+$el.closest('li').dataset.update) > 0" class="rounded bg-red-600/70 px-2 py-0.5 text-[12px] font-semibold uppercase tracking-wide text-white">New</span>
-          <span x-show="(+$el.closest('li').dataset.total || 0) > 0 && (+$el.closest('li').dataset.read || 0) >= (+$el.closest('li').dataset.total || 0)" class="rounded bg-emerald-600/70 px-2 py-0.5 text-[12px] font-semibold uppercase tracking-wide text-white">Done</span>
+          <span x-show="badge($el.closest('li')).news" class="rounded bg-red-600/70 px-2 py-0.5 text-[12px] font-semibold uppercase tracking-wide text-white">New</span>
+          <span x-show="badge($el.closest('li')).done" class="rounded bg-emerald-600/70 px-2 py-0.5 text-[12px] font-semibold uppercase tracking-wide text-white">Done</span>
           <span x-show="$el.closest('li').dataset.status" class="rounded bg-black/40 px-2 py-0.5 text-[12px] font-medium uppercase tracking-wide text-zinc-100" x-text="$el.closest('li').dataset.status"></span>
         </div>
         <button class="absolute left-2 bottom-2 rounded bg-black/40 px-2 py-0.5 text-[12px] text-zinc-100 hover:bg-black/60 flex items-center gap-1.5" @click.prevent="setPlugin('{{plugin}}')"><img src="/plugin/{{plugin}}/logo" alt="" class="w-5 h-5 rounded-sm" onerror="this.style.display='none'">{{plugin}}</button>
