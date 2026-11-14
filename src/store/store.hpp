@@ -55,6 +55,7 @@ struct SavedManga {
     std::string synopsis{};        // plugin-source detail envelope synopsis (or 'description'; NOT enrichment)
     std::string alt_titles{};      // plugin-source detail envelope alt titles, JSON array verbatim
     int dup_group{};               // 0 = unique; recomputed from FTS5 + Dice similarity (library-dedup 2.2)
+    int status_flags{};            // bit0=is_new, bit1=is_done; free bits for future status without migration
 };
 
 /** Last-read position of one manga (reader-page): resume point + continue

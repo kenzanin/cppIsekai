@@ -587,6 +587,7 @@ static store_detail::SavedMangaEntity saved_row(const SavedManga& m, std::int64_
         .synopsis = m.synopsis,
         .alt_titles = m.alt_titles,
         .dup_group = m.dup_group,
+        .status_flags = m.status_flags,
     };
 }
 
@@ -607,6 +608,7 @@ void Store::save_manga(const SavedManga& m) {
         e.synopsis = rows[0].synopsis;
         e.alt_titles = rows[0].alt_titles;
         e.dup_group = rows[0].dup_group;
+        e.status_flags = rows[0].status_flags;
     }
     impl_->storage.replace(e);
     fts_sync(*impl_, e.plugin, e.slug, e.name, e.alt_titles, e.synopsis); // library-dedup 1.4
@@ -672,6 +674,9 @@ void Store::saved_read_rollup(const std::string& plugin, const std::string& slug
     if (last_read_at > 0) {
         e.last_read_at = last_read_at;
     }
+    const int done = e.total_ch > 0 && read_ch >= e.total_ch ? 1 : 0;
+    const int news = e.has_update != 0 && !done ? 1 : 0;
+    e.status_flags = (done ? 2 : 0) | (news ? 1 : 0); // bit1=is_done, bit0=is_new
     impl_->storage.replace(e);
 }
 

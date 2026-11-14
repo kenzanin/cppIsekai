@@ -29,6 +29,7 @@ void register_library(Ctx& c) {
             row["total_ch"] = r.total_ch;
             row["read_ch"] = r.read_ch;
             row["has_update"] = r.has_update;
+            row["status_flags"] = r.status_flags;
             row["last_read_at"] = static_cast<double>(r.last_read_at);
             row["updated_at"] = static_cast<double>(r.updated_at);
             list[idx++] = std::move(row);

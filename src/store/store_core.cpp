@@ -69,10 +69,11 @@ Store::Store(const std::string& path) : impl_(std::make_unique<StoreImpl>(path))
                 "ALTER TABLE saved_manga ADD COLUMN synopsis TEXT NOT NULL DEFAULT ''",
                 "ALTER TABLE saved_manga ADD COLUMN alt_titles TEXT NOT NULL DEFAULT ''",
                 "ALTER TABLE saved_manga ADD COLUMN dup_group INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE saved_manga ADD COLUMN status_flags INTEGER NOT NULL DEFAULT 0",
             };
             constexpr std::string_view names[] = {
                 "status",     "total_ch", "read_ch",    "has_update", "last_read_at",
-                "updated_at", "synopsis", "alt_titles", "dup_group",
+                "updated_at", "synopsis", "alt_titles", "dup_group",  "status_flags",
             };
             for (std::size_t i = 0; i < std::size(stmts); ++i) {
                 if (!have.contains(std::string(names[i]))) {
