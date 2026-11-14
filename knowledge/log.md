@@ -1,3 +1,6 @@
+## 2026-11-14
+* **Creation**: Documented concept `decisions/guest-runtime-language.md` (Guest runtime language policy).
+
 ## 2026-11-13
 * **Update**: Updated concept `findings/js-image-referer-gap.md`.
 * **Update**: Linked `references/site-quirks-mangatown-mangafreak.md` to `references/wasm-guest-pitfalls.md`.
