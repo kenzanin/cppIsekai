@@ -1,0 +1,9 @@
+{
+  "name": "MangaFox",
+  "id": "mangafox",
+  "version": "1.0.0",
+  "website": "https://fanfox.net",
+  "runtime": "wasm",
+  "capabilities": ["search", "detail", "chapters", "pages"],
+  "api": 1
+}
