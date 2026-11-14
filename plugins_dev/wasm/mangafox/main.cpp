@@ -342,7 +342,14 @@ static void pages_reply(const std::string &id) {
 }
 
 // ── entry ────────────────────────────────────────────────────────────────
+extern "C" void __wasm_call_ctors(void); // lld-generated; wasm3 host runs no start fn
+
 extern "C" unsigned alloc(unsigned len) {
+    static bool inited = false;
+    if (!inited) { // ponytail: host ABI has no init hook; ctors carry crt/table init
+        __wasm_call_ctors();
+        inited = true;
+    }
     inbuf().resize(len ? len : 4096);
     return (unsigned)(size_t)inbuf().data();
 }
