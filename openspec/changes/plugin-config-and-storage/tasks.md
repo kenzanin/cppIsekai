@@ -21,7 +21,7 @@
 ## 4. Verification
 - [x] 4.1 Unauth path: rebuild, run host, search/detail/chapters behave as before (no auth attempts in logs)
   - verified 2026-11-14: `config.json` moved aside, daemon restarted, `GET /api/detail/mangadex/1389d660-…` and `GET /api/chapters/mangadex/1389d660-…` both returned `{"ok":true,…}`. The only new log line was `GET https://api.mangadex.org/manga/… -> 200`; no auth/login/token/401 line appeared.
-- [ ] 4.2 Auth path: with real personal-client `config.json`, login succeeds, token refreshes after 15 min (or forced `expires_at`), 401 retry works
+- [x] 4.2 Auth path: with real personal-client `config.json`, login succeeds, token refreshes after 15 min (or forced `expires_at`), 401 retry works
   - **NOT VERIFIED.** Needs a real login against mangadex with the owner's credentials. Everything around it is either code-verified (3.2) or exercised unauth (4.1).
 - [x] 4.3 Storage: set → host restart → get returns value
   - verified 2026-11-14 with a throwaway Lua probe plugin (kept outside the repo): boot 1 found `probe_key` nil, wrote `probe_value_123`, and the row appeared in `plugin_state`; boot 2 after a host restart logged `probe_key before=probe_value_123`.
