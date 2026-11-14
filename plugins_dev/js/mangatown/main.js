@@ -258,6 +258,7 @@ function handle(req) {
     case "chapters":
       return get_chapter_list(p);
     case "pages":
+      return get_page_list(p);
     case "genres":
       return { ok: true, data: [
         "4 Koma", "Action", "Adventure", "Comedy", "Cooking", "Doujinshi", "Drama", "Ecchi", "Fantasy", "Gender Bender", "Harem", "Historical", "Horror", "Martial Arts", "Mature", "Mecha", "Music", "Mystery", "One Shot", "Psychological", "Reverse Harem", "Romance", "School Life", "Sci Fi", "Shotacon", "Slice Of Life", "Smut", "Sports", "Supernatural", "Suspense", "Tragedy", "Vampire", "Webtoons", "Youkai",
