@@ -30,3 +30,31 @@ The new helper in `api_ctx.hpp` (injects the stored bitfield into the detail env
 ## Note
 
 `test_templates`' grid badge test was already stale at b958e60 (it asserted the pre-bitfield `dataset.read`/`dataset.update` arithmetic and failed at HEAD); c0fce4e re-locked it to the bitfield semantics. G4 is the matching detail-page half.
+
+## G5: bitfield migration candidates (2026-11-14 inventory)
+
+Per-manga state on `saved_manga` was reviewed for what still lives outside `status_flags`. Candidates, ranked:
+
+### Complete -> bit2 (worth doing)
+
+The grid's Complete filter is a string match: `(c.dataset.status || '').toLowerCase() === 'completed'` (grid_body.mustache). The detail page has NO Complete badge at all -- only the raw `detail.status` text chip. Moving Complete to bit2:
+
+- gives the detail page a Complete badge consistent with New/Done (bit0/bit1)
+- removes the fragile string comparison; plugin status is stored verbatim, so Complete becomes a derived, stored bit
+- follows the existing pattern: `saved_stats_update` already writes the flags; add `bit2 = (status == "completed")` there
+
+OKF already states "Complete = plugin status 'Completed' (case-insensitive)" -- so this is classification already, not raw status.
+
+### has_update -> already bit0 (redundant column, NOT a bitfield migration)
+
+`has_update` is now a duplicate of bit0: `saved_stats_update` sets both, `saved_clear_update` clears both. This is a column to drop, not a bit to add -- and it is spec-pinned (`openspec/specs/library-save/spec.md` SHALL list `has_update` in `GET /api/library`) plus 4 assertions in `test_store`. The repo convention is additive-only migrations, so dropping the column touches spec + db migration. Not a clean candidate.
+
+### Not advised
+
+- **`dim` toggle** (`host/dim/<plugin>/<slug>`) -- a display preference, not a status. Putting it in `status_flags` mixes axes.
+- **`dup_group`** -- a grouping id, not a boolean; a derived `is_dup` bool loses the group id.
+
+### Bonus cleanup (not bitfield)
+
+`detail.mustache` line 15 still has `x-show="... || progressPct || isDone"` -- both properties are undefined in `detail_script` (removed). Dead ref, harmless; can be dropped.
+
