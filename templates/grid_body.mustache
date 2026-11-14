@@ -48,13 +48,13 @@ function gridPage() {
     reset() { this.q = ''; this.plugin = ''; this.sort = 'added'; this.sortDir = {}; this.dup = false;
       this.filterState = { new: 'off', done: 'off', complete: 'off' }; this.page = 1; this.apply(); },
     ratio(c) { const t = +c.dataset.total || 0; return t > 0 ? (+c.dataset.read || 0) / t : -1; },
-    badge(c) { // New/Done are mutually exclusive on a card
+    badge(c) { // New/Done are mutually exclusive; Done takes priority over New
       const t = +c.dataset.total || 0;
       const r = +c.dataset.read || 0;
       const u = +c.dataset.update || 0;
-      const done = t > 0 && r >= t;
-      const news = u > 0;
-      return { news, done: done && !news };
+      const done = t > 0 && r >= t;      // all chapters read -> Done
+      const news = u > 0 && !done;       // has update AND not fully read -> New
+      return { news, done };
     },
     matches(c) {
       if (this.plugin && c.dataset.plugin !== this.plugin) return false;
