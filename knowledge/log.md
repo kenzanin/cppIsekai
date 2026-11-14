@@ -1,4 +1,5 @@
 ## 2026-11-14
+* **Update**: Updated concept `references/wasm-guest-pitfalls.md`.
 * **Creation**: Documented concept `decisions/guest-runtime-language.md` (Guest runtime language policy).
 
 ## 2026-11-13
