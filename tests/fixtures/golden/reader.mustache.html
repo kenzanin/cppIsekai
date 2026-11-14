@@ -77,7 +77,7 @@
       <button @click="zoomOut()" :disabled="zoom === 'custom' && zoomPct <= 25" aria-label="Zoom out"
               class="w-9 h-9 rounded border border-zinc-700 text-lg leading-none text-zinc-100 hover:bg-zinc-800 disabled:opacity-30">&#8722;</button>
       <span class="w-12 text-center text-xs tabular-nums text-zinc-400 select-none" x-show="zoom === 'custom'" x-cloak x-text="zoomPct + '%'"></span>
-      <span class="w-12 text-center text-xs tabular-nums text-zinc-600 select-none" x-show="zoom !== 'custom'" x-cloak x-text="'—'"></span>
+      <span class="w-12 text-center text-xs tabular-nums text-zinc-400 select-none" x-show="zoom !== 'custom'" x-cloak x-text="'—'"></span>
       <button @click="zoomIn()" :disabled="zoom === 'custom' && zoomPct >= 400" aria-label="Zoom in"
               class="w-9 h-9 rounded border border-zinc-700 text-lg leading-none text-zinc-100 hover:bg-zinc-800 disabled:opacity-30">+</button>
     </div>

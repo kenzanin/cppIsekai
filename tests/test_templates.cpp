@@ -196,3 +196,37 @@ TEST_CASE("templates: card badge reads stored status_flags bits") {
     // the row carries the bitfield the grid reads.
     CHECK(got.find("data-status-flags=") != std::string::npos);
 }
+
+
+// UI polish lock (ui-polish):
+// 1. Grid category filter buttons exist and test status_flags category bits
+// 2. Dim toggle is present on saved cards with data-dim-toggle
+// 3. Accessible names (aria-label) exist on icon-only/interactive controls
+TEST_CASE("templates: ui-polish controls and aria-label presence") {
+    crow::mustache::set_base(CPPISEKAI_TEMPLATES_DIR);
+    const std::string home = crow::mustache::load("home.mustache").render(home_ctx()).dump();
+
+    // Category filter buttons present in grid
+    CHECK(home.find(R"(aria-label="Filter ongoing")") != std::string::npos);
+    CHECK(home.find(R"(aria-label="Filter hiatus")") != std::string::npos);
+    CHECK(home.find(R"(aria-label="Filter canceled")") != std::string::npos);
+    CHECK(home.find(R"(aria-label="Filter completed")") != std::string::npos);
+
+    // Dim toggle present on saved-manga card
+    CHECK(home.find(R"(data-dim-toggle=")") != std::string::npos);
+    CHECK(home.find(R"(aria-label="Toggle dim cover")") != std::string::npos);
+
+    // Plugin filter button has accessible name
+    CHECK(home.find(R"(aria-label="Filter by plugin )") != std::string::npos);
+
+    // Grid pager buttons have aria-labels
+    CHECK(home.find(R"(aria-label="Previous page")") != std::string::npos);
+    CHECK(home.find(R"(aria-label="Next page")") != std::string::npos);
+
+    const std::string detail = crow::mustache::load("detail.mustache").render(active("library")).dump();
+    // Detail chapter toggles and pager have accessible names
+    CHECK(detail.find(R"(aria-label="Previous chapters")") != std::string::npos);
+    CHECK(detail.find(R"(aria-label="Next chapters")") != std::string::npos);
+    CHECK(detail.find(R"(:aria-label="ch.done ? 'Unhide chapter' : 'Hide chapter'")") != std::string::npos);
+    CHECK(detail.find(R"(:aria-label="isRead(ch) ? 'Mark chapter unread' : 'Mark chapter read'")") != std::string::npos);
+}
