@@ -1,9 +1,9 @@
 ---
 type: Decision
 title: "library-grid-stats: saved_manga stat columns + envelope-derived sync"
-description: "saved_manga stat columns (status/total_ch/read_ch/has_update/last_read_at/updated_at) plus status_flags bitfield (bit0=is_new, bit1=is_done) persisted per-title; detail open is the single writer of status_flags and both grid and detail render those stored bits; reader touch clears bit0 and has_update."
-tags: [store, library, sqlite, sync, has-update, openspec, grid]
-generated: { by: agent/mcp, at: "2026-11-14T04:49:41Z" }
+description: "saved_manga stat columns (status/total_ch/read_ch/last_read_at/updated_at) plus the status_flags bitfield (bit0=is_new, bit1=is_done, bit2-5 one-hot status category, bit6=is_dim) persisted per-title; detail open and the chapters-only scheduler both write it through compose_flags; has_update was dropped in status-flags-followup-cleanup (bit0 is the single New source)."
+tags: [store, library, sqlite, sync, status-flags, openspec, grid]
+generated: { by: agent/mcp, at: "2026-11-14T10:18:02Z" }
 status: stable
 ---
 

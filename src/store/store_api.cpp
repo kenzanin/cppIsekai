@@ -86,7 +86,6 @@ std::optional<SavedManga> Store::saved_get(const std::string& plugin, const std:
         .status = r.status,
         .total_ch = r.total_ch,
         .read_ch = r.read_ch,
-        .has_update = r.has_update,
         .last_read_at = r.last_read_at,
         .updated_at = r.updated_at,
         .synopsis = r.synopsis,

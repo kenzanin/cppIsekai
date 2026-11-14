@@ -3,7 +3,7 @@ type: decision
 title: "cppIsekai core architecture: plugin-per-site manga viewer"
 description: "Plugin-per-site manga viewer: plugins parse HTML themselves, host = crow+mustache + libsql + impersonate proxy w/ disk cache; light sandbox; zero new deps"
 tags: [architecture, plugin, manga]
-generated: { by: agent/mcp, at: "2026-11-07T14:04:38Z" }
+generated: { by: agent/mcp, at: "2026-11-14T10:31:33Z" }
 status: stable
 ---
 
@@ -28,3 +28,7 @@ Deferred (ponytail): test framework at first plugin regression suite; WAMR swap 
 - [cppIsekai dependency API surface](../references/dependency-api.md): Plugin ABI function names come from the verified dependency API reference
 - Related to [cppIsekai image-cache + offline-first pathway](image-cache-offline.md)
 - [cli-config: registry-backed config surface (CLI/env/ini/dump/save)](cli-config.md): Config layer feeds the host core (paths/port wiring to store, plugin, cache); registry is consumer of its dependency APIs.
+- [Plugin backends stay struct+dispatch; introduce PluginBackend interface only for a 4th runtime or out-of-process](../decisions/plugin-backend-interface.md): Backend dispatch stays struct-based until a 4th runtime.
+- [plugin manifest website field -> api rows + card link](../decisions/plugin-website-field.md): Plugin manifest website field.
+- [goIsekai reference corpus: example plugins + HAR captures](../references/goisekai-plugin-examples.md): Example plugins from the predecessor project.
+- [Source layout: crown facades, ~200-loc units, clang-doc comments](../decisions/source-layout-policy.md): Source file layout policy.

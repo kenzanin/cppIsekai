@@ -3,7 +3,7 @@ type: Decision
 title: xmake build system alongside cmake + prod-code gate tasks
 description: "xmake is the primary build path (cmake kept, ./build rebuilt by xmake). Daily: xmake -j → xmake test; gate = format/fix/build/test with tidy/fix diff-scoped vs HEAD since 2026-11-12 (5a41afc) — vendor-template TUs skip the crawl; always build+test after fix, its reflow has eaten separators. Original decisions d019d91/3a8a466/12b7202."
 tags: [build, xmake, cmake, clang-tidy, clang-format, gate, workflow, diff-scope]
-generated: { by: agent/mcp, at: "2026-11-12T17:24:46Z" }
+generated: { by: agent/mcp, at: "2026-11-14T10:31:34Z" }
 status: stable
 ---
 
@@ -35,3 +35,8 @@ Target parity: vendored static C `git check-ignore -v` after editing.
 - Gotcha 10: xrepo libzippp nests its header `libzippp/libzippp.h` (export_cbz.cpp include adapted). quickjs-ng 0.15.1 `JS_SetInterruptHandler` takes the runtime, not ctx (js_rt.cpp adapted).
 - Targetdir: default xmake layout; run-cppIsekai.sh path unchanged. A transient `outdir=build` override was reverted to keep the launcher script + AGENTS run-line canonical.
 - Zero-warning sweep: NSDMI added — PageCtx::chapter_id / CoverCtx::plugin (cache.hpp), WindowCtx::chapter_id (worker.hpp), SavedManga synopsis/alt_titles (store.hpp); vestigial params commented in htmltext_html ddoc + http_pages layout().
+
+# Related Concepts
+- [Build system: CMake + C++23, exe-only](build-toolchain-cpp23.md): C++23 toolchain choice for the build.
+- [xmake pkg-install interrupted leaves empty hash-dirs](../constraints/xmake-install-interrupt.md): xmake package install interruption pitfall.
+- [browser smoke tooling: blueprint-mcp free mode](browser-smoke-tooling.md): Smoke-test tooling used alongside the build.

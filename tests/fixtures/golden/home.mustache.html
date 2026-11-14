@@ -7,7 +7,7 @@
   <script src="/static/htmx.min.js"></script>
   <script defer src="/static/alpine.min.js"></script>
   <style>
-    /* per-manga dim+blur: toggling host/dim/<plugin>/<slug> marks this page's cover */
+    /* per-manga dim+blur: toggling status_flags bit6 marks this page's cover */
     img.cover-dim { filter: brightness(0.35) blur(6px); }
     .dim-toggle { font-size: 11px; }
   </style>
@@ -187,8 +187,9 @@
               if (ns.new === 'hide' && news) return false;
               if (ns.done === 'show' && !done) return false;
               if (ns.done === 'hide' && done) return false;
-              if (ns.complete === 'show' && (c.dataset.status || '').toLowerCase() !== 'completed') return false;
-              if (ns.complete === 'hide' && (c.dataset.status || '').toLowerCase() === 'completed') return false;
+              const complete = (((+c.dataset.statusFlags || 0) & 32) !== 0); // stored bit5: category completed
+              if (ns.complete === 'show' && !complete) return false;
+              if (ns.complete === 'hide' && complete) return false;
               return true;
             },
             dir(sortKey) { return (this.sortDir[sortKey] || 'asc') === 'desc' ? -1 : 1; },
@@ -239,7 +240,7 @@
           <button @click="reset()" class="underline underline-offset-2 hover:text-zinc-300">Reset filters</button>
         </div>
         <ul id="saved-cards" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                  <li data-name="One Piece" data-plugin="mangadex" data-status="" data-total="" data-read="" data-update="" data-status-flags="" data-added="" data-lastread="" data-updated="" data-dup="3">
+                  <li data-name="One Piece" data-plugin="mangadex" data-status="" data-total="" data-read="" data-status-flags="" data-added="" data-lastread="" data-updated="" data-dup="3">
             <a href="&#x2F;view&#x2F;manga&#x2F;mangadex&#x2F;one-piece" class="group block min-w-0">
               <div class="relative">
                   <img src="/cache/img?url=http:&#x2F;&#x2F;example&#x2F;cover.jpg&cover=1&plugin=mangadex&slug=one-piece"
@@ -258,7 +259,7 @@
               <p class="text-xs text-zinc-500" x-show="(+$el.closest('li').dataset.total || 0) > 0"><span x-text="$el.closest('li').dataset.read"></span> / <span x-text="$el.closest('li').dataset.total"></span> read</p>
             </a>
           </li>
-                  <li data-name="No Cover" data-plugin="baka" data-status="" data-total="" data-read="" data-update="" data-status-flags="" data-added="" data-lastread="" data-updated="" data-dup="0">
+                  <li data-name="No Cover" data-plugin="baka" data-status="" data-total="" data-read="" data-status-flags="" data-added="" data-lastread="" data-updated="" data-dup="0">
             <a href="&#x2F;view&#x2F;manga&#x2F;baka&#x2F;no-cover" class="group block min-w-0">
               <div class="relative">
                   <img src="/cache/img?url=&cover=1&plugin=baka&slug=no-cover"

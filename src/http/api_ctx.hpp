@@ -43,7 +43,6 @@ inline constexpr const char* kStateHost = "host";
 inline constexpr const char* kSkipPrefix = "host/skip/";
 inline constexpr const char* kReadPrefix = "host/read/";
 inline constexpr const char* kPositionKey = "host/pos";
-inline constexpr const char* kDimPrefix = "host/dim/"; // per-manga dim: key = host/dim/<plugin>/<slug>
 
 // Typed readers for request/state JSON: absent or wrong-typed -> default.
 // House crow accessors throw on a type mismatch; bodies are a trust boundary.
@@ -150,13 +149,16 @@ inline std::string inject_status_flags(const std::string& envelope, int flags) {
  *  Reader position POST / continue-read call `saved_clear_update` directly. */
 inline void sync_saved_stats(Store& store, BS::thread_pool<>& db, const std::string& plugin, const std::string& slug,
                              const std::string& detail_env, const std::string& chapters_env) {
+    // chapters envelope -> total from the list size (chapters-only path needs
+    // it too: auto-update G1 advances total_ch + bit0 without a detail call)
+    const auto chs = envelope_data(chapters_env);
+    int total = 0;
+    if (chs) {
+        total = static_cast<int>(chs->size());
+    }
     // detail envelope -> status + updated_at on save
     if (const auto d = detail::envelope_object(detail_env)) {
         const std::string status = detail::envelope_str(*d, "status");
-        int total = 0;
-        if (const auto chs = envelope_data(chapters_env)) {
-            total = static_cast<int>(chs->size());
-        }
         // library-dedup 1.2: synopsis (or 'description') + alt_titles from the SOURCE envelope
         std::string syn = detail::envelope_str(*d, "synopsis");
         if (syn.empty()) {
@@ -176,9 +178,16 @@ inline void sync_saved_stats(Store& store, BS::thread_pool<>& db, const std::str
             store.recompute_dup_groups();
             return 0;
         });
+    } else if (chs) {
+        // chapters-only (design D4): same stat write with an empty status so
+        // the source status + category bits stay untouched; an absent saved
+        // row stays a quiet no-op inside the store call.
+        http::on_pool(db, [&] {
+            store.saved_stats_update(plugin, slug, "", total);
+            return 0;
+        });
     }
     // chapters envelope -> total_ch + read_ch rollup
-    const auto chs = envelope_data(chapters_env);
     if (!chs) {
         return;
     }

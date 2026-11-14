@@ -265,7 +265,7 @@ TEST_CASE("Store: saved manga stats roundtrip (library-grid-stats 1.3/1.4)") {
         CHECK(row->status == "ongoing");
         CHECK(row->total_ch == 0);
         CHECK(row->read_ch == 0);
-        CHECK(row->has_update == 0);
+        CHECK(row->status_flags == 0); // fresh save: no bits
         CHECK(row->last_read_at == 0);
         CHECK(row->updated_at == 0);
     }
@@ -277,7 +277,7 @@ TEST_CASE("Store: saved manga stats roundtrip (library-grid-stats 1.3/1.4)") {
         REQUIRE(row.has_value());
         CHECK(row->status == "complete");
         CHECK(row->total_ch == 12);
-        CHECK(row->has_update == 1); // 12 > 0 -> growth marks New
+        CHECK((row->status_flags & 1) != 0); // 12 > 0 -> growth marks New (bit0)
         CHECK(row->updated_at > 0);
 
         store.saved_read_rollup(plugin, slug, 7, 0); // ts 0 = leave last_read alone
@@ -293,10 +293,10 @@ TEST_CASE("Store: saved manga stats roundtrip (library-grid-stats 1.3/1.4)") {
         CHECK(row->read_ch == 8);
         CHECK(row->last_read_at == ts);
 
-        store.saved_clear_update(plugin, slug); // reader touch: clears flag, stamps now
+        store.saved_clear_update(plugin, slug); // reader touch: clears bit0, stamps now
         row = store.saved_get(plugin, slug);
         REQUIRE(row.has_value());
-        CHECK(row->has_update == 0);
+        CHECK((row->status_flags & 1) == 0);
         CHECK(row->last_read_at > ts);
 
         const auto before = row->last_read_at;
@@ -317,7 +317,7 @@ TEST_CASE("Store: saved manga stats roundtrip (library-grid-stats 1.3/1.4)") {
                 seen = true;
                 CHECK(m.status == "hiatus");
                 CHECK(m.total_ch == 3);
-                CHECK(m.has_update == 1);
+                CHECK((m.status_flags & 1) != 0); // 3 > 0 -> growth marks New (bit0)
             }
         CHECK(seen);
 
@@ -325,7 +325,149 @@ TEST_CASE("Store: saved manga stats roundtrip (library-grid-stats 1.3/1.4)") {
         store.saved_stats_update(plugin, absent, "x", 1); // quiet no-ops
         store.saved_read_rollup(plugin, absent, 1, 1);
         store.saved_clear_update(plugin, absent);
+        store.saved_dim_update(plugin, absent, true); // unsaved row: toggle stays a no-op
     }
+
+    SUBCASE("status_flags lifecycle: new -> done -> category -> dim") {
+        const unsigned FRESH = 0; // fresh save: no state bits yet
+        store.save_manga({plugin, slug, "Life", "", 0});
+        REQUIRE(store.saved_get(plugin, slug)->status_flags == FRESH); // fresh save: no state bits
+
+        // first stat write: the stored status ("ongoing") becomes category bit2,
+        // growth beyond the stored total raises bit0
+        store.saved_stats_update(plugin, slug, "", 5);
+        CHECK_EQ(store.saved_get(plugin, slug)->status_flags, 4 | 1);
+
+        store.saved_read_rollup(plugin, slug, 5, 0); // read_ch >= total -> bit1, bit0 drops
+        CHECK_EQ(store.saved_get(plugin, slug)->status_flags, 4 | 2);
+
+        const std::pair<const char*, unsigned> cats[] = {
+            {"ongoing", 4}, {"hiatus", 8},
+            {"canceled", 16}, {"cancelled", 16},
+            {"completed", 32}, {"weird", 0},
+        };
+        for (const auto& [st, mask] : cats) {
+            store.saved_stats_update(plugin, slug, st, 5); // flat count; read_ch == total_ch -> done
+            const auto row = store.saved_get(plugin, slug);
+            REQUIRE(row.has_value());
+            CHECK(row->status == st); // source status stays verbatim
+            // exactly the category bit (+ bit1: read_ch >= total_ch) and nothing else
+            CHECK_EQ(static_cast<unsigned>(row->status_flags), mask | 2);
+        }
+
+        store.saved_stats_update(plugin, slug, "completed", 5); // category bit5 back
+        store.saved_dim_update(plugin, slug, true); // bit6 sets alone (category + done ride through)
+        CHECK_EQ(store.saved_get(plugin, slug)->status_flags, 32 | 2 | 64);
+        store.saved_dim_update(plugin, slug, false);
+        CHECK_EQ(store.saved_get(plugin, slug)->status_flags, 32 | 2);
+
+        // stat writers preserve bit6 through the composition
+        store.saved_dim_update(plugin, slug, true);
+        store.saved_read_rollup(plugin, slug, 1, 0); // unread again: not done
+        CHECK_EQ(store.saved_get(plugin, slug)->status_flags, 32 | 64);
+        store.saved_stats_update(plugin, slug, "", 6); // growth: bit0 up, dim kept
+        CHECK_EQ(store.saved_get(plugin, slug)->status_flags, 32 | 1 | 64);
+        store.saved_read_rollup(plugin, slug, 6, 0); // done: bit1 up, bit0 drops, dim kept
+        CHECK_EQ(store.saved_get(plugin, slug)->status_flags, 32 | 2 | 64);
+
+        // reader touch clears bit0 only (category + dim survive)
+        store.saved_read_rollup(plugin, slug, 1, 0); // not done again
+        store.saved_stats_update(plugin, slug, "", 7); // growth: bit0 up
+        CHECK_EQ(store.saved_get(plugin, slug)->status_flags, 32 | 1 | 64);
+        store.saved_clear_update(plugin, slug);
+        CHECK_EQ(store.saved_get(plugin, slug)->status_flags, 32 | 64);
+    }
+
+    SUBCASE("dim list returns exactly the rows with bit6 set") {
+        const std::string dplugin = "dim_" + run; // own plugin: the db file is shared across runs
+        const std::string d1 = "dim-a-" + run, d2 = "dim-b-" + run, d3 = "dim-c-" + run;
+        for (const auto& d : {d1, d2, d3}) {
+            store.save_manga({dplugin, d, d, "", 0});
+        }
+        store.saved_dim_update(dplugin, d1, true);
+        store.saved_dim_update(dplugin, d2, true);
+        const auto dims = store.saved_dim_list();
+        std::vector<std::string> mine;
+        for (const auto& [p, sl] : dims) {
+            if (p == dplugin) {
+                mine.push_back(sl);
+            }
+        }
+        REQUIRE(mine.size() == 2); // d3 untouched
+        bool saw_d1 = false;
+        bool saw_d2 = false;
+        for (const auto& sl : mine) {
+            saw_d1 = saw_d1 || sl == d1;
+            saw_d2 = saw_d2 || sl == d2;
+            CHECK(sl != d3);
+        }
+        CHECK(saw_d1);
+        CHECK(saw_d2);
+        // unsaved manga: the toggle is a no-op, no row appears
+        store.saved_dim_update(dplugin, "not-saved-" + run, true);
+        CHECK(store.saved_get(dplugin, "not-saved-" + run) == std::nullopt);
+    }
+}
+
+TEST_CASE("Store: legacy saved_manga migrates has_update into status_flags (design D5)") {
+    const std::string path = "test_store_legacy.db";
+    std::remove(path.c_str());
+    { // a pre-status_flags library: has_update present, status_flags missing
+        sqlite3* db = nullptr;
+        REQUIRE(sqlite3_open(path.c_str(), &db) == SQLITE_OK);
+        sqlite3_exec(db,
+                     "CREATE TABLE saved_manga(plugin TEXT NOT NULL, slug TEXT NOT NULL, name TEXT NOT NULL, "
+                     "cover TEXT NOT NULL, added_at INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'ongoing', "
+                     "total_ch INTEGER NOT NULL DEFAULT 0, read_ch INTEGER NOT NULL DEFAULT 0, "
+                     "has_update INTEGER NOT NULL DEFAULT 0, last_read_at INTEGER NOT NULL DEFAULT 0, "
+                     "updated_at INTEGER NOT NULL DEFAULT 0, synopsis TEXT NOT NULL DEFAULT '', "
+                     "alt_titles TEXT NOT NULL DEFAULT '', dup_group INTEGER NOT NULL DEFAULT 0, "
+                     "PRIMARY KEY(plugin, slug))",
+                     nullptr, nullptr, nullptr);
+        // three rows: new (has_update), done (read_ch == total_ch), done+update
+        sqlite3_exec(db,
+                     "INSERT INTO saved_manga(plugin, slug, name, cover, added_at, status, total_ch, read_ch, has_update) "
+                     "VALUES('md','new','New','',1,'ongoing',10,3,1), "
+                     "('md','done','Done','',2,'completed',10,10,0), "
+                     "('md','done-new','DoneNew','',3,'hiatus',10,10,1)",
+                     nullptr, nullptr, nullptr);
+        sqlite3_close(db);
+    }
+    { Store store(path); } // the migration runs here
+    { Store store(path); } // second boot: the migration is idempotent
+
+    sqlite3* db = nullptr;
+    REQUIRE(sqlite3_open(path.c_str(), &db) == SQLITE_OK);
+    sqlite3_stmt* st = nullptr;
+    REQUIRE(sqlite3_prepare_v2(db, "PRAGMA table_info(saved_manga)", -1, &st, nullptr) == SQLITE_OK);
+    bool has_update = false;
+    bool has_status_flags = false;
+    while (sqlite3_step(st) == SQLITE_ROW) {
+        const auto* name = reinterpret_cast<const char*>(sqlite3_column_text(st, 1));
+        has_update = has_update || std::string(name) == "has_update";
+        has_status_flags = has_status_flags || std::string(name) == "status_flags";
+    }
+    sqlite3_finalize(st);
+    CHECK_FALSE(has_update); // the column is gone
+    CHECK(has_status_flags); // and the bitfield took its place
+
+    auto flags_of = [&](const char* slug) {
+        sqlite3_stmt* q = nullptr;
+        REQUIRE(sqlite3_prepare_v2(db, "SELECT status_flags FROM saved_manga WHERE slug = ?", -1, &q, nullptr) ==
+                SQLITE_OK);
+        sqlite3_bind_text(q, 1, slug, -1, SQLITE_STATIC);
+        int flags = -1;
+        if (sqlite3_step(q) == SQLITE_ROW) {
+            flags = sqlite3_column_int(q, 0);
+        }
+        sqlite3_finalize(q);
+        return flags;
+    };
+    CHECK_EQ(flags_of("new"), 1 | 4);      // has_update -> bit0, "ongoing" -> bit2
+    CHECK_EQ(flags_of("done"), 2 | 32);    // read_ch >= total_ch -> bit1, "completed" -> bit5
+    CHECK_EQ(flags_of("done-new"), 2 | 8); // done wins over the update flag, "hiatus" -> bit3
+    sqlite3_close(db);
+    std::remove(path.c_str());
 }
 
 TEST_CASE("Store: api_cache JSONB round-trip (write via jsonb(), read via json())") {

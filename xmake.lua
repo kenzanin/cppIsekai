@@ -234,6 +234,14 @@ cxx_bin("test_worker", {
     test = true,
 })
 
+cxx_bin("test_saved_stats", {
+    files = {"tests/test_saved_stats.cpp", STORE_SRC},
+    incs = {"src"},
+    pkgs = {"vips"},
+    reqs = {"glaze", "sqlite_orm", "thread-pool", "simpleini", "readerwriterqueue", "spdlog", "sqlite3", "utf8proc"},
+    test = true,
+})
+
 cxx_bin("test_templates", {
     files = {"tests/test_templates.cpp"},
     incs = {"src"},

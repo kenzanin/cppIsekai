@@ -2,10 +2,12 @@
 #include "store_internal.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdlib>
 #include <cstdint>
 #include <ctime>
 #include <map>
+#include <string_view>
 #include <vector>
 #include <sqlite3.h>
 #include <utf8proc.h>
@@ -581,7 +583,6 @@ static store_detail::SavedMangaEntity saved_row(const SavedManga& m, std::int64_
         .status = m.status.empty() ? std::string{"ongoing"} : m.status,
         .total_ch = m.total_ch,
         .read_ch = m.read_ch,
-        .has_update = m.has_update,
         .last_read_at = m.last_read_at,
         .updated_at = m.updated_at,
         .synopsis = m.synopsis,
@@ -590,6 +591,40 @@ static store_detail::SavedMangaEntity saved_row(const SavedManga& m, std::int64_
         .status_flags = m.status_flags,
     };
 }
+
+namespace {
+// status-fold -> one-hot category mask (design D3): lowercase compare, unknown
+// strings carry no category bit and are not an error.
+unsigned status_category_mask(std::string_view status) {
+    std::string low(status);
+    std::transform(low.begin(), low.end(), low.begin(), [](unsigned char c) { return std::tolower(c); });
+    if (low == "ongoing") {
+        return static_cast<unsigned>(std::to_underlying(StatusFlag::kOngoing));
+    }
+    if (low == "hiatus") {
+        return static_cast<unsigned>(std::to_underlying(StatusFlag::kHiatus));
+    }
+    if (low == "canceled" || low == "cancelled") {
+        return static_cast<unsigned>(std::to_underlying(StatusFlag::kCanceled));
+    }
+    if (low == "completed") {
+        return static_cast<unsigned>(std::to_underlying(StatusFlag::kCompleted));
+    }
+    return 0;
+}
+// Single composition for every stat writer (design D2): rebuild the bitfield
+// from the entity + incoming change so the bits never drift apart. An empty
+// incoming status means "leave the stored status alone" -> the category is
+// derived from the stored status; the dim bit is owned by the toggle path and
+// always survives.
+int compose_flags(const store_detail::SavedMangaEntity& e, const std::string& status, bool is_new) {
+    const unsigned cat = status_category_mask(status.empty() ? e.status : status);
+    const bool done = e.total_ch > 0 && e.read_ch >= e.total_ch;
+    const unsigned new_bit = (is_new && !done) ? static_cast<unsigned>(std::to_underlying(StatusFlag::kNew)) : 0u;
+    const unsigned dim = static_cast<unsigned>(e.status_flags) & static_cast<unsigned>(std::to_underlying(StatusFlag::kDim));
+    return static_cast<int>(cat | (done ? static_cast<unsigned>(std::to_underlying(StatusFlag::kDone)) : 0u) | new_bit | dim);
+}
+} // namespace
 
 void Store::save_manga(const SavedManga& m) {
     // REPLACE on the (plugin, slug) PK: refreshes name/cover/added_at on re-save.
@@ -601,7 +636,6 @@ void Store::save_manga(const SavedManga& m) {
         e.status = rows[0].status;
         e.total_ch = rows[0].total_ch;
         e.read_ch = rows[0].read_ch;
-        e.has_update = rows[0].has_update;
         e.last_read_at = rows[0].last_read_at;
         e.updated_at = rows[0].updated_at;
         // library-dedup 1.2: preserve signal columns (envelope sync owns them)
@@ -627,15 +661,12 @@ void Store::saved_stats_update(const std::string& plugin, const std::string& slu
         e.status = status;
     }
     const auto now = static_cast<std::int64_t>(std::time(nullptr));
-    if (total_ch > e.total_ch) {
-        e.has_update = 1; // growth → mark New
-    }
-    e.total_ch = total_ch;
-    // Keep the badge bits in step with the stored counters -- same formula as
-    // the rollup below, so the flags are never stale when the chapters
-    // envelope is absent (the rollup refines them when it is available).
-    const bool done = e.total_ch > 0 && e.read_ch >= e.total_ch;
-    e.status_flags = (done ? 2 : 0) | ((e.has_update != 0 && !done) ? 1 : 0); // bit1=is_done, bit0=is_new
+    // is_new = "previously set OR grew in this call" (design D4): a flat
+    // refresh neither raises nor clears the badge.
+    const bool grown = total_ch > e.total_ch;
+    const int news = (e.status_flags & static_cast<int>(std::to_underlying(StatusFlag::kNew))) | (grown ? 1 : 0);
+    e.total_ch = total_ch;             // compose against the NEW total (done = read_ch >= total_ch)
+    e.status_flags = compose_flags(e, status, news != 0);
     if (changed) {
         e.updated_at = now;
     }
@@ -679,9 +710,11 @@ void Store::saved_read_rollup(const std::string& plugin, const std::string& slug
     if (last_read_at > 0) {
         e.last_read_at = last_read_at;
     }
-    const int done = e.total_ch > 0 && read_ch >= e.total_ch ? 1 : 0;
-    const int news = e.has_update != 0 && !done ? 1 : 0;
-    e.status_flags = (done ? 2 : 0) | (news ? 1 : 0); // bit1=is_done, bit0=is_new
+    // same composition as the stats path (design D2): read_ch drives bit1,
+    // the category + dim bits ride through untouched. is_new is "previously
+    // set OR grew in this call" (the rollup never observes the chapter list).
+    const int news = e.status_flags & static_cast<int>(std::to_underlying(StatusFlag::kNew));
+    e.status_flags = compose_flags(e, "", news != 0);
     impl_->storage.replace(e);
 }
 
@@ -694,14 +727,36 @@ void Store::saved_clear_update(const std::string& plugin, const std::string& slu
     auto& e = rows[0];
     const auto now = static_cast<std::int64_t>(std::time(nullptr));
     e.last_read_at = now; // reader touch (library-grid-stats 2.4), flag or not
-    if (e.has_update != 0) {
-        e.has_update = 0;
-        e.updated_at = now;
-    }
     // detail is the source of truth for status_flags: a reader touch means the
-    // title is no longer "new" — clear bit0 so library grid and detail agree.
-    e.status_flags &= ~1;
+    // title is no longer "new" — clear bit0 so library grid and detail agree;
+    // category and dim bits survive.
+    e.status_flags &= ~static_cast<int>(std::to_underlying(StatusFlag::kNew));
     impl_->storage.replace(e);
+}
+
+void Store::saved_dim_update(const std::string& plugin, const std::string& slug, bool on) {
+    auto rows = impl_->storage.get_all<store_detail::SavedMangaEntity>(where(
+        c(&store_detail::SavedMangaEntity::plugin) == plugin && c(&store_detail::SavedMangaEntity::slug) == slug));
+    if (rows.empty()) {
+        return; // unsaved manga has no row to hold the bit: toggle is a no-op
+    }
+    auto& e = rows[0];
+    const int dim = static_cast<int>(std::to_underlying(StatusFlag::kDim));
+    e.status_flags = on ? e.status_flags | dim : e.status_flags & ~dim; // bit6 only, owned by this path
+    impl_->storage.replace(e);
+}
+
+std::vector<std::pair<std::string, std::string>> Store::saved_dim_list() {
+    const int dim = static_cast<int>(std::to_underlying(StatusFlag::kDim));
+    auto rows = impl_->storage.select(
+        columns(&store_detail::SavedMangaEntity::plugin, &store_detail::SavedMangaEntity::slug),
+        where(c(&store_detail::SavedMangaEntity::status_flags) & dim));
+    std::vector<std::pair<std::string, std::string>> out;
+    out.reserve(rows.size());
+    for (const auto& r : rows) {
+        out.emplace_back(std::get<0>(r), std::get<1>(r));
+    }
+    return out;
 }
 
 void Store::unsave_manga(const std::string& plugin, const std::string& slug) {
@@ -727,7 +782,6 @@ std::vector<SavedManga> Store::saved_list() {
             .status = r.status,
             .total_ch = r.total_ch,
             .read_ch = r.read_ch,
-            .has_update = r.has_update,
             .last_read_at = r.last_read_at,
             .updated_at = r.updated_at,
             .synopsis = r.synopsis,

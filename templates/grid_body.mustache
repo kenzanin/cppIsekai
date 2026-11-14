@@ -63,8 +63,9 @@ function gridPage() {
       if (ns.new === 'hide' && news) return false;
       if (ns.done === 'show' && !done) return false;
       if (ns.done === 'hide' && done) return false;
-      if (ns.complete === 'show' && (c.dataset.status || '').toLowerCase() !== 'completed') return false;
-      if (ns.complete === 'hide' && (c.dataset.status || '').toLowerCase() === 'completed') return false;
+      const complete = (((+c.dataset.statusFlags || 0) & 32) !== 0); // stored bit5: category completed
+      if (ns.complete === 'show' && !complete) return false;
+      if (ns.complete === 'hide' && complete) return false;
       return true;
     },
     dir(sortKey) { return (this.sortDir[sortKey] || 'asc') === 'desc' ? -1 : 1; },
@@ -116,7 +117,7 @@ function gridPage() {
 </div>
 <ul id="saved-cards" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
   {{#saved_list}}
-  <li data-name="{{name}}" data-plugin="{{plugin}}" data-status="{{status}}" data-total="{{total_ch}}" data-read="{{read_ch}}" data-update="{{has_update}}" data-status-flags="{{status_flags}}" data-added="{{added_at}}" data-lastread="{{last_read_at}}" data-updated="{{updated_at}}" data-dup="{{dup}}">
+  <li data-name="{{name}}" data-plugin="{{plugin}}" data-status="{{status}}" data-total="{{total_ch}}" data-read="{{read_ch}}" data-status-flags="{{status_flags}}" data-added="{{added_at}}" data-lastread="{{last_read_at}}" data-updated="{{updated_at}}" data-dup="{{dup}}">
     <a href="{{url}}" class="group block min-w-0">
       <div class="relative">
         {{#cover}}

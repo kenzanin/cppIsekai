@@ -3,7 +3,7 @@ type: decision
 title: "Plugin system: folder packaging, manifest, multi-runtime data-contract ABI"
 description: "Plugin packaging: one folder per plugin under data/plugins (entry + manifest json + logo), declared via ini; ABI = JSON-text-in/out data contract + per-runtime host-tool bindings; jsonb is DB-side storage only, never the wire format; lua first, wasm/js/micropython later"
 tags: [plugin, abi, packaging, jsonb]
-generated: { by: agent/mcp, at: "2026-11-07T11:37:17Z" }
+generated: { by: agent/mcp, at: "2026-11-14T10:31:33Z" }
 status: stable
 ---
 
@@ -37,3 +37,8 @@ Relations: implements the plugin orchestration in manga-viewer-core; consumes no
 - [Normalisation contract: MangaDex canonical + chapter release_at](normalization-contract.md): Wire-vs-storage clarification extends the unix-time + JSON policy (okf_update wipes relations)
 - [cppIsekai core architecture: plugin-per-site manga viewer](manga-viewer-core.md): Plugin system realizes the host-tools orchestration of the core architecture
 - [Dependencies & plugins: curl-first APIs, runtime parity, no hand-rolled crypto](../decisions/deps-and-plugins.md): Runtime parity: quickjs-ng menjadi runtime kedua dengan feature set & signature sama (data-contract ABI tetap; wasm3 tidak diprioritaskan).
+- [Atsumaru plugin (atsu.moe): Typesense search, CDN images, composite chapter ids](atsumaru-plugin.md): Concrete site plugin built on this packaging/ABI.
+- [goIsekai to cppIsekai plugin ABI mapping](../references/goisekai-abi-mapping.md): ABI mapping reference from the predecessor project.
+- [Plugin lifecycle: disabled = cache-only reads; folder-removal GC purges every trace](../decisions/plugin-lifecycle.md): Plugin load/unload lifecycle.
+- [host.url_encode/url_decode: percent-codec host tool (no crypto yet)](../decisions/host-url-codec.md): Host URL codec helper exposed to plugins.
+- [host.crypto.vrf_sign: host-executed VRF signing (tables plugin-side)](../references/host-crypto-vrf-sign.md): Host crypto helper for VRF signing.

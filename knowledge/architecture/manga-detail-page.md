@@ -3,7 +3,7 @@ type: decision
 title: "manga-detail-page: stale-serve + fail-safe refresh pattern"
 description: "Detail page pattern: stale-serve detail/chapters via call_cached, fail-safe POST refresh overwriting both stale entries only after both envelopes validate, SSR shell + Alpine hydrate, per-chapter CBZ links, slug guard 404. Integration: search results link to /view/manga/<plugin>/<slug> (commit 6808ed5)."
 tags: [detail-page, stale-serve, refresh, cbz, alpine, ssr]
-generated: { by: agent/mcp, at: "2026-11-09T03:22:45Z" }
+generated: { by: agent/mcp, at: "2026-11-14T10:31:33Z" }
 status: stable
 ---
 
@@ -22,3 +22,7 @@ SMOKE (verified live): page 200 + detailPage mounted; refresh {"ok":true}; detai
 # Related Concepts
 - Related to [cppIsekai core architecture: plugin-per-site manga viewer](manga-viewer-core.md)
 - Related to [cppIsekai image-cache + offline-first pathway](image-cache-offline.md)
+- [chapter-list-controls: read-state routes and detail rows](../decisions/chapter-list-controls.md): Read-state routes and chapter rows on the detail page.
+- [reader: chapter 0 is valid — falsy-zero regression fixed + unit-locked](../decisions/chapter-zero-falsy-regression.md): Chapter number zero regression affecting chapter rows.
+- [Settings restart button + per-chapter CBZ cache-full gate](../decisions/restart-and-cbz-gate.md): Restart and CBZ export gate.
+- [Golden-file render test for top-level templates](../decisions/template-golden-test.md): Golden render tests lock the template output.

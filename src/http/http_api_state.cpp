@@ -18,13 +18,10 @@ void register_state(Ctx& c) {
     auto& plugins = c.plugins;
     auto& prefetch = c.prefetch;
 
-    // Per-manga dim+blur cover. Key = host/dim/<plugin>/<slug> in the host
-    // bucket; toggled from the detail page, applied to every cover img that
-    // carries plugin+slug (grid/detail); search results have no slug and are
-    // never dimmed.
-    const auto dim_key = [](const std::string& plugin, const std::string& slug) {
-        return std::string(kDimPrefix) + plugin + '/' + slug;
-    };
+    // Per-manga dim+blur cover lives on the saved row itself: status_flags
+    // bit6 (is_dim), toggled from the detail page, applied to every cover
+    // img that carries plugin+slug (grid/detail). Unsaved manga have no row,
+    // so the toggle is a no-op there (the request still succeeds).
     CROW_ROUTE(app, "/api/display/dim-blur")
         .methods(crow::HTTPMethod::POST)([&](const crow::request& req) -> crow::response {
             const auto body = crow::json::load(req.body);
@@ -41,7 +38,7 @@ void register_state(Ctx& c) {
                 on = body["on"].t() == crow::json::type::True;
             }
             on_pool(db, [&] {
-                store.state_set(kStateHost, dim_key(plugin, slug), on ? "1" : "0");
+                store.saved_dim_update(plugin, slug, on);
                 return 0;
             });
             crow::response r{on ? R"({"ok":true,"on":true})" : R"({"ok":true,"on":false})"};
@@ -50,18 +47,13 @@ void register_state(Ctx& c) {
         });
     // GET list of dimmed manga: [["plugin","slug"], ...] for client-side paint.
     CROW_ROUTE(app, "/api/display/dim-list")([&] {
-        const auto keys = on_pool(db, [&] { return store.state_keys_value(kStateHost, kDimPrefix, "1"); });
+        const auto pairs = on_pool(db, [&] { return store.saved_dim_list(); });
         crow::json::wvalue list(crow::json::type::List);
         int idx = 0;
-        for (const auto& k : keys) {
-            const auto rest = k.substr(std::string(kDimPrefix).size());
-            const auto slash = rest.find('/');
-            if (slash == std::string::npos || slash == 0) {
-                continue;
-            }
+        for (const auto& [plugin, slug] : pairs) {
             crow::json::wvalue pair(crow::json::type::List);
-            pair[0] = rest.substr(0, slash);
-            pair[1] = rest.substr(slash + 1);
+            pair[0] = plugin;
+            pair[1] = slug;
             list[idx++] = std::move(pair);
         }
         crow::json::wvalue out;
