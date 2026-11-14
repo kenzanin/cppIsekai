@@ -186,7 +186,7 @@ void register_reader(Ctx& c) {
                     const int now = std::max(prev, p);
                     store.state_set(kStateHost, std::string(kReadPrefix) + chapter, std::to_string(now));
                 }
-                // library-grid-stats 2.4: reader touch stamps last_read_at + clears has_update.
+                // library-grid-stats 2.4: reader touch stamps last_read_at + clears the New bit.
                 store.saved_clear_update(plugin, manga);
                 spdlog::debug("position {} {} ch={} p={} cn={} mode='{}' dir='{}'", plugin, manga, chapter, next.page,
                               next.chapter_number, next.mode, next.direction);

@@ -12,7 +12,7 @@
     <div class="flex-1 min-w-0">
       <h1 class="text-2xl font-semibold mb-2 leading-tight" x-text="detail.name || '…'"></h1>
       <!-- attribution (detail-enrichment 3.1): plugin name + logo + status/date/cached badges on one line under title; @error falls back to name only -->
-      <div class="flex items-center flex-wrap gap-2 text-xs text-zinc-500 mb-2" x-show="pluginName || detail.status || detail.release_at || cached || progressPct || isDone" x-cloak>
+      <div class="flex items-center flex-wrap gap-2 text-xs text-zinc-500 mb-2" x-show="pluginName || detail.status || detail.release_at || cached || detail.status_flags" x-cloak>
         <template x-if="pluginName && pluginLogoOk">
           <img :src="'/plugin/'+encodeURIComponent(plugin)+'/logo'" class="h-5 w-5 object-contain rounded" @error="pluginLogoOk=false" alt="">
         </template>
@@ -22,6 +22,11 @@
         <span class="px-2 py-0.5 rounded-full bg-emerald-900/40 text-emerald-300 border border-emerald-800" x-show="cached">cached</span>
         <span class="px-2 py-0.5 rounded-full bg-red-900/40 text-red-300 border border-red-800" x-show="detail.status_flags & 1">New</span>
         <span class="px-2 py-0.5 rounded-full bg-emerald-900/40 text-emerald-300 border border-emerald-800" x-show="detail.status_flags & 2">Done</span>
+        <span class="px-2 py-0.5 rounded-full bg-sky-900/40 text-sky-300 border border-sky-800" x-show="detail.status_flags & 4">Ongoing</span>
+        <span class="px-2 py-0.5 rounded-full bg-amber-900/40 text-amber-300 border border-amber-800" x-show="detail.status_flags & 8">Hiatus</span>
+        <span class="px-2 py-0.5 rounded-full bg-rose-900/40 text-rose-300 border border-rose-800" x-show="detail.status_flags & 16">Canceled</span>
+        <span class="px-2 py-0.5 rounded-full bg-violet-900/40 text-violet-300 border border-violet-800" x-show="detail.status_flags & 32">Completed</span>
+        <span class="px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400 border border-zinc-700" x-show="detail.status_flags & 64">Dim</span>
       </div>
       <div class="flex flex-wrap gap-1.5 mb-3" x-show="detail.tags && detail.tags.length" x-cloak>
         <template x-for="t in detail.tags" :key="t">

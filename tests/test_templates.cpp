@@ -141,6 +141,30 @@ TEST_CASE("templates: each top-level page renders to its golden file") {
     check_golden("logs.mustache", logs_ctx());
 }
 
+// Detail-page badge lock (status-flags-followup-cleanup): every badge is
+// gated on its own status_flags bit (bit0 New, bit1 Done, bits2-5 the status
+// category, bit6 Dim). The badge text is static; the gate is the bit mask.
+TEST_CASE("templates: detail badges are gated on their status_flags bit") {
+    crow::mustache::set_base(CPPISEKAI_TEMPLATES_DIR);
+    const std::string got = crow::mustache::load("detail.mustache").render(active("library")).dump();
+
+    const std::pair<const char*, int> badges[] = {
+        {"New", 1}, {"Done", 2}, {"Ongoing", 4}, {"Hiatus", 8}, {"Canceled", 16}, {"Completed", 32}, {"Dim", 64},
+    };
+    for (const auto& [label, bit] : badges) {
+        const std::string gate = "x-show=\"detail.status_flags & " + std::to_string(bit) + "\"";
+        const auto at = got.find(">" + std::string(label) + "</span>");
+        REQUIRE(at != std::string::npos);
+        const auto start = got.rfind("<span", at);
+        REQUIRE(start != std::string::npos);
+        const std::string span = got.substr(start, at - start);
+        CHECK(span.find(gate) != std::string::npos);
+    }
+    // the dead progressPct/isDone reference is gone
+    CHECK(got.find("progressPct") == std::string::npos);
+    CHECK(got.find("isDone") == std::string::npos);
+}
+
 // Badge semantics lock (library-grid-stats): New/Done come from the stored
 // status_flags bitfield (bit0=is_new, bit1=is_done), not from client-side
 // arithmetic over dataset.read/total/update. A golden regen could silently

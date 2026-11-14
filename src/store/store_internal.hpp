@@ -52,13 +52,13 @@ struct SavedMangaEntity {
     std::string status;          // ongoing|hiatus|complete|canceled (plugin source; stored verbatim)
     int total_ch{};              // chapters reported by the source envelope; 0 = unknown
     int read_ch{};               // chapters fully read (host/read >= pages) at last rollup
-    int has_update{};            // 1 when a refresh/detail-open saw newer chapters than stored
     std::int64_t last_read_at{}; // reader position POST timestamp; 0 = never opened
     std::int64_t updated_at{};   // unix seconds of last envelope-derived change; 0 = never synced
     std::string synopsis;        // plugin-source detail envelope synopsis (NOT enrichment)
     std::string alt_titles;      // plugin-source detail envelope alt titles, JSON array verbatim
     int dup_group{};             // 0 = unique; elsewhere groups same work (recomputed, never trusted across boots)
-    int status_flags{};          // bit0=is_new, bit1=is_done; free bits for future status without migration
+    int status_flags{};          // bit0=1 is_new, bit1=2 is_done, bit2=4 ongoing, bit3=8 hiatus,
+                                 // bit4=16 canceled, bit5=32 completed, bit6=64 is_dim
 };
 
 struct TitleMetaEntity {
@@ -119,7 +119,6 @@ inline auto create_storage(const std::string& path) {
                    make_column("status", &SavedMangaEntity::status, default_value("ongoing")),
                    make_column("total_ch", &SavedMangaEntity::total_ch, default_value(0)),
                    make_column("read_ch", &SavedMangaEntity::read_ch, default_value(0)),
-                   make_column("has_update", &SavedMangaEntity::has_update, default_value(0)),
                    make_column("last_read_at", &SavedMangaEntity::last_read_at, default_value(0)),
                    make_column("updated_at", &SavedMangaEntity::updated_at, default_value(0)),
                    make_column("synopsis", &SavedMangaEntity::synopsis, default_value("")),

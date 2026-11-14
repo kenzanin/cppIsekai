@@ -111,8 +111,7 @@ crow::json::wvalue home_context(Store& store, BS::thread_pool<>& db, const crow:
         row["status"] = m.status;
         row["total_ch"] = m.total_ch;
         row["read_ch"] = m.read_ch;
-        row["has_update"] = m.has_update;
-        row["status_flags"] = m.status_flags;
+        row["status_flags"] = m.status_flags; // bit0 carries the New state (was has_update)
         row["last_read_at"] = static_cast<double>(m.last_read_at);
         row["added_at"] = static_cast<double>(m.added_at);
         row["dup"] = m.dup_group; // library-dedup 3.1: grid duplicate filter/sort marker

@@ -10,6 +10,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 struct Plugin {
@@ -38,6 +39,19 @@ struct ApiCacheRow {
     std::int64_t ttl_s{};
 };
 
+/** Per-manga state bitfield on saved_manga.status_flags (single INTEGER
+ *  column; the raw value is what clients gate on). Bits 7+ stay free: a new
+ *  plugin status costs one bit, not a migration. */
+enum class StatusFlag : unsigned {
+    kNew = 1u << 0,       // is_new: refresh observed chapter growth beyond stored total_ch
+    kDone = 1u << 1,      // is_done: total_ch > 0 and read_ch >= total_ch
+    kOngoing = 1u << 2,   // category: source status folds "ongoing"
+    kHiatus = 1u << 3,    // category: source status folds "hiatus"
+    kCanceled = 1u << 4,  // category: source status folds "canceled"/"cancelled"
+    kCompleted = 1u << 5, // category: source status folds "completed"
+    kDim = 1u << 6,       // is_dim: user toggled dim+blur on the entry
+};
+
 /** One user-saved manga (library-save): denormalized name/cover so the grid
  *  never calls plugins at render; keyed unique on (plugin, slug). */
 struct SavedManga {
@@ -49,13 +63,13 @@ struct SavedManga {
     std::string status{"ongoing"}; // plugin source envelope, verbatim; unknown values stored as-is
     int total_ch{};                // chapters reported by the source envelope; 0 = unknown
     int read_ch{};                 // chapters fully read at the last rollup
-    int has_update{};              // 1 when a refresh observed growth beyond stored total_ch
     std::int64_t last_read_at{};   // reader position timestamp; 0 = never opened
     std::int64_t updated_at{};     // unix seconds of last envelope-derived change; 0 = never synced
     std::string synopsis{};        // plugin-source detail envelope synopsis (or 'description'; NOT enrichment)
     std::string alt_titles{};      // plugin-source detail envelope alt titles, JSON array verbatim
     int dup_group{};               // 0 = unique; recomputed from FTS5 + Dice similarity (library-dedup 2.2)
-    int status_flags{};            // bit0=is_new, bit1=is_done; free bits for future status without migration
+    int status_flags{};            // StatusFlag bitfield: bit0=is_new, bit1=is_done, bit2-5=one-hot
+                                   // category (ongoing/hiatus/canceled/completed), bit6=is_dim
 };
 
 /** Last-read position of one manga (reader-page): resume point + continue
@@ -147,7 +161,8 @@ public:
     void api_cache_put(const std::string& plugin_id, const std::string& query_hash, const std::string& params_json,
                        const std::string& payload, std::int64_t fetched_at, std::int64_t ttl_s);
 
-    /** \brief Envelope-derived stat update (status, total_ch, has_update, updated_at). Only changed fields bump
+    /** \brief Envelope-derived stat update (status, total_ch, status_flags, updated_at). Empty
+     * status leaves the stored status (and its category bits) alone; only changed fields bump
      * updated_at. */
     void saved_stats_update(const std::string& plugin, const std::string& slug, const std::string& status,
                             int total_ch);
@@ -160,7 +175,7 @@ public:
                              const std::string& alt_titles_json);
     /** \brief Rollup of fully-read chapters + last-read timestamp (0 = leave untouched). */
     void saved_read_rollup(const std::string& plugin, const std::string& slug, int read_ch, std::int64_t last_read_at);
-    /** \brief Reader touch: stamp last_read_at=now, clear has_update when set. */
+    /** \brief Reader touch: stamp last_read_at=now, clear status_flags bit0 only. */
     void saved_clear_update(const std::string& plugin, const std::string& slug);
 
     /** \brief Upsert/unsave one saved manga; the saved list is the Library
@@ -169,6 +184,11 @@ public:
     void unsave_manga(const std::string& plugin, const std::string& slug);
     std::vector<SavedManga> saved_list(); // added_at desc
     std::optional<SavedManga> saved_get(const std::string& plugin, const std::string& slug);
+    /** \brief Dim+blur toggle: sets or clears status_flags bit6 on the row; no-op when the
+     *  manga is not saved (unsaved entries have no row to hold the bit). */
+    void saved_dim_update(const std::string& plugin, const std::string& slug, bool on);
+    /** \brief (plugin, slug) pairs with status_flags bit6 set (the dimmed covers). */
+    std::vector<std::pair<std::string, std::string>> saved_dim_list();
 
     /** \brief One enrichment row for a saved manga; fetched/chosen are raw JSON text. */
     struct TitleMetaRow {
