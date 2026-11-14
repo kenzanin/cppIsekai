@@ -1,10 +1,10 @@
 ---
 type: Fact
 title: "status_flags: followup gaps left open by the detail-source-of-truth fix (c0fce4e)"
-description: "Four known gaps after making detail open the single writer of saved_manga.status_flags: the auto-update scheduler skips the detail envelope so total_ch/has_update (and thus the New badge) never advance there; the flag lifecycle has no store-level test; inject_status_flags has no test; and the detail page badge bits are not locked by test_templates."
+description: "RESOLVED 2026-11-14 by change status-flags-followup-cleanup: the scheduler chapters-only path now advances total_ch/bit0; the store flag lifecycle, inject_status_flags and detail-page badge bits are test-locked. Complete became bit5 of a one-hot category set (not a standalone bit2), dim moved to bit6, and has_update was dropped after a backfill. Superseded by architecture/status-flags-bitfield and findings/status-flags-apply-migration-order."
 tags: [library, status-flags, badge, auto-update, followup, test-coverage]
-generated: { by: agent/reasonix, at: "2026-11-14T05:49:49Z" }
-status: stable
+generated: { by: agent/mcp, at: "2026-11-14T10:29:06Z" }
+status: deprecated
 ---
 
 Recorded 2026-11-14 after c0fce4e ("library: make detail the source of truth for status_flags badges").
@@ -58,3 +58,5 @@ OKF already states "Complete = plugin status 'Completed' (case-insensitive)" -- 
 
 `detail.mustache` line 15 still has `x-show="... || progressPct || isDone"` -- both properties are undefined in `detail_script` (removed). Dead ref, harmless; can be dropped.
 
+# Related Concepts
+- [status_flags bitfield: bit0-6 layout + single compose_flags writer](../architecture/status-flags-bitfield.md): Followup gaps G1-G5 were resolved by this bitfield design.

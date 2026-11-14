@@ -1,24 +1,25 @@
 ---
 type: Decision
 title: Per-manga dim+blur cover toggle
-description: "Dim+blur is per-manga: toggled from detail page, stored as host/dim/<plugin>/<slug>=1 in plugin_state, applied client-side to cover imgs carrying plugin+slug (grid/detail; search exempt). User-verified 2026-11-12. Gotchas: crow::json::wvalue for dim-list, htmx:afterSwap repaint, async Alpine cover needs $nextTick repaint."
+description: Per-manga dim+blur is stored as status_flags bit6 (is_dim) on the saved_manga row; applied client-side to cover imgs carrying plugin+slug (grid/detail; search exempt); unsaved manga cannot be dimmed.
 tags: [library, ui, display, cover, detail, live-verified]
-generated: { by: agent/mcp, at: "2026-11-12T03:20:07Z" }
+generated: { by: agent/mcp, at: "2026-11-14T10:27:48Z" }
 status: stable
 ---
 
 Goal: hide/blur NSFW covers on a per-title basis from the detail page, not a global switch.
 
-Implementation (2026-11-12, user-verified working "mantrap done"):
-- DB key: `host/dim/<plugin>/<slug>` = "1" in `plugin_state` (host bucket, same pattern as host/skip/<id>).
-- `Store::state_keys_value(plugin_id, key_prefix, value)` — LIKE-escaped prefix + value filter; backs GET `/api/display/dim-list` returning `[["plugin","slug"],...]` built with crow::json::wvalue.
-- POST `/api/display/dim-blur` takes `{plugin, slug, on}`; 400 on missing/invalid plugin (rejects `/`) or slug.
-- `templates/top.mustache`: `coverKey()` parses img src query (`cover=1` + `plugin` + `slug`); `dimSet` hydrated from `/api/display/dim-list` on DOMContentLoaded; `paintDim()` toggles class `img.cover-dim` (brightness .35, blur 6px) and `[data-dim-toggle]` button labels. `toggleDimBlur(plugin, slug)` toggles one pair; detail button passes literal plugin/slug via Alpine `@click`. `window.paintDim` is exposed for late renders.
-- Search page imgs carry no `slug` param → coverKey returns null → never dimmed (user-approved).
-- Golden fixtures regenerated; `ctest -R "templates|pages"` pass.
+Current storage (status-flags-followup-cleanup, 2026-11-14; supersedes the 2026-11-12 plugin_state key):
+- The dim state is `status_flags` bit6 (value 64) on the `saved_manga` row. `plugin_state` key `host/dim/<plugin>/<slug>` is retired.
+- `Store::saved_dim_update(plugin, slug, on)` sets or clears bit6 only; a no-op when the manga is not saved (no row to hold the bit).
+- `Store::saved_dim_list()` returns the `(plugin, slug)` pairs with bit6 set; backs GET `/api/display/dim-list` as `[["plugin","slug"],...]` built with `crow::json::wvalue`.
+- POST `/api/display/dim-blur` takes `{plugin, slug, on}` and calls `saved_dim_update`. Unsaved manga: request succeeds, nothing persisted.
+- All stat writers preserve bit6 via the single `compose_flags` helper (see architecture/status-flags-bitfield).
 
-Gotchas (all hit in production this session):
-1. dim-list JSON MUST be built with `crow::json::wvalue` — an earlier hand-rolled string concat (jesc lambda) got mangled by heredoc escaping and emitted literal C++ source into the JSON body.
-2. htmx swaps (`/library/grid` into `#grid`) replace cover imgs without a page load — repaint via `window.addEventListener('htmx:afterSwap', paintDim)` in top.mustache (window, not document.body: head script runs before body exists).
-3. Detail-page cover renders ASYNC (Alpine `x-if="detail.cover"` after fetch): paintDim at DOMContentLoaded misses it — button state correct, image undimmed. Fix: detail boot() calls `this.$nextTick(() => window.paintDim())` after `await this.load()`.
-4. Mixed binary/template state looks like a broken feature: templates render from disk per request, endpoints come from the compiled binary. Restart the daemon after rebuilding before judging template bugs.
+Client (`templates/top.mustache`): `coverKey()` parses the img src query (`cover=1` + `plugin` + `slug`); `dimSet` hydrates from dim-list on DOMContentLoaded; `paintDim()` toggles class `img.cover-dim` and `[data-dim-toggle]` labels. `window.paintDim` is exposed for late renders. Search page imgs carry no slug, so they are never dimmed.
+
+Gotchas:
+1. dim-list JSON MUST be built with `crow::json::wvalue`; a hand-rolled string concat once emitted literal C++ source into the body.
+2. htmx swaps replace cover imgs without a page load; repaint via `window.addEventListener('htmx:afterSwap', paintDim)` in top.mustache.
+3. The detail-page cover renders async (Alpine after fetch): call `this.$nextTick(() => window.paintDim())` after load.
+4. Templates render from disk per request but endpoints come from the compiled binary; restart the daemon after rebuilding before judging template bugs.

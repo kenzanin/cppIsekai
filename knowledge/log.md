@@ -1,4 +1,14 @@
 ## 2026-11-14
+* **Update**: Linked `findings/library-status-flags-followups.md` to `architecture/status-flags-bitfield.md` (Followup gaps G1-G5 were resolved by this bitfield design.).
+* **Update**: Linked `architecture/status-flags-bitfield.md` to `architecture/per-manga-dim-blur.md` (Dim state is status_flags bit6; the dim toggle writes through saved_dim_update on this bitfield.).
+* **Update**: Updated concept `architecture/per-manga-dim-blur.md`.
+* **Update**: Linked `findings/free-worker-routing.md` to `findings/status-flags-apply-migration-order.md` (The status-flags apply was delegated to the free worker; this finding records the delegation routing used for it.).
+* **Update**: Linked `architecture/status-flags-bitfield.md` to `architecture/library-grid-stats.md` (The bitfield decision supersedes the earlier bit0/bit1-only status_flags contract described by library-grid-stats.).
+* **Update**: Linked `findings/status-flags-apply-migration-order.md` to `architecture/status-flags-bitfield.md` (The apply finding is the migration consequence of the bitfield decision: dropping has_update required a backfill into status_flags first.).
+* **Creation**: Documented concept `findings/free-worker-routing.md` (Delegating to a free model: native subagent skill beats spawn_agents (no model field)).
+* **Update**: Updated concept `findings/library-status-flags-followups.md`.
+* **Creation**: Documented concept `findings/status-flags-apply-migration-order.md` (status-flags apply: backfill must precede DROP COLUMN has_update (18/31 rows at risk)).
+* **Creation**: Documented concept `architecture/status-flags-bitfield.md` (status_flags bitfield: bit0-6 layout + single compose_flags writer).
 * **Creation**: Documented concept `findings/library-status-flags-followups.md` (status_flags: followup gaps left open by the detail-source-of-truth fix (c0fce4e)).
 * **Update**: Updated concept `architecture/library-grid-stats.md`.
 * **Creation**: Documented concept `references/site-quirks-mangafox.md` (MangaFox (fanfox.net) site quirks (wasm guest)).
