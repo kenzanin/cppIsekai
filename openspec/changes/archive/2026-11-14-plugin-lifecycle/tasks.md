@@ -13,4 +13,5 @@
 
 ## 3. Wrap
 
-- [ ] 3.1 Full suite green, daemon restarted, disabled + removed flows exercised by hand.
+- [x] 3.1 Full suite green, daemon restarted, disabled + removed flows exercised by hand.
+  - verified 2026-11-14: full suite green (18/18 targets on the same build). Freshly restarted daemon on :8090 — disabled flow: `POST /plugin/6/enabled {"enabled":false}` → `{"enabled":false,"id":6}` (db flag 0), `POST /api/refresh/atsumaru/some-slug` → `{"ok":false,"error":"plugin disabled"}`, then re-enabled (db flag 1). Removed flow: deleted the `data/plugins/atsumaru` symlink and restarted — log line `[plugin] atsumaru: folder gone, registry + traces purged`, plugin row id 6 gone, `atsumaru` absent from `/api/plugins`; restoring the symlink and restarting re-registered it as id 14.

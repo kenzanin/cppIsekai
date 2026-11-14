@@ -1,4 +1,16 @@
 ## 2026-11-14
+* **Update**: Linked `decisions/cache-ns-display-name.md` to `architecture/cache-layout-v3.md` (the namespace replaces the per-plugin directory component described there, and drops its context-free sha fallback).
+* **Update**: Updated concept `decisions/cache-ns-display-name.md`.
+* **Update**: Linked `findings/rec-backlog-triage.md` to `references/rec-architecture-improvements.md` (triage of the backlog written in that reference).
+* **Update**: Linked `decisions/cache-ns-display-name.md` to `architecture/cache-layout-v3.md` (the namespace replaces the per-plugin directory component described there).
+* **Creation**: Documented concept `decisions/cache-ns-display-name.md` (Cache namespace = plugin display name, not plugin id).
+* **Update**: Updated concept `references/rec-ui-polish.md`.
+* **Update**: Updated concept `references/rec-architecture-improvements.md`.
+* **Creation**: Documented concept `findings/rec-backlog-triage.md` (Rec backlog triage: 2 items already done, A7 proven bug, 3 OpenSpec changes opened).
+* **Update**: Linked `references/rec-ui-polish.md` to `references/rec-architecture-improvements.md` (Architecture backlog; A3 and A5 gate parts of the UI work.).
+* **Update**: Linked `references/rec-architecture-improvements.md` to `references/rec-ui-polish.md` (UI items U7 depends on architecture item A3.).
+* **Creation**: Documented concept `references/rec-ui-polish.md` (Recommendation: UI polish backlog (for another model to pick up)).
+* **Creation**: Documented concept `references/rec-architecture-improvements.md` (Recommendation: architecture improvements backlog (for another model to pick up)).
 * **Update**: Linked `decisions/xrepo-round-2-deps.md` to `decisions/dummy-seed-removal.md` (Removal of dummy seed data.).
 * **Update**: Linked `decisions/xmake-build-system.md` to `decisions/browser-smoke-tooling.md` (Smoke-test tooling used alongside the build.).
 * **Update**: Linked `architecture/manga-viewer-core.md` to `decisions/source-layout-policy.md` (Source file layout policy.).
