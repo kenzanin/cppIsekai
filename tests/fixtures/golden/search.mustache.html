@@ -145,7 +145,7 @@
             <img :src="'/cache/img?url='+encodeURIComponent(it.cover)+'&cover=1&plugin='+encodeURIComponent(plugin)" class="w-full h-full object-cover" loading="lazy"
                  @error="$el.style.display='none'" alt="">
           </div>
-          <p class="mt-1 text-sm truncate group-hover:text-white" x-text="it.name"></p>
+          <p class="mt-1 text-sm truncate group-hover:text-white" x-text="it.title || it.name"></p>
           <p class="text-xs text-zinc-500" x-text="it.status"></p>
         </a>
       </li>
