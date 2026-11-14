@@ -17,7 +17,7 @@ namespace plugin::wasm {
 
 /** Per-handle() fuel budget, armed at load and refreshed on every call; the
  *  wasm-side equivalent of lua's instruction-count hook (~same order). */
-inline constexpr uint64_t kGasPerCall = 2'000'000'000ULL; // 1200-chapter lists + O(n^2) dedup burn ~1G
+inline constexpr uint64_t kGasPerCall = 8'000'000'000ULL;  // one_piece-scale chapter lists burn >2G
 
 /** \brief The module's one linear memory, window [off, off+len); nullopt when
  *  out of bounds -- guest offsets are bounds-checked here, never trusted. */
