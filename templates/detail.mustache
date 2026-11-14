@@ -34,18 +34,22 @@
       </div>
       <p class="text-sm text-zinc-400 leading-relaxed" x-show="detail.description" x-text="detail.description"></p>
       <div class="flex gap-2 mt-4">
-        <template x-if="hint">
-        <a :href="hint.url"
-           class="px-3 py-1.5 text-sm border border-emerald-700 bg-emerald-900/40 text-emerald-300 hover:bg-emerald-900/60 rounded-md"
-           x-text="hint.text"></a>
-      </template>
         <button @click="toggleLibrary()"
                 class="px-3 py-1.5 text-sm border rounded-md disabled:opacity-40"
                 :class="inLibrary ? 'border-emerald-700 bg-emerald-900/40 text-emerald-300 hover:bg-emerald-900/60' : 'border-zinc-700 text-zinc-300 hover:bg-zinc-800'"
                 x-text="inLibrary ? 'In library' : 'Add to library'"></button>
+        <button @click="startOrContinue()"
+                :disabled="!inLibrary"
+                class="px-3 py-1.5 text-sm border rounded-md disabled:opacity-40"
+                :class="inLibrary ? (hint ? 'border-emerald-700 bg-emerald-900/40 text-emerald-300 hover:bg-emerald-900/60' : 'border-emerald-700 text-emerald-300 hover:bg-zinc-800') : 'border-zinc-700 text-zinc-500'"
+                x-text="hint ? 'Continue reading' : 'Start reading'"></button>
         <button @click="refresh()" :disabled="refreshing || !pe"
                 class="px-3 py-1.5 text-sm border border-zinc-700 text-zinc-300 hover:bg-zinc-800 rounded-md disabled:opacity-40"
                 x-text="refreshing ? '…' : '⟳ Update'"></button>
+        <button disabled
+                :disabled="true"
+                class="px-3 py-1.5 text-sm border border-zinc-500 text-zinc-500 rounded-md opacity-50"
+                x-text="'Migrate'"></button>
       </div>
       <p class="text-xs text-red-400 mt-2" x-show="err" x-text="err" x-cloak></p>
       <!-- enrichment (detail-enrichment-fields): fetch detail/covers, picker, reset. Saved-manga library gate is enforced server-side (not in library = 404). -->

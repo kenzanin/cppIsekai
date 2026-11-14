@@ -262,8 +262,17 @@ function detailPage() {
       for (const it of (Array.isArray(saved) ? saved : [])) push(it);
       this.related = merged;
     },
-    async loadRelated() {
-      // scraper related only (cap-gated); enrichment recommendations render only via Add all (chosen.related_add)
+    async startOrContinue() { // [add to library] then [start / continue reading] -> reader at stored chapter
+      if (!this.inLibrary) return;
+      const target = this.hint && this.hint.url ? this.hint.url
+        : `/read/${encodeURIComponent(this.plugin)}/${encodeURIComponent(this.slug)}?ch=${
+          this.chapters && this.chapters[0]
+            ? Number(this.chapters[0].number) || this.chapters[0].number
+            : '1'
+        }`;
+      location.href = target;
+    },
+    async loadRelated() { // scraper related only (cap-gated); enrichment recommendations render only via Add all (chosen.related_add)
       const grab = (url) => fetch(url).then(r => r.ok ? r.json() : null).catch(() => null);
       try {
         const wantsRelated = (this.pluginCaps || '').split(',').map(s => s.trim()).includes('related');
