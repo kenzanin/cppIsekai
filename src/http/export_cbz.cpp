@@ -1,13 +1,16 @@
 #include "export_cbz.hpp"
 
+#include <algorithm>
 #include <libzippp/libzippp.h>
 
 #include <chrono>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
-#include <map>
+#include <limits>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace fs = std::filesystem;
 
@@ -24,7 +27,7 @@ constexpr char kEmptyZip[] = "\x50\x4b\x05\x06" // End-of-central-dir sig
                              "\x00\x00\x00\x00" // central dir offset
                              "\x00\x00";        // comment length
 
-std::optional<std::string> zip_of(const fs::path& tmp, const std::map<std::string, fs::path>& entries) {
+std::optional<std::string> zip_of(const fs::path& tmp, const std::vector<std::pair<std::string, fs::path>>& entries) {
     std::optional<std::string> out;
     {
         libzippp::ZipArchive zip(tmp.string());
@@ -79,10 +82,49 @@ std::optional<std::string> zip_of(const fs::path& tmp, const std::map<std::strin
     return out;
 }
 
+// Parsed numeric sort key for one (ch-dir, page-file) entry. A value of
+// (UINT_MAX, UINT_MAX, "") sorts last and deterministically (design D2):
+// an unparsable name is still exported, it just lands at the tail.
+struct EntryKey {
+    std::uint32_t chapter;
+    std::uint32_t page;
+    std::string name;
+};
+
+// "chNNN" or "chNNN-<id8>" -> NNN. Empty when the dir does not parse.
+std::uint32_t ch_num(const std::string& dir) {
+    if (dir.size() < 3 || dir.compare(0, 2, "ch") != 0)
+        return 0;
+    std::string digits = dir.substr(2);
+    if (const auto dash = digits.find('-'))
+        digits = digits.substr(0, dash);
+    if (digits.empty())
+        return 0;
+    std::size_t used;
+    const auto n = std::stoul(digits, &used);
+    return used == digits.size() ? static_cast<std::uint32_t>(n) : 0;
+}
+
+// "pNNN.<ext>" -> NNN. Empty when the file does not parse.
+std::uint32_t page_num(const std::string& file) {
+    if (file.size() < 2 || file[0] != 'p')
+        return 0;
+    std::string digits = file.substr(1, file.find('.', 1) - 1);
+    if (digits.empty())
+        return 0;
+    std::size_t used;
+    const auto n = std::stoul(digits, &used);
+    return used == digits.size() ? static_cast<std::uint32_t>(n) : 0;
+}
+
 } // namespace
 
 std::optional<std::string> build(const std::string& cache_root, const std::string& plugin, const std::string& slug) {
-    std::map<std::string, fs::path> entries; // map = lexicographic entry order
+    struct Slot {
+        EntryKey key;
+        fs::path path;
+    };
+    std::vector<Slot> slots; // reading order = numeric (ch, page), not string
     if (!plugin.empty() && !slug.empty()) {
         // Layout v3 pages: <root>/manga/<manga>/<ch-dir>/pNNN.ext. Slug carries
         // an optional "/chNNN" suffix exporting a single chapter; prefix match
@@ -106,11 +148,27 @@ std::optional<std::string> build(const std::string& cache_root, const std::strin
             }
             for (const auto& page : fs::directory_iterator(ch.path(), ec)) {
                 if (!ec && page.is_regular_file(ec)) {
-                    entries.emplace((ch.path().filename() / page.path().filename()).generic_string(), page.path());
+                    const auto entry_name = (ch.path().filename() / page.path().filename()).generic_string();
+                    const auto ch_dir = ch.path().filename().string();
+                    const auto pg_file = page.path().filename().string();
+                    const auto cnum = ch_num(ch_dir);
+                    const auto pnum = page_num(pg_file);
+                    slots.push_back({{cnum ? cnum : UINT32_MAX, pnum ? pnum : UINT32_MAX, entry_name}, page.path()});
                 }
             }
         }
     }
+    std::sort(slots.begin(), slots.end(), [](const Slot& a, const Slot& b) {
+        if (a.key.chapter != b.key.chapter)
+            return a.key.chapter < b.key.chapter;
+        if (a.key.page != b.key.page)
+            return a.key.page < b.key.page;
+        return a.key.name < b.key.name; // deterministic tiebreak
+    });
+    std::vector<std::pair<std::string, fs::path>> entries;
+    entries.reserve(slots.size());
+    for (const auto& s : slots)
+        entries.emplace_back(s.key.name, s.path);
     const auto tmp = fs::temp_directory_path() /
                      ("cbz-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + ".tmp");
     return zip_of(tmp, entries);

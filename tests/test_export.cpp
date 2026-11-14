@@ -35,6 +35,12 @@ bool zip_has(const std::string& zip, const std::string& name) {
     return zip.find(name) != std::string::npos;
 }
 
+// Local-file-header order: the FIRST occurrence of the entry name is the LFH
+// name field, which precedes the central directory. Returns npos when absent.
+std::size_t lfh_offset(const std::string& zip, const std::string& name) {
+    return zip.find(name);
+}
+
 } // namespace
 
 TEST_CASE("empty slug is an empty valid zip") {
@@ -66,4 +72,25 @@ TEST_CASE("v3 pages land under reading-order names; ch filter narrows") {
     CHECK(zip_has(*one, "ch003/p001.webp"));
     CHECK(zip_has(*one, "ch003-a1b2c3d4/p001.webp"));
     CHECK_FALSE(zip_has(*one, "ch004/p001.webp"));
+}
+
+// Regression: archive order = reading order. ch999 must precede ch1000 even
+// though "ch1000" sorts before "ch999" lexicographically (different padding
+// width). Asserted on the local file header offsets, which is the true entry
+// order inside the zip.
+TEST_CASE("chapter order crossing the padding width stays numeric (ch999 before ch1000)") {
+    TempRoot tmp;
+    put(tmp.path / "img/mangadex/manga/slug-Y/ch999/p001.webp", "C999P1");
+    put(tmp.path / "img/mangadex/manga/slug-Y/ch1000/p001.webp", "C1000P1");
+
+    const auto zip = cbz::build(tmp.path.string(), "mangadex", "slug-Y");
+    REQUIRE(zip);
+    CHECK(zip_has(*zip, "ch999/p001.webp"));
+    CHECK(zip_has(*zip, "ch1000/p001.webp"));
+
+    const std::size_t off999 = lfh_offset(*zip, "ch999/p001.webp");
+    const std::size_t off1000 = lfh_offset(*zip, "ch1000/p001.webp");
+    REQUIRE(off999 != std::string::npos);
+    REQUIRE(off1000 != std::string::npos);
+    CHECK(off999 < off1000); // ch999 first: reading order, not lexicographic
 }
