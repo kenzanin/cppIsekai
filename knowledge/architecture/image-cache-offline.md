@@ -3,7 +3,7 @@ type: decision
 title: cppIsekai image-cache + offline-first pathway
 description: "cppIsekai image-cache + offline-first pathway -- cache-layout sub-change COMPLETE 2026-11-08 (9/9 tasks, openspec all_done, ctest 10/10 green, live smoke verified legacy purge + CBZ export)."
 tags: [rewrite, cache, offline, proxy, stale, reader, mangadex, cache-layout, cbz-export]
-generated: { by: agent/mcp, at: "2026-11-08T00:41:36Z" }
+generated: { by: agent/mcp, at: "2026-11-14T10:31:33Z" }
 status: stable
 ---
 
@@ -21,3 +21,10 @@ Git rectification (user-ruled): branch cli-config had cache-layout capture at it
 Pending: 2.2 /reader/window probe (verify worker structured writes when slug present), 3.1 vendored libzippp + CMake, 3.2 GET /export/cbz streaming route, whole-diff independent review (R1'), 4.1 ctest+openspec validate, 4.2 live smoke (purge message in log + CBZ download + structured window probe).
 
 Rulings: R1' independent review ONCE whole-diff before 4.1; R2 serial workers; R5 SDD workspace files English; R6 libzippp vendored under third_party/libzippp, minizip build-level FALLBACK only.
+
+# Related Concepts
+- [cache stale-hit guard: wipe no longer serves 200-blank](../decisions/cache-stale-hit-guard.md): Guard rules for serving stale cache hits.
+- [api_cache db-lock treated as cache miss: local-first regression (mitigated)](../decisions/api-cache-lock-miss-regression.md): Local-first regression from db lock read as cache miss.
+- [api_cache NULL payload served as 200-empty-body](../decisions/api-cache-null-payload.md): Null-payload handling in the api cache.
+- [cover prefetch: dedicated worker, cache-first, library + search hooks](cover-prefetch-worker.md): Background cover prefetch worker.
+- [Library reads are local-first](local-first-reads.md): Local-first read path.

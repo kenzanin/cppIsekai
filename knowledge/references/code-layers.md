@@ -3,7 +3,7 @@ type: reference
 title: "Source layer map and rules (src/<scope>/, .mustache templates)"
 description: "Layer map of the shipped tree: src grouped by scope (store/http/log), templates .mustache, Store is the only SQL, on_db is the only cross-thread path"
 tags: [code, architecture, reference]
-generated: { by: agent/mcp, at: "2026-11-06T14:06:18Z" }
+generated: { by: agent/mcp, at: "2026-11-14T10:31:33Z" }
 status: stable
 ---
 
@@ -24,3 +24,8 @@ Rules going forward:
 
 # Related Concepts
 - [Home demo: library grid, plugin filter, live log](../architecture/home-demo.md): Layer map shows how the home-demo decision is realized in source (paths updated after restructure)
+- [src/http compile gotchas: global-scope helpers in api_ctx.hpp; crow::response is move-only](../architecture/http-layer-gotchas.md): Compile and runtime traps in the http layer.
+- [Static assets: vendored, precompressed brotli-only via explicit routes](../decisions/static-assets-br.md): Static asset serving in the http layer.
+- [search-cache: api read model as JSONB in sqlite](../decisions/search-cache-jsonb.md): Search cache storage in the store layer.
+- [DB read-parallel deferred: keep single-writer db_pool; read-only scans on demand](../decisions/db-read-parallel.md): Parallel db reads through the store layer.
+- [settings-page: openspec change drafted (GET /config projection + /settings UI)](../architecture/settings-page-openspec.md): Settings page change under the http/template layers.

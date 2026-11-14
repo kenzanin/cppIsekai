@@ -1,4 +1,40 @@
 ## 2026-11-14
+* **Update**: Linked `decisions/xrepo-round-2-deps.md` to `decisions/dummy-seed-removal.md` (Removal of dummy seed data.).
+* **Update**: Linked `decisions/xmake-build-system.md` to `decisions/browser-smoke-tooling.md` (Smoke-test tooling used alongside the build.).
+* **Update**: Linked `architecture/manga-viewer-core.md` to `decisions/source-layout-policy.md` (Source file layout policy.).
+* **Update**: Linked `architecture/manga-detail-page.md` to `decisions/template-golden-test.md` (Golden render tests lock the template output.).
+* **Update**: Linked `references/code-layers.md` to `architecture/settings-page-openspec.md` (Settings page change under the http/template layers.).
+* **Update**: Linked `architecture/image-cache-offline.md` to `architecture/local-first-reads.md` (Local-first read path.).
+* **Update**: Linked `decisions/plugin-runtimes-wasm-js.md` to `references/mangafire-vrf-algorithm.md` (VRF algorithm reference for a plugin using host crypto.).
+* **Update**: Linked `architecture/plugin-system.md` to `references/host-crypto-vrf-sign.md` (Host crypto helper for VRF signing.).
+* **Update**: Linked `architecture/manga-detail-page.md` to `decisions/restart-and-cbz-gate.md` (Restart and CBZ export gate.).
+* **Update**: Linked `references/code-layers.md` to `decisions/db-read-parallel.md` (Parallel db reads through the store layer.).
+* **Update**: Linked `architecture/image-cache-offline.md` to `architecture/cover-prefetch-worker.md` (Background cover prefetch worker.).
+* **Update**: Linked `architecture/manga-viewer-core.md` to `references/goisekai-plugin-examples.md` (Example plugins from the predecessor project.).
+* **Update**: Linked `decisions/deps-and-plugins.md` to `decisions/luajit-migration.md` (Lua runtime migration decision.).
+* **Update**: Linked `decisions/plugin-runtimes-wasm-js.md` to `findings/js-image-referer-gap.md` (Image referer gap found in the js runtime.).
+* **Update**: Linked `architecture/plugin-system.md` to `decisions/host-url-codec.md` (Host URL codec helper exposed to plugins.).
+* **Update**: Linked `decisions/xmake-build-system.md` to `constraints/xmake-install-interrupt.md` (xmake package install interruption pitfall.).
+* **Update**: Linked `decisions/xrepo-round-2-deps.md` to `constraints/utf8proc-2.11-3-api.md` (utf8proc 2.11.3 API constraint.).
+* **Update**: Linked `architecture/manga-detail-page.md` to `decisions/chapter-zero-falsy-regression.md` (Chapter number zero regression affecting chapter rows.).
+* **Update**: Linked `references/code-layers.md` to `decisions/search-cache-jsonb.md` (Search cache storage in the store layer.).
+* **Update**: Linked `architecture/image-cache-offline.md` to `decisions/api-cache-null-payload.md` (Null-payload handling in the api cache.).
+* **Update**: Linked `architecture/manga-viewer-core.md` to `decisions/plugin-website-field.md` (Plugin manifest website field.).
+* **Update**: Linked `decisions/deps-and-plugins.md` to `decisions/curl-impersonate-chrome-only.md` (curl-first fetch: impersonation profile scope.).
+* **Update**: Linked `decisions/plugin-runtimes-wasm-js.md` to `decisions/guest-runtime-language.md` (Guest runtime language choice.).
+* **Update**: Linked `architecture/plugin-system.md` to `decisions/plugin-lifecycle.md` (Plugin load/unload lifecycle.).
+* **Update**: Linked `decisions/xmake-build-system.md` to `decisions/build-toolchain-cpp23.md` (C++23 toolchain choice for the build.).
+* **Update**: Linked `decisions/xrepo-round-2-deps.md` to `constraints/sol2-lua-version.md` (Lua version constraint behind the system lua pin.).
+* **Update**: Linked `architecture/manga-detail-page.md` to `decisions/chapter-list-controls.md` (Read-state routes and chapter rows on the detail page.).
+* **Update**: Linked `references/code-layers.md` to `decisions/static-assets-br.md` (Static asset serving in the http layer.).
+* **Update**: Linked `architecture/image-cache-offline.md` to `decisions/api-cache-lock-miss-regression.md` (Local-first regression from db lock read as cache miss.).
+* **Update**: Linked `architecture/manga-viewer-core.md` to `decisions/plugin-backend-interface.md` (Backend dispatch stays struct-based until a 4th runtime.).
+* **Update**: Linked `decisions/plugin-runtimes-wasm-js.md` to `decisions/plugin-port-js-wasm.md` (Porting decision for the js/wasm runtimes.).
+* **Update**: Linked `architecture/plugin-system.md` to `references/goisekai-abi-mapping.md` (ABI mapping reference from the predecessor project.).
+* **Update**: Linked `decisions/xrepo-round-2-deps.md` to `constraints/xmake-re2-pin.md` (Constraint record for the re2 pin.).
+* **Update**: Linked `references/code-layers.md` to `architecture/http-layer-gotchas.md` (Compile and runtime traps in the http layer.).
+* **Update**: Linked `architecture/image-cache-offline.md` to `decisions/cache-stale-hit-guard.md` (Guard rules for serving stale cache hits.).
+* **Update**: Linked `architecture/plugin-system.md` to `architecture/atsumaru-plugin.md` (Concrete site plugin built on this packaging/ABI.).
 * **Update**: Linked `findings/library-status-flags-followups.md` to `architecture/status-flags-bitfield.md` (Followup gaps G1-G5 were resolved by this bitfield design.).
 * **Update**: Linked `architecture/status-flags-bitfield.md` to `architecture/per-manga-dim-blur.md` (Dim state is status_flags bit6; the dim toggle writes through saved_dim_update on this bitfield.).
 * **Update**: Updated concept `architecture/per-manga-dim-blur.md`.

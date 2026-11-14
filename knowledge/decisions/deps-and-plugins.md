@@ -3,7 +3,7 @@ type: decision
 title: "Dependencies & plugins: curl-first APIs, runtime parity, no hand-rolled crypto"
 description: "User-confirmed 2026-11-07: curl-first REST routes (CBZ export = host route), plugin runtime parity same signature (quickjs-ng second runtime), no hand-rolled crypto (stbrumme/hash-library md5/sha1), base64 dari glaze, libzippp + pacman libzip, quickjs-ng vendored static."
 tags: [dependencies, cbz, quickjs, plugins, hashing, api-design]
-generated: { by: agent/mcp, at: "2026-11-07T14:04:38Z" }
+generated: { by: agent/mcp, at: "2026-11-14T10:31:26Z" }
 status: stable
 ---
 
@@ -32,3 +32,5 @@ Change openspec baru `deps-and-plugins`, di-stack di branch image-cache (file ya
 
 # Related Concepts
 - [cli-config: registry-backed config surface (CLI/env/ini/dump/save)](../architecture/cli-config.md): POST /config is a REST route per curl-first ruling; registry wraps CLI11/SimpleIni/glaze APIs.
+- [curl-impersonate: chrome-family only; ini-fed profile dropdown; local-time crow log](curl-impersonate-chrome-only.md): curl-first fetch: impersonation profile scope.
+- [LuaJIT migration: skipped (not faster, higher risk)](luajit-migration.md): Lua runtime migration decision.

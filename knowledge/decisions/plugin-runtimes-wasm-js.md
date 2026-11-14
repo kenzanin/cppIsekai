@@ -3,7 +3,7 @@ type: decision
 title: "Plugin runtimes: wasm3 + quickjs-ng execution contract"
 description: "plugin-helper landed: unified host.* namespace (11 tools) across lua/js/wasm, RE2 + lexbor heavy helpers behind one htmltext core, lua fs.read parity closed; lexbor vendor pitfalls (ports/posix memory.c, separate selectors/ subtree) recorded."
 tags: [plugin-runtime, host-tools, re2, lexbor, parity, helper-api, html, regex]
-generated: { by: agent/mcp, at: "2026-11-09T07:35:16Z" }
+generated: { by: agent/mcp, at: "2026-11-14T10:31:33Z" }
 status: stable
 ---
 
@@ -23,3 +23,7 @@ GOTCHAS: sol2 as_table does not convert to sol::object - build sol::table manual
 
 # Related Concepts
 - Related to [Plugin system: folder packaging, manifest, multi-runtime data-contract ABI](../architecture/plugin-system.md)
+- [Plugin port to JS and WASM — plan](plugin-port-js-wasm.md): Porting decision for the js/wasm runtimes.
+- [Guest runtime language policy](guest-runtime-language.md): Guest runtime language choice.
+- [Host image fetch is plugin-blind: no Referer (js mangatown pilot finding)](../findings/js-image-referer-gap.md): Image referer gap found in the js runtime.
+- [Mangafire VRF algorithm (port target for host.crypto.vrf_sign)](../references/mangafire-vrf-algorithm.md): VRF algorithm reference for a plugin using host crypto.
