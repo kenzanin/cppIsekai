@@ -103,14 +103,15 @@ directly under `data/cache/img/`; that rejection replaces the old sha-pool fallb
 - **THEN** `data/cache/img/` contains only namespace directories, never a loose `<sha>.<ext>`
 
 ### Requirement: CBZ export route
-`GET /export/cbz?plugin=<id>&slug=<slug>` SHALL stream a CBZ (zip) of the cached chapter page
-images for that manga, entries named `chNNN/pNNN.<ext>` after the zero-padded file paths.
-Archive order SHALL be reading order: entries SHALL be ordered by chapter number and then by
-page number, compared **numerically**. The implementation SHALL NOT rely on lexicographic
-ordering of the entry names, because chapter directories are padded to a minimum of three
-digits and a four-digit chapter name (`ch1000`) sorts before `ch999`. An optional `/<chNNN>`
-suffix on the slug SHALL narrow the export to directories whose name starts with that prefix.
-Empty cache for a requested slug SHALL produce an empty archive, not an error.
+`GET /export/cbz?plugin=<id>&slug=<slug>` SHALL stream a CBZ (zip) of the cached chapter
+page images for that manga, entries named `chNNN/pNNN.<ext>` after the zero-padded file
+paths. Archive order SHALL be reading order: entries SHALL be ordered by chapter number and
+then by page number, compared **numerically**. The implementation SHALL NOT rely on
+lexicographic ordering of the entry names, because chapter directories are padded to a
+minimum of three digits and a four-digit chapter name (`ch1000`) sorts before `ch999`.
+An optional `/<chNNN>` suffix on the slug SHALL narrow the export to directories whose name
+starts with that prefix. Empty cache for a requested slug SHALL produce an empty archive,
+not an error.
 
 #### Scenario: Downloadable CBZ
 - **WHEN** a slug whose pages were cached is exported
