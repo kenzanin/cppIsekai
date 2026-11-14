@@ -96,7 +96,13 @@ void register_state(Ctx& c) {
                         window.emplace_back(url);
                     }
                     if (!found.empty()) {
-                        prefetch.nudge(found); // rerun delta (3.3)
+                        // Placement context is not optional: the worker drops a
+                        // batch without it, so mirror the reader route's nudge.
+                        prefetch.nudge(found, {.plugin = plugin,
+                                               .slug = manga,
+                                               .chapter = static_cast<int>(last->chapter_number),
+                                               .page_base = last->page + 1,
+                                               .chapter_id = chapter}); // rerun delta (3.3)
                     }
                 }
             }

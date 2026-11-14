@@ -36,6 +36,11 @@ namespace cache {
  *  fetcher can attach per-site headers (image Referer). */
 using Fetcher = std::function<std::optional<std::string>(const std::string& key, const std::string& plugin)>;
 
+/** \brief plugin id -> cache namespace (the on-disk directory component).
+ *  Injected so the cache does not depend on the Store or the plugin registry;
+ *  an empty resolver keeps the plugin id as-is. */
+using NsResolver = std::function<std::string(const std::string& plugin_id)>;
+
 struct Config {
     std::string root = "data/cache";
     std::int64_t max_bytes = 2048LL << 20; // cache_max_mb, default 2048
@@ -47,10 +52,16 @@ class Cache {
 public:
     /** \brief Walks the whole root tree: existing files keep serving and count
      *  toward the cap. */
-    Cache(Config conf, Fetcher fetch);
+    Cache(Config conf, Fetcher fetch, NsResolver ns = {});
 
     Cache(const Cache&) = delete;
     Cache& operator=(const Cache&) = delete;
+
+    /** \brief Cache namespace for a plugin id: the directory under
+     *  <root>/img/ that owns its files. Defaults to the id when no resolver
+     *  was injected. Callers outside this class (cbz export, cache-full probe)
+     *  must go through this instead of using the raw id. */
+    [[nodiscard]] std::string ns(const std::string& plugin) const;
 
     /** \brief Hit: return path, bump recency. Miss: fetch -> store -> path.
      *
@@ -76,10 +87,11 @@ public:
     std::optional<std::string> peek(const std::string& key, const std::string& kind, const std::string& rel_path = {});
 
     /** \brief V3 context-aware store for img pool only: writes body under a
-     *  layout-specific path (cover / chapter-dir / sha fallback), plus a one-line
-     *  JSON sidecar for covers when dims+ratio can be decoded. Returns the stored
-     *  path; nullopt on write failure. Decode fail falls back to v2 hash name and
-     *  stores original bytes (no sidecar). */
+     *  layout-specific path (cover / chapter-dir), plus a one-line JSON sidecar
+     *  for covers when dims+ratio can be decoded. Returns the stored path;
+     *  nullopt on write failure or when no placement context was given (the img
+     *  pool has no sha fallback). Decode fail falls back to the original bytes
+     *  (no sidecar). */
     struct CoverCtx {
         std::string url;
         std::string plugin{};
@@ -133,6 +145,7 @@ private:
 
     Config conf_;
     Fetcher fetch_;
+    NsResolver ns_;
     std::unordered_map<std::string, Entry> entries_; // by file path
     std::int64_t bytes_{};
     std::uint64_t tick_{}; // recency clock; disk seed = mtime order

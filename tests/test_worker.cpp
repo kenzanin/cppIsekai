@@ -48,8 +48,17 @@ struct Rig {
     cache::Cache cache{cache::Config{dir.path.string(), 1 << 20},
                        [this](const std::string& k, const std::string&) { return fake.get(k); }};
 
-    void seed(const std::string& key) { REQUIRE(cache.store(key, "img", "body:" + key).has_value()); }
-    bool on_disk(const std::string& key) { return cache.peek(key, "img").has_value(); }
+    // The img pool has no sha fallback, so seeded/peeked files need a
+    // placement path: seed into the exact slot a worker batch would fill.
+    static std::string slot(int page) {
+        std::string n = std::to_string(page);
+        while (n.size() < 3) n = "0" + n;
+        return "md/manga/slug-a/ch001/p" + n + ".bin";
+    }
+    void seed(const std::string& key, int page) {
+        REQUIRE(cache.store(key, "img", "body:" + key, slot(page)).has_value());
+    }
+    bool on_disk(const std::string& key, int page) { return cache.peek(key, "img", slot(page)).has_value(); }
     bool on_disk_rel(const std::string& key, const std::string& rel) {
         return cache.peek(key, "img", rel).has_value();
     }
@@ -59,19 +68,20 @@ struct Rig {
 
 TEST_CASE("worker: delta only -- seeded urls are skipped, misses fetched in window order") {
     Rig rig;
-    rig.seed("w/a");
-    rig.seed("w/c");
+    rig.seed("w/a", 1);
+    rig.seed("w/c", 3);
     rig.fake.bodies = {{"w/b", "b"}, {"w/d", "d"}, {"w/e", "e"}};
 
     // Worker construction starts the thread; the queue is the only shared
     // state, so nudge -> stop is a deterministic single-batch run: stop
     // drains before join returns.
     reader::Worker worker{rig.cache};
-    worker.nudge({"w/a", "w/b", "w/c", "w/d", "w/e"});
+    worker.nudge({"w/a", "w/b", "w/c", "w/d", "w/e"}, reader::WindowCtx{"md", "slug-a", 1});
     worker.stop();
 
     CHECK(rig.fake.fetched == std::vector<std::string>{"w/b", "w/d", "w/e"});
-    for (const auto& url : {"w/a", "w/b", "w/c", "w/d", "w/e"}) CHECK(rig.on_disk(url));
+    int page = 0;
+    for (const auto& url : {"w/a", "w/b", "w/c", "w/d", "w/e"}) CHECK(rig.on_disk(url, ++page));
 }
 
 TEST_CASE("worker: failed fetch is best-effort, the rest of the window still lands") {
@@ -79,12 +89,12 @@ TEST_CASE("worker: failed fetch is best-effort, the rest of the window still lan
     rig.fake.bodies = {{"w/a", "a"}}; // w/missing not in bodies -> fetch fails
 
     reader::Worker worker{rig.cache};
-    worker.nudge({"w/missing", "w/a"});
+    worker.nudge({"w/missing", "w/a"}, reader::WindowCtx{"md", "slug-a", 1});
     worker.stop();
 
     CHECK(rig.fake.fetched == std::vector<std::string>{"w/missing", "w/a"});
-    CHECK(rig.on_disk("w/a"));
-    CHECK(!rig.on_disk("w/missing"));
+    CHECK(rig.on_disk("w/a", 2));
+    CHECK(!rig.on_disk("w/missing", 1));
 }
 
 TEST_CASE("worker: start/stop sanity -- idle stop and reuse after stop are quiet") {
@@ -127,38 +137,35 @@ TEST_CASE("worker: structured placement -- complete ctx lands <plugin>/manga/<sl
     for (std::size_t i = 1; i < dirs.size(); ++i) CHECK(dirs[i - 1] < dirs[i]);
 }
 
-TEST_CASE("worker: sha fallback -- missing slug or chapter stays on the exact old path") {
+TEST_CASE("worker: a nudge without full placement context is dropped, never sha-written") {
     Rig rig;
-    rig.fake.bodies = {{"http://x/a.png", "a"}};
-    const reader::WindowCtx ctx{"md", "slug-a", 1};
+    rig.fake.bodies = {{"http://x/a.png", "a"}, {"http://x/plain", "p"}};
 
     {
         reader::Worker w{rig.cache};
         w.nudge({"http://x/a.png"}); // no ctx at all
         w.stop();
     }
-    CHECK(rig.on_disk("http://x/a.png")); // flat <sha>.png, no structured copy
-    CHECK(!rig.on_disk_rel("http://x/a.png", "md/slug-a/ch001/p001.png"));
+    CHECK(rig.fake.fetched.empty()); // not even fetched
+    CHECK(!rig.on_disk("http://x/a.png", 1));
 
-    // ctx present but slug missing -> same flat path.
+    // ctx present but slug missing -> same: dropped, nothing written.
     {
         reader::Worker w{rig.cache};
         w.nudge({"http://x/a.png"}, reader::WindowCtx{"md", "", 1});
         w.stop();
     }
-    CHECK(rig.on_disk("http://x/a.png"));
-    CHECK(!rig.on_disk_rel("http://x/a.png", "md//ch001/p001.png"));
+    CHECK(rig.fake.fetched.empty());
+    CHECK(!rig.on_disk("http://x/a.png", 1));
 
-    // ctx present but url has no extension -> ext_of falls back to "bin",
-    // structured landing still applies (md/manga/slug-a/ch001/p001.bin).
-    rig.fake.bodies["http://x/plain"] = "p";
+    // Full ctx, url without an extension -> ext_of falls back to "bin" and the
+    // structured landing still applies.
     {
         reader::Worker w{rig.cache};
-        w.nudge({"http://x/plain"}, ctx);
+        w.nudge({"http://x/plain"}, reader::WindowCtx{"md", "slug-a", 1});
         w.stop();
     }
     CHECK(rig.on_disk_rel("http://x/plain", "md/manga/slug-a/ch001/p001.bin"));
-    CHECK(!rig.on_disk("http://x/plain")); // no flat sha landing
 }
 
 TEST_CASE("worker: store reuse -- peek with the same rel_path hits, a second rel refetches") {

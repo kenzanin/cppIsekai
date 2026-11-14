@@ -80,18 +80,23 @@ TEST_CASE("cache: miss fetch+store, hit serves without refetch") {
     cache::Cache cache(cache::Config{root.path.string(), 1 << 20},
                        [state](const std::string& k, const std::string&) { return state->get(k); });
 
-    const auto a = cache.ensure("http://x/a.jpg", "img");
+    const std::string rel = "mangadex/manga/slug-x/ch001/p001.jpg";
+    const auto a = cache.ensure("http://x/a.jpg", "img", rel);
     REQUIRE(ok(a));
-    CHECK(fs::path(*a).extension() == ".jpg"); // ext from url, lowercased
-    CHECK(fs::path(*a).parent_path().filename() == "img");
-    CHECK(fs::path(*a).stem() == sha1_hex("http://x/a.jpg")); // sha1 keys
+    CHECK(fs::path(*a).parent_path().filename() == "ch001");
+    CHECK(fs::path(*a).filename() == "p001.jpg"); // the placement path names the file
     CHECK(fs::file_size(*a) == 40);
 
     const int calls = state->calls;
-    CHECK(cache.ensure("http://x/a.jpg", "img") == a); // same path on hit
-    CHECK(state->calls == calls);                      // no refetch on hit
+    CHECK(cache.ensure("http://x/a.jpg", "img", rel) == a); // same path on hit
+    CHECK(state->calls == calls);                           // no refetch on hit
 
-    CHECK(fs::path(*cache.ensure("http://x/p.PNG?w=100", "img")).extension() == ".png");
+    // img has no sha fallback: without a placement path nothing is fetched.
+    CHECK(cache.ensure("http://x/p.PNG?w=100", "img") == std::nullopt);
+    CHECK(state->calls == calls);
+
+    // the api pool keeps v1 sha naming; ext comes from the url, lowercased
+    CHECK(fs::path(*cache.ensure("http://x/p.PNG?w=100", "api")).extension() == ".png");
 }
 
 TEST_CASE("cache: evict on insert follows LRU, survivors stay readable") {
@@ -101,23 +106,23 @@ TEST_CASE("cache: evict on insert follows LRU, survivors stay readable") {
     cache::Cache cache(cache::Config{root.path.string(), 100}, // tiny cap
                        [state](const std::string& k, const std::string&) { return state->get(k); });
 
-    const auto a = cache.ensure("a", "img");
-    const auto b = cache.ensure("b", "img");
+    const auto a = cache.ensure("a", "api");
+    const auto b = cache.ensure("b", "api");
     REQUIRE(ok(a));
     REQUIRE(ok(b));
 
-    cache.ensure("a", "img"); // touch a: b becomes LRU
-    const auto c = cache.ensure("c", "img");
+    cache.ensure("a", "api"); // touch a: b becomes LRU
+    const auto c = cache.ensure("c", "api");
     REQUIRE(ok(c));
 
     CHECK(state->calls == 3);    // touch + insert, no extra fetches
     CHECK_FALSE(fs::exists(*b)); // LRU evicted from disk...
     CHECK(fs::exists(*a));       // ...recently-used survivor...
     const int calls = state->calls;
-    CHECK(cache.ensure("a", "img") == a);
+    CHECK(cache.ensure("a", "api") == a);
     CHECK(state->calls == calls); // ...and still a hit, not a refetch
 
-    CHECK(ok(cache.ensure("b", "img"))); // evicted key refetches fine
+    CHECK(ok(cache.ensure("b", "api"))); // evicted key refetches fine
 }
 
 TEST_CASE("cache: restart rescans disk, counts toward cap, keeps recency") {
@@ -127,8 +132,8 @@ TEST_CASE("cache: restart rescans disk, counts toward cap, keeps recency") {
     const cache::Config conf{root.path.string(), 100};
     cache::Cache first(conf, [state](const std::string& k, const std::string&) { return state->get(k); });
 
-    const auto a = first.ensure("a", "img");
-    const auto c = first.ensure("c", "img");
+    const auto a = first.ensure("a", "api");
+    const auto c = first.ensure("c", "api");
     REQUIRE(ok(a));
     REQUIRE(ok(c));
     // distinct mtimes so the rebuilt recency order is deterministic
@@ -138,10 +143,10 @@ TEST_CASE("cache: restart rescans disk, counts toward cap, keeps recency") {
 
     cache::Cache again(conf, [state](const std::string& k, const std::string&) { return state->get(k); });
     const int calls = state->calls;
-    CHECK(again.ensure("a", "img") == a); // rebooted entries serve from disk
+    CHECK(again.ensure("a", "api") == a); // rebooted entries serve from disk
     CHECK(state->calls == calls);
 
-    const auto d = again.ensure("d", "img"); // 120B > 100B: evict, LRU = c
+    const auto d = again.ensure("d", "api"); // 120B > 100B: evict, LRU = c
     REQUIRE(ok(d));                          // (a's hit above bumped its recency)
     CHECK(state->calls == calls + 1);
     CHECK_FALSE(fs::exists(*c)); // rebuilt pool counted a+c, evicts by LRU
@@ -155,7 +160,7 @@ TEST_CASE("cache: failed fetch leaves nothing behind") {
     cache::Cache cache(cache::Config{root.path.string(), 1 << 20},
                        [state](const std::string& k, const std::string&) { return state->get(k); });
 
-    CHECK(cache.ensure("http://x/none.jpg", "img") == std::nullopt);
+    CHECK(cache.ensure("http://x/none.jpg", "img", "mangadex/manga/slug-x/ch001/p001.jpg") == std::nullopt);
     std::size_t files = 0;
     std::error_code nodir; // img pool created lazily on first store
     for (const auto& e : fs::directory_iterator(root.path / "img", nodir)) {
@@ -206,7 +211,7 @@ TEST_CASE("cache: boot walk spans tree depth; trim evicts across pools by mtime"
     cache::Cache cache(cache::Config{root.path.string(), 100},
                        [state](const std::string& k, const std::string&) { return state->get(k); });
 
-    const auto n = cache.ensure("n", "img"); // 160B > 100B: oldest evicted
+    const auto n = cache.ensure("n", "api"); // 160B > 100B: oldest evicted
     REQUIRE(ok(n));
     CHECK(state->calls == 1);
     CHECK_FALSE(fs::exists(deep)); // nested depth was indexed, then evicted
@@ -274,10 +279,10 @@ TEST_CASE("cache v3: page landing paths + duplicate chapter disambiguation") {
     REQUIRE(ok(e));
     CHECK(fs::path(*e).parent_path().filename().string() == "ch012-c3d4e5f6");
 
-    // no context -> sha fallback at pool root
-    const auto f = cache.img_store("http://x/plain.gif", "E", {}, {});
-    REQUIRE(ok(f));
-    CHECK(fs::path(*f).parent_path().filename() == "img");
+    // no placement context -> refused, nothing lands at the pool root (D5:
+    // the img pool has no sha fallback)
+    CHECK(cache.img_store("http://x/plain.gif", "E", {}, {}) == std::nullopt);
+    CHECK_FALSE(fs::exists(root.path / "img" / (sha1_hex("http://x/plain.gif") + ".gif")));
 }
 
 TEST_CASE("cache v3: cover landing + sidecar round-trip") {
@@ -348,12 +353,15 @@ TEST_CASE("cache v3: stale index entry after manual wipe falls through to refetc
     CHECK(*again == landed);                     // re-landed at the exact v3 spot
     CHECK(fs::file_size(*again) == 40);          // body re-stored, not blank
 
-    // --- sha fallback path: same guard without context
-    REQUIRE(ok(cache.img_ensure("http://x/plain.gif", {}, {})));
-    const auto fb = cache.img_ensure("http://x/plain.gif", {}, {});
+    // --- second page slot: same guard, its own landing path
+    cache::Cache::PageCtx pg2 = pg;
+    pg2.chapter = 2;
+    state->bodies["http://x/plain.gif"] = forty('c');
+    REQUIRE(ok(cache.img_ensure("http://x/plain.gif", {}, pg2)));
+    const auto fb = cache.img_ensure("http://x/plain.gif", {}, pg2);
     REQUIRE(fb.has_value());
     fs::remove(*fb);
-    const auto fb2 = cache.img_ensure("http://x/plain.gif", {}, {});
+    const auto fb2 = cache.img_ensure("http://x/plain.gif", {}, pg2);
     // stale entry dropped, refetch succeeds (body present) -> re-stored
     REQUIRE(fb2.has_value());
     CHECK(*fb2 == *fb);
@@ -371,4 +379,31 @@ TEST_CASE("cache v3: stale index entry after manual wipe falls through to refetc
     REQUIRE(c2.has_value());
     CHECK(*c2 == *c1);
     CHECK(fs::file_size(*c2) == 40);
+}
+
+TEST_CASE("cache: namespace resolver keys the on-disk directory, id is the fallback") {
+    TempRoot root;
+    auto state = std::make_shared<FakeState>();
+    state->bodies = {{"http://x/page.jpg", forty('p')}};
+    // id -> display-name namespace; an empty result means "keep the id"
+    auto ns = [](const std::string& id) -> std::string {
+        return id == "mangadex" ? std::string("mangadex-name") : std::string{};
+    };
+    cache::Cache cache(cache::Config{root.path.string(), 1 << 20},
+                       [state](const std::string& k, const std::string&) { return state->get(k); }, ns);
+
+    CHECK(cache.ns("mangadex") == "mangadex-name"); // resolver wins
+    CHECK(cache.ns("other") == "other");            // empty result -> id
+
+    cache::Cache::PageCtx pg{.plugin = "mangadex", .slug = "solo-leveling", .chapter = 3, .page = 1};
+    const auto p = cache.img_ensure("http://x/page.jpg", {}, pg);
+    REQUIRE(ok(p));
+    CHECK(fs::path(*p).generic_string().find("img/mangadex-name/manga/solo-leveling/ch003/p001") !=
+          std::string::npos);
+
+    cache::Cache::PageCtx p2 = pg;
+    p2.plugin = "other";
+    const auto p2p = cache.img_ensure("http://x/page.jpg", {}, p2);
+    REQUIRE(ok(p2p));
+    CHECK(fs::path(*p2p).generic_string().find("img/other/manga/solo-leveling/") != std::string::npos);
 }

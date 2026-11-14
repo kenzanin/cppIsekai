@@ -15,27 +15,27 @@ namespace cache {
 std::optional<std::string> Cache::img_store(const std::string& key, const std::string& body, const CoverCtx& cover_ctx,
                                             const PageCtx& page_ctx, const std::string& ext_override) {
     // V3 layout (D1-D4): cover -> <plugin>/cover/<urlhash16>.<ext> + sidecar;
-    // page -> <plugin>/manga/<slug>/ch<n>-<id8>/pNNN.<ext> via page_rel;
-    // no context -> sha fallback. ext_override (transcode target ext) wins,
-    // else extension derived from the key.
+    // page -> <plugin>/manga/<slug>/ch<n>-<id8>/pNNN.<ext> via page_rel.
+    // No placement context -> store nothing: the img pool has no sha fallback
+    // (D5), every file lives under a plugin namespace. ext_override (transcode
+    // target ext) wins, else extension derived from the key.
     const std::string ext = ext_override.empty() ? internal::ext_of(key) : ext_override;
     std::string rel;
     if (cover_ctx.cover) {
         const auto h = sha1_hex(cover_ctx.url.empty() ? key : cover_ctx.url).substr(0, 16);
-        rel = internal::cover_rel(cover_ctx.plugin.empty() ? "common" : cover_ctx.plugin, h, ext,
+        rel = internal::cover_rel(cover_ctx.plugin.empty() ? std::string("common") : ns(cover_ctx.plugin), h, ext,
                                   cover_ctx.w > 0 && cover_ctx.h > 0
                                       ? static_cast<double>(cover_ctx.w) / static_cast<double>(cover_ctx.h)
                                       : 0.0);
     } else if (page_ctx.plugin.empty() || page_ctx.slug.empty() || page_ctx.chapter < 1 || page_ctx.page < 1) {
-        rel = {}; // no complete page context: sha fallback
+        return std::nullopt; // no placement context: nothing to name the file
     } else {
-        rel = internal::page_rel(page_ctx.plugin, page_ctx.slug, page_ctx.chapter, page_ctx.page, page_ctx.chapter_id) +
+        rel = internal::page_rel(ns(page_ctx.plugin), page_ctx.slug, page_ctx.chapter, page_ctx.page, page_ctx.chapter_id) +
               "." + ext;
     }
 
     const std::lock_guard lock(mu_);
-    const std::string path = rel.empty() ? path_for(key, "img", {}) : (fs::path(conf_.root) / "img" / rel).string();
-    auto stored = persist_locked(path, body);
+    auto stored = persist_locked((fs::path(conf_.root) / "img" / rel).string(), body);
     if (!stored)
         return std::nullopt;
     return stored;
@@ -62,12 +62,19 @@ std::optional<std::string> Cache::img_ensure(const std::string& key, const Cover
         return false;
     };
 
+    // No placement context (neither a cover nor a complete page): there is no
+    // path to look up and none to store, so do not fetch either (D5).
+    if (!cover_ctx.cover && (page_ctx.plugin.empty() || page_ctx.slug.empty() || page_ctx.chapter < 1 ||
+                             page_ctx.page < 1)) {
+        spdlog::debug("cache: img no placement context, refusing {}", key);
+        return std::nullopt;
+    }
+
     std::optional<std::string> hit; // candidate chosen under lock, verified outside
     {
         const std::lock_guard lock(mu_);
-        if (!cover_ctx.cover && !page_ctx.plugin.empty() && !page_ctx.slug.empty() && page_ctx.chapter >= 1 &&
-            page_ctx.page >= 1) {
-            const std::string prefix = internal::page_rel(page_ctx.plugin, page_ctx.slug, page_ctx.chapter,
+        if (!cover_ctx.cover) {
+            const std::string prefix = internal::page_rel(ns(page_ctx.plugin), page_ctx.slug, page_ctx.chapter,
                                                           page_ctx.page, page_ctx.chapter_id) +
                                        ".";
             for (const auto& [path, _] : entries_)
@@ -78,16 +85,6 @@ std::optional<std::string> Cache::img_ensure(const std::string& key, const Cover
             if (!hit)
                 spdlog::debug("cache: img ctx-miss, fetching {} (ch{} p{} {})", key, page_ctx.chapter, page_ctx.page,
                               page_ctx.slug);
-            // Context miss: fetch below lands in this exact v3 spot. Deliberately
-            // no sha-fallback lookup here -- an entry there predates this
-            // context's layout and would serve the wrong landing path.
-        } else {
-            // No (or incomplete) context: sha-fallback hit check.
-            const std::string fb = path_for(key, "img", {});
-            if (entries_.count(fb))
-                hit = fb;
-            else
-                spdlog::debug("cache: img sha-miss, fetching {}", key);
         }
     }
     if (hit && !alive(*hit))
@@ -142,7 +139,7 @@ std::optional<std::string> Cache::cover_serve(const std::string& plugin, const s
     // Match the tail (hash prefix, any ratio suffix and ext).
     const std::lock_guard lock(mu_);
     const std::string tail =
-        "img/" + (plugin.empty() ? std::string("common") : plugin) + "/cover/" + sha1_hex(url).substr(0, 16) + "-";
+        "img/" + (plugin.empty() ? std::string("common") : ns(plugin)) + "/cover/" + sha1_hex(url).substr(0, 16) + "-";
     for (const auto& [path, _] : entries_) {
         if (path.find(tail) != std::string::npos)
             return path;

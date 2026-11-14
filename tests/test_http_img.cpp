@@ -68,7 +68,7 @@ TEST_CASE("img: miss fetches+stores+serves; second view comes from disk") {
     state->bodies = {{"http://x/a.jpg", "JPEGBYTES"}};
     cache::Cache cache = fake_cache(root.path.string(), state);
 
-    const ImgReply first = serve_cached_image(cache, "http://x/a.jpg");
+    const ImgReply first = serve_cached_image(cache, "http://x/a.jpg", {}, {"mangadex", "slug-x", 3, 1});
     CHECK(first.code == 200);
     CHECK(first.body == "JPEGBYTES");
     CHECK(first.mime == "image/jpeg");
@@ -76,7 +76,7 @@ TEST_CASE("img: miss fetches+stores+serves; second view comes from disk") {
 
     // fetcher now fails: the second view must be served from disk regardless
     state->bodies.clear();
-    const ImgReply again = serve_cached_image(cache, "http://x/a.jpg");
+    const ImgReply again = serve_cached_image(cache, "http://x/a.jpg", {}, {"mangadex", "slug-x", 3, 1});
     CHECK(again.code == 200);
     CHECK(again.body == "JPEGBYTES");
     CHECK(again.mime == "image/jpeg");
@@ -88,10 +88,30 @@ TEST_CASE("img: offline miss is 404 with empty body") {
     auto state = std::make_shared<FakeState>();
     cache::Cache cache = fake_cache(root.path.string(), state);
 
-    const ImgReply miss = serve_cached_image(cache, "http://x/none.webp");
+    const ImgReply miss = serve_cached_image(cache, "http://x/none.webp", {}, {"mangadex", "slug-x", 3, 1});
     CHECK(miss.code == 404);
     CHECK(miss.body.empty());
     CHECK(state->calls == 1);
+}
+
+TEST_CASE("img: no placement context is 404 and costs no fetch") {
+    TempRoot root;
+    auto state = std::make_shared<FakeState>();
+    state->bodies = {{"http://x/a.jpg", "JPEGBYTES"}};
+    cache::Cache cache = fake_cache(root.path.string(), state);
+
+    // Neither a cover nor a complete page: no path to serve, none to store.
+    // Regression: this used to fetch and drop the bytes at img/<sha1>.<ext>.
+    const ImgReply bare = serve_cached_image(cache, "http://x/a.jpg");
+    CHECK(bare.code == 404);
+    CHECK(bare.body.empty());
+    CHECK(state->calls == 0);
+
+    std::size_t files = 0;
+    std::error_code ec;
+    for (const auto& e : fs::recursive_directory_iterator(root.path / "img", ec))
+        if (!e.is_directory()) ++files;
+    CHECK(files == 0); // nothing written at the pool root
 }
 
 TEST_CASE("img: page-context miss fetches and lands in the v3 tree") {
@@ -134,8 +154,11 @@ TEST_CASE("img: plugin identity rides the fetch (referer plumbing)") {
     REQUIRE(serve_cached_image(cache, "http://x/p1.jpg", {}, ctx).code == 200);
     CHECK(state->last_plugin == "mangadex");
 
-    // Contextless sha-fallback: no plugin, no referer -- as before the fix.
+    // A contextless request has no placement path: 404, and the fetcher is
+    // never called (the img pool has no sha fallback).
     state->bodies = {{"http://x/bare.jpg", "BYTES"}};
-    REQUIRE(serve_cached_image(cache, "http://x/bare.jpg").code == 200);
-    CHECK(state->last_plugin.empty());
+    const int calls = state->calls;
+    CHECK(serve_cached_image(cache, "http://x/bare.jpg").code == 404);
+    CHECK(state->calls == calls);
+    CHECK(state->last_plugin == "mangadex"); // unchanged: no fetch happened
 }

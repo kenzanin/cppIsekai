@@ -77,4 +77,17 @@ inline std::string manga_slug(const std::map<std::string, std::string>& titles, 
     return slug;
 }
 
+/** \brief Cache namespace for a plugin: the slugified display name, falling
+ *  back to the plugin id when the name is blank or slugifies to nothing.
+ *
+ *  Cache paths key on THIS, not on the plugin id, so a plugin's cache survives
+ *  changing its id or folder name -- what has to stay stable is the display
+ *  name. Two plugins sharing a display name share a cache directory. */
+inline std::string cache_ns(std::string_view plugin_id, std::string_view name) {
+    if (name.find_first_not_of(" \t\r\n") == std::string_view::npos)
+        return std::string(plugin_id);
+    std::string s = slug_base(name);
+    return s == "untitled" ? std::string(plugin_id) : s;
+}
+
 } // namespace cache

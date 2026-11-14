@@ -1,3 +1,4 @@
+#include "cache/slug.hpp"
 #include "config/config.hpp"
 #include "http/http.hpp"
 #include "log/log.hpp"
@@ -16,6 +17,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <map>
 #include <thread>
 
 int main(int argc, char** argv) {
@@ -108,7 +110,18 @@ int main(int argc, char** argv) {
     cache::Config ccfg{"data/cache", cache_max_bytes};
     ccfg.image_format = cfg.image_format; // ponytail: must ride Config, else ini knob silently ignored
     ccfg.cover_max_px = cfg.cover_max_px;
-    cache::Cache images{ccfg, makeCurlFetcher(cfg.proxy, plugins)};
+    // Cache namespace: <root>/img/<dir> is keyed by the plugin display name
+    // (cache_ns), not its id, so swapping a plugin's id or folder keeps the
+    // cached files. Snapshot at boot: a reload that renames a display name is
+    // picked up on the next restart.
+    std::map<std::string, std::string> cache_ns_by_id;
+    for (const auto& p : store.plugins())
+        cache_ns_by_id[p.plugin_id] = cache::cache_ns(p.plugin_id, p.name);
+    cache::Cache images{ccfg, makeCurlFetcher(cfg.proxy, plugins),
+                        [ns = std::move(cache_ns_by_id)](const std::string& id) {
+                            const auto it = ns.find(id);
+                            return it == ns.end() ? id : it->second;
+                        }};
 
     // auto-update scheduler: started after pools/store are up, joined before drain
     update::Scheduler scheduler{store, db_pool, plugin_pool, plugins, ini_path, overrides};

@@ -11,13 +11,14 @@ namespace fs = std::filesystem;
 
 namespace {
 
-// cache-full check for one chapter: <root>/img/<plugin>/manga/<slug>/<chdir>/pNNN.ext
+// cache-full check for one chapter: <root>/img/<ns>/manga/<slug>/<chdir>/pNNN.ext
 // count >= pages. ch-dir matched by chNNN prefix (collision id8 variant counts too).
-bool chapter_cached(const std::string& plugin, const std::string& slug, int chapter, int pages) {
+// `ns` is the cache namespace from Cache::ns(), not the raw plugin id.
+bool chapter_cached(const std::string& ns, const std::string& slug, int chapter, int pages) {
     if (chapter <= 0 || pages <= 0) {
         return false;
     }
-    const fs::path base = fs::path("data/cache") / "img" / plugin / "manga" / slug;
+    const fs::path base = fs::path("data/cache") / "img" / ns / "manga" / slug;
     const std::string prefix = "ch" +
                                (chapter < 10    ? std::string("00")
                                 : chapter < 100 ? std::string("0")
@@ -164,12 +165,12 @@ void register_content(Ctx& c) {
     // cache-full probe for the detail page CBZ button: per-chapter gate.
     // Query: ?plugin=&slug=&ch=<n>&pages=<total> -> {"ok":true,"full":bool}
     CROW_ROUTE(app, "/api/cbz-ready")
-    ([](const crow::request& req) {
+    ([&](const crow::request& req) {
         const auto plugin = param(req, "plugin");
         const auto slug = param(req, "slug");
         const int ch = std::atoi(param(req, "ch").c_str());
         const int pages = std::atoi(param(req, "pages").c_str());
-        const bool full = valid_title_pair(plugin, slug) && chapter_cached(plugin, slug, ch, pages);
+        const bool full = valid_title_pair(plugin, slug) && chapter_cached(images.ns(plugin), slug, ch, pages);
         crow::json::wvalue out;
         out["ok"] = true;
         out["full"] = full;
@@ -181,9 +182,9 @@ void register_content(Ctx& c) {
     // CBZ export (cache-layout D6): stream the cached tree as an in-memory zip;
     // empty/unknown slug = empty-but-valid zip, never 404.
     CROW_ROUTE(app, "/export/cbz")
-    ([](const crow::request& req) {
+    ([&](const crow::request& req) {
         crow::response res;
-        const auto zip = cbz::build("data/cache", param(req, "plugin"), param(req, "slug"));
+        const auto zip = cbz::build("data/cache", images.ns(param(req, "plugin")), param(req, "slug"));
         if (!zip) {
             res.code = 500;
             res.set_header("Content-Type", "text/plain");

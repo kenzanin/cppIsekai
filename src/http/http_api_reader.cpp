@@ -198,19 +198,16 @@ void register_reader(Ctx& c) {
             for (const auto& url : found) {
                 window.emplace_back(url);
             }
-            if (!found.empty()) {
-                if (chapter_number) { // v3 placement; else the sha fallback
-                    spdlog::debug("nudge {} urls, ctx {}.{} ch{} base-p{}", found.size(), plugin, manga,
-                                  *chapter_number, pos.page + 1);
-                    prefetch.nudge(found, {.plugin = plugin,
-                                           .slug = manga,
-                                           .chapter = static_cast<int>(*chapter_number),
-                                           .page_base = pos.page + 1,
-                                           .chapter_id = pos.chapter_id});
-                } else {
-                    spdlog::debug("nudge {} urls, no chapter number -> sha fallback", found.size());
-                    prefetch.nudge(found); // background delta fetch (3.3)
-                }
+            // No chapter number = no placement path, so no prefetch: the worker
+            // would have nowhere to put the files the reader can find again.
+            if (!found.empty() && chapter_number) {
+                spdlog::debug("nudge {} urls, ctx {}.{} ch{} base-p{}", found.size(), plugin, manga, *chapter_number,
+                              pos.page + 1);
+                prefetch.nudge(found, {.plugin = plugin,
+                                       .slug = manga,
+                                       .chapter = static_cast<int>(*chapter_number),
+                                       .page_base = pos.page + 1,
+                                       .chapter_id = pos.chapter_id});
             }
 
             crow::json::wvalue out;

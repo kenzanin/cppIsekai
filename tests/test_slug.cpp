@@ -68,3 +68,21 @@ TEST_CASE("collision slug stays within the 64-char cap") {
     CHECK(s == std::string(55, 'a') + "-22222222");
     CHECK(s.size() == cache::slug_max);
 }
+
+TEST_CASE("cache_ns: the display name keys the cache, the id is only the fallback") {
+    // The point of the whole exercise: the on-disk directory follows the plugin
+    // display NAME, so swapping the plugin id or its folder keeps the cached
+    // files. These two lines are the requirement.
+    CHECK(cache::cache_ns("mangadex", "MangaDex") == "mangadex");
+    CHECK(cache::cache_ns("some-renamed-folder", "MangaDex") == cache::cache_ns("mangadex", "MangaDex"));
+
+    // Blank or unslugifiable name -> the id still works as a namespace.
+    CHECK(cache::cache_ns("mangadex", "") == "mangadex");
+    CHECK(cache::cache_ns("mangadex", "   \t\n") == "mangadex");
+    CHECK(cache::cache_ns("mangadex", "!!!") == "mangadex");
+
+    // Still fs-safe, lowercase and capped like every other slug.
+    CHECK(cache::cache_ns("x", "Atsu.moe Reader") == "atsu-moe-reader");
+    CHECK(fs_safe(cache::cache_ns("x", "Atsu.moe Reader")));
+    CHECK(cache::cache_ns("x", std::string(100, 'A')).size() == cache::slug_max);
+}

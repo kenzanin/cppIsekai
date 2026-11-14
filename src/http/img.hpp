@@ -51,9 +51,10 @@ struct ImgReply {
 
 /** \brief The /cache/img answer for \p url: 200+body+mime on hit, the 404
  *  shape otherwise. Context (cover/page) routes through Cache::img_ensure —
- *  v3 layout + transcode + sidecar (D1-D3); empty context keeps the v2
- *  sha fallback. cover=true adds the X-Image-Ratio header from the
- *  stored sidecar (D3). */
+ *  v3 layout + transcode + sidecar (D1-D3). A call with neither a cover nor a
+ *  complete page context has no placement path, so it is a 404 and costs no
+ *  fetch. cover=true adds the X-Image-Ratio header from the stored sidecar
+ *  (D3). */
 inline ImgReply serve_cached_image(
     cache::Cache& images, std::string_view url,
     const cache::Cache::CoverCtx& cover_ctx = {},
