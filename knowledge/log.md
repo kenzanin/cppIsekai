@@ -1,4 +1,5 @@
 ## 2026-11-14
+* **Creation**: Documented concept `references/site-quirks-mangafox.md` (MangaFox (fanfox.net) site quirks (wasm guest)).
 * **Update**: Updated concept `references/wasm-guest-pitfalls.md`.
 * **Creation**: Documented concept `decisions/guest-runtime-language.md` (Guest runtime language policy).
 
