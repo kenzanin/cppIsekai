@@ -230,15 +230,19 @@ static const char PAT_COVER[] = "data-src=\"([^\"]+)\"";
 static const char PAT_COVER2[] = "<img[^>]*src=\"([^\"]+)\"";
 
 static void search_reply(const char *q, unsigned int qn) {
-    if (url_encode((unsigned int)(unsigned long)q, qn,
-                   (unsigned int)(unsigned long)ENC, sizeof ENC - 1u) <= 0) {
+    int en = url_encode((unsigned int)(unsigned long)q, qn,
+                        (unsigned int)(unsigned long)ENC, sizeof ENC - 1u);
+    if (en > 0)
+        ENC[en] = 0; // host writes len only; %s needs the terminator
+    else
         ENC[0] = 0;
-    }
     char url[512];
     int un = snprintf(url, sizeof url, BASE "/Find/%s", ENC);
     unsigned int body_len = fetch_body(url);
     if (!body_len) {
-        reply_err("fetch failed");
+        static char dbg[192]; // DEBUG: surface the url we tried
+        snprintf(dbg, sizeof dbg, "fetch failed u=[%.170s]", url);
+        reply_err(dbg);
         return;
     }
     unsigned int bn = find_n(PAT_BLOCK, BODY, body_len);
@@ -649,7 +653,8 @@ unsigned int handle(unsigned int in_ptr, unsigned int in_len) {
     char arg[512] = ""; // params.title/query/id (unescaped; house: title first)
     unsigned int al = 0;
     if ((al = jstr_field(env, n, "title", &mv)) ||
-        (al = jstr_field(env, n, "query", &mv))) {
+        (al = jstr_field(env, n, "query", &mv)) ||
+        (al = jstr_field(env, n, "q", &mv))) {  // host passes the raw query key
         al = unesc(mv, al < 512 ? al : 511, arg, sizeof arg - 1u);
     } else if ((al = jstr_field(env, n, "id", &mv))) {
         al = unesc(mv, al < 512 ? al : 511, arg, sizeof arg - 1u);
