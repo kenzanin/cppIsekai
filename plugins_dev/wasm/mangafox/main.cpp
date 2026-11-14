@@ -184,17 +184,17 @@ static void detail_reply(const std::string &slug) {
     auto g = rx("<a href=\"/directory/[^\"]*\"[^>]*>([^<]+)</a>", body_buf(), rb2());
     emit("{\"ok\":true,\"data\":{\"id\":");
     jemit(slug);
-    emit(",\"title\":");
+    emit(",\"name\":");  // house detail keys: name/tags/authors[] (UI reads these)
     jemit(title);
     emit(",\"cover\":");
     jemit(cover);
     emit(",\"status\":");
     jemit(status);
-    emit(",\"author\":");
-    jemit(author);
-    emit(",\"artist\":");
-    jemit(artist);
-    emit(",\"genres\":[");
+    emit(",\"release_at\":0,\"authors\":[");
+    if (!author.empty()) jemit(author);
+    emit("],\"artists\":[");
+    if (!artist.empty()) jemit(artist);
+    emit("],\"tags\":[");
     for (size_t i = 0; i < g.size(); ++i) {
         if (i) emit(",");
         jemit(g[i].size() > 1 ? g[i][1] : std::string());
@@ -208,12 +208,12 @@ static void detail_reply(const std::string &slug) {
 static void chapters_reply(const std::string &slug) {
     if (!fetch("https://m.fanfox.net/manga/" + slug + "/", "{}"))
         return reply_err("fetch failed");
-    auto ch = rx("href=\"[^\"]*/c([0-9.]+)/1\\.html\"[^>]*?title=\"([^\"]*)\"", body_buf(), rb1());
+    auto ch = rx("href=\"[^\"]*/c([0-9.]+)/1\\.html\"", body_buf(), rb1());  // m. list <a> carries no title attr
     std::vector<std::pair<std::string, std::string>> list;  // c-token, title
     std::set<std::string> seen;
     for (auto &r : ch) {
-        if (r.size() < 3) continue;
-        if (seen.insert(r[1]).second) list.emplace_back(r[1], r[2]);
+        if (r.size() < 2) continue;
+        if (seen.insert(r[1]).second) list.emplace_back(r[1], std::string());
     }
     emit("{\"ok\":true,\"data\":[");
     for (size_t i = list.size(); i-- > 0;) {  // newest first
@@ -360,6 +360,7 @@ extern "C" unsigned handle(unsigned, unsigned) {
     if (method == "search") {
         std::string q = env_field("title");
         if (q.empty()) q = env_field("query");
+        if (q.empty()) q = env_field("q");  // host passes the raw query key
         search_reply(q);
     } else if (method == "detail") {
         detail_reply(env_field("id"));
