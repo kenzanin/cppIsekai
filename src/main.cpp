@@ -1,24 +1,4 @@
-#include "cache/slug.hpp"
-#include "config/config.hpp"
-#include "http/http.hpp"
-#include "log/log.hpp"
-#include "plugin/plugin.hpp"
-#include "store/store.hpp"
-#include "update/scheduler.hpp"
-
-#include <CLI/CLI.hpp> // system 2.7.2: flag parsing
-#include <BS_thread_pool.hpp>
-
-#include <spdlog/sinks/stdout_color_sinks.h>
-#include <spdlog/spdlog.h>
-
-#include <atomic>
-#include <chrono>
-#include <filesystem>
-#include <fstream>
-#include <iostream>
-#include <map>
-#include <thread>
+#include "main.hpp"
 
 int main(int argc, char** argv) {
     // Default logger wrapped so spdlog::info call ends up in queue sink,
@@ -29,6 +9,14 @@ int main(int argc, char** argv) {
     spdlog::set_default_logger(base);
     spdlog::set_level(spdlog::level::info);
     spdlog::set_pattern("[%H:%M:%S] [%l] %v");
+
+    // Crash traces (backward-cpp): a fatal signal dumps a symbolized stack on
+    // stderr, which every launch path captures (nohup/herdr redirect). Armed
+    // before anything heavy so early-boot crashes trace too; SIGINT/SIGTERM
+    // stay default so shutdown handling is untouched. ponytail: the v1.6
+    // handler prints to stderr only -- a dedicated crash.log needs a tee
+    // process or an upstream sink option.
+    static backward::SignalHandling crash_signals({SIGABRT, SIGSEGV, SIGBUS, SIGILL, SIGFPE});
 
     // Every knob comes from the one registry (src/config/); layered here by
     // config::resolve: default < ini < CPPISEKAI_* env < explicit flag (D7).
@@ -77,7 +65,7 @@ int main(int argc, char** argv) {
     // db pool stays 1:1, Store holds one connection; crow runs its own pool.
     // ponytail: db_pool exists for the storage.* layout target, nothing queued yet.
     BS::thread_pool<> db_pool(1);
-    BS::thread_pool<> plugin_pool(2); // blocking http.fetch plugin calls live here
+    BS::thread_pool<> plugin_pool(10); // blocking http.fetch plugin calls live here
     BS::thread_pool<> log_pool(1);
 
     std::atomic<bool> running{true};

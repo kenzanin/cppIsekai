@@ -2,7 +2,7 @@ set_project("cppIsekai")
 set_version("0.1.0")
 
 set_languages("c23", "c++23")
-add_rules("mode.debug", "mode.release")
+add_rules("mode.debug", "mode.release", "mode.releasedbg")
 set_config("mode", "release") -- daemon runs from this build
 set_policy("package.requires_lock", true) -- lock resolved versions (xmake-requires.lock); bump via the pins below
 
@@ -73,6 +73,7 @@ local function cxx_bin(name, cfg)
             import("lib.detect.find_program")
             if find_program("mold") then
                 t:add("ldflags", "-fuse-ld=mold", {force = true})
+        t:add("ldflags", "-rdynamic", {force = true}) -- dynsym utk backward dladdr; jalur def-time add_ldflags menghilangkannya
             end
         end)
     target_end()
@@ -102,7 +103,7 @@ cxx_bin("cppIsekai", {
     incs = {"src"},
     deps = {"wasm3", "tiny-aes256"},
     pkgs = {"vips", "lua54"},
-    reqs = {"glaze", "sol2", "thread-pool", "readerwriterqueue", "lexbor", "libzippp", "quickjs-ng", "simpleini", "sqlite_orm", "spdlog", "zlib", "sqlite3", "utf8proc", "re2", "date", "hash-library", "pugixml"},
+    reqs = {"glaze", "sol2", "thread-pool", "readerwriterqueue", "lexbor", "libzippp", "quickjs-ng", "simpleini", "sqlite_orm", "spdlog", "zlib", "sqlite3", "utf8proc", "re2", "date", "hash-library", "pugixml", "backward-cpp"},
     ldflags = {CURL_SO},
     rpath = {CURL_LIB},
     defs = {'CPPISEKAI_FETCH_LIB_DIR="' .. CURL_LIB .. '"', "CROW_USE_LOCALTIMEZONE", "CROW_ENABLE_COMPRESSION"},

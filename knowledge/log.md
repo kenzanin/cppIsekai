@@ -1,4 +1,8 @@
 ## 2026-11-14
+* **Update**: Linked `decisions/crash-traces-backward-cpp.md` to `decisions/xmake-build-system.md` (Crash-trace symbolization required build-system changes: the mode.releasedbg rule and the cxx_bin on_load ldflags hook in xmake.lua.).
+* **Update**: Linked `findings/xmake-ldflags-on-load-hook.md` to `decisions/crash-traces-backward-cpp.md` (The on_load -rdynamic export documented here is what lets backward's dladdr resolver name crash-trace frames; without it the crash-trace decision degrades to bare addresses.).
+* **Creation**: Documented concept `findings/xmake-ldflags-on-load-hook.md` (xmake cxx_bin: def-time add_ldflags can drop flags; on_load t:add is the reliable route).
+* **Creation**: Documented concept `decisions/crash-traces-backward-cpp.md` (Crash traces via backward-cpp: fatal-signal handler in main, dynsym-only names, stderr capture).
 * **Update**: Linked `decisions/cache-ns-display-name.md` to `architecture/cache-layout-v3.md` (the namespace replaces the per-plugin directory component described there, and drops its context-free sha fallback).
 * **Update**: Updated concept `decisions/cache-ns-display-name.md`.
 * **Update**: Linked `findings/rec-backlog-triage.md` to `references/rec-architecture-improvements.md` (triage of the backlog written in that reference).
