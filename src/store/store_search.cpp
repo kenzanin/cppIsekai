@@ -631,6 +631,11 @@ void Store::saved_stats_update(const std::string& plugin, const std::string& slu
         e.has_update = 1; // growth → mark New
     }
     e.total_ch = total_ch;
+    // Keep the badge bits in step with the stored counters -- same formula as
+    // the rollup below, so the flags are never stale when the chapters
+    // envelope is absent (the rollup refines them when it is available).
+    const bool done = e.total_ch > 0 && e.read_ch >= e.total_ch;
+    e.status_flags = (done ? 2 : 0) | ((e.has_update != 0 && !done) ? 1 : 0); // bit1=is_done, bit0=is_new
     if (changed) {
         e.updated_at = now;
     }
@@ -693,6 +698,9 @@ void Store::saved_clear_update(const std::string& plugin, const std::string& slu
         e.has_update = 0;
         e.updated_at = now;
     }
+    // detail is the source of truth for status_flags: a reader touch means the
+    // title is no longer "new" — clear bit0 so library grid and detail agree.
+    e.status_flags &= ~1;
     impl_->storage.replace(e);
 }
 
@@ -725,6 +733,7 @@ std::vector<SavedManga> Store::saved_list() {
             .synopsis = r.synopsis,
             .alt_titles = r.alt_titles,
             .dup_group = r.dup_group,
+            .status_flags = r.status_flags,
         });
     }
     return out;

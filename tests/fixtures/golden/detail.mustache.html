@@ -87,7 +87,7 @@
     <div class="flex-1 min-w-0">
       <h1 class="text-2xl font-semibold mb-2 leading-tight" x-text="detail.name || '…'"></h1>
       <!-- attribution (detail-enrichment 3.1): plugin name + logo + status/date/cached badges on one line under title; @error falls back to name only -->
-      <div class="flex items-center flex-wrap gap-2 text-xs text-zinc-500 mb-2" x-show="pluginName || detail.status || detail.release_at || cached" x-cloak>
+      <div class="flex items-center flex-wrap gap-2 text-xs text-zinc-500 mb-2" x-show="pluginName || detail.status || detail.release_at || cached || progressPct || isDone" x-cloak>
         <template x-if="pluginName && pluginLogoOk">
           <img :src="'/plugin/'+encodeURIComponent(plugin)+'/logo'" class="h-5 w-5 object-contain rounded" @error="pluginLogoOk=false" alt="">
         </template>
@@ -95,6 +95,8 @@
         <span class="px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300" x-show="detail.status" x-text="detail.status"></span>
         <span class="px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400" x-show="detail.release_at" x-text="fmtDate(detail.release_at)"></span>
         <span class="px-2 py-0.5 rounded-full bg-emerald-900/40 text-emerald-300 border border-emerald-800" x-show="cached">cached</span>
+        <span class="px-2 py-0.5 rounded-full bg-red-900/40 text-red-300 border border-red-800" x-show="detail.status_flags & 1">New</span>
+        <span class="px-2 py-0.5 rounded-full bg-emerald-900/40 text-emerald-300 border border-emerald-800" x-show="detail.status_flags & 2">Done</span>
       </div>
       <div class="flex flex-wrap gap-1.5 mb-3" x-show="detail.tags && detail.tags.length" x-cloak>
         <template x-for="t in detail.tags" :key="t">
@@ -109,18 +111,22 @@
       </div>
       <p class="text-sm text-zinc-400 leading-relaxed" x-show="detail.description" x-text="detail.description"></p>
       <div class="flex gap-2 mt-4">
-        <template x-if="hint">
-        <a :href="hint.url"
-           class="px-3 py-1.5 text-sm border border-emerald-700 bg-emerald-900/40 text-emerald-300 hover:bg-emerald-900/60 rounded-md"
-           x-text="hint.text"></a>
-      </template>
         <button @click="toggleLibrary()"
                 class="px-3 py-1.5 text-sm border rounded-md disabled:opacity-40"
                 :class="inLibrary ? 'border-emerald-700 bg-emerald-900/40 text-emerald-300 hover:bg-emerald-900/60' : 'border-zinc-700 text-zinc-300 hover:bg-zinc-800'"
                 x-text="inLibrary ? 'In library' : 'Add to library'"></button>
+        <button @click="startOrContinue()"
+                :disabled="!inLibrary"
+                class="px-3 py-1.5 text-sm border rounded-md disabled:opacity-40"
+                :class="inLibrary ? (hint ? 'border-emerald-700 bg-emerald-900/40 text-emerald-300 hover:bg-emerald-900/60' : 'border-emerald-700 text-emerald-300 hover:bg-zinc-800') : 'border-zinc-700 text-zinc-500'"
+                x-text="hint ? 'Continue reading' : 'Start reading'"></button>
         <button @click="refresh()" :disabled="refreshing || !pe"
                 class="px-3 py-1.5 text-sm border border-zinc-700 text-zinc-300 hover:bg-zinc-800 rounded-md disabled:opacity-40"
                 x-text="refreshing ? '…' : '⟳ Update'"></button>
+        <button disabled
+                :disabled="true"
+                class="px-3 py-1.5 text-sm border border-zinc-500 text-zinc-500 rounded-md opacity-50"
+                x-text="'Migrate'"></button>
       </div>
       <p class="text-xs text-red-400 mt-2" x-show="err" x-text="err" x-cloak></p>
       <!-- enrichment (detail-enrichment-fields): fetch detail/covers, picker, reset. Saved-manga library gate is enforced server-side (not in library = 404). -->
@@ -550,8 +556,17 @@ function detailPage() {
       for (const it of (Array.isArray(saved) ? saved : [])) push(it);
       this.related = merged;
     },
-    async loadRelated() {
-      // scraper related only (cap-gated); enrichment recommendations render only via Add all (chosen.related_add)
+    async startOrContinue() { // [add to library] then [start / continue reading] -> reader at stored chapter
+      if (!this.inLibrary) return;
+      const target = this.hint && this.hint.url ? this.hint.url
+        : `/read/${encodeURIComponent(this.plugin)}/${encodeURIComponent(this.slug)}?ch=${
+          this.chapters && this.chapters[0]
+            ? Number(this.chapters[0].number) || this.chapters[0].number
+            : '1'
+        }`;
+      location.href = target;
+    },
+    async loadRelated() { // scraper related only (cap-gated); enrichment recommendations render only via Add all (chosen.related_add)
       const grab = (url) => fetch(url).then(r => r.ok ? r.json() : null).catch(() => null);
       try {
         const wantsRelated = (this.pluginCaps || '').split(',').map(s => s.trim()).includes('related');

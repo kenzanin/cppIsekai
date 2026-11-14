@@ -281,15 +281,6 @@ function detailPage() {
         this.mergeSavedRelated();
       } catch (e) { /* related section stays hidden */ }
     },
-    // progress badge (detail-page 4.1): New/Done computed from chapter read state,
-    // same semantics as the library grid badge (Done wins over New).
-    get progressDone() {
-      if (!this.chapters.length) return false;
-      const chs = this.chapters.filter(c => c.pages && c.pages > 0);
-      if (!chs.length) return false;
-      return chs.every(c => this.isRead(c));
-    },
-    get progressNews() { return !this.progressDone && this.hint && this.chapters.length; },
     async toggleLibrary() {
       if (this.libraryBusy) return;
       this.libraryBusy = true;

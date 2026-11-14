@@ -59,6 +59,14 @@ void register_title(Ctx& c) {
             });
             // detail body is r.body; chapters may be absent (not cached) — skip then
             sync_saved_stats(store, db, plugin, slug, r.body, chs_body);
+            // library-grid-stats: detail open is the writer of status_flags
+            // (via the rollup above); echo the stored bitfield back so the page
+            // badges read exactly what the library grid renders.
+            const int flags = on_pool(db, [&] {
+                const auto row = store.saved_get(plugin, slug);
+                return row ? row->status_flags : 0;
+            });
+            r.body = detail::inject_status_flags(r.body, flags);
         }
         return r;
     });

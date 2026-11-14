@@ -141,11 +141,11 @@ TEST_CASE("templates: each top-level page renders to its golden file") {
     check_golden("logs.mustache", logs_ctx());
 }
 
-// Badge semantics lock (architecture/library-page, user clarification
-// 2026-11-12): Done = read>=total regardless of has_update -- New and Done
-// coexist. A golden regen could silently re-XOR the badge behind New; this
-// asserts the rule, not the bytes.
-TEST_CASE("templates: card done badge ignores has_update, new stays gated") {
+// Badge semantics lock (library-grid-stats): New/Done come from the stored
+// status_flags bitfield (bit0=is_new, bit1=is_done), not from client-side
+// arithmetic over dataset.read/total/update. A golden regen could silently
+// re-derive the badge in the page; this asserts the rule, not the bytes.
+TEST_CASE("templates: card badge reads stored status_flags bits") {
     crow::mustache::set_base(CPPISEKAI_TEMPLATES_DIR);
     const std::string got = crow::mustache::load("home.mustache").render(home_ctx()).dump();
 
@@ -159,11 +159,16 @@ TEST_CASE("templates: card done badge ignores has_update, new stays gated") {
 
     const std::string done = open_tag("Done");
     CHECK(done.find("x-show") != std::string::npos); // span matched, not a degenerate
-    CHECK(done.find("dataset.read") != std::string::npos);
-    CHECK(done.find("dataset.total") != std::string::npos);
-    CHECK(done.find("dataset.update") == std::string::npos); // no New-XOR gate
+    CHECK(done.find(".done") != std::string::npos);    // gated by the stored bit1
+    CHECK(done.find("dataset.read") == std::string::npos);  // no client-side arithmetic
+    CHECK(done.find("dataset.total") == std::string::npos);
+    CHECK(done.find("dataset.update") == std::string::npos);
 
     const std::string upd = open_tag("New");
     CHECK(upd.find("x-show") != std::string::npos);
-    CHECK(upd.find("dataset.update") != std::string::npos); // New stays has_update-gated
+    CHECK(upd.find(".news") != std::string::npos);   // gated by the stored bit0
+    CHECK(upd.find("dataset.update") == std::string::npos);
+
+    // the row carries the bitfield the grid reads.
+    CHECK(got.find("data-status-flags=") != std::string::npos);
 }

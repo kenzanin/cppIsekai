@@ -92,6 +92,7 @@ std::optional<SavedManga> Store::saved_get(const std::string& plugin, const std:
         .synopsis = r.synopsis,
         .alt_titles = r.alt_titles,
         .dup_group = r.dup_group,
+        .status_flags = r.status_flags,
     };
 }
 

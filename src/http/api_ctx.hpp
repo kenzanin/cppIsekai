@@ -124,6 +124,25 @@ inline std::string envelope_raw_json(const glz::generic::object_t& obj, const ch
     }
     return glz::write_json(it->second).value_or(std::string{});
 }
+// library-grid-stats: the stored status_flags bitfield (bit0=is_new, bit1=is_done)
+// rides into the detail envelope's `data`, so the page badges read the same
+// stored value the library grid renders. Detail open is the writer; both read
+// the saved-manga row.
+inline std::string inject_status_flags(const std::string& envelope, int flags) {
+    glz::generic env;
+    if (glz::read_json(env, envelope) || !envelope_ok(env) || !env.is_object()) {
+        return envelope;
+    }
+    auto& obj = env.get_object();
+    auto* const data = obj.find("data");
+    if (data == obj.end() || !data->second.is_object()) {
+        return envelope;
+    }
+    glz::generic value;
+    value.data = static_cast<double>(flags);
+    data->second.get_object()["status_flags"] = std::move(value);
+    return glz::write_json(env).value_or(envelope);
+}
 } // namespace detail
 
 /** \brief Derive status + chapter totals/read counts from the plugin's own

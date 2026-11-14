@@ -20,8 +20,8 @@
         <span class="px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300" x-show="detail.status" x-text="detail.status"></span>
         <span class="px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400" x-show="detail.release_at" x-text="fmtDate(detail.release_at)"></span>
         <span class="px-2 py-0.5 rounded-full bg-emerald-900/40 text-emerald-300 border border-emerald-800" x-show="cached">cached</span>
-        <span class="px-2 py-0.5 rounded-full bg-red-900/40 text-red-300 border border-red-800" x-show="progressNews">New</span>
-        <span class="px-2 py-0.5 rounded-full bg-emerald-900/40 text-emerald-300 border border-emerald-800" x-show="progressDone">Done</span>
+        <span class="px-2 py-0.5 rounded-full bg-red-900/40 text-red-300 border border-red-800" x-show="detail.status_flags & 1">New</span>
+        <span class="px-2 py-0.5 rounded-full bg-emerald-900/40 text-emerald-300 border border-emerald-800" x-show="detail.status_flags & 2">Done</span>
       </div>
       <div class="flex flex-wrap gap-1.5 mb-3" x-show="detail.tags && detail.tags.length" x-cloak>
         <template x-for="t in detail.tags" :key="t">
