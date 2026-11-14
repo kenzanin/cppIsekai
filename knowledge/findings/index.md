@@ -1,2 +1,3 @@
 # Findings
 * [Host image fetch is plugin-blind: no Referer (js mangatown pilot finding)](js-image-referer-gap.md) - Image CDNs that require Referer 403 through the host cache/reader path; fix = per-plugin image-referer plumbed to the img fetcher.
+* [status_flags: followup gaps left open by the detail-source-of-truth fix (c0fce4e)](library-status-flags-followups.md) - Four known gaps after making detail open the single writer of saved_manga.status_flags: the auto-update scheduler skips the detail envelope so total_ch/has_update (and thus the New badge) never advance there; the flag lifecycle has no store-level test; inject_status_flags has no test; and the detail page badge bits are not locked by test_templates.

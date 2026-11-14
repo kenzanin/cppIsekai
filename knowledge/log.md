@@ -1,4 +1,5 @@
 ## 2026-11-14
+* **Creation**: Documented concept `findings/library-status-flags-followups.md` (status_flags: followup gaps left open by the detail-source-of-truth fix (c0fce4e)).
 * **Update**: Updated concept `architecture/library-grid-stats.md`.
 * **Creation**: Documented concept `references/site-quirks-mangafox.md` (MangaFox (fanfox.net) site quirks (wasm guest)).
 * **Update**: Updated concept `references/wasm-guest-pitfalls.md`.
