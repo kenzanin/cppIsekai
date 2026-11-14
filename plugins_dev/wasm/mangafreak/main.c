@@ -247,7 +247,7 @@ static void search_reply(const char *q, unsigned int qn) {
     }
     unsigned int bn = find_n(PAT_BLOCK, BODY, body_len);
     emits("{\"ok\":true,\"data\":{\"items\":[");
-    char seen[64][128];
+    char seen[64][128] = {0}; // zeroed: garbage byte at [s0] false-dups and drops results
     unsigned int nseen = 0, emitted = 0;
     for (unsigned int bi = 0; bi < 200; ++bi) { // blocks come one call at a time
         unsigned int blen = 0;
@@ -298,7 +298,7 @@ static void search_reply(const char *q, unsigned int qn) {
         const char *cover = json_elem(TMP2, cn, 1, &t2);
         if (!cover) {
             cn = find2(PAT_COVER2, block, blen);
-            cover = json_elem(TMP, cn, 1, &t2);
+            cover = json_elem(TMP2, cn, 1, &t2); // TMP2: find2 target — TMP still holds stale find_n blocks
         }
         if (emitted++) {
             emit(",", 1);
