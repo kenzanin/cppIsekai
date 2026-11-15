@@ -41,6 +41,23 @@ void register_admin(Ctx& c) {
         return r;
     });
 
+    // Per-plugin cache clean (stale-shape recovery / refresh): drop cached
+    // envelopes so the next call refetches. Body {"plugin": "id"}; absent = all.
+    // Images are a separate store (disk LRU) and keep their own lifecycle.
+    CROW_ROUTE(app, "/plugins/cache-clear").methods(crow::HTTPMethod::POST)([&](const crow::request& req) {
+        std::string id;
+        if (const auto body = crow::json::load(req.body); body && body.has("plugin")) {
+            id = body["plugin"].s();
+        }
+        const int n = on_pool(db, [&] { return store.api_cache_clear(id); });
+        crow::json::wvalue out;
+        out["ok"] = n >= 0;
+        out["cleared"] = n;
+        crow::response r{out};
+        r.set_header("Content-Type", "application/json");
+        return r;
+    });
+
     // Page data for /plugins: registry rows + live health.
     CROW_ROUTE(app, "/api/plugins")
     ([&] {

@@ -40,6 +40,12 @@ function pluginsPage() {
       await fetch('/plugins/reload', { method: 'POST' })
       await this.load()
     },
+    async clearCache(r) { // drop cached envelopes; next plugin call refetches
+      await fetch('/plugins/cache-clear', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plugin: r.key })
+      })
+    },
   }
 }
 </script>

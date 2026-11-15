@@ -70,6 +70,28 @@ void Store::api_cache_put(const std::string& plugin_id, const std::string& query
     sqlite3_close(db);
 }
 
+int Store::api_cache_clear(const std::string& plugin_id) {
+    // Empty id clears every plugin; else just that plugin's envelopes.
+    sqlite3* db = nullptr;
+    if (sqlite3_open(impl_->path.c_str(), &db) != SQLITE_OK) {
+        return -1;
+    }
+    sqlite3_busy_timeout(db, 3000);
+    sqlite3_stmt* stmt = nullptr;
+    const char* sql = plugin_id.empty() ? "DELETE FROM api_cache" : "DELETE FROM api_cache WHERE plugin_id = ?";
+    int changes = -1;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        if (!plugin_id.empty()) {
+            sqlite3_bind_text(stmt, 1, plugin_id.c_str(), -1, SQLITE_TRANSIENT);
+        }
+        sqlite3_step(stmt);
+        changes = sqlite3_changes(db);
+        sqlite3_finalize(stmt);
+    }
+    sqlite3_close(db);
+    return changes;
+}
+
 std::optional<SavedManga> Store::saved_get(const std::string& plugin, const std::string& slug) {
     auto rows = impl_->storage.get_all<store_detail::SavedMangaEntity>(where(
         c(&store_detail::SavedMangaEntity::plugin) == plugin && c(&store_detail::SavedMangaEntity::slug) == slug));

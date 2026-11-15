@@ -173,6 +173,9 @@ public:
     /** \brief Upsert an api_cache row; payload is stored as JSONB binary. */
     void api_cache_put(const std::string& plugin_id, const std::string& query_hash, const std::string& params_json,
                        const std::string& payload, std::int64_t fetched_at, std::int64_t ttl_s);
+    /** \brief Drop cached envelopes; empty plugin_id clears every plugin.
+     *  Returns the row count removed (-1 on sqlite failure). */
+    int api_cache_clear(const std::string& plugin_id);
 
     /** \brief Envelope-derived stat update (status, total_ch, status_flags, updated_at). Empty
      * status leaves the stored status (and its category bits) alone; a negative total_ch keeps

@@ -132,6 +132,8 @@
         <button @click="toggle(r)" x-show="!r.enrichment"
                 class="px-3 py-1 text-xs rounded bg-zinc-800 hover:bg-zinc-700"
                 x-text="r.enabled ? 'Disable' : 'Enable'"></button>
+        <button @click="clearCache(r)" title="Drop cached responses; next call refetches"
+                class="px-2 py-1 text-xs rounded bg-zinc-800 hover:bg-zinc-700">Clean</button>
         <button @click="reload()" title="Rescan plugin dir"
                 class="px-2 py-1 text-xs rounded bg-zinc-800 hover:bg-zinc-700">⟳</button>
       </li>
@@ -180,6 +182,8 @@
         <button @click="toggle(r)" x-show="!r.enrichment"
                 class="px-3 py-1 text-xs rounded bg-zinc-800 hover:bg-zinc-700"
                 x-text="r.enabled ? 'Disable' : 'Enable'"></button>
+        <button @click="clearCache(r)" title="Drop cached responses; next call refetches"
+                class="px-2 py-1 text-xs rounded bg-zinc-800 hover:bg-zinc-700">Clean</button>
         <button @click="reload()" title="Rescan plugin dir"
                 class="px-2 py-1 text-xs rounded bg-zinc-800 hover:bg-zinc-700">⟳</button>
       </li>
@@ -227,6 +231,12 @@ function pluginsPage() {
       this.busy = true
       await fetch('/plugins/reload', { method: 'POST' })
       await this.load()
+    },
+    async clearCache(r) { // drop cached envelopes; next plugin call refetches
+      await fetch('/plugins/cache-clear', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plugin: r.key })
+      })
     },
   }
 }
