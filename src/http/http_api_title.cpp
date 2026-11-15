@@ -9,6 +9,11 @@ namespace {
 // The shared body of the detail/chapters endpoints: disabled = cache-only via
 // the stale layer, json envelope. `method` is the plugin method; `id_key` the query param the
 // plugin's contract names for the title key.
+//
+// manga-detail-table: a saved row with materialized detail answers /api/detail
+// from the row (D3) -- no plugin call, `cached` flagged (D8), enrichment overlay
+// intact (D7). Otherwise the live path runs and the resolved fields are written
+// back through materialize_detail (D2, route-level -- never inside apply_chosen).
 crow::response title_data_response(plugin::Host& plugins, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool,
                                    Store& store, const std::string& plugin, const std::string& slug,
                                    const std::string& method) {
@@ -18,11 +23,41 @@ crow::response title_data_response(plugin::Host& plugins, BS::thread_pool<>& db,
     crow::json::wvalue p;
     p["id"] = slug; // the slug IS the title key the cache layout and plugins mint
     const std::string params = p.dump();
-    std::string body = on_pool(plugin_pool, [&] {
-        return call_cached(store, plugin, method, params, [&] { return plugins.call(plugin, method, params); });
-    });
+
+    std::string body = saved_detail_response(store, db, plugin, slug); // '' unless the row serves
+    const bool row_served = !body.empty();
+    if (!row_served) {
+        body = on_pool(plugin_pool, [&] {
+            return call_cached(store, plugin, method, params, [&] { return plugins.call(plugin, method, params); });
+        });
+        if (method == "detail") {
+            body = apply_chosen(store, db, plugin, slug, body); // chosen rides after stale-serve merge (3.4)
+            materialize_detail(store, db, plugin, slug, body);  // write-through (D2)
+        }
+    }
     if (method == "detail") {
-        body = apply_chosen(store, db, plugin, slug, body); // chosen rides after stale-serve merge (3.4)
+        if (!row_served) {
+            // library-grid-stats 2.2: saved-manga stat sync on detail open.
+            // Reuse the stale-served envelopes already in api_cache (no extra
+            // network); failures leave the last-known stats untouched. A row-
+            // served answer learned nothing new -- the sync would only feed the
+            // display synopsis back into the source column (D4), so it skips.
+            const std::string chs_body = on_pool(db, [&] {
+                if (auto row = store.api_cache_get(plugin, stale_key(plugin, "chapters", params))) {
+                    return row->payload;
+                }
+                return std::string{};
+            });
+            sync_saved_stats(store, db, plugin, slug, body, chs_body);
+        }
+        // library-grid-stats: detail open is the writer of status_flags (via the
+        // rollup above); echo the stored bitfield back so the page badges read
+        // exactly what the library grid renders.
+        const int flags = on_pool(db, [&] {
+            const auto row = store.saved_get(plugin, slug);
+            return row ? row->status_flags : 0;
+        });
+        body = detail::inject_status_flags(body, flags);
     }
     crow::response r{std::move(body)};
     r.set_header("Content-Type", "application/json");
@@ -45,30 +80,9 @@ void register_title(Ctx& c) {
     // cache layout and plugins mint. The page's Alpine layer consumes these.
     CROW_ROUTE(app, "/api/detail/<string>/<string>")
     ([&](const crow::request& /*req*/, std::string plugin, const std::string& slug) {
-        crow::response r = title_data_response(plugins, db, plugin_pool, store, plugin, slug, "detail");
-        if (r.code == 200) {
-            // library-grid-stats 2.2: saved-manga stat sync on detail open.
-            // Reuse the stale-served envelopes already in api_cache (no extra
-            // network); failures leave the last-known stats untouched.
-            const std::string params = std::string(R"({"id":")") + slug + "\"}";
-            const std::string chs_body = on_pool(db, [&] {
-                if (auto row = store.api_cache_get(plugin, stale_key(plugin, "chapters", params))) {
-                    return row->payload;
-                }
-                return std::string{};
-            });
-            // detail body is r.body; chapters may be absent (not cached) — skip then
-            sync_saved_stats(store, db, plugin, slug, r.body, chs_body);
-            // library-grid-stats: detail open is the writer of status_flags
-            // (via the rollup above); echo the stored bitfield back so the page
-            // badges read exactly what the library grid renders.
-            const int flags = on_pool(db, [&] {
-                const auto row = store.saved_get(plugin, slug);
-                return row ? row->status_flags : 0;
-            });
-            r.body = detail::inject_status_flags(r.body, flags);
-        }
-        return r;
+        // sync/flags/materialize/read-first live in title_data_response (shared
+        // body above); the route is the thin mapper it always was.
+        return title_data_response(plugins, db, plugin_pool, store, plugin, slug, "detail");
     });
 
     // detail-enrichment 2.1: related readings; same envelope and stale-serve

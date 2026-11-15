@@ -31,6 +31,22 @@ void register_library(Ctx& c) {
             row["status_flags"] = r.status_flags; // bit0 carries the New state (was has_update)
             row["last_read_at"] = static_cast<double>(r.last_read_at);
             row["updated_at"] = static_cast<double>(r.updated_at);
+            // manga-detail-table 1.3: expose the materialized display columns (raw
+            // JSON arrays stored verbatim); absent until first materialization.
+            const auto put_arr = [&row](const char* key, const std::string& text) {
+                if (text.empty()) {
+                    return;
+                }
+                if (const auto parsed = crow::json::load(text)) {
+                    row[key] = crow::json::wvalue(parsed);
+                }
+            };
+            put_arr("authors", r.authors);
+            put_arr("artists", r.artists);
+            put_arr("tags", r.tags);
+            if (!r.synopsis_display.empty()) {
+                row["synopsis_display"] = r.synopsis_display;
+            }
             list[idx++] = std::move(row);
         }
         crow::json::wvalue out;
@@ -55,6 +71,15 @@ void register_library(Ctx& c) {
         m.cover =
             json.has("cover") && json["cover"].t() == crow::json::type::String ? json["cover"].s() : std::string{};
         on_pool(db, [&] {
+            // manga-detail-table D9: the detail page submits detail.name || slug. A
+            // pre-materialization row opened with the plugin down would overwrite a
+            // real stored name with the slug/empty -- keep the stored one instead.
+            if (m.name.empty() || m.name == m.slug) {
+                if (const auto existing = store.saved_get(m.plugin, m.slug);
+                    existing.has_value() && !existing->name.empty() && existing->name != m.slug) {
+                    m.name = existing->name;
+                }
+            }
             store.save_manga(m);
             store.recompute_dup_groups();
             return 0;

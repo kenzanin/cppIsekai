@@ -22,7 +22,7 @@ Save manga to a personal library: a `saved_manga` store table, JSON routes to sa
 - **THEN** the entry is deleted and the button becomes "Add to library"
 
 ### Requirement: Saved entries are listed
-`GET /api/library` SHALL return the saved entries (name, cover, plugin, slug, and the stat fields `status, total_ch, read_ch, last_read_at, updated_at, status_flags`) ordered by `added_at` descending. The `has_update` stat field SHALL NOT be returned; the New state is carried by `status_flags` bit0. The home/Library grid SHALL render saved entries as cover cards linking to `/view/manga/<plugin>/<slug>`; an empty library SHALL show the empty state instead of the search-cache grid. In saved mode the grid is client-paginated (12/page) instead of server-paginated.
+`GET /api/library` SHALL return the saved entries (name, cover, plugin, slug, and the stat fields `status, total_ch, read_ch, last_read_at, updated_at, status_flags`) ordered by `added_at` descending. The `has_update` stat field SHALL NOT be returned; the New state is carried by `status_flags` bit0. The home/Library grid SHALL render saved entries as cover cards linking to `/view/manga/<plugin>/<slug>`; an empty library SHALL show the empty state instead of the search-cache grid. In saved mode the grid is client-paginated (12/page) instead of server-paginated. The response SHALL also carry the stored display-detail fields (`authors`, `artists`, `tags`).
 
 `status_flags` SHALL be the single per-manga state integer on `saved_manga`, with this layout:
 
@@ -77,6 +77,10 @@ The grid's "Complete" filter SHALL gate on bit5 (`status_flags & 32`) instead of
 #### Scenario: New state survives without has_update
 - **WHEN** `GET /api/library` is called for an entry whose chapter list grew
 - **THEN** the response carries `status_flags` with bit0 set and carries no `has_update` field
+
+#### Scenario: Detail fields travel with the listing
+- **WHEN** `GET /api/library` returns a saved entry that has stored detail
+- **THEN** its `authors`, `artists` and `tags` are present in the same object as its name and cover
 
 ### Requirement: Saved entries store duplicate signal
 Saved entries SHALL store the source plugin's `synopsis` and `alt_titles` (JSON array, verbatim) when present in the detail envelope; they are refreshed on save and on detail refresh; enrichment values are NOT used for this.
@@ -177,3 +181,51 @@ after the toggle, never applied optimistically before the response.
 #### Scenario: Unsaved entry has no dim state
 - **WHEN** a card does not correspond to a saved entry
 - **THEN** no dim control is offered, because the bit lives on the saved row
+
+### Requirement: A saved entry carries its display detail
+`saved_manga` SHALL store the detail the detail page renders: `name`, `cover`, `status`, `authors`, `artists`, `tags`, and a merged `synopsis_display`. Library cards, the detail heading and the detail API SHALL take a saved manga's display values from this row. The plugin-source `synopsis` and `alt_titles` columns SHALL keep their current meaning and remain the input of duplicate clustering.
+
+#### Scenario: Card and heading agree
+- **WHEN** the library grid and the detail page render the same saved manga
+- **THEN** both show the name stored on the row
+
+#### Scenario: Unsaved titles have no row
+- **WHEN** a title is not in the library
+- **THEN** no display detail is stored for it and its metadata stays live from the plugin
+
+#### Scenario: Source synopsis is untouched
+- **WHEN** a detail open writes `synopsis` and `alt_titles` from the plugin envelope
+- **THEN** the merged display synopsis in `synopsis_display` is unchanged, and duplicate grouping is computed from the same values as before the change
+
+### Requirement: The route materializes display detail
+When the detail API serves a resolved envelope for a saved manga and the resolved values differ from the stored ones, the host SHALL write them to the row and SHALL skip the write when they are unchanged. Fetching enrichment candidates or saving `chosen` SHALL NOT write these columns; the merge itself SHALL stay side-effect free so enrichment callers keep seeing an untouched `saved_manga`.
+
+#### Scenario: Resolve stores the detail
+- **WHEN** a saved manga's detail page opens and the resolver yields a name, synopsis, authors, artists and tags
+- **THEN** those values are stored on its `saved_manga` row
+
+#### Scenario: Candidate fetch does not touch the row
+- **WHEN** an enrichment source is fetched or `chosen` is saved
+- **THEN** no display-detail column on `saved_manga` changes
+
+#### Scenario: Unchanged resolve is read-only
+- **WHEN** a saved manga's detail is served and the resolved values equal the stored ones
+- **THEN** the row is not written
+
+### Requirement: Reset clears materialized detail
+`POST /api/enrichment/reset` SHALL clear the materialized display fields it invalidates (`detail` clears the merged title/synopsis/authors/artists/tags, `cover` clears the chosen cover) while keeping `title_meta.fetched`, so the next detail open re-resolves them from the plugin envelope.
+
+#### Scenario: Reset detail re-resolves
+- **WHEN** the user resets detail on a saved manga and reopens the page
+- **THEN** the materialized fields are repopulated from the scraper envelope instead of showing the reset values
+
+#### Scenario: Reset keeps candidates
+- **WHEN** the user resets cover or detail
+- **THEN** `title_meta.fetched` is unchanged and the picker still lists the fetched candidates
+
+### Requirement: The library upsert never stores a placeholder name
+`POST /api/library` SHALL skip writing `name` when the submitted value is empty or equal to the slug, and SHALL NOT overwrite a non-empty stored name with such a value.
+
+#### Scenario: Plugin unreachable on re-add
+- **WHEN** a saved manga without stored detail is re-added while its plugin is unreachable and the page submits the slug as the name
+- **THEN** the stored name is left as-is

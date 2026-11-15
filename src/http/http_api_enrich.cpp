@@ -98,14 +98,19 @@ void register_enrich(Ctx& c) {
                 if (mode == "cover") {
                     {
                         store.title_meta_reset_cover(plugin, slug);
+                        // D6: the chosen overlay is gone; nothing else to clear --
+                        // the materialized detail survives and the read-first
+                        // cover falls back to the row via chosen_cover ?? row.
                     }
                 } else if (mode == "detail") {
                     {
                         store.title_meta_reset_detail(plugin, slug);
+                        store.saved_detail_clear(plugin, slug); // D6: next open re-resolves
                     }
                 } else if (mode == "all") {
                     store.title_meta_reset_cover(plugin, slug);
                     store.title_meta_reset_detail(plugin, slug);
+                    store.saved_detail_clear(plugin, slug); // D6
                 } else {
                     {
                         bad = 1;

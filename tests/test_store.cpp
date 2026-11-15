@@ -728,3 +728,80 @@ TEST_CASE("Store: plugin_prune_absent cascade (plugin-lifecycle 2.1)") {
     CHECK(store.plugin_enabled("Flame"));
     CHECK(store.plugin_prune_absent({"Asura", "Flame"}).empty());
 }
+
+TEST_CASE("Store: materialized detail columns (manga-detail-table 1.4/2.1/3.2)") {
+    Store store("test_store.db");
+    const auto run = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+    const std::string plugin = "md";
+
+    SUBCASE("saved_detail_put writes display columns; source signals untouched") {
+        const std::string slug = "mat-a-" + run;
+        store.save_manga({plugin, slug, "Raw", "", 0});
+        store.saved_signal_update(plugin, slug, "source synopsis", R"(["Alt One"])");
+        CHECK(store.saved_detail_put(plugin, slug, "Resolved", R"(["Author A"])", R"(["Artist B"])",
+                                     R"(["Tag 1","Tag 2"])", "display text"));
+        const auto row = store.saved_get(plugin, slug);
+        REQUIRE(row.has_value());
+        CHECK(row->name == "Resolved");
+        CHECK(row->authors == R"(["Author A"])");
+        CHECK(row->artists == R"(["Artist B"])");
+        CHECK(row->tags == R"(["Tag 1","Tag 2"])");
+        CHECK(row->synopsis_display == "display text");
+        CHECK(row->synopsis == "source synopsis"); // D4: source column owned by sync only
+        CHECK(row->alt_titles == R"(["Alt One"])"); // source verbatim
+    }
+
+    SUBCASE("re-save preserves materialized columns; name refresh allowed") {
+        const std::string slug = "mat-b-" + run;
+        store.save_manga({plugin, slug, "Raw", "", 0});
+        REQUIRE(store.saved_detail_put(plugin, slug, "Resolved", R"(["A"])", "", R"(["t"])", "d"));
+        store.save_manga({plugin, slug, "Re-saved", "", 0}); // plain re-save
+        const auto row = store.saved_get(plugin, slug);
+        REQUIRE(row.has_value());
+        CHECK(row->name == "Re-saved"); // re-save refreshes identity, not detail
+        CHECK(row->authors == R"(["A"])");
+        CHECK(row->synopsis_display == "d");
+    }
+
+    SUBCASE("placeholder name never clobbers a stored one (D9 guard at the store seam)") {
+        const std::string slug = "mat-c-" + run;
+        store.save_manga({plugin, slug, "Real Name", "", 0});
+        CHECK(store.saved_detail_put(plugin, slug, "", R"(["A"])", "", "", "")); // columns land, name kept
+        CHECK(store.saved_get(plugin, slug)->name == "Real Name");
+        CHECK(store.saved_detail_put(plugin, slug, slug, "", "", "", "x")); // slug == name kept
+        CHECK(store.saved_get(plugin, slug)->name == "Real Name");
+        CHECK(store.saved_detail_put(plugin, slug, "Better", "", "", "", "")); // real name lands
+        CHECK(store.saved_get(plugin, slug)->name == "Better");
+    }
+
+    SUBCASE("saved_detail_clear wipes only the display columns") {
+        const std::string slug = "mat-d-" + run;
+        store.save_manga({plugin, slug, "Raw", "", 0});
+        store.saved_signal_update(plugin, slug, "src", R"(["Alt"])");
+        store.saved_stats_update(plugin, slug, "ongoing", 9);
+        REQUIRE(store.saved_detail_put(plugin, slug, "R", R"(["A"])", "", R"(["t"])", "d"));
+        store.saved_detail_clear(plugin, slug);
+        const auto row = store.saved_get(plugin, slug);
+        REQUIRE(row.has_value());
+        CHECK(row->authors.empty());
+        CHECK(row->artists.empty());
+        CHECK(row->tags.empty());
+        CHECK(row->synopsis_display.empty());
+        CHECK(row->name == "R"); // resolved name survives the display wipe
+        CHECK(row->synopsis == "src"); // source signals survive the clear
+        CHECK(row->alt_titles == R"(["Alt"])");
+        CHECK(row->total_ch == 9); // stats survive
+        store.saved_detail_clear("nope", "x"); // absent row no-op
+        CHECK_FALSE(store.saved_detail_put("nope", "x", "N", "[]", "[]", "[]", "")); // absent row no-op
+    }
+
+    SUBCASE("saved_has_detail gate and recompute coexistence") {
+        const std::string slug = "mat-e-" + run;
+        store.save_manga({plugin, slug, "Raw", "", 0});
+        CHECK_FALSE(saved_has_detail(*store.saved_get(plugin, slug))); // empty everywhere: not materialized
+        REQUIRE(store.saved_detail_put(plugin, slug, "", "", "", "", "only synopsis"));
+        CHECK(saved_has_detail(*store.saved_get(plugin, slug)));
+        store.recompute_dup_groups(); // clustering runs over rows carrying detail
+        CHECK(store.saved_get(plugin, slug)->dup_group == 0);
+    }
+}

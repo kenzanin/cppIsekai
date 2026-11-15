@@ -100,7 +100,7 @@ and `chosen_cover`, exactly like today's merged envelope.
 `chosenNow()` and the `Reset cover` button from those keys. Building the response from the row alone
 would make the picker believe nothing is chosen while `title_meta` still holds it.
 
-**Consequence.** The read-first response is "row values + title_meta overlay", not "row only".
+**Consequence.** The read-first response is "row values + title_meta overlay", not "row only". `release_at` has no stored column, so a row-served page hides the release badge; the next live pass (⟳ or cold re-resolve) restores it.
 
 ## D8. A row-served answer is flagged `cached`
 

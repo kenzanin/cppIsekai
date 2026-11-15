@@ -90,7 +90,20 @@ void register_state(Ctx& /*c*/); // chapter skip/read/state flags
 void register_content(Ctx& /*c*/); // reader pages, image cache, cbz export
 void register_enrich(Ctx& /*c*/); // enrichment fetch/chosen/reset
 
+// manga-detail-table D2: forward decls so refresh_title (below, parsed before or
+// after enrich_internal depending on the TU include order) links to the
+// definitions in enrich_internal.hpp.
+void materialize_detail(Store& store, BS::thread_pool<>& db, const std::string& plugin, const std::string& slug,
+                        const std::string& resolved_env);
+std::string apply_chosen(Store& store, BS::thread_pool<>& db, const std::string& plugin, const std::string& slug,
+                         const std::string& envelope);
+
 } // namespace http::api
+
+// manga-detail-table D2: refresh_title (below) materializes through the enrichment
+// helpers; placed after the decls above because enrich_internal re-opens this
+// namespace and needs valid_title_pair visible (pragma-once makes the cycle benign).
+#include "enrich_internal.hpp"
 
 // --- saved-manga stats sync (library-grid-stats 2.x) ---
 namespace detail {
@@ -302,6 +315,13 @@ inline RefreshOutcome refresh_title(Store& store, BS::thread_pool<>& db, BS::thr
     const std::string detail_env = chapters_only ? std::string{} : fresh[0];
     const std::string chapters_env = chapters_only ? fresh[0] : fresh[1];
     sync_saved_stats(store, db, plugin, slug, detail_env, chapters_env);
+    if (!chapters_only) {
+        // manga-detail-table D2: the refresh resolved a detail envelope -- write it
+        // through like the route does (chosen overlay applied first; D2 keeps the
+        // write out of apply_chosen itself).
+        http::api::materialize_detail(store, db, plugin, slug,
+                                      http::api::apply_chosen(store, db, plugin, slug, fresh[0]));
+    }
     http::on_pool(db, [&] { // 3.2: stamp success (resets backoff)
         store.upsert_update_attempt(plugin, slug, "ok", "");
         return 0;

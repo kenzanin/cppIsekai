@@ -68,9 +68,22 @@ struct SavedManga {
     std::string synopsis{};        // plugin-source detail envelope synopsis (or 'description'; NOT enrichment)
     std::string alt_titles{};      // plugin-source detail envelope alt titles, JSON array verbatim
     int dup_group{};               // 0 = unique; recomputed from FTS5 + Dice similarity (library-dedup 2.2)
-    int status_flags{};            // StatusFlag bitfield: bit0=is_new, bit1=is_done, bit2-5=one-hot
+    int status_flags{}; // StatusFlag bitfield: bit0=is_new, bit1=is_done, bit2-5=one-hot
                                    // category (ongoing/hiatus/canceled/completed), bit6=is_dim
+    // manga-detail-table: materialized display detail (resolved envelope);
+    // empty = not materialized yet (next open resolves)
+    std::string authors{};          // JSON array verbatim
+    std::string artists{};          // JSON array verbatim
+    std::string tags{};             // merged list the page renders, JSON array verbatim
+    std::string synopsis_display{}; // resolved display synopsis; '' falls back to source synopsis
 };
+
+/** \brief manga-detail-table D3 predicate: the row carries materialized display
+ *  detail. Empty everywhere reads as "not materialized yet" (cold miss resolves
+ *  + materializes on the next open). */
+inline bool saved_has_detail(const SavedManga& s) {
+    return !s.authors.empty() || !s.artists.empty() || !s.tags.empty() || !s.synopsis_display.empty();
+}
 
 /** Last-read position of one manga (reader-page): resume point + continue
  *  hint. Keyed by (plugin, slug). */
@@ -189,6 +202,16 @@ public:
     void saved_dim_update(const std::string& plugin, const std::string& slug, bool on);
     /** \brief (plugin, slug) pairs with status_flags bit6 set (the dimmed covers). */
     std::vector<std::pair<std::string, std::string>> saved_dim_list();
+    /** \brief manga-detail-table: persist the resolved display detail on the saved row
+     *  (authors/artists/tags JSON arrays + display synopsis; name refreshed too). No-op
+     *  (returns false) when the row is absent or nothing changed; the dedup signals
+     *  synopsis/alt_titles are never touched here (design D4). */
+    bool saved_detail_put(const std::string& plugin, const std::string& slug, const std::string& name,
+                          const std::string& authors_json, const std::string& artists_json,
+                          const std::string& tags_json, const std::string& synopsis_display);
+    /** \brief manga-detail-table reset (design D6): clear the materialized display fields so
+     *  the next open re-resolves them. No-op when the row is absent. */
+    void saved_detail_clear(const std::string& plugin, const std::string& slug);
 
     /** \brief One enrichment row for a saved manga; fetched/chosen are raw JSON text. */
     struct TitleMetaRow {
