@@ -198,7 +198,20 @@ void register_pages(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, L
 
     CROW_ROUTE(app, "/plugins")([&] { return html("plugins.mustache", layout(store, db, "plugins")); });
     CROW_ROUTE(app, "/settings")([&] { return html("settings.mustache", layout(store, db, "settings")); });
-    CROW_ROUTE(app, "/about")([&] { return html("blank.mustache", layout(store, db, "about")); });
+   CROW_ROUTE(app, "/about")([&] { return html("about.mustache", layout(store, db, "about")); });
+   // Single source for the About page: repo-root README.md, read per
+   // request (it changes with every push) and cached never.
+   CROW_ROUTE(app, "/about/readme")([](const crow::request& req, crow::response& res) {
+       std::ifstream f("README.md", std::ios::binary);
+       if (!f) { res.code = 404; res.end(); return; }
+       std::stringstream ss;
+       ss << f.rdbuf();
+       res.body = ss.str();
+       res.compressed = false;
+       res.set_header("Content-Type", "text/markdown; charset=utf-8");
+       res.set_header("Cache-Control", "no-cache");
+       res.end();
+   });
 
     CROW_ROUTE(app, "/logs")
     ([&] {
@@ -262,6 +275,12 @@ void br_asset(const crow::request& req, crow::response& res, const char* path, c
 void http::register_static(crow::SimpleApp& app) {
     CROW_ROUTE(app, "/static/htmx.min.js")([](const crow::request& req, crow::response& res) {
         br_asset(req, res, "static/htmx.min.js", "application/javascript");
+    });
+    CROW_ROUTE(app, "/static/marked.min.js")([](const crow::request& req, crow::response& res) {
+        br_asset(req, res, "static/marked.min.js", "application/javascript");
+    });
+    CROW_ROUTE(app, "/static/mermaid.min.js")([](const crow::request& req, crow::response& res) {
+        br_asset(req, res, "static/mermaid.min.js", "application/javascript");
     });
     CROW_ROUTE(app, "/static/alpine.min.js")([](const crow::request& req, crow::response& res) {
         br_asset(req, res, "static/alpine.min.js", "application/javascript");

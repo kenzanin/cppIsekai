@@ -74,7 +74,67 @@
     <a href="/about" class="px-3 py-1 rounded hover:bg-zinc-800/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 transition-colors bg-zinc-800">About</a>
   </header>
   <main class="p-4">
-  <p class="text-zinc-400">Not built yet.</p>
+<style>
+  .about-md { max-width: 52rem; margin: 0 auto; line-height: 1.7; color: #d4d4d8; }
+  .about-md h1 { font-size: 1.6rem; font-weight: 700; color: #fafafa; margin-bottom: .4rem; }
+  .about-md h2 { font-size: 1.2rem; font-weight: 600; color: #fafafa; margin: 1.6rem 0 .5rem; border-bottom: 1px solid #27272a; padding-bottom: .3rem; }
+  .about-md h3 { font-size: 1rem; font-weight: 600; color: #e4e4e7; margin: 1.1rem 0 .4rem; }
+  .about-md p, .about-md li { margin: .45rem 0; }
+  .about-md ul { list-style: disc; padding-left: 1.4rem; }
+  .about-md ol { list-style: decimal; padding-left: 1.4rem; }
+  .about-md a { color: #93c5fd; text-decoration: underline; text-underline-offset: 2px; }
+  .about-md a:hover { color: #bfdbfe; }
+  .about-md code { background: #18181b; border: 1px solid #27272a; border-radius: .3rem; padding: .1rem .35rem; font-size: .85em; }
+  .about-md pre { background: #18181b; border: 1px solid #27272a; border-radius: .5rem; padding: .75rem 1rem; overflow-x: auto; margin: .6rem 0; }
+  .about-md pre code { background: transparent; border: 0; padding: 0; }
+  .about-md table { width: 100%; border-collapse: collapse; margin: .7rem 0; font-size: .9rem; }
+  .about-md th, .about-md td { border: 1px solid #27272a; padding: .35rem .6rem; text-align: left; }
+  .about-md th { background: #18181b; color: #e4e4e7; }
+  .about-md svg { max-width: 100%; height: auto; }
+  .about-md pre.mermaid, .about-md .mermaid { background: transparent; border: 0; text-align: center; }
+</style>
+
+<div id="about-content" class="about-md">
+  <div class="text-zinc-500 text-sm py-10 text-center">Loading README&hellip;</div>
+</div>
+
+<script src="/static/marked.min.js"></script>
+<script src="/static/mermaid.min.js"></script>
+<script>
+(function () {
+  const GH = 'https://github.com/kenzanin/cppIsekai';
+  const BRANCH = 'main';
+  const el = document.getElementById('about-content');
+
+  function fail(msg) {
+    el.innerHTML = '<p class="text-red-400">Failed to render README.md: ' + msg +
+      ' <button id="about-retry" class="underline ml-2">Retry</button></p>';
+    document.getElementById('about-retry').addEventListener('click', () => location.reload());
+  }
+
+  fetch('/about/readme', { cache: 'no-cache' })
+    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+    .then(md => {
+      el.innerHTML = marked.parse(md);
+
+      // Repo-root relative links (e.g. `ARCHITECTURE.md`) live on GitHub, not in the app.
+      el.querySelectorAll('a[href]').forEach(a => {
+        const href = a.getAttribute('href') || '';
+        if (/^(https?:|mailto:|#)/.test(href)) {
+          if (/^https?:/.test(href)) { a.target = '_blank'; a.rel = 'noopener'; }
+          return;
+        }
+        a.href = GH + '/blob/' + BRANCH + '/' + href.replace(/^\.\//, '');
+        a.target = '_blank';
+        a.rel = 'noopener';
+      });
+
+      mermaid.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'strict' });
+      return mermaid.run({ querySelector: '.language-mermaid' });
+    })
+    .catch(e => fail(e.message || String(e)));
+})();
+</script>
   </main>
   <div id="srv-status" style="display:none;position:fixed;top:0;left:0;right:0;z-index:50;text-align:center;font-size:12px;padding:6px 0;"></div>
   <script>

@@ -1,6 +1,6 @@
 # cppIsekai
 
-Local C++23 daemon.
+Local-first, self-hosted manga reader daemon for Linux. C++23, Crow HTTP, SQLite via sqlite_orm, plugin-per-site manga fetching with a stale-first cache. Single binary, no cloud, no account.
 
 ## Build
 
@@ -11,68 +11,161 @@ xmake test
 ```
 
 System prerequisites (Arch): `sudo pacman -S libvips curl crow asio`.
+Server base URL: `http://localhost:8090`. Port precedence: `--port` > `$PORT` > `[server] port` in `data/cppisekai.ini` > 8090.
+
+## Status (Nov 2026)
+
+Everything below is implemented and verified against the running daemon.
+
+- **Library** — save manga rows with name/cover, search with Unicode NFKD + casefold normalization, duplicate grouping (`dup_group`) and status flags.
+- **Saved-row detail** — detail/chapters for saved rows serve from SQLite without calling the plugin; enrichment data (MangaDex/MangaUpdates: authors, artists, tags, synopsis) is materialized onto the row. Chosen alt-title/cover overrides apply on both live-fetch and row-serve paths.
+- **Stale-first fetch** — plugin API responses are cached in `api_cache` (SQLite, with raw-JSONB payload) and served stale-on-error; image bytes land in a disk LRU under `cache/` (layout v2: `<plugin>/covers/<slug>.<ext>`, `<plugin>/<slug>/chNNN/pNNN.<ext>`; whole-file eviction on overflow).
+- **Reader** — 10-page window, RTL/LTR, skip-aware, position resumed from the store, prev/next resolved by stable number order + index so duplicate chapter numbers (24a/24b) stay individually reachable; the reader links and prefetches by chapter id (`?ch_id=`), old number-only URLs keep working.
+- **Plugins** — per-site plugin-per-runtime; hosts expose a JSON ABI plus `http.fetch`, `storage.*`, `log.*`, `host.re2`, `host.html`, `host.crypto`, `host.text` (NFKD/casefold, `date_to_iso`).
+  - Lua 5.4 (sol2): anisascans, atsumaru, mangadex, mangafire (+ metadata-only enrichment sources `enrichment-mangadex`, `enrichment-mangaupdates`)
+  - WASM (wasm3): mangafox, mangafreak
+  - JavaScript (quickjs-ng): mangatown
+  - mangafox reader is currently broken (upstream URL/shape change); tracked in `openspec/changes/plugin-port-multi-runtime/`.
+- **CBZ export** — `GET /export/cbz?plugin=&slug=` (libzippp).
+- **Cover pipeline** — vips transcode to WebP/AVIF, `/cache/img` serves through the LRU.
+- **About page** — renders this README.md live (see below).
+
+## Architecture
+
+```mermaid
+flowchart TB
+    UI["Browser — crow templates, Alpine.js, htmx, Tailwind"] --> HTTP
+    subgraph daemon["cppIsekai daemon (Crow + asio)"]
+        HTTP["HTTP routes<br/>src/http/"] --> Store[("SQLite<br/>sqlite_orm")]
+        HTTP --> Reader["Reader worker<br/>10-page window"]
+        HTTP --> Stale["Stale-first layer<br/>api_cache + disk LRU"]
+        Reader --> Cache2["prefetch + image cache"]
+        Stale --> Plugins{Plugin runtime}
+        Plugins --> Lua["Lua 5.4 · sol2"]
+        Plugins --> Wasm["WASM · wasm3"]
+        Plugins --> Js["JS · quickjs-ng"]
+    end
+    Cache2 --> Img["/cache/img<br/>vips WebP/AVIF"]
+    Lua --> Sites[("Manga sites")]
+    Wasm --> Sites
+    Js --> Sites
+    Sites --> Stale
+```
+
+## Database
+
+One SQLite file (`data/library.db`), one connection, all store access funneled through `src/store/` — plugins never touch SQLite directly (host `storage.*` only). Relationships are **logical** keys (`plugin` columns hold the plugin slug); the only enforced FK is `title.plugin_id → plugin.id`.
+
+```mermaid
+erDiagram
+    plugin ||--o{ title : "has"
+    plugin ||--o{ plugin_state : "host/skip + cache flags"
+    plugin ||--o{ api_cache : "shaped by params_json"
+    plugin ||--o{ saved_manga : "rows the user keeps"
+    plugin ||--o{ title_meta : "enrichment payloads"
+    plugin ||--o{ update_attempts : "fetch backoff"
+    plugin ||--o{ reader_positions : "resume state"
+
+    plugin {
+        int id PK
+        string name
+        string plugin_id
+        string runtime
+        int enabled
+    }
+    title {
+        int id PK
+        int plugin_id FK
+        string name
+    }
+    saved_manga {
+        string plugin PK
+        string slug PK
+        string name
+        string cover
+        string status
+        int total_ch
+        int read_ch
+        string authors
+        string tags
+        string synopsis_display
+    }
+    title_meta {
+        string plugin PK
+        string slug PK
+        string fetched
+        string chosen
+        int fetched_at
+    }
+    api_cache {
+        string plugin_id PK
+        string query_hash PK
+        string params_json
+        int fetched_at
+        int ttl_s
+    }
+    reader_positions {
+        string plugin PK
+        string slug PK
+        string chapter_id
+        real chapter_number
+        int page
+        string mode
+        int updated_at
+    }
+    plugin_state {
+        string plugin_id PK
+        string key PK
+        string value
+    }
+    update_attempts {
+        string plugin PK
+        string slug PK
+        int last_attempt_at
+        int consecutive_errors
+        int backoff_until
+    }
+```
 
 ## System dependencies (shared, not vendored)
 
-| Lib | Version | License | Role |
-|---|---|---|---|
-| libvips | 8.18.7 | LGPL-2.1 | image processing (WebP/AVIF) |
-| crow | 1.3.4 | BSD-3-Clause | micro web framework (HTTP/WebSocket) |
-| asio | 1.38.2 | BSL-1.0 | async networking under Crow |
-| curl (headers) | 8.23 | MIT-like | ABI headers for curl-impersonate |
-| CLI11 | 2.7.2 (pacman `cli11`) | BSD-3-Clause | flag parsing (`--port`, `--config`) |
+| Lib | Role |
+|---|---|
+| libvips | image processing, WebP/AVIF transcode |
+| crow + asio | HTTP server framework |
+| curl-impersonate (chrome) | plugin fetch fingerprint; system OpenSSL dlopen path for ff*/firefox fallback hosts |
+| CLI11 | flag parsing |
 
-## Vendored `third_party/` (only what xrepo lacks)
-
-| Lib | Pin | License | Extracted |
-|---|---|---|---|
-| [wasm3](https://github.com/wasm3/wasm3) | master `28ecb9a` | MIT | `source/*.c,*.h` (built static) |
-| [curl-impersonate](https://github.com/lwthiker/curl-impersonate) | v0.6.1 prebuilt x86_64 | curl license (MIT-like; [text](https://github.com/lwthiker/curl-impersonate/blob/master/LICENSE)) | `libcurl-impersonate-chrome.so.4.8.0` (the `-ff` variant ships in same release) |
-
-## Via xrepo (`add_requires` in `xmake.lua`, resolved versions locked in `xmake-requires.lock`)
+## Via xrepo (`add_requires` in `xmake.lua`, pinned in `xmake-requires.lock`)
 
 | Pkg | Pin | Role |
 |---|---|---|
-| glaze | 7.9.0 | JSON (store/http serialization) |
+| glaze | 9.1.0 | JSON (store/http serialization) — 7.9.0 does not compile; pinned with `xrepo update-repo` so the `v`-prefixed tag resolves |
 | sol2 | 3.5.0 | Lua binding (plugin runtime) |
+| lua | 5.4.8 | Lua 5.4 runtime (pinned; xrepo default is 5.5) |
+| quickjs-ng | 0.15.1 | JS plugin runtime |
+| sqlite_orm | 1.9.1 | store ORM |
+| sqlite3 | 3.54.0 | store engine |
 | thread-pool | 5.1.0 | BS::thread_pool worker pool |
 | readerwriterqueue | 1.0.7 | SPSC queues |
 | lexbor | 3.0.0 | HTML parse (plugin htmltext) |
+| pugixml | 1.16 | XPath bridge for `host.html.xpath` |
 | libzippp | 7.1 | CBZ export wrapper |
-| lua | 5.4.8 | MIT | Lua 5.4 runtime (plugin VM) |
-| spdlog | 1.17.0 | MIT | logging |
-| zlib | 1.3.2 | zlib | crow HTTP compression |
-| sqlite3 | 3.54.0 | Public Domain | store engine |
-| utf8proc | 2.11.3 | MIT | Unicode NFKD tokeniser (library-dedup) |
-| re2 | 2025.11.05 | BSD-3-Clause | regex (html text extraction) |
-| quickjs-ng | 0.15.1 | JS plugin runtime |
+| utf8proc | 2.11.3 | Unicode NFKD + casefold |
+| re2 | 2025.11.05 | regex (html text extraction) |
+| hash-library | 2021.09.29 | `host.crypto.*` (SHA-256/MD5/HMAC) |
 | simpleini | 4.27 | ini config read/write |
-| sqlite_orm | 1.9.1 | store ORM |
+| spdlog | 1.17.0 | logging (+ zlib for crow compression) |
+| date | 3.0.4 | `host.text.date_to_iso` layout parsing |
 
-Vendored copies of the above were removed 2026-11-12; history in git.
+## Engineering notes
 
-## Notes
+- **Config** — one registry (`src/config/`): CLI flag + `CPPISEKAI_*` env + ini layers; precedence default < ini < env < flag. `--dump-config` renders the template, `POST /config` merge-saves.
+- **Plugin ABI** — JSON-text in/out; single wrap point `call_cached` (`cached:true` stale-serve). Host-wide `CURLOPT_PROXY` via `plugin::applyProxy`.
+- **Cache layout v2** — `<plugin>/covers/<slug>.<ext>`, `<plugin>/<slug>/chNNN/pNNN.<ext>` (zero-padded order = reading order), stale `api/<sha>.json` on disk plus the `api_cache` table; boot scan purges once via `.cache-v2` stamp.
+- **Build** — glaze/clang story: the toolchain is clang (`xmake f -m release`); see `knowledge/constraints/test-binary-releasedbg-vs-release` for why `xmake test` runs the releasedbg binary.
+- **Diagrams** — this file is the single source for GitHub and the in-app About page; Mermaid blocks render natively on GitHub and in-app via mermaid.js. Keep diagrams as ` ```mermaid ` fenced blocks.
 
-- `curl-impersonate` links as a shared lib; `BUILD_RPATH` points at `third_party/curl-impersonate/lib`; TLS fingerprinting via BoringSSL + nghttp2.
-- Pin hashes = `git rev-parse --short HEAD` at vendoring time; the clone scratch lived in `tmp/vendor/` (gitignored).
-- Port precedence: `--port` > `$PORT` > `[server] port` in `data/cppisekai.ini` (comments survive rewrites via SimpleIni) > 8090.
+## About page
 
-## Enrichment plugins
-
-`data/enrichment/` holds metadata-only enrichment sources (MangaDex, MangaUpdates first); it is NOT `data/plugins/` and these plugins never appear as manga/scraper plugins
-— they are not rendered on the Plugins page, are not stale-served on the scraper
-path, and cannot request chapters/pages.
-
-Dev copies live in `plugins_dev/lua/enrichment-*/` and are symlinked in the same
-way `data/plugins/mangadex` points to `plugins_dev/lua/mangadex/`, e.g.:
-
-```bash
-cd data/enrichment
-ln -sfn ../../plugins_dev/lua/enrichment-mangadex mangadex-enrichment
-ln -sfn ../../plugins_dev/lua/enrichment-mangaupdates mangaupdates-enrichment
-```
-
-Do not commit fetched enrichment payloads; they are user data and are stored via
-`title_meta` once the detail page feature ships. The daemon logs loaded
-enrichment sources on boot. See `openspec/changes/detail-enrichment-fields/` for
-the feature contract.
+The `/about` page fetches `README.md` from the repo root (`/about/readme`, per-request, never cached) and renders it with vendored `marked` + `mermaid` (`static/*.min.js.br`). Edits to this file show up on both GitHub and the app after a refresh — no rebuild needed (only a restart if the daemon was the one editing it).
