@@ -23,16 +23,24 @@ local FETCH_SRC = {"src/fetch/fetch.cpp", "src/fetch/fetch_curl.cpp"}
 
 -- system shared libs via pkg-config; the rest pinned from xrepo (locked in xmake-requires.lock)
 add_requires("pkgconfig::vips", {system = true})
-add_requires("pkgconfig::lua54", {system = true})
 
 -- xrepo pins; formerly vendored/system. wasm3 + curl-impersonate remain vendored.
--- sol2 is header-only: tell its recipe not to pull a Lua dep (Arch's system lua54 covers runtime + headers),
--- because xmake resolves bare "lua" to Arch's pacman lua 5.5 which sol2 3.5.0 rejects.
+-- sol2 is header-only: tell its recipe not to pull a Lua dep (we pin xrepo lua 5.4.8 ourselves),
+-- because xmake resolves bare "lua" to xrepo's lua 5.5 which sol2 3.5.0's compat header rejects
+-- (LUA_ERRGCMM undeclared; 5.1-5.4 only).
 add_requires("sol2 3.5.0", {configs = {includes_lua = false}})
+-- lua 5.4.8 (not 5.5.x): latest sol2 in xmake-repo is 3.5.0, incompatible with 5.5 otherwise.
+add_requires("lua 5.4.8")
 add_requires("glaze 9.1.0", "thread-pool 5.1.0", "readerwriterqueue 1.0.7", "lexbor 3.0.0",
     "libzippp 7.1", "quickjs-ng 0.15.1", "simpleini 4.27", "sqlite_orm 1.9.1",
     "spdlog 1.17.0", "zlib 1.3.2", "sqlite3 3.54.0+100", "utf8proc 2.11.3", "re2 2025.11.05",
     "date 3.0.4", "hash-library 2021.09.29", "pugixml 1.16", "backward-cpp")
+
+-- crow + cli11: both header-only (static into the binary), pinned via xrepo.
+-- crow's SSL build is skipped: the daemon serves plain HTTP.
+-- asio is pulled by crow's recipe with no version constraint of its own.
+add_requires("asio 1.36.0", "crow 1.3.5", {configs = {ssl = false}})
+add_requires("cli11 2.7.2", {configs = {cmake = false}})
 
 -- add_files needs flat strings; cfg.files may embed the shared groups above
 local function flatten(list)
@@ -102,8 +110,8 @@ cxx_bin("cppIsekai", {
     files = {"src/**.cpp"},
     incs = {"src"},
     deps = {"wasm3", "tiny-aes256"},
-    pkgs = {"vips", "lua54"},
-    reqs = {"glaze", "sol2", "thread-pool", "readerwriterqueue", "lexbor", "libzippp", "quickjs-ng", "simpleini", "sqlite_orm", "spdlog", "zlib", "sqlite3", "utf8proc", "re2", "date", "hash-library", "pugixml", "backward-cpp"},
+    pkgs = {"vips"},
+    reqs = {"lua", "crow", "cli11", "asio", "glaze", "sol2", "thread-pool", "readerwriterqueue", "lexbor", "libzippp", "quickjs-ng", "simpleini", "sqlite_orm", "spdlog", "zlib", "sqlite3", "utf8proc", "re2", "date", "hash-library", "pugixml", "backward-cpp"},
     ldflags = {CURL_SO},
     rpath = {CURL_LIB},
     defs = {'CPPISEKAI_FETCH_LIB_DIR="' .. CURL_LIB .. '"', "CROW_USE_LOCALTIMEZONE", "CROW_ENABLE_COMPRESSION"},
@@ -122,8 +130,7 @@ cxx_bin("test_plugin", {
     incs = {"src"},
     deps = {"wasm3", "tiny-aes256"},
 
-    pkgs = {"lua54"},
-    reqs = {"glaze", "sol2", "thread-pool", "lexbor", "sqlite_orm", "readerwriterqueue", "quickjs-ng", "spdlog", "sqlite3", "utf8proc", "re2", "date", "hash-library", "pugixml"},
+    reqs = {"lua", "glaze", "sol2", "thread-pool", "lexbor", "sqlite_orm", "readerwriterqueue", "quickjs-ng", "spdlog", "sqlite3", "utf8proc", "re2", "date", "hash-library", "pugixml"},
     ldflags = {CURL_SO},
     rpath = {CURL_LIB},
     defs = {'TEST_PLUGIN_FIXTURES="$(projectdir)/tests/fixtures/plugins"'},
@@ -135,8 +142,7 @@ cxx_bin("test_htmltext", {
     incs = {"src"},
     deps = {"wasm3", "tiny-aes256"},
 
-    pkgs = {"lua54"},
-    reqs = {"glaze", "sol2", "thread-pool", "lexbor", "sqlite_orm", "readerwriterqueue", "quickjs-ng", "spdlog", "sqlite3", "utf8proc", "re2", "date", "hash-library", "pugixml"},
+    reqs = {"lua", "glaze", "sol2", "thread-pool", "lexbor", "sqlite_orm", "readerwriterqueue", "quickjs-ng", "spdlog", "sqlite3", "utf8proc", "re2", "date", "hash-library", "pugixml"},
     ldflags = {CURL_SO},
     rpath = {CURL_LIB},
     defs = {'TEST_PLUGIN_FIXTURES="$(projectdir)/tests/fixtures/plugins"'},
@@ -173,7 +179,7 @@ cxx_bin("test_vrf", {
 cxx_bin("test_config", {
     files = {"tests/test_config.cpp"},
     incs = {"src"},
-    reqs = {"simpleini", "glaze"},
+    reqs = {"cli11", "simpleini", "glaze"},
     test = true,
 })
 
@@ -204,14 +210,14 @@ cxx_bin("test_http_enrich", {
     files = {"tests/test_http_enrich.cpp", STORE_SRC},
     incs = {"src"},
     pkgs = {"vips"},
-    reqs = {"glaze", "sqlite_orm", "thread-pool", "simpleini", "readerwriterqueue", "spdlog", "sqlite3", "utf8proc", "hash-library"},
+    reqs = {"crow", "glaze", "sqlite_orm", "thread-pool", "simpleini", "readerwriterqueue", "spdlog", "sqlite3", "utf8proc", "hash-library"},
     test = true,
 })
 
 cxx_bin("test_pages", {
     files = {"tests/test_pages.cpp", "src/http/pages_api.cpp"},
     incs = {"src"},
-    reqs = {"glaze", "spdlog", "hash-library"},
+    reqs = {"crow", "glaze", "spdlog", "hash-library"},
     test = true,
 })
 
@@ -248,6 +254,7 @@ cxx_bin("test_templates", {
     incs = {"src"},
     defs = {'CPPISEKAI_TEMPLATES_DIR="$(projectdir)/templates"',
             'CPPISEKAI_GOLDEN_DIR="$(projectdir)/tests/fixtures/golden"'},
+    reqs = {"crow"},
     test = true,
 })
 

@@ -130,7 +130,12 @@
       });
 
       mermaid.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'strict' });
-      return mermaid.run({ querySelector: '.language-mermaid' });
+      mermaid.run({ querySelector: '.language-mermaid' }).catch(e => {
+        const warn = document.createElement('p');
+        warn.className = 'text-yellow-500 text-sm';
+        warn.textContent = 'Diagrams failed to render: ' + (e.message || e);
+        el.prepend(warn);
+      });
     })
     .catch(e => fail(e.message || String(e)));
 })();
