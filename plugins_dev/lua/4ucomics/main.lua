@@ -61,7 +61,8 @@ methods.search = function(params)
       description = "",
     }
   end
-  return { ok = true, data = out }
+  -- UI contract: {items, total} envelope, not a bare array (search_script run()).
+  return { ok = true, data = { items = out, total = #out } }
 end
 
 methods.detail = function(params)
