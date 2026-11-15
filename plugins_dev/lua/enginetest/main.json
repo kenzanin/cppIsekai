@@ -1,0 +1,9 @@
+{
+  "name": "Engine Probe",
+  "id": "enginetest",
+  "version": "0.1.0",
+  "website": "https://example.com",
+  "runtime": "lua",
+  "capabilities": ["probe"],
+  "api": 1
+}

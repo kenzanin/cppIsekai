@@ -34,6 +34,9 @@ inline std::string checked_profile(std::string want, const std::string& live_def
     if (want.empty()) {
         want = "chrome116";
     }
+    if (want == "lightpanda" || want == "obscura") {
+        return want; // headless-renderer engines (fetch::sync rendered_fetch)
+    }
     if (!fetch::is_known_target(want)) {
         spdlog::warn("[fetch] unknown profile '{}' -> using '{}'", want, live_default);
         want = live_default.empty() ? "chrome116" : live_default;
