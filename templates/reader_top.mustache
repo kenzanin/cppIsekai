@@ -1,13 +1,8 @@
 <!-- top overlay: back + chapter dropdown (synced) + mode/dir/zoom. Shown only while navShown. -->
 <div x-show="navShown && !done" x-cloak
      class="fixed top-0 inset-x-0 z-30 flex items-center justify-between gap-2 px-3 py-2 bg-zinc-950/95 border-b border-zinc-800 backdrop-blur">
-  <!-- Left group: [back to detail] [view mode] [zoom] [ltr/rtl] -->
+  <!-- Left group: [view mode] [zoom] [ltr/rtl] -->
   <div class="flex items-center gap-2 shrink-0">
-    <a :href="'/view/manga/'+encodeURIComponent(plugin)+'/'+encodeURIComponent(slug)"
-       class="flex items-center gap-1.5 px-2.5 py-1.5 rounded border border-zinc-700 bg-zinc-900/80 text-zinc-100 hover:bg-zinc-800 transition-colors" aria-label="Back to detail">
-      <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 19l-7-7 7-7"/><path d="M3.5 12H14"/><path d="M14 4h4a2 2 0 012 2v12a2 2 0 01-2 2h-4"/></svg>
-      <span class="text-xs font-medium">Detail</span>
-    </a>
     <select x-model="mode" @change="modeChanged()" aria-label="Reading mode"
             class="bg-zinc-900 border border-zinc-700 rounded px-2.5 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-zinc-500">
       <option value="webtoon">webtoon</option>
@@ -45,5 +40,11 @@
                 x-text="formatChapterLabel(c)"></option>
       </template>
     </select>
+    <!-- Exit to detail: extreme top-right corner -->
+    <a :href="'/view/manga/'+encodeURIComponent(plugin)+'/'+encodeURIComponent(slug)"
+       class="flex items-center gap-1.5 shrink-0 px-2.5 py-1.5 rounded border border-zinc-700 bg-zinc-900/80 text-zinc-100 hover:bg-zinc-800 transition-colors" aria-label="Back to detail">
+      <span class="text-xs font-medium hidden sm:inline">Detail</span>
+      <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h4a2 2 0 012 2v12a2 2 0 01-2 2h-4"/><path d="M10 12H3.5"/><path d="M13.5 8L17.5 12 13.5 16"/></svg>
+    </a>
   </div>
 </div>
