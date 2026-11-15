@@ -1,6 +1,18 @@
 -- MangaDex plugin: search/detail/chapters via api.mangadex.org, using only
 -- host.http.fetch + json + base/string/table libs. Canonical output fields:
 -- {id, name, cover, status, tags, release_at, chapters = {id, number, title, release_at}}
+-- canonical status; unknown passes through, empty -> "unknown"
+local function normalize_status(s)
+  s = tostring(s or ""):lower():gsub("[^a-z0-9]", "")
+  if s == "" then return "unknown" end
+  if s == "ongoing" or s == "ongoin" or s == "releasing" or s == "publishing" then return "Ongoing" end
+  if s == "completed" or s == "finished" then return "Completed" end
+  if s == "hiatus" or s == "onhaiatus" then return "Hiatus" end
+  if s == "dropped" or s == "cancelled" or s == "canceled" then return "Dropped" end
+  if s == "upcoming" or s == "notyetreleased" then return "Upcoming" end
+  return s
+end
+
 local API = "https://api.mangadex.org"
 local AUTH = "https://auth.mangadex.org/realms/mangadex/protocol/openid-connect/token"
 
@@ -157,7 +169,7 @@ local function canonical_manga(m)
     id = m.id,
     name = name,
     cover = cover,
-    status = attrs.status or "",
+    status = normalize_status(attrs.status),
     tags = tags,
     release_at = epoch(attrs.createdAt),
     description = desc,

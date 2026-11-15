@@ -4,6 +4,17 @@
 -- No chapters, no pages, no login: public read-only MangaDex API.
 
 local API = "https://api.mangadex.org"
+-- canonical status; unknown passes through, empty -> "unknown"
+local function normalize_status(s)
+  s = tostring(s or ""):lower():gsub("[^a-z0-9]", "")
+  if s == "" then return "unknown" end
+  if s == "ongoing" or s == "ongoin" or s == "releasing" or s == "publishing" then return "Ongoing" end
+  if s == "completed" or s == "finished" then return "Completed" end
+  if s == "hiatus" or s == "onhaiatus" then return "Hiatus" end
+  if s == "dropped" or s == "cancelled" or s == "canceled" then return "Dropped" end
+  if s == "upcoming" or s == "notyetreleased" then return "Upcoming" end
+  return s
+end
 local CDN = "https://uploads.mangadex.org"
 local SITE = "https://mangadex.org"
 
@@ -222,7 +233,7 @@ local function build_detail(rec)
   return {
     title = pick(attrs.title),
     synopsis = clean_text(pick(attrs.description)),
-    status = attrs.status,
+    status = normalize_status(attrs.status),
     year = attrs.year,
     authors = extract_names(rec, "author"),
     artists = extract_names(rec, "artist"),

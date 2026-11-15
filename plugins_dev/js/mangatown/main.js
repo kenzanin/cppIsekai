@@ -4,6 +4,18 @@
 // Pages are plain URL strings: the reader/api consumers keep string elements
 // only, and the host fetch is chrome-impersonated (no per-image headers).
 
+// canonical status; unknown passes through, empty -> "unknown"
+function normalize_status(s) {
+  s = String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (s === "") return "unknown";
+  if (s === "ongoing" || s === "ongoin" || s === "releasing" || s === "publishing") return "Ongoing";
+  if (s === "completed" || s === "finished") return "Completed";
+  if (s === "hiatus" || s === "onhaiatus") return "Hiatus";
+  if (s === "dropped" || s === "cancelled" || s === "canceled") return "Dropped";
+  if (s === "upcoming" || s === "notyetreleased") return "Upcoming";
+  return s;
+}
+
 // get_body parity: "" on any failure (transport, non-200, malformed reply).
 function get_body(url, headers) {
   const body = host.http.fetch_body(url, headers ? { headers: headers } : undefined);
@@ -69,7 +81,7 @@ function get_manga_detail(p) {
   const title = host.text.trim(host.text.unescape(grp(host.re2.find('class="title">([^<]+)<', html), 1)));
   const cover = host.text.unescape(grp(host.re2.find('<img src="([^"]+)"[^>]*class="detail-cover"', html), 1));
   const author = host.text.strip_html(grp(host.re2.find('Author\\(s\\):\\s*</span>(.*?)</p>', html), 1));
-  const status = host.text.normalize_status(grp(host.re2.find('Status:\\s*</span>\\s*([^<]+)', html), 1));
+  const status = normalize_status(grp(host.re2.find('Status:\\s*</span>\\s*([^<]+)', html), 1));
   const summary =
     grp(host.re2.find('(?s)<span id="show"[^>]*>(.*?)</span>', html), 1) ||
     grp(host.re2.find('(?s)<span id="hide">(.*?)</span>', html), 1);

@@ -1,9 +1,12 @@
 #!/bin/sh
 # Build the mangafreak wasm guest -> main.wasm (next to this file).
-# Host ABI imports are documented in main.c header; runtime = wasm3 (src/plugin/wasm/).
+# Host ABI imports are documented in main.cpp header; runtime = wasm3 (src/plugin/wasm/).
 cd "$(dirname "$0")" || exit 1
-exec clang --target=wasm32-wasip1 --sysroot=/opt/wasi-sdk/share/wasi-sysroot \
-    -O2 -nostartfiles -nodefaultlibs \
+export LD_LIBRARY_PATH=""
+exec clang++ --target=wasm32-wasip1 --sysroot=/opt/wasi-sdk/share/wasi-sysroot \
+    -std=c++20 -O2 -nostartfiles -nodefaultlibs -fno-exceptions -fno-rtti \
     -Wl,--no-entry -Wl,--allow-undefined \
     -Wl,--export=alloc -Wl,--export=handle -Wl,--export=last_len \
-    main.c /opt/wasi-sdk/share/wasi-sysroot/lib/wasm32-wasi/libc.a -o main.wasm
+    main.cpp /opt/wasi-sdk/share/wasi-sysroot/lib/wasm32-wasi/libc++.a \
+             /opt/wasi-sdk/share/wasi-sysroot/lib/wasm32-wasi/libc++abi.a \
+             /opt/wasi-sdk/share/wasi-sysroot/lib/wasm32-wasi/libc.a -o main.wasm

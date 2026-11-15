@@ -78,13 +78,13 @@ end
 
 -- canonical status; unknown passes through, empty -> "unknown"
 local function normalize_status(s)
-  s = tostring(s or ""):lower():gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
+  s = tostring(s or ""):lower():gsub("[^a-z0-9]", "")
   if s == "" then return "unknown" end
-  if s == "ongoing" or s == "releasing" or s == "publishing" then return "Ongoing" end
+  if s == "ongoing" or s == "ongoin" or s == "releasing" or s == "publishing" then return "Ongoing" end
   if s == "completed" or s == "finished" then return "Completed" end
-  if s == "hiatus" or s == "on hiatus" then return "Hiatus" end
-  if s == "dropped" or s == "cancelled" then return "Dropped" end
-  if s == "upcoming" or s == "not yet released" then return "Upcoming" end
+  if s == "hiatus" or s == "onhaiatus" then return "Hiatus" end
+  if s == "dropped" or s == "cancelled" or s == "canceled" then return "Dropped" end
+  if s == "upcoming" or s == "notyetreleased" then return "Upcoming" end
   return s
 end
 

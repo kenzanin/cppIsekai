@@ -12,7 +12,6 @@
 //
 // Build: ./build.sh (this dir; system clang + wasi-sdk sysroot).
 
-#define _GNU_SOURCE // memmem on wasi libc
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
@@ -330,6 +329,46 @@ static const char PAT_GENRE[] = "<a[^>]*>([^<]+)</a>";
 static const char PAT_DESC_BLOCK[] = "(?s)class=\"manga_series_description\">(.*?)</div>\\s*</div>";
 static const char PAT_P[] = "(?s)<p>(.*?)</p>";
 
+// canonical status vocab: sites ship case/separator soup ("ON-GOING", "On_going");
+// match on an alnum-only key so one entry covers them all. unknown -> raw (trimmed).
+static unsigned int normalize_status_into(char *dst, unsigned int cap, const char *s, unsigned int n) {
+    char key[80];
+    unsigned int kn = 0;
+    for (unsigned int i = 0; i < n && kn < sizeof key - 1u; ++i) {
+        char c = s[i];
+        if (c >= 'A' && c <= 'Z') c = (char)(c - 'A' + 'a');
+        if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) key[kn++] = c;
+    }
+    key[kn] = 0;
+    const char *canon = 0;
+    if (!strcmp(key, "ongoing") || !strcmp(key, "ongoin") ||
+        !strcmp(key, "releasing") || !strcmp(key, "publishing")) canon = "Ongoing";
+    else if (!strcmp(key, "completed") || !strcmp(key, "finished")) canon = "Completed";
+    else if (!strcmp(key, "hiatus") || !strcmp(key, "onhaiatus")) canon = "Hiatus";
+    else if (!strcmp(key, "dropped") || !strcmp(key, "cancelled") || !strcmp(key, "canceled")) canon = "Dropped";
+    else if (!strcmp(key, "upcoming") || !strcmp(key, "notyetreleased")) canon = "Upcoming";
+    const char *out = canon;
+    unsigned int on = 0;
+    if (out) {
+        on = (unsigned int)strlen(out);
+    } else {
+        // unrecognized vocab: pass raw through, trimmed
+        unsigned int start = 0, end = n;
+        while (start < end && (s[start] == ' ' || s[start] == '\t' || s[start] == '\n' || s[start] == '\r')) ++start;
+        while (end > start && (s[end - 1] == ' ' || s[end - 1] == '\t' || s[end - 1] == '\n' || s[end - 1] == '\r')) --end;
+        out = s + start;
+        on = end - start;
+        if (!on) {
+            out = "Unknown";
+            on = 7;
+        }
+    }
+    if (on > cap - 1u) on = cap - 1u;
+    memcpy(dst, out, on);
+    dst[on] = 0;
+    return on;
+}
+
 static void strip_into(const char *s, unsigned int n) { // strip_html -> TMP2
     TMP2[0] = 0;
     if (text_strip_html((unsigned int)(unsigned long)s, n,
@@ -370,7 +409,7 @@ static void detail_reply(const char *id, unsigned int idn) {
     char status[64] = "Unknown";
     {
         const char needle[] = "This is ";
-        const char *p = memmem(BODY, body_len, needle, sizeof needle - 1u);
+        const char *p = (const char *)memmem(BODY, body_len, needle, sizeof needle - 1u);
         if (p) {
             p += sizeof needle - 1u;
             unsigned int n = 0;
@@ -389,6 +428,8 @@ static void detail_reply(const char *id, unsigned int idn) {
             status[n] = 0;
         }
     }
+    char status_n[80];
+    normalize_status_into(status_n, sizeof status_n, status, (unsigned int)strlen(status));
     unsigned int gb = find(PAT_GENRE_BLOCK, BODY, body_len);
     const char *gb_s = json_elem(TMP, gb, 1, &gb);
     unsigned int db = find(PAT_DESC_BLOCK, BODY, body_len);
@@ -413,7 +454,7 @@ static void detail_reply(const char *id, unsigned int idn) {
     emits(",\"cover\":\"");
     emit(cover, (unsigned int)strlen(cover));
     emits("\",\"status\":");
-    jstr(status, (unsigned int)strlen(status));
+    jstr(status_n, (unsigned int)strlen(status_n));
     emits(",\"author\":\"\",\"artist\":\"\",\"genres\":[");
     unsigned int gcount = 0;
     if (gb_s) {
@@ -462,9 +503,9 @@ static void chapters_reply(const char *id, unsigned int idn) {
     const char *block = BODY;
     unsigned int block_len = body_len;
     {
-        const char *bs = memmem(BODY, body_len, "manga_series_list", 17);
+        const char *bs = (const char *)memmem(BODY, body_len, "manga_series_list", 17);
         if (bs) {
-            const char *be = memmem(bs, body_len - (unsigned int)(bs - BODY), "</table>", 8);
+            const char *be = (const char *)memmem(bs, body_len - (unsigned int)(bs - BODY), "</table>", 8);
             if (be) {
                 block = bs;
                 block_len = (unsigned int)(be - bs) + 8;
@@ -484,7 +525,7 @@ static void chapters_reply(const char *id, unsigned int idn) {
                 ++p;
                 continue;
             }
-            const char *e = memchr(p, ']', end - p); // inner array end
+            const char *e = (const char *)memchr(p, ']', end - p); // inner array end
             if (!e) {
                 break;
             }
@@ -493,7 +534,7 @@ static void chapters_reply(const char *id, unsigned int idn) {
             int np = 0;
             const char *z = p;
             while (np < 3) {
-                const char *a = memchr(z, '"', e - z);
+                const char *a = (const char *)memchr(z, '"', e - z);
                 if (!a) {
                     break;
                 }
@@ -572,7 +613,7 @@ static const char PAT_GOHERE[] = "<img[^>]*id=\"gohere\"[^>]*src=\"([^\"]*)\"|<i
 
 static void pages_reply(const char *id, unsigned int idn) {
     // id = "SLUG:Read1_SLUG_CH"; url = BASE/Read1_SLUG_CH
-    const char *colon = memchr(id, ':', idn);
+    const char *colon = (const char *)memchr(id, ':', idn);
     const char *path = colon ? colon + 1 : id;
     unsigned int path_len = (unsigned int)(id + idn - path);
     char url[512];
@@ -633,12 +674,12 @@ static void pages_reply(const char *id, unsigned int idn) {
 }
 
 // ── entry ──────────────────────────────────────────────────────────────────
-unsigned int alloc(unsigned int len) {
+extern "C" unsigned int alloc(unsigned int len) {
     (void)len;
     return (unsigned int)(unsigned long)ARENA; // host copies envelope here
 }
 
-unsigned int handle(unsigned int in_ptr, unsigned int in_len) {
+extern "C" unsigned int handle(unsigned int in_ptr, unsigned int in_len) {
     (void)in_ptr;
     used = 0; // fresh arena per call; host reads the reply before the next call
     const char *env = (const char *)(unsigned long)0; // envelope was memcpy'd to alloc()'s address
@@ -698,6 +739,6 @@ unsigned int handle(unsigned int in_ptr, unsigned int in_len) {
     return (unsigned int)(unsigned long)ARENA;
 }
 
-unsigned int last_len(void) {
+extern "C" unsigned int last_len(void) {
     return last_len_v;
 }
