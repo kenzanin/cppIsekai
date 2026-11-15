@@ -28,14 +28,33 @@
 
 ## Phase 3 — WASM (wasm3): port goIsekai WASM sites
 
+### Findings (task 3.7) — mangafox reader dead end to end
+Found during the 6-plugin chapter-nav sweep (2026-11-15), not a regression in `/api/pages`:
+- `plugins_dev/wasm/mangafox/main.cpp:307` builds `.../manga/<slug>/<ch>/1.html`; fanfox needs
+  `.../manga/<slug>/c<ch>/1.html` (probe: `c001` → 200, `001` → 404).
+- Even with the URL fixed, the mobile chapter page is today a ~10 KB JS-rendered shell with no
+  `chapterid` / `imagecount` markers, so the regexes at lines 309-310 match nothing — the guest needs a
+  different source for the page list (the old `chapterfun.ashx` endpoint or the desktop reader page).
+- Symptom: `/plugin/mangafox/pages` → `{"ok":false,"error":"fetch failed"}` and
+  `/api/pages/mangafox/...` 404/500 for every chapter, while search/detail/chapters still work from cache.
+- A sibling numbering bug in the same guest was fixed separately (chapter 24b → 24 in c8157d8).
+
 - [x] 3.1 Choose toolchain: wasi-sdk vs odin (record decision) — **DECIDED: wasi-sdk** (design D7; host pacman `wasi-sdk-git`, clang → wasm32-wasi, C ABI maps 1:1 to wasm3 `env.*` imports; odin dev-channel risk) — wasm3 loader + imports present (`src/plugin/wasm/wasm_imports.cpp`); site plugins mostly Go/odin compiled → toolchain decision matters
 - [x] 3.2 wasm3 loader host-tool bindings confirmed present (http.fetch/fetch_body/get_json/post_json, re2.*, html.*, text.*, codecs.*, crypto.* (vrf+sha256/md5/hmac/aes_gcm), url_*)
 - [x] 3.3 Smoke-test one WASM site end-to-end — **mangafreak** (search 7 / detail / chapters 1204 / pages 13, all ok:true live)
 - [ ] 3.4 Port goIsekai WASM sites to `plugins_dev/wasm/<site>/` (main.json + main.wasm)
 - [ ] 3.5 HAR-verify each WASM ported plugin
 - [ ] 3.6 Full test suite green; WASM runtime loads plugins
+- [ ] 3.7 Repair the mangafox WASM guest's reader path (see Findings above): switch the chapter URL to
+      `c<ch>/1.html` and replace the `chapterid`/`imagecount` extraction with a source that still exists
+      (desktop reader page or the chapterfun endpoint); rebuild the `.wasm`, then verify live that
+      `/api/pages/mangafox/<slug>/<ch>` returns pages and the first image loads through `/cache/img`
 
 ## Phase 4 — Verification + gaps
 - [ ] 4.1 Document host-tool gaps per runtime (Lua/JS/WASM)
 - [ ] 4.2 List Cloudflare-blocked sites skipped (not ported)
 - [ ] 4.3 Full suite green; daemon restarted; all three runtimes load plugins
+- [ ] 4.4 Reader-path verification for every ported plugin, not just search/detail: `/api/chapters` returns
+      a usable number sequence (no placeholder 0, no bogus ordering) and `/api/pages` returns pages with a
+      working image URL for at least one chapter — a green build and a working detail page have repeatedly
+      masked dead readers (mangafox today, see 3.7; mangafire phantom chapter 0, fixed 1e24d06)

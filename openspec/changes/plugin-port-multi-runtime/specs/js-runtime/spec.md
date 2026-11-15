@@ -13,7 +13,11 @@ The host SHALL load JS plugins via quickjs-ng under `src/plugin/js/`, exposing h
 - **WHEN** a JS plugin calls `host.http.fetch(url, opts)`
 - **THEN** the host performs the HTTP request through the same curl-family gate as Lua plugins and returns `{status, body, headers}`
 
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: Plugin ABI contract
-The JSON-text-in/out ABI (search_manga, get_manga_detail, get_chapter_list, get_page_list, optional get_genres, PLUGIN manifest) is runtime-agnostic; JS plugins implement the same exports as Lua plugins.
+The JSON-text-in/out ABI (search_manga, get_manga_detail, get_chapter_list, get_page_list, optional get_genres, PLUGIN manifest) SHALL be runtime-agnostic; JS plugins SHALL implement the same exports as Lua plugins.
+
+#### Scenario: Same exports in JS and Lua
+- **WHEN** the host dispatches `chapters` to a JS plugin and to a Lua plugin
+- **THEN** both are invoked with the same `{api, method, params}` JSON and both answer with the same `{ok, data}` envelope

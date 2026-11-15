@@ -13,7 +13,11 @@ Every goIsekai Lua site not blocked by Cloudflare SHALL have a ported plugin und
 - **WHEN** a goIsekai Lua site is blocked by Cloudflare
 - **THEN** it is NOT ported and is listed in the skipped-sites record
 
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: Plugin dev layout
-Plugins developed in `plugins_dev/<lang>/<site>/`; testing symlinks/copies the plugin into `data/plugins/`; host ini carries no plugin sections (per `decisions/plugin-dev-layout`). Applies to `lua/` as well as `js/` and `wasm/`.
+Plugins SHALL be developed in `plugins_dev/<lang>/<site>/`; testing SHALL symlink or copy the plugin into `data/plugins/`; the host ini SHALL carry no plugin sections (per `decisions/plugin-dev-layout`). This applies to `lua/` as well as `js/` and `wasm/`.
+
+#### Scenario: Dev plugin reaches the running daemon
+- **WHEN** a plugin lives at `plugins_dev/<lang>/<site>/` and is linked into `data/plugins/<id>`
+- **THEN** `POST /plugins/reload` picks it up and `/plugin/<id>/<action>` serves it, with no ini entry added

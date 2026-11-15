@@ -13,7 +13,11 @@ The host SHALL load WASM plugins via wasm3 under `src/plugin/wasm/`, exposing ho
 - **WHEN** a plugin folder `plugins_dev/wasm/<site>/` contains `main.json` and compiled `main.wasm`
 - **THEN** the wasm3 loader instantiates the module and routes JSON-text-in/out ABI calls to plugin exports
 
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: Plugin ABI contract
-The JSON-text-in/out ABI is runtime-agnostic; WASM plugins implement the same exports as Lua/JS plugins, adapted to the wasm3 calling convention.
+The JSON-text-in/out ABI SHALL be runtime-agnostic; WASM plugins SHALL implement the same exports as Lua/JS plugins, adapted to the wasm3 calling convention.
+
+#### Scenario: WASM plugin answers the same envelope
+- **WHEN** the host dispatches `chapters` to a WASM plugin
+- **THEN** the guest reads `{api, method, params}` from host memory and replies with `{ok, data}` exactly as the Lua and JS runtimes do
