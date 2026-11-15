@@ -175,8 +175,8 @@ public:
                        const std::string& payload, std::int64_t fetched_at, std::int64_t ttl_s);
 
     /** \brief Envelope-derived stat update (status, total_ch, status_flags, updated_at). Empty
-     * status leaves the stored status (and its category bits) alone; only changed fields bump
-     * updated_at. */
+     * status leaves the stored status (and its category bits) alone; a negative total_ch keeps
+     * the stored count (envelope absent). Only changed fields bump updated_at. */
     void saved_stats_update(const std::string& plugin, const std::string& slug, const std::string& status,
                             int total_ch);
     /** \brief Library-dedup 2.2: FTS5 candidate + Dice similarity clustering; writes dup_group for ALL saved rows in

@@ -661,16 +661,17 @@ void Store::saved_stats_update(const std::string& plugin, const std::string& slu
         return;
     }
     auto& e = rows[0];
-    const bool changed = (!status.empty() && e.status != status) || e.total_ch != total_ch;
+    const int new_total = total_ch < 0 ? e.total_ch : total_ch; // <0 = unknown, keep stored
+    const bool changed = (!status.empty() && e.status != status) || e.total_ch != new_total;
     if (!status.empty()) {
         e.status = status;
     }
     const auto now = static_cast<std::int64_t>(std::time(nullptr));
     // is_new = "previously set OR grew in this call" (design D4): a flat
     // refresh neither raises nor clears the badge.
-    const bool grown = total_ch > e.total_ch;
+    const bool grown = new_total > e.total_ch;
     const int news = (e.status_flags & static_cast<int>(std::to_underlying(StatusFlag::kNew))) | (grown ? 1 : 0);
-    e.total_ch = total_ch;             // compose against the NEW total (done = read_ch >= total_ch)
+    e.total_ch = new_total;            // compose against the NEW total (done = read_ch >= total_ch)
     e.status_flags = compose_flags(e, status, news != 0);
     if (changed) {
         e.updated_at = now;

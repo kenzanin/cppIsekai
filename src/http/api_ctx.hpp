@@ -185,8 +185,7 @@ inline void apply_read_rollup(Store& store, BS::thread_pool<>& db, const std::st
             if (const auto* d = std::get_if<double>(&p->second.data)) {
                 pages = static_cast<int>(*d);
             }
-        }
-        const auto stored = http::on_pool(
+        }        const auto stored = http::on_pool(
             db, [&] { return store.state_get(http::api::kStateHost, std::string(http::api::kReadPrefix) + *id_s); });
         if (!stored || stored->empty()) {
             continue;
@@ -196,6 +195,14 @@ inline void apply_read_rollup(Store& store, BS::thread_pool<>& db, const std::st
             ++completed;
         }
     }
+    // The chapters envelope is in hand, so total_ch is refreshed here too:
+    // row-served opens never run the full sync, and a total learned only on
+    // the live path leaves done = read_ch >= total_ch stuck at total 0.
+    const std::size_t total = chs->size();
+    http::on_pool(db, [&] {
+        store.saved_stats_update(plugin, slug, "", static_cast<int>(total));
+        return 0;
+    });
     http::on_pool(db, [&] {
         store.saved_read_rollup(plugin, slug, completed, 0);
         return 0;
@@ -223,7 +230,7 @@ inline void sync_saved_stats(Store& store, BS::thread_pool<>& db, const std::str
         }
         const std::string alts = detail::envelope_raw_json(*d, "alt_titles");
         http::on_pool(db, [&] {
-            store.saved_stats_update(plugin, slug, status, total);
+            store.saved_stats_update(plugin, slug, status, chs ? total : -1);
             return 0;
         });
         http::on_pool(db, [&] {

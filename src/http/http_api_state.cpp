@@ -1,5 +1,7 @@
 #include "api_ctx.hpp"
 
+#include "plugin/url_codec.hpp"
+
 #include <filesystem>
 #include <map>
 #include <optional>
@@ -73,6 +75,7 @@ void register_state(Ctx& c) {
     // response already reflects the reroute.
     CROW_ROUTE(app, "/chapter/<string>/skip")
         .methods(crow::HTTPMethod::POST)([&](const crow::request& req, std::string id) -> crow::response {
+            id = plugin::url_decode(id); // crow leaves %3A etc. encoded in path params
             bool skipped = false;
             if (const auto body = crow::json::load(req.body); body && body.has("skipped")) {
                 const auto t = body["skipped"].t();
@@ -124,6 +127,7 @@ void register_state(Ctx& c) {
     // chapter under host/read/<uuid>; page 0 clears the marker.
     CROW_ROUTE(app, "/chapter/<string>/read")
         .methods(crow::HTTPMethod::POST)([&](const crow::request& req, std::string id) -> crow::response {
+            id = plugin::url_decode(id); // keep state keys identical to the reader/body paths
             const auto body = crow::json::load(req.body);
             const int page = static_cast<int>(std::max(0L, num_field(body, "page", 0)));
             on_pool(db, [&] {
