@@ -122,6 +122,16 @@ TEST_CASE("enrich: apply_chosen merges and leaves envelope intact when no row") 
     CHECK(has(merged, R"("enrichment")"));
 }
 
+TEST_CASE("enrich: apply_chosen derives detail name from the scraper title") {
+    TempRoot root;
+    Store store = store_at(root.path);
+    BS::thread_pool<> db(1);
+    // scraper envelopes carry `title` only; the detail h1 reads `name`
+    const std::string envelope = R"({"ok":true,"data":{"title":"Scraper Title","description":"d"}})";
+    const auto out = apply_chosen(store, db, "enrichtest", "not-in-library", envelope);
+    CHECK(has(out, R"("name":"Scraper Title")"));
+}
+
 TEST_CASE("enrich: enrichment writes never touch saved_manga / api_cache") {
     TempRoot root;
     Store store = store_at(root.path);
