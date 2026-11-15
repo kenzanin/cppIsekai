@@ -643,6 +643,11 @@ void Store::save_manga(const SavedManga& m) {
         e.alt_titles = rows[0].alt_titles;
         e.dup_group = rows[0].dup_group;
         e.status_flags = rows[0].status_flags;
+        // manga-detail-table: materialized display detail survives a re-save
+        e.authors = rows[0].authors;
+        e.artists = rows[0].artists;
+        e.tags = rows[0].tags;
+        e.synopsis_display = rows[0].synopsis_display;
     }
     impl_->storage.replace(e);
     fts_sync(*impl_, e.plugin, e.slug, e.name, e.alt_titles, e.synopsis); // library-dedup 1.4
@@ -734,6 +739,56 @@ void Store::saved_clear_update(const std::string& plugin, const std::string& slu
     impl_->storage.replace(e);
 }
 
+bool Store::saved_detail_put(const std::string& plugin, const std::string& slug, const std::string& name,
+                             const std::string& authors_json, const std::string& artists_json,
+                             const std::string& tags_json, const std::string& synopsis_display) {
+    auto rows = impl_->storage.get_all<store_detail::SavedMangaEntity>(where(
+        c(&store_detail::SavedMangaEntity::plugin) == plugin && c(&store_detail::SavedMangaEntity::slug) == slug));
+    if (rows.empty()) {
+        return false;
+    }
+    auto& e = rows[0];
+    // name guard mirrors D9: never land a placeholder over a real name
+    std::string new_name = e.name;
+    if (!name.empty() && name != slug) {
+        new_name = name;
+    }
+    const bool name_changed = new_name != e.name;
+    const bool changed = name_changed || e.authors != authors_json || e.artists != artists_json ||
+                         e.tags != tags_json || e.synopsis_display != synopsis_display;
+    if (!changed) {
+        return false; // plain page open stays read-only (design D2)
+    }
+    e.name = new_name;
+    e.authors = authors_json;
+    e.artists = artists_json;
+    e.tags = tags_json;
+    e.synopsis_display = synopsis_display;
+    impl_->storage.replace(e);
+    if (name_changed) {
+        // name is an FTS-indexed column (library-dedup 1.4); signals above are untouched (D4)
+        fts_sync(*impl_, e.plugin, e.slug, e.name, e.alt_titles, e.synopsis);
+    }
+    return true;
+}
+
+void Store::saved_detail_clear(const std::string& plugin, const std::string& slug) {
+    auto rows = impl_->storage.get_all<store_detail::SavedMangaEntity>(where(
+        c(&store_detail::SavedMangaEntity::plugin) == plugin && c(&store_detail::SavedMangaEntity::slug) == slug));
+    if (rows.empty()) {
+        return;
+    }
+    auto& e = rows[0];
+    if (e.authors.empty() && e.artists.empty() && e.tags.empty() && e.synopsis_display.empty()) {
+        return;
+    }
+    e.authors.clear();
+    e.artists.clear();
+    e.tags.clear();
+    e.synopsis_display.clear();
+    impl_->storage.replace(e);
+}
+
 void Store::saved_dim_update(const std::string& plugin, const std::string& slug, bool on) {
     auto rows = impl_->storage.get_all<store_detail::SavedMangaEntity>(where(
         c(&store_detail::SavedMangaEntity::plugin) == plugin && c(&store_detail::SavedMangaEntity::slug) == slug));
@@ -788,6 +843,10 @@ std::vector<SavedManga> Store::saved_list() {
             .alt_titles = r.alt_titles,
             .dup_group = r.dup_group,
             .status_flags = r.status_flags,
+            .authors = r.authors,
+            .artists = r.artists,
+            .tags = r.tags,
+            .synopsis_display = r.synopsis_display,
         });
     }
     return out;

@@ -16,7 +16,9 @@
 
 namespace fs = std::filesystem;
 using http::api::apply_chosen;
+using http::api::materialize_detail;
 using http::api::normalize_chosen;
+using http::api::saved_detail_response;
 using http::api::stored_source;
 using http::api::valid_title_pair;
 
@@ -198,4 +200,85 @@ TEST_CASE("enrich: normalize_chosen related_add validation") {
 
     const auto not_array = crow::json::load(R"({"related_add":"u"})");
     CHECK_FALSE(normalize_chosen(not_array).has_value());
+}
+
+TEST_CASE("enrich: materialize_detail write-through and read-first serve (manga-detail-table D2/D3/D6/D7/D8)") {
+    TempRoot root;
+    Store store = store_at(root.path);
+    BS::thread_pool<> db(1);
+    const std::string plugin = "enrichtest";
+    const std::string slug = "mat-1";
+    seed_saved(store, plugin, slug);
+
+    SUBCASE("materialize persists resolved fields; source columns untouched") {
+        const std::string resolved =
+            R"({"ok":true,"data":{"name":"Resolved Name","description":"The description","synopsis":"ignored",
+                "authors":["A1","A2"],"artists":["Art"],"tags":["T1","T2"],"title":"unused"}})";
+        materialize_detail(store, db, plugin, slug, resolved);
+        const auto row = store.saved_get(plugin, slug);
+        REQUIRE(row.has_value());
+        CHECK(row->name == "Resolved Name");
+        CHECK(row->synopsis_display == "The description"); // description wins over synopsis
+        CHECK(row->authors == R"(["A1","A2"])");
+        CHECK(row->artists == R"(["Art"])");
+        CHECK(row->tags == R"(["T1","T2"])");
+        CHECK(row->synopsis.empty()); // D4: sync alone writes the source column
+    }
+
+    SUBCASE("malformed envelope is a quiet no-op") {
+        materialize_detail(store, db, plugin, slug, "not json at all");
+        materialize_detail(store, db, plugin, slug, R"({"ok":true})"); // no data object
+        const auto row = store.saved_get(plugin, slug);
+        REQUIRE(row.has_value());
+        CHECK(row->synopsis_display.empty());
+    }
+
+    SUBCASE("row serve: cached flag, no enrichment without title_meta, D4 fallback") {
+        const std::string resolved = R"({"ok":true,"data":{"name":"R","tags":["x"]}})";
+        store.saved_signal_update(plugin, slug, "src synopsis", R"(["Alt"])");
+        materialize_detail(store, db, plugin, slug, resolved);
+        const std::string body = saved_detail_response(store, db, plugin, slug);
+        CHECK(has(body, R"("cached":true)")); // D8
+        CHECK(has(body, R"("name":"R")"));
+        CHECK(has(body, R"("tags":["x"])"));
+        CHECK(has(body, R"("description":"src synopsis")")); // D4: display falls back to source
+        CHECK(has(body, R"("alt_titles":["Alt"])"));
+        CHECK(has(body, R"("status":"ongoing")")); // stats echo (schema default)
+        CHECK_FALSE(has(body, "enrichment")); // nothing fetched yet
+
+        // D7: title_meta overlay rides along
+        store.title_meta_put_fetched(plugin, slug, R"([{"source":"m","fetched_at":7,"data":{}}])", 7);
+        store.title_meta_put_chosen(plugin, slug, R"({"cover":"https://c/z.webp"})");
+        const std::string overlaid = saved_detail_response(store, db, plugin, slug);
+        CHECK(has(overlaid, R"("chosen_cover":"https://c/z.webp")"));
+        CHECK(has(overlaid, R"("fetched_at":7)"));
+        CHECK(has(overlaid, R"("chosen")"));
+    }
+
+    SUBCASE("D6: reset detail drops the row serve; cover-only reset keeps it") {
+        materialize_detail(store, db, plugin, slug, R"({"ok":true,"data":{"name":"R","tags":["x"]}})");
+        store.title_meta_put_chosen(plugin, slug, R"({"cover":"https://c/z.webp"})");
+        store.title_meta_reset_cover(plugin, slug);
+        CHECK_FALSE(saved_detail_response(store, db, plugin, slug).empty()); // detail survives
+        store.saved_detail_clear(plugin, slug);
+        CHECK(saved_detail_response(store, db, plugin, slug).empty()); // nothing materialized left
+    }
+
+    SUBCASE("absent row and empty-detail rows do not serve") {
+        CHECK(saved_detail_response(store, db, "nope", "x").empty());
+        saved_detail_response(store, db, plugin, slug); // unsaved-but-present: quiet
+        CHECK(saved_detail_response(store, db, plugin, slug).empty()); // nothing materialized yet
+    }
+
+    SUBCASE("apply_chosen stays read-only over saved rows (D2 purity, pairs with 5.2 guard)") {
+        store.title_meta_put_fetched(plugin, slug, R"([{"source":"m","fetched_at":3,"data":{"title":"T"}}])", 3);
+        store.title_meta_put_chosen(plugin, slug, R"({"synopsis":"chosen text"})");
+        const std::string env = R"({"ok":true,"data":{"name":"N","description":"d"}})";
+        const std::string out = apply_chosen(store, db, plugin, slug, env);
+        const auto row = store.saved_get(plugin, slug);
+        REQUIRE(row.has_value());
+        CHECK(row->synopsis_display.empty()); // no write happened inside apply_chosen
+        materialize_detail(store, db, plugin, slug, out);
+        CHECK(store.saved_get(plugin, slug)->synopsis_display == "chosen text"); // chosen rides the display
+    }
 }

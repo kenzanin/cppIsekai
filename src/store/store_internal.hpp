@@ -59,6 +59,12 @@ struct SavedMangaEntity {
     int dup_group{};             // 0 = unique; elsewhere groups same work (recomputed, never trusted across boots)
     int status_flags{};          // bit0=1 is_new, bit1=2 is_done, bit2=4 ongoing, bit3=8 hiatus,
                                  // bit4=16 canceled, bit5=32 completed, bit6=64 is_dim
+    // manga-detail-table: materialized DISPLAY detail (resolved envelope; the
+    // source synopsis/alt_titles above keep feeding dedup clustering)
+    std::string authors;         // JSON array verbatim
+    std::string artists;         // JSON array verbatim
+    std::string tags;            // merged list the page renders (hidden filtered), JSON array verbatim
+    std::string synopsis_display; // resolved display synopsis; '' = fall back to source synopsis
 };
 
 struct TitleMetaEntity {
@@ -124,7 +130,11 @@ inline auto create_storage(const std::string& path) {
                    make_column("synopsis", &SavedMangaEntity::synopsis, default_value("")),
                    make_column("alt_titles", &SavedMangaEntity::alt_titles, default_value("")),
                    make_column("dup_group", &SavedMangaEntity::dup_group, default_value(0)),
-                  make_column("status_flags", &SavedMangaEntity::status_flags, default_value(0)),
+                   make_column("status_flags", &SavedMangaEntity::status_flags, default_value(0)),
+                   make_column("authors", &SavedMangaEntity::authors, default_value("")),
+                   make_column("artists", &SavedMangaEntity::artists, default_value("")),
+                   make_column("tags", &SavedMangaEntity::tags, default_value("")),
+                   make_column("synopsis_display", &SavedMangaEntity::synopsis_display, default_value("")),
                    primary_key(&SavedMangaEntity::plugin, &SavedMangaEntity::slug)),
         make_table("title_meta", make_column("plugin", &TitleMetaEntity::plugin),
                    make_column("slug", &TitleMetaEntity::slug), make_column("fetched", &TitleMetaEntity::fetched),
