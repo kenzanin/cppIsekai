@@ -10,7 +10,7 @@ xmake test
 ./run-cppIsekai.sh
 ```
 
-System prerequisites (Arch): `sudo pacman -S libvips curl crow asio`.
+System prerequisites (Arch): `sudo pacman -S libvips curl`. Everything else comes from xrepo (see below) — no pacman crow/cli11/lua needed.
 Server base URL: `http://localhost:8090`. Port precedence: `--port` > `$PORT` > `[server] port` in `data/cppisekai.ini` > 8090.
 
 ## Status (Nov 2026)
@@ -132,14 +132,15 @@ erDiagram
 | Lib | Role |
 |---|---|
 | libvips | image processing, WebP/AVIF transcode |
-| crow + asio | HTTP server framework |
 | curl-impersonate (chrome) | plugin fetch fingerprint; system OpenSSL dlopen path for ff*/firefox fallback hosts |
-| CLI11 | flag parsing |
 
 ## Via xrepo (`add_requires` in `xmake.lua`, pinned in `xmake-requires.lock`)
 
 | Pkg | Pin | Role |
 |---|---|---|
+| crow | 1.3.5 | HTTP server framework (ssl=false, header-only) |
+| asio | 1.36.0 | crow transitive dep, pinned |
+| cli11 | 2.7.2 | flag parsing (header-only) |
 | glaze | 9.1.0 | JSON (store/http serialization) — 7.9.0 does not compile; pinned with `xrepo update-repo` so the `v`-prefixed tag resolves |
 | sol2 | 3.5.0 | Lua binding (plugin runtime) |
 | lua | 5.4.8 | Lua 5.4 runtime (pinned; xrepo default is 5.5) |
@@ -169,3 +170,7 @@ erDiagram
 ## About page
 
 The `/about` page fetches `README.md` from the repo root (`/about/readme`, per-request, never cached) and renders it with vendored `marked` + `mermaid` (`static/*.min.js.br`). Edits to this file show up on both GitHub and the app after a refresh — no rebuild needed (only a restart if the daemon was the one editing it).
+
+## License
+
+MIT — © 2026 kenzanin <kenzanin@gmail.com>. See [LICENSE](LICENSE).
