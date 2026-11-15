@@ -157,6 +157,49 @@ inline std::string inject_status_flags(const std::string& envelope, int flags) {
 }
 } // namespace detail
 
+// Read a chapters envelope, count entries flagged read in the store, and
+// write the rollup onto the saved-manga row. No-op when the envelope is
+// missing (a cached-only open must not zero an existing read count).
+inline void apply_read_rollup(Store& store, BS::thread_pool<>& db, const std::string& plugin, const std::string& slug, const std::string& chapters_env) {
+    const auto chs = envelope_data(chapters_env);
+    if (!chs) {
+        return;
+    }
+    int completed = 0;
+    for (const auto& item : *chs) {
+        if (!item.is_object()) {
+            continue;
+        }
+        const auto& entry = item.get_object();
+        const auto* const id_it = entry.find("id");
+        if (id_it == entry.end()) {
+            continue;
+        }
+        const auto* id_s = std::get_if<std::string>(&id_it->second.data);
+        if (id_s == nullptr) {
+            continue;
+        }
+        int pages = 0;
+        if (const auto* const p = entry.find("pages"); p != entry.end()) {
+            if (const auto* d = std::get_if<double>(&p->second.data)) {
+                pages = static_cast<int>(*d);
+            }
+        }
+        const auto stored = http::on_pool(
+            db, [&] { return store.state_get(http::api::kStateHost, std::string(http::api::kReadPrefix) + *id_s); });
+        if (!stored || stored->empty()) {
+            continue;
+        }
+        const int read = std::atoi(stored->c_str());
+        if (pages > 0 ? read >= pages : read > 0) {
+            ++completed;
+        }
+    }
+    http::on_pool(db, [&] {
+        store.saved_read_rollup(plugin, slug, completed, 0);
+        return 0;
+    });
+}
 /** \brief Derive status + chapter totals/read counts from the plugin's own
  *  detail+chapters envelopes and persist them on the saved-manga row.
  *  Reader position POST / continue-read call `saved_clear_update` directly. */
@@ -200,44 +243,7 @@ inline void sync_saved_stats(Store& store, BS::thread_pool<>& db, const std::str
             return 0;
         });
     }
-    // chapters envelope -> total_ch + read_ch rollup
-    if (!chs) {
-        return;
-    }
-    int completed = 0;
-    for (const auto& item : *chs) {
-        if (!item.is_object()) {
-            continue;
-        }
-        const auto& entry = item.get_object();
-        const auto* const id_it = entry.find("id");
-        if (id_it == entry.end()) {
-            continue;
-        }
-        const auto* id_s = std::get_if<std::string>(&id_it->second.data);
-        if (id_s == nullptr) {
-            continue;
-        }
-        int pages = 0;
-        if (const auto* const p = entry.find("pages"); p != entry.end()) {
-            if (const auto* d = std::get_if<double>(&p->second.data)) {
-                pages = static_cast<int>(*d);
-            }
-        }
-        const auto stored = http::on_pool(
-            db, [&] { return store.state_get(http::api::kStateHost, std::string(http::api::kReadPrefix) + *id_s); });
-        if (!stored || stored->empty()) {
-            continue;
-        }
-        const int read = std::atoi(stored->c_str());
-        if (pages > 0 ? read >= pages : read > 0) {
-            ++completed;
-        }
-    }
-    http::on_pool(db, [&] {
-        store.saved_read_rollup(plugin, slug, completed, 0);
-        return 0;
-    });
+    apply_read_rollup(store, db, plugin, slug, chapters_env);
 }
 
 /** \brief Shared refresh body for the detail-page button and the auto-update

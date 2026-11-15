@@ -86,6 +86,10 @@ local function best_record(query)
       end
     end
   end
+  if bestScore == nil and #body.data > 0 then
+    host.log.debug("no scored candidate for query; falling back to relevance #1")
+    return body.data[1]
+  end
   return best
 end
 

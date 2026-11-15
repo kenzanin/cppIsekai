@@ -35,6 +35,14 @@ crow::response title_data_response(plugin::Host& plugins, BS::thread_pool<>& db,
         body = apply_chosen(store, db, plugin, slug, body);
     }
     if (method == "detail") {
+        // library-grid-stats: the read rollup is pure-DB compute -- run it on
+        // both paths so a cached (row-served) open keeps read_ch/Done fresh.
+        const std::string chs_body = on_pool(db, [&] {
+            if (auto row = store.api_cache_get(plugin, stale_key(plugin, "chapters", params))) {
+                return row->payload;
+            }
+            return std::string{};
+        });
         if (!row_served) {
             materialize_detail(store, db, plugin, slug, body); // write-through (D2, post-merge)
             // library-grid-stats 2.2: saved-manga stat sync on detail open.
@@ -42,13 +50,9 @@ crow::response title_data_response(plugin::Host& plugins, BS::thread_pool<>& db,
             // network); failures leave the last-known stats untouched. A row-
             // served answer learned nothing new -- the sync would only feed the
             // display synopsis back into the source column (D4), so it skips.
-            const std::string chs_body = on_pool(db, [&] {
-                if (auto row = store.api_cache_get(plugin, stale_key(plugin, "chapters", params))) {
-                    return row->payload;
-                }
-                return std::string{};
-            });
             sync_saved_stats(store, db, plugin, slug, body, chs_body);
+        } else {
+            apply_read_rollup(store, db, plugin, slug, chs_body); // row-serve: stats only
         }
         // library-grid-stats: detail open is the writer of status_flags (via the
         // rollup above); echo the stored bitfield back so the page badges read
