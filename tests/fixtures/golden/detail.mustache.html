@@ -141,8 +141,8 @@
         <button @click="openEnrich('covers', false)" :disabled="enrichBusy" class="px-3 py-1.5 text-xs border border-zinc-700 rounded-md text-zinc-300 hover:bg-zinc-800 disabled:opacity-40">Fetch covers</button>
         <button @click="openEnrich('covers', true)" :disabled="enrichBusy" class="px-3 py-1.5 text-xs border border-zinc-800 rounded-md text-zinc-500 hover:bg-zinc-800 disabled:opacity-40" title="always refetch candidate covers">⟳ force</button>
         <button @click="resetDetail()" :disabled="enrichBusy" class="px-3 py-1.5 text-xs border border-zinc-800 rounded-md text-zinc-500 hover:bg-zinc-800 disabled:opacity-40" title="clear chosen title/synopsis/artist/author/tags (keeps cover)">Reset detail</button>
-        <span class="text-[11px] text-zinc-600" x-show="enrichLastFetched" x-text="'last fetched ' + fmtEnrichDate(enrichLastFetched)"></span>
-        <span class="text-[11px] text-zinc-600" x-show="enrichBusy">fetching…</span>
+        <span class="text-[11px] text-zinc-400" x-show="enrichLastFetched" x-text="'last fetched ' + fmtEnrichDate(enrichLastFetched)"></span>
+        <span class="text-[11px] text-zinc-400" x-show="enrichBusy">fetching…</span>
       </div>
       <!-- picker panel: candidates grouped per source, user picks; nothing auto-applied -->
       <div :class="enrichKind === 'covers' ? 'fixed inset-0 z-50 bg-black/80 backdrop-blur-sm overflow-y-auto p-6' : 'mt-3 border border-zinc-800 rounded-lg p-3 text-sm'" x-show="enrichOpen" x-cloak @keydown.escape.window="enrichOpen = false">
@@ -154,14 +154,14 @@
           <span class="flex-1"></span>
           <span class="text-xs text-red-400" x-show="enrichErr" x-text="enrichErr"></span>
         </div>
-        <p class="text-xs text-zinc-600 mb-2">Pick per field; nothing is applied until you choose it. Tags can be toggled; the detail page hides any tag in “hidden tags”.</p>
+        <p class="text-xs text-zinc-300 mb-2">Pick per field; nothing is applied until you choose it. Tags can be toggled; the detail page hides any tag in “hidden tags”.</p>
 <!-- combined detail candidates from BOTH enrichment sources; normalized dedupe, MangaDex wins; one block, md/mu badges -->
         <div class="space-y-1" x-show="enrichKind !== 'covers' && (candFor('mangadex-enrichment', 'detail') || candFor('mangaupdates-enrichment', 'detail'))">
           <div class="mb-2" x-show="altTitleCandidates().length">
-            <span class="text-[10px] text-zinc-600 mr-1">alt titles</span>
+            <span class="text-[10px] text-zinc-400 uppercase tracking-wide mr-1">alt titles</span>
             <div class="flex items-center gap-1 flex-wrap mt-1">
               <template x-for="t in altTitleCandidates()" :key="t.lang + '|' + t.title">
-                <button @click="pickField('title', t.title)" class="text-xs px-2 py-0.5 rounded-full border" :class="chosenNow().title === t.title ? 'border-emerald-600 text-emerald-300' : 'border-zinc-700 text-zinc-500 hover:text-zinc-300'" :title="((t.lang ? t.lang + ' — ' : '') + (t.main ? 'main' : 'alt'))"><span class="text-[9px] text-zinc-700 mr-1" x-text="t.lang || ''"></span><span x-text="t.title"></span><span class="text-[8px] text-zinc-700 ml-1 align-middle" x-text="t.source === 'mangadex-enrichment' ? 'MD' : 'MU'"></span></button>
+                <button @click="pickField('title', t.title)" class="text-xs px-2 py-0.5 rounded-full border" :class="chosenNow().title === t.title ? 'border-emerald-600 text-emerald-300' : 'border-zinc-700 text-zinc-500 hover:text-zinc-300'" :title="((t.lang ? t.lang + ' — ' : '') + (t.main ? 'main' : 'alt'))"><span class="text-[9px] text-zinc-400 mr-1" x-text="t.lang || ''"></span><span x-text="t.title"></span><span class="text-[8px] text-zinc-400 ml-1 align-middle" x-text="t.source === 'mangadex-enrichment' ? 'MD' : 'MU'"></span></button>
               </template>
             </div>
           </div>
@@ -172,33 +172,33 @@
             </p>
           </template>
           <p x-show="mergedList('authors').length" class="flex items-center gap-1 flex-wrap">
-            <span class="text-[10px] text-zinc-600 mr-1">authors</span>
+            <span class="text-[10px] text-zinc-400 uppercase tracking-wide mr-1">authors</span>
             <template x-for="a in mergedList('authors')" :key="a.name">
-              <button @click="toggleName('author', a.name)" class="text-xs px-2 py-0.5 rounded-full border" :class="(chosenNow().author || []).includes(a.name) ? 'border-emerald-600 text-emerald-300' : 'border-zinc-700 text-zinc-500 hover:text-zinc-300'"><span x-text="a.name"></span><span class="text-[8px] text-zinc-700 ml-1 align-middle" x-text="a.source === 'mangadex-enrichment' ? 'MD' : 'MU'"></span></button>
+              <button @click="toggleName('author', a.name)" class="text-xs px-2 py-0.5 rounded-full border" :class="(chosenNow().author || []).includes(a.name) ? 'border-emerald-600 text-emerald-300' : 'border-zinc-700 text-zinc-500 hover:text-zinc-300'"><span x-text="a.name"></span><span class="text-[8px] text-zinc-400 ml-1 align-middle" x-text="a.source === 'mangadex-enrichment' ? 'MD' : 'MU'"></span></button>
             </template>
           </p>
           <p x-show="mergedList('artists').length" class="flex items-center gap-1 flex-wrap">
-            <span class="text-[10px] text-zinc-600 mr-1">artists</span>
+            <span class="text-[10px] text-zinc-400 uppercase tracking-wide mr-1">artists</span>
             <template x-for="a in mergedList('artists')" :key="a.name">
-              <button @click="toggleName('artist', a.name)" class="text-xs px-2 py-0.5 rounded-full border" :class="(chosenNow().artist || []).includes(a.name) ? 'border-emerald-600 text-emerald-300' : 'border-zinc-700 text-zinc-500 hover:text-zinc-300'"><span x-text="a.name"></span><span class="text-[8px] text-zinc-700 ml-1 align-middle" x-text="a.source === 'mangadex-enrichment' ? 'MD' : 'MU'"></span></button>
+              <button @click="toggleName('artist', a.name)" class="text-xs px-2 py-0.5 rounded-full border" :class="(chosenNow().artist || []).includes(a.name) ? 'border-emerald-600 text-emerald-300' : 'border-zinc-700 text-zinc-500 hover:text-zinc-300'"><span x-text="a.name"></span><span class="text-[8px] text-zinc-400 ml-1 align-middle" x-text="a.source === 'mangadex-enrichment' ? 'MD' : 'MU'"></span></button>
             </template>
           </p>
           <div x-show="mergedRelated().length" class="mb-2">
             <p class="flex items-center gap-1 flex-wrap">
-              <span class="text-[10px] text-zinc-600 mr-1">Related reading:</span>
+              <span class="text-[10px] text-zinc-400 uppercase tracking-wide mr-1">Related reading:</span>
               <button @click="addAllRelated()" class="text-xs px-2 py-0.5 rounded border border-zinc-700 text-zinc-400 hover:text-emerald-300 hover:border-emerald-700">Add all</button>
               <button @click="removeAllRelated()" class="text-xs px-2 py-0.5 rounded border border-zinc-700 text-zinc-400 hover:text-zinc-200">Remove all</button>
             </p>
             <div class="flex items-center gap-1 flex-wrap mt-1">
               <template x-for="r in mergedRelated()" :key="r.url">
-                <a :href="r.url" target="_blank" rel="noopener" class="text-xs px-2 py-0.5 rounded-full border border-zinc-700 text-zinc-400 hover:text-emerald-300"><span x-text="r.name"></span><span class="text-[8px] text-zinc-700 ml-1 align-middle" x-text="r.source === 'mangadex-enrichment' ? 'MD' : 'MU'"></span></a>
+                <a :href="r.url" target="_blank" rel="noopener" class="text-xs px-2 py-0.5 rounded-full border border-zinc-700 text-zinc-400 hover:text-emerald-300"><span x-text="r.name"></span><span class="text-[8px] text-zinc-400 ml-1 align-middle" x-text="r.source === 'mangadex-enrichment' ? 'MD' : 'MU'"></span></a>
               </template>
             </div>
           </div>
           <p x-show="mergedList('tags').length" class="flex items-center gap-1 flex-wrap">
-            <span class="text-[10px] text-zinc-600 mr-1">tags</span>
+            <span class="text-[10px] text-zinc-400 uppercase tracking-wide mr-1">tags</span>
             <template x-for="t in mergedList('tags')" :key="t.name">
-              <button @click="toggleTag(t.name)" class="text-xs px-2 py-0.5 rounded-full border" :class="(chosenNow().tags_add || []).includes(t.name) ? 'border-emerald-600 text-emerald-300' : 'border-zinc-700 text-zinc-500 hover:text-zinc-300'"><span x-text="t.name"></span><span class="text-[8px] text-zinc-700 ml-1 align-middle" x-text="t.source === 'mangadex-enrichment' ? 'MD' : 'MU'"></span></button>
+              <button @click="toggleTag(t.name)" class="text-xs px-2 py-0.5 rounded-full border" :class="(chosenNow().tags_add || []).includes(t.name) ? 'border-emerald-600 text-emerald-300' : 'border-zinc-700 text-zinc-500 hover:text-zinc-300'"><span x-text="t.name"></span><span class="text-[8px] text-zinc-400 ml-1 align-middle" x-text="t.source === 'mangadex-enrichment' ? 'MD' : 'MU'"></span></button>
             </template>
           </p>
         </div>
@@ -210,8 +210,8 @@
           <div class="mb-3" x-show="enrichKind === 'covers' && candFor(src.id, 'covers') && candFor(src.id, 'covers').ok">
             <div class="flex items-center gap-2 mb-1">
               <span class="text-xs uppercase tracking-wide text-zinc-500" x-text="src.name || src.id"></span>
-              <span class="text-[10px] text-zinc-700" x-show="busySources[src.id]">fetching…</span>
-              <span class="text-[10px] text-zinc-700" x-show="!busySources[src.id] && candFor(src.id, enrichKind) && candFor(src.id, enrichKind).cached">(cached)</span>
+              <span class="text-[10px] text-zinc-400" x-show="busySources[src.id]">fetching…</span>
+              <span class="text-[10px] text-zinc-400" x-show="!busySources[src.id] && candFor(src.id, enrichKind) && candFor(src.id, enrichKind).cached">(cached)</span>
             </div>
             <div class="flex flex-wrap gap-2">
               <template x-for="u in (candFor(src.id, 'covers').data && candFor(src.id, 'covers').data.covers) || []" :key="u">
@@ -222,7 +222,7 @@
             </div>
           </div>
         </template>
-        <p class="text-xs text-zinc-600" x-show="!enrichSources.length">No enrichment sources loaded. Dev copies: symlink <code>~/tmp/goIsekai</code>… → see README “Enrichment plugins”.</p>
+        <p class="text-xs text-zinc-400" x-show="!enrichSources.length">No enrichment sources loaded. Dev copies: symlink <code>~/tmp/goIsekai</code>… → see README “Enrichment plugins”.</p>
         </div>
       </div>
     </div>
@@ -235,13 +235,13 @@
     <!-- top chapters pager (right-aligned on the Chapters line) -->
     <span class="flex flex-nowrap items-center gap-1.5 text-base font-medium text-zinc-300 whitespace-nowrap" x-show="pageCount > 1" x-cloak>
       <button class="px-2.5 py-0.5 border border-zinc-700 rounded hover:bg-zinc-800 disabled:opacity-30" :disabled="chPage <= 0"
-              @click="chPage--">‹</button>
+              aria-label="Previous chapters" @click="chPage--">‹</button>
       <template x-for="n in chWindow()" :key="'ct'+n">
         <button class="px-2.5 py-0.5 rounded" :class="n === 0 ? 'cursor-default text-zinc-500' : (n === chPage + 1 ? 'border border-zinc-500 bg-zinc-700 text-zinc-100' : 'border border-zinc-700 hover:bg-zinc-800')"
                 :disabled="n === 0" @click="n !== 0 && (chPage = n - 1)" x-text="n === 0 ? '…' : n"></button>
       </template>
       <button class="px-2.5 py-0.5 border border-zinc-700 rounded hover:bg-zinc-800 disabled:opacity-30" :disabled="chPage >= pageCount-1"
-              @click="chPage++">›</button><button x-show="hiddenCount() > 0" @click="showHidden = !showHidden" class="px-1.5 border border-zinc-700 rounded text-xs" :class="showHidden ? 'text-emerald-400 border-emerald-700' : ''" x-cloak x-text="(showHidden ? 'hide' : 'show') + ' ' + hiddenCount()" title="toggle hidden chapters"></button>
+              aria-label="Next chapters" @click="chPage++">›</button><button x-show="hiddenCount() > 0" @click="showHidden = !showHidden" class="px-1.5 border border-zinc-700 rounded text-xs" :class="showHidden ? 'text-emerald-400 border-emerald-700' : ''" x-cloak x-text="(showHidden ? 'hide' : 'show') + ' ' + hiddenCount()" title="toggle hidden chapters"></button>
     </span>
   </h2>
   <p class="text-sm text-zinc-500 mb-3" x-show="!loading && !chapters.length && !err" x-cloak>No chapters.</p>
@@ -249,8 +249,8 @@
     <template x-for="ch in chPageRows()" :key="ch.id">
       <div class="flex items-center gap-3 px-4 py-2.5 hover:bg-zinc-900/50">
         <!-- eye: hide/show chapter row (skip flag feeds reader window) -->
-        <button @click="toggleDone(ch)" class="shrink-0" :class="ch.done ? 'text-emerald-400' : 'text-zinc-600 hover:text-zinc-400'"
-                :title="ch.done ? 'unhide chapter' : 'hide chapter'">
+        <button @click="toggleDone(ch)" class="shrink-0" :class="ch.done ? 'text-emerald-400' : 'text-zinc-400 hover:text-zinc-200'"
+                :title="ch.done ? 'unhide chapter' : 'hide chapter'" :aria-label="ch.done ? 'Unhide chapter' : 'Hide chapter'">
           <svg x-show="!ch.done" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M10 3C5 3 1.7 7 1 10c.7 3 4 7 9 7s8.3-4 9-7c-.7-3-4-7-9-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-2a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/></svg>
           <svg x-show="ch.done" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 20 20"><path d="M2 10c.7-3 4-7 8-7s7.3 4 8 7c-.7 3-4 7-8 7s-7.3-4-8-7Zm8 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" stroke-linecap="round"/><path d="M3 17 17 3" stroke-linecap="round"/></svg>
         </button>
@@ -261,14 +261,14 @@
         <!-- read/total counter; total when the plugin reports it -->
         <span class="text-xs text-zinc-300 tabular-nums" x-show="readMax(ch) > 0" x-text="readMax(ch)+(ch.pages ? '/'+ch.pages : '')"></span>
         <!-- check: read state, lit when fully read -->
-        <button @click="toggleRead(ch)" class="shrink-0" :class="isRead(ch) ? 'text-emerald-400' : 'text-zinc-600 hover:text-zinc-400'"
-                :title="isRead(ch) ? 'unread' : 'mark read'">
+        <button @click="toggleRead(ch)" class="shrink-0" :class="isRead(ch) ? 'text-emerald-400' : 'text-zinc-400 hover:text-zinc-200'"
+                :title="isRead(ch) ? 'unread' : 'mark read'" :aria-label="isRead(ch) ? 'Mark chapter unread' : 'Mark chapter read'">
           <svg x-show="isRead(ch)" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M10 1 2.5 3.5v5c0 4.5 3.2 8.7 7.5 10 4.3-1.3 7.5-5.5 7.5-10v-5L10 1Zm-1 12-3-3 1.4-1.4L9 10.2l4.6-4.6L15 7l-6 6Z"/></svg>
           <svg x-show="!isRead(ch)" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 20 20"><path d="M10 2 3.5 4.2v4.3c0 4 2.9 7.8 6.5 9 3.6-1.2 6.5-5 6.5-9V4.2L10 2Z" stroke-linejoin="round"/><path d="m7 10 2.2 2.2L13.5 8" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
         <a x-show="cbzReady[ch.id]" :href="'/export/cbz?plugin='+plugin+'&slug='+encodeURIComponent(slug+'/'+chSlug(ch))"
            class="text-xs h-7 px-2 inline-flex items-center rounded border border-zinc-700 text-zinc-300 hover:bg-zinc-800" title="export cached chapter as cbz">⬇ cbz</a>
-        <span x-show="!cbzReady[ch.id]" class="text-xs h-7 px-2 inline-flex items-center rounded border border-zinc-800 text-zinc-600 cursor-not-allowed" title="chapter not fully cached yet">⬇ cbz</span>
+        <span x-show="!cbzReady[ch.id]" class="text-xs h-7 px-2 inline-flex items-center rounded border border-zinc-800 text-zinc-500 cursor-not-allowed" title="chapter not fully cached yet">⬇ cbz</span>
       </div>
     </template>
   </div>
@@ -276,13 +276,13 @@
   <div class="flex flex-nowrap justify-end mt-3 mb-2 whitespace-nowrap" x-show="pageCount > 1" x-cloak>
     <span class="flex items-center gap-1.5 text-base font-medium text-zinc-300">
       <button class="px-2.5 py-0.5 border border-zinc-700 rounded hover:bg-zinc-800 disabled:opacity-30" :disabled="chPage <= 0"
-              @click="chPage--">‹</button>
+              aria-label="Previous chapters" @click="chPage--">‹</button>
       <template x-for="n in chWindow()" :key="'cb'+n">
         <button class="px-2.5 py-0.5 rounded" :class="n === 0 ? 'cursor-default text-zinc-500' : (n === chPage + 1 ? 'border border-zinc-500 bg-zinc-700 text-zinc-100' : 'border border-zinc-700 hover:bg-zinc-800')"
                 :disabled="n === 0" @click="n !== 0 && (chPage = n - 1)" x-text="n === 0 ? '…' : n"></button>
       </template>
       <button class="px-2.5 py-0.5 border border-zinc-700 rounded hover:bg-zinc-800 disabled:opacity-30" :disabled="chPage >= pageCount-1"
-              @click="chPage++">›</button>
+              aria-label="Next chapters" @click="chPage++">›</button>
     </span>
   </div>
   <!-- related (user steer): text-only links to the source site; hidden until data arrives -->
@@ -561,13 +561,13 @@ function detailPage() {
       for (const it of (Array.isArray(saved) ? saved : [])) push(it);
       this.related = merged;
     },
-    async startOrContinue() { // [add to library] then [start / continue reading] -> reader at stored chapter
+    startOrContinue() { // [add to library] then [start / continue reading] -> reader at stored chapter
       if (!this.inLibrary) return;
+      // chapters are sorted newest-first, so the first chapter read is the LAST row
+      const first = this.chapters && this.chapters.length ? this.chapters[this.chapters.length - 1] : null;
       const target = this.hint && this.hint.url ? this.hint.url
         : `/read/${encodeURIComponent(this.plugin)}/${encodeURIComponent(this.slug)}?ch=${
-          this.chapters && this.chapters[0]
-            ? Number(this.chapters[0].number) || this.chapters[0].number
-            : '1'
+          first ? Number(first.number) || first.number : '1'
         }`;
       location.href = target;
     },

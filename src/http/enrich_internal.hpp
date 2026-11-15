@@ -422,16 +422,43 @@ inline std::string lower_copy(const std::string& s) {
 inline std::string apply_chosen(Store& store, BS::thread_pool<>& db, const std::string& plugin, const std::string& slug,
                                 const std::string& envelope) {
     const auto row = on_pool(db, [&] { return store.title_meta_get(plugin, slug); });
-    if (!row) {
-        return envelope;
-    }
+    // Display-title resolver, shared with the library grid (home_context): the detail
+    // name must equal the card name -- chosen title, else saved library name, else the
+    // scraper's own title. Also guarantees detail.name for enrichment-less plugins
+    // (detail h1 reads it; raw envelopes carry `title` only).
+    const auto saved = on_pool(db, [&] { return store.saved_get(plugin, slug); });
+    auto ensure_name = [&](glz::generic& env) {
+        if (!env.is_object()) return;
+        auto& obj = env.get_object();
+        auto* data = obj.find("data");
+        if (data == obj.end() || !data->second.is_object()) return;
+        auto& d = data->second.get_object();
+        if (auto* n = d.find("name"); n != d.end()) {
+            if (const auto* s = std::get_if<std::string>(&n->second.data); s != nullptr && !s->empty()) return;
+        }
+        if (auto* t = d.find("title"); t != d.end()) { // scraper title beats saved_manga.name (library rows can hold the slug)
+            if (const auto* s = std::get_if<std::string>(&t->second.data); s != nullptr && !s->empty()) {
+                // copy first: glaze's object_t is a flat map, and inserting "name" can move
+                // the title node -- assigning through *s then reads freed memory (empty name).
+                const std::string title = *s;
+                d["name"].data = title;
+                return;
+            }
+        }
+        if (saved && !saved->name.empty() && saved->name != slug) {
+            d["name"].data = saved->name;
+        }
+    };
     glz::generic env;
     if (glz::read_json(env, envelope) || !envelope_ok(env) || !env.is_object()) {
         return envelope;
     }
     glz::generic chosen;
-    if (glz::read_json(chosen, row->chosen) || !chosen.is_object()) {
-        return envelope;
+    // no title_meta row or an unusable `chosen`: envelope + the name resolver only
+    const bool have_chosen = row.has_value() && !glz::read_json(chosen, row->chosen) && chosen.is_object();
+    if (!have_chosen) {
+        ensure_name(env);
+        return glz::write_json(env).value_or(envelope);
     }
     auto& obj = env.get_object();
     const auto& cd = chosen.get_object();
@@ -522,6 +549,7 @@ inline std::string apply_chosen(Store& store, BS::thread_pool<>& db, const std::
         }
     }
 
+    ensure_name(env); // chosen merged; guarantee name even when chosen carries no title
     glz::generic enr;
     auto& e = enr.data.emplace<glz::generic::object_t>();
     e["fetched_at"] = glz::generic{};

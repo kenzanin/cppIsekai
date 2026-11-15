@@ -137,7 +137,11 @@ crow::json::wvalue home_context(Store& store, BS::thread_pool<>& db, const crow:
 }
 
 crow::response html(const std::string& file, const crow::json::wvalue& ctx) {
-    return {crow::mustache::load(file).render(ctx)};
+    crow::response r{crow::mustache::load(file).render(ctx)};
+    // HTML shell references static-content snapshots the build can change; let the
+    // browser revalidate instead of pinning a stale broken shell (see reader topbar).
+    r.set_header("Cache-Control", "no-cache");
+    return r;
 }
 
 } // namespace

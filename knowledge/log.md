@@ -1,3 +1,15 @@
+## 2026-11-15
+* **Update**: Updated concept `decisions/saved-manga-detail-source-of-truth.md`.
+* **Update**: Linked `decisions/saved-manga-detail-source-of-truth.md` to `findings/detail-name-vs-library-card.md` (The 2026-11-15 empty-detail-name bug is what motivated storing resolved detail on saved_manga: the resolver ran but nothing durable held its output, so the next page open re-derived the name.).
+* **Creation**: Documented concept `decisions/saved-manga-detail-source-of-truth.md` (Saved manga detail lives on saved_manga (planned, openspec manga-detail-table)).
+* **Update**: Updated concept `findings/detail-name-vs-library-card.md`.
+* **Creation**: Documented concept `findings/detail-name-vs-library-card.md` (Detail vs library title mismatch: apply_chosen trusts cached envelope with name:null).
+* **Update**: Updated concept `architecture/reader-page-progress.md`.
+* **Update**: Linked `decisions/ui-polish-grid-accessibility-contrast.md` to `architecture/status-flags-bitfield.md`.
+* **Update**: Linked `decisions/ui-polish-grid-accessibility-contrast.md` to `architecture/per-manga-dim-blur.md`.
+* **Update**: Linked `decisions/ui-polish-grid-accessibility-contrast.md` to `references/rec-ui-polish.md` (Implementation of U1, U3, U5, and dark-theme contrast fix from rec-ui-polish).
+* **Creation**: Documented concept `decisions/ui-polish-grid-accessibility-contrast.md` (UI polish: category filters, card dim toggle, accessible names, and dark contrast fix).
+
 ## 2026-11-14
 * **Update**: Linked `decisions/crash-traces-backward-cpp.md` to `decisions/xmake-build-system.md` (Crash-trace symbolization required build-system changes: the mode.releasedbg rule and the cxx_bin on_load ldflags hook in xmake.lua.).
 * **Update**: Linked `findings/xmake-ldflags-on-load-hook.md` to `decisions/crash-traces-backward-cpp.md` (The on_load -rdynamic export documented here is what lets backward's dladdr resolver name crash-trace frames; without it the crash-trace decision degrades to bare addresses.).

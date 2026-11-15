@@ -128,7 +128,7 @@
         function gridPage() {
           return {
             q: '', plugin: '', sort: 'added', sortDir: {}, dup: false,
-            filterState: { new: 'off', done: 'off', complete: 'off' },
+            filterState: { new: 'off', done: 'off', ongoing: 'off', hiatus: 'off', canceled: 'off', completed: 'off' },
             page: 1, perPage: 30,
             pages: 1, count: 0, total: 0, hasDup: false, hasStats: false,
             init() {
@@ -170,7 +170,7 @@
               this.page = 1; this.apply();
             },
             reset() { this.q = ''; this.plugin = ''; this.sort = 'added'; this.sortDir = {}; this.dup = false;
-              this.filterState = { new: 'off', done: 'off', complete: 'off' }; this.page = 1; this.apply(); },
+              this.filterState = { new: 'off', done: 'off', ongoing: 'off', hiatus: 'off', canceled: 'off', completed: 'off' }; this.page = 1; this.apply(); },
             ratio(c) { const t = +c.dataset.total || 0; return t > 0 ? (+c.dataset.read || 0) / t : -1; },
             badge(c) { // New/Done from stored status_flags bits (bit0=is_new, bit1=is_done); Done priority kept by caller
               const f = +c.dataset.statusFlags || 0;
@@ -187,9 +187,15 @@
               if (ns.new === 'hide' && news) return false;
               if (ns.done === 'show' && !done) return false;
               if (ns.done === 'hide' && done) return false;
-              const complete = (((+c.dataset.statusFlags || 0) & 32) !== 0); // stored bit5: category completed
-              if (ns.complete === 'show' && !complete) return false;
-              if (ns.complete === 'hide' && complete) return false;
+              const f = +c.dataset.statusFlags || 0;
+              if (ns.ongoing === 'show' && !(f & 4)) return false;
+              if (ns.ongoing === 'hide' && (f & 4)) return false;
+              if (ns.hiatus === 'show' && !(f & 8)) return false;
+              if (ns.hiatus === 'hide' && (f & 8)) return false;
+              if (ns.canceled === 'show' && !(f & 16)) return false;
+              if (ns.canceled === 'hide' && (f & 16)) return false;
+              if (ns.completed === 'show' && !(f & 32)) return false;
+              if (ns.completed === 'hide' && (f & 32)) return false;
               return true;
             },
             dir(sortKey) { return (this.sortDir[sortKey] || 'asc') === 'desc' ? -1 : 1; },
@@ -219,9 +225,12 @@
         </script>
         <div class="flex flex-wrap items-center gap-2 mb-3">
           <button x-show="hasDup" @click="toggleDup()" class="px-2.5 py-1 text-xs rounded-full border" :class="dup ? 'border-violet-500 bg-violet-900/40 text-violet-300' : 'border-zinc-700 text-zinc-400 hover:bg-zinc-800'">Duplicates</button>
-          <button x-show="hasStats" @click="toggleBadge('new')" class="px-2.5 py-1 text-xs rounded-full border" :class="filterState.new === 'show' ? 'border-red-500 bg-red-900/40 text-red-300' : filterState.new === 'hide' ? 'border-red-700 bg-red-500/10 text-red-400/70' : 'border-zinc-700 text-zinc-400 hover:bg-zinc-800'" :title="filterState.new === 'show' ? 'show new' : filterState.new === 'hide' ? 'hide new' : 'new off'">New</button>
-          <button x-show="hasStats" @click="toggleBadge('done')" class="px-2.5 py-1 text-xs rounded-full border" :class="filterState.done === 'show' ? 'border-emerald-500 bg-emerald-900/40 text-emerald-300' : filterState.done === 'hide' ? 'border-emerald-700 bg-emerald-500/10 text-emerald-400/70' : 'border-zinc-700 text-zinc-400 hover:bg-zinc-800'" :title="filterState.done === 'show' ? 'show done' : filterState.done === 'hide' ? 'hide done' : 'done off'">Done</button>
-          <button x-show="hasStats" @click="toggleBadge('complete')" class="px-2.5 py-1 text-xs rounded-full border" :class="filterState.complete === 'show' ? 'border-green-500 bg-green-900/40 text-green-300' : filterState.complete === 'hide' ? 'border-green-700 bg-green-500/10 text-green-400/70' : 'border-zinc-700 text-zinc-400 hover:bg-zinc-800'" :title="filterState.complete === 'show' ? 'show complete' : filterState.complete === 'hide' ? 'hide complete' : 'complete off'">Complete</button>
+          <button x-show="hasStats" @click="toggleBadge('new')" aria-label="Filter new" class="px-2.5 py-1 text-xs rounded-full border" :class="filterState.new === 'show' ? 'border-red-500 bg-red-900/40 text-red-300' : filterState.new === 'hide' ? 'border-red-700 bg-red-500/10 text-red-400/70' : 'border-zinc-700 text-zinc-400 hover:bg-zinc-800'" :title="filterState.new === 'show' ? 'show new' : filterState.new === 'hide' ? 'hide new' : 'new off'">New</button>
+          <button x-show="hasStats" @click="toggleBadge('done')" aria-label="Filter done" class="px-2.5 py-1 text-xs rounded-full border" :class="filterState.done === 'show' ? 'border-emerald-500 bg-emerald-900/40 text-emerald-300' : filterState.done === 'hide' ? 'border-emerald-700 bg-emerald-500/10 text-emerald-400/70' : 'border-zinc-700 text-zinc-400 hover:bg-zinc-800'" :title="filterState.done === 'show' ? 'show done' : filterState.done === 'hide' ? 'hide done' : 'done off'">Done</button>
+          <button @click="toggleBadge('ongoing')" aria-label="Filter ongoing" class="px-2.5 py-1 text-xs rounded-full border" :class="filterState.ongoing === 'show' ? 'border-sky-500 bg-sky-900/40 text-sky-300' : filterState.ongoing === 'hide' ? 'border-sky-700 bg-sky-500/10 text-sky-400/70' : 'border-zinc-700 text-zinc-400 hover:bg-zinc-800'" :title="filterState.ongoing === 'show' ? 'show ongoing' : filterState.ongoing === 'hide' ? 'hide ongoing' : 'ongoing off'">Ongoing</button>
+          <button @click="toggleBadge('hiatus')" aria-label="Filter hiatus" class="px-2.5 py-1 text-xs rounded-full border" :class="filterState.hiatus === 'show' ? 'border-amber-500 bg-amber-900/40 text-amber-300' : filterState.hiatus === 'hide' ? 'border-amber-700 bg-amber-500/10 text-amber-400/70' : 'border-zinc-700 text-zinc-400 hover:bg-zinc-800'" :title="filterState.hiatus === 'show' ? 'show hiatus' : filterState.hiatus === 'hide' ? 'hide hiatus' : 'hiatus off'">Hiatus</button>
+          <button @click="toggleBadge('canceled')" aria-label="Filter canceled" class="px-2.5 py-1 text-xs rounded-full border" :class="filterState.canceled === 'show' ? 'border-rose-500 bg-rose-900/40 text-rose-300' : filterState.canceled === 'hide' ? 'border-rose-700 bg-rose-500/10 text-rose-400/70' : 'border-zinc-700 text-zinc-400 hover:bg-zinc-800'" :title="filterState.canceled === 'show' ? 'show canceled' : filterState.canceled === 'hide' ? 'hide canceled' : 'canceled off'">Canceled</button>
+          <button @click="toggleBadge('completed')" aria-label="Filter completed" class="px-2.5 py-1 text-xs rounded-full border" :class="filterState.completed === 'show' ? 'border-violet-500 bg-violet-900/40 text-violet-300' : filterState.completed === 'hide' ? 'border-violet-700 bg-violet-500/10 text-violet-400/70' : 'border-zinc-700 text-zinc-400 hover:bg-zinc-800'" :title="filterState.completed === 'show' ? 'show completed' : filterState.completed === 'hide' ? 'hide completed' : 'completed off'">Completed</button>
          <div class="flex items-center gap-1 text-xs border border-zinc-700 rounded px-1 py-0.5">
            <span class="text-zinc-500 px-1">Sort:</span>
            <button @click="setSort('added')" class="px-1 py-0.5 text-zinc-400 hover:text-white" :title="sort==='added' ? ('added ' + (sortDir.added || 'asc')) : 'sort added'">added</button>
@@ -251,9 +260,14 @@
                 <div class="absolute left-2 top-2 flex items-center gap-1">
                   <span x-show="badge($el.closest('li')).news" class="rounded bg-red-600/70 px-2 py-0.5 text-[12px] font-semibold uppercase tracking-wide text-white">New</span>
                   <span x-show="badge($el.closest('li')).done" class="rounded bg-emerald-600/70 px-2 py-0.5 text-[12px] font-semibold uppercase tracking-wide text-white">Done</span>
-                  <span x-show="$el.closest('li').dataset.status" class="rounded bg-black/40 px-2 py-0.5 text-[12px] font-medium uppercase tracking-wide text-zinc-100" x-text="$el.closest('li').dataset.status"></span>
+                  <span x-show="((+$el.closest('li').dataset.statusFlags || 0) & 4)" class="rounded bg-sky-900/60 border border-sky-700 px-2 py-0.5 text-[12px] font-medium uppercase tracking-wide text-sky-200">Ongoing</span>
+                  <span x-show="((+$el.closest('li').dataset.statusFlags || 0) & 8)" class="rounded bg-amber-900/60 border border-amber-700 px-2 py-0.5 text-[12px] font-medium uppercase tracking-wide text-amber-200">Hiatus</span>
+                  <span x-show="((+$el.closest('li').dataset.statusFlags || 0) & 16)" class="rounded bg-rose-900/60 border border-rose-700 px-2 py-0.5 text-[12px] font-medium uppercase tracking-wide text-rose-200">Canceled</span>
+                  <span x-show="((+$el.closest('li').dataset.statusFlags || 0) & 32)" class="rounded bg-violet-900/60 border border-violet-700 px-2 py-0.5 text-[12px] font-medium uppercase tracking-wide text-violet-200">Completed</span>
+                  <span x-show="!((+$el.closest('li').dataset.statusFlags || 0) & 60) && $el.closest('li').dataset.status" class="rounded bg-black/40 px-2 py-0.5 text-[12px] font-medium uppercase tracking-wide text-zinc-100" x-text="$el.closest('li').dataset.status"></span>
                 </div>
-                <button class="absolute left-2 bottom-2 rounded bg-black/40 px-2 py-0.5 text-[12px] text-zinc-100 hover:bg-black/60 flex items-center gap-1.5" @click.prevent="setPlugin('mangadex')"><img src="/plugin/mangadex/logo" alt="" class="w-5 h-5 rounded-sm" onerror="this.style.display='none'">mangadex</button>
+                <button class="absolute left-2 bottom-2 rounded bg-black/40 px-2 py-0.5 text-[12px] text-zinc-100 hover:bg-black/60 flex items-center gap-1.5" @click.prevent="setPlugin('mangadex')" aria-label="Filter by plugin mangadex"><img src="/plugin/mangadex/logo" alt="" class="w-5 h-5 rounded-sm" onerror="this.style.display='none'">mangadex</button>
+                <button @click.prevent="toggleDimBlur('mangadex', 'one-piece')" :data-dim-toggle="'mangadex/one-piece'" aria-label="Toggle dim cover" class="dim-toggle absolute right-2 top-2 rounded bg-black/60 hover:bg-black/80 px-2 py-0.5 text-[11px] text-zinc-300">Dim + blur cover</button>
               </div>
               <p class="mt-1 text-sm truncate text-zinc-300 group-hover:text-zinc-100 transition-colors">One Piece</p>
               <p class="text-xs text-zinc-500" x-show="(+$el.closest('li').dataset.total || 0) > 0"><span x-text="$el.closest('li').dataset.read"></span> / <span x-text="$el.closest('li').dataset.total"></span> read</p>
@@ -270,9 +284,14 @@
                 <div class="absolute left-2 top-2 flex items-center gap-1">
                   <span x-show="badge($el.closest('li')).news" class="rounded bg-red-600/70 px-2 py-0.5 text-[12px] font-semibold uppercase tracking-wide text-white">New</span>
                   <span x-show="badge($el.closest('li')).done" class="rounded bg-emerald-600/70 px-2 py-0.5 text-[12px] font-semibold uppercase tracking-wide text-white">Done</span>
-                  <span x-show="$el.closest('li').dataset.status" class="rounded bg-black/40 px-2 py-0.5 text-[12px] font-medium uppercase tracking-wide text-zinc-100" x-text="$el.closest('li').dataset.status"></span>
+                  <span x-show="((+$el.closest('li').dataset.statusFlags || 0) & 4)" class="rounded bg-sky-900/60 border border-sky-700 px-2 py-0.5 text-[12px] font-medium uppercase tracking-wide text-sky-200">Ongoing</span>
+                  <span x-show="((+$el.closest('li').dataset.statusFlags || 0) & 8)" class="rounded bg-amber-900/60 border border-amber-700 px-2 py-0.5 text-[12px] font-medium uppercase tracking-wide text-amber-200">Hiatus</span>
+                  <span x-show="((+$el.closest('li').dataset.statusFlags || 0) & 16)" class="rounded bg-rose-900/60 border border-rose-700 px-2 py-0.5 text-[12px] font-medium uppercase tracking-wide text-rose-200">Canceled</span>
+                  <span x-show="((+$el.closest('li').dataset.statusFlags || 0) & 32)" class="rounded bg-violet-900/60 border border-violet-700 px-2 py-0.5 text-[12px] font-medium uppercase tracking-wide text-violet-200">Completed</span>
+                  <span x-show="!((+$el.closest('li').dataset.statusFlags || 0) & 60) && $el.closest('li').dataset.status" class="rounded bg-black/40 px-2 py-0.5 text-[12px] font-medium uppercase tracking-wide text-zinc-100" x-text="$el.closest('li').dataset.status"></span>
                 </div>
-                <button class="absolute left-2 bottom-2 rounded bg-black/40 px-2 py-0.5 text-[12px] text-zinc-100 hover:bg-black/60 flex items-center gap-1.5" @click.prevent="setPlugin('baka')"><img src="/plugin/baka/logo" alt="" class="w-5 h-5 rounded-sm" onerror="this.style.display='none'">baka</button>
+                <button class="absolute left-2 bottom-2 rounded bg-black/40 px-2 py-0.5 text-[12px] text-zinc-100 hover:bg-black/60 flex items-center gap-1.5" @click.prevent="setPlugin('baka')" aria-label="Filter by plugin baka"><img src="/plugin/baka/logo" alt="" class="w-5 h-5 rounded-sm" onerror="this.style.display='none'">baka</button>
+                <button @click.prevent="toggleDimBlur('baka', 'no-cover')" :data-dim-toggle="'baka/no-cover'" aria-label="Toggle dim cover" class="dim-toggle absolute right-2 top-2 rounded bg-black/60 hover:bg-black/80 px-2 py-0.5 text-[11px] text-zinc-300">Dim + blur cover</button>
               </div>
               <p class="mt-1 text-sm truncate text-zinc-300 group-hover:text-zinc-100 transition-colors">No Cover</p>
               <p class="text-xs text-zinc-500" x-show="(+$el.closest('li').dataset.total || 0) > 0"><span x-text="$el.closest('li').dataset.read"></span> / <span x-text="$el.closest('li').dataset.total"></span> read</p>
@@ -281,11 +300,11 @@
         </ul>
         <div class="flex justify-end mt-4" x-show="count > 0 && pages > 1" x-cloak>
           <nav class="flex gap-1 items-center text-sm text-zinc-400">
-            <button @click="page = Math.max(1, page - 1); apply()" :disabled="page <= 1" class="px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 disabled:opacity-30">‹</button>
+            <button @click="page = Math.max(1, page - 1); apply()" :disabled="page <= 1" aria-label="Previous page" class="px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 disabled:opacity-30">‹</button>
             <template x-for="n in Array.from({length: pages}, (_, i) => i + 1)" :key="n">
               <button @click="page = n; apply()" class="px-2 py-1 rounded" :class="n === page ? 'bg-zinc-700 text-zinc-100' : 'bg-zinc-800 hover:bg-zinc-700'" x-text="n"></button>
             </template>
-            <button @click="page = Math.min(pages, page + 1); apply()" :disabled="page >= pages" class="px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 disabled:opacity-30">›</button>
+            <button @click="page = Math.min(pages, page + 1); apply()" :disabled="page >= pages" aria-label="Next page" class="px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 disabled:opacity-30">›</button>
           </nav>
         </div>
         </div>
