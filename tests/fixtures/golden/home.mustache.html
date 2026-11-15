@@ -126,9 +126,11 @@
         <div x-data="gridPage">
         <script>
         function gridPage() {
+          let prefs = {};
+          try { prefs = JSON.parse(localStorage.getItem('grid_prefs') || '{}'); } catch (_) { prefs = {}; }
           return {
-            q: '', plugin: '', sort: 'added', sortDir: {}, dup: false,
-            filterState: { new: 'off', done: 'off', ongoing: 'off', hiatus: 'off', canceled: 'off', completed: 'off' },
+            q: prefs.q || '', plugin: prefs.plugin || '', sort: prefs.sort || 'added', sortDir: prefs.sortDir || {}, dup: !!prefs.dup,
+            filterState: Object.assign({ new: 'off', done: 'off', ongoing: 'off', hiatus: 'off', canceled: 'off', completed: 'off' }, prefs.filterState || {}),
             page: 1, perPage: 30,
             pages: 1, count: 0, total: 0, hasDup: false, hasStats: false,
             init() {
@@ -156,6 +158,7 @@
               this.hasDup = this.cards.some(c => (+c.dataset.dup || 0) > 0);
               this.hasStats = this.cards.some(c => (+c.dataset.total || 0) > 0);
             },
+            save() { try { localStorage.setItem('grid_prefs', JSON.stringify({ q: this.q, plugin: this.plugin, sort: this.sort, sortDir: this.sortDir, dup: this.dup, filterState: this.filterState })); } catch (_) {} },
             toggleBadge(kind) { // 3-state per badge: off -> show -> hide -> off
               const st = this.filterState;
               const cur = st[kind] || 'off';
@@ -219,6 +222,7 @@
               const shown = new Set(vis.slice(start, end));
               for (const c of this.cards) c.style.display = shown.has(c) ? '' : 'none';
               this.syncSidebar();
+              this.save();
             },
           };
         }
@@ -267,7 +271,6 @@
                   <span x-show="!((+$el.closest('li').dataset.statusFlags || 0) & 60) && $el.closest('li').dataset.status" class="rounded bg-black/40 px-2 py-0.5 text-[12px] font-medium uppercase tracking-wide text-zinc-100" x-text="$el.closest('li').dataset.status"></span>
                 </div>
                 <button class="absolute left-2 bottom-2 rounded bg-black/40 px-2 py-0.5 text-[12px] text-zinc-100 hover:bg-black/60 flex items-center gap-1.5" @click.prevent="setPlugin('mangadex')" aria-label="Filter by plugin mangadex"><img src="/plugin/mangadex/logo" alt="" class="w-5 h-5 rounded-sm" onerror="this.style.display='none'">mangadex</button>
-                <button @click.prevent="toggleDimBlur('mangadex', 'one-piece')" :data-dim-toggle="'mangadex/one-piece'" aria-label="Toggle dim cover" class="dim-toggle absolute right-2 top-2 rounded bg-black/60 hover:bg-black/80 px-2 py-0.5 text-[11px] text-zinc-300">Dim + blur cover</button>
               </div>
               <p class="mt-1 text-sm truncate text-zinc-300 group-hover:text-zinc-100 transition-colors">One Piece</p>
               <p class="text-xs text-zinc-500" x-show="(+$el.closest('li').dataset.total || 0) > 0"><span x-text="$el.closest('li').dataset.read"></span> / <span x-text="$el.closest('li').dataset.total"></span> read</p>
@@ -291,7 +294,6 @@
                   <span x-show="!((+$el.closest('li').dataset.statusFlags || 0) & 60) && $el.closest('li').dataset.status" class="rounded bg-black/40 px-2 py-0.5 text-[12px] font-medium uppercase tracking-wide text-zinc-100" x-text="$el.closest('li').dataset.status"></span>
                 </div>
                 <button class="absolute left-2 bottom-2 rounded bg-black/40 px-2 py-0.5 text-[12px] text-zinc-100 hover:bg-black/60 flex items-center gap-1.5" @click.prevent="setPlugin('baka')" aria-label="Filter by plugin baka"><img src="/plugin/baka/logo" alt="" class="w-5 h-5 rounded-sm" onerror="this.style.display='none'">baka</button>
-                <button @click.prevent="toggleDimBlur('baka', 'no-cover')" :data-dim-toggle="'baka/no-cover'" aria-label="Toggle dim cover" class="dim-toggle absolute right-2 top-2 rounded bg-black/60 hover:bg-black/80 px-2 py-0.5 text-[11px] text-zinc-300">Dim + blur cover</button>
               </div>
               <p class="mt-1 text-sm truncate text-zinc-300 group-hover:text-zinc-100 transition-colors">No Cover</p>
               <p class="text-xs text-zinc-500" x-show="(+$el.closest('li').dataset.total || 0) > 0"><span x-text="$el.closest('li').dataset.read"></span> / <span x-text="$el.closest('li').dataset.total"></span> read</p>

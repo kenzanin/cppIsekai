@@ -200,7 +200,7 @@ TEST_CASE("templates: card badge reads stored status_flags bits") {
 
 // UI polish lock (ui-polish):
 // 1. Grid category filter buttons exist and test status_flags category bits
-// 2. Dim toggle is present on saved cards with data-dim-toggle
+// 2. Dim toggle no longer on library cards (detail page only)
 // 3. Accessible names (aria-label) exist on icon-only/interactive controls
 TEST_CASE("templates: ui-polish controls and aria-label presence") {
     crow::mustache::set_base(CPPISEKAI_TEMPLATES_DIR);
@@ -212,9 +212,9 @@ TEST_CASE("templates: ui-polish controls and aria-label presence") {
     CHECK(home.find(R"(aria-label="Filter canceled")") != std::string::npos);
     CHECK(home.find(R"(aria-label="Filter completed")") != std::string::npos);
 
-    // Dim toggle present on saved-manga card
-    CHECK(home.find(R"(data-dim-toggle=")") != std::string::npos);
-    CHECK(home.find(R"(aria-label="Toggle dim cover")") != std::string::npos);
+    // Dim toggle removed from library cards (detail page only); locked by its absence
+    CHECK(home.find(R"(data-dim-toggle=")") == std::string::npos);
+    CHECK(home.find(R"(aria-label="Toggle dim cover")") == std::string::npos);
 
     // Plugin filter button has accessible name
     CHECK(home.find(R"(aria-label="Filter by plugin )") != std::string::npos);
