@@ -58,7 +58,8 @@ TEST_CASE("pages: descending plugin order still yields nearest neighbors") {
     const auto dup = build_pages_response(desc, pages_env, {"m", "s", 23});
     REQUIRE(dup);
     CHECK(has(*dup, R"("prev_ch":3)"));
-    CHECK(has(*dup, R"("next_ch":24)")); // duplicate numbers collapse to one stop
+    CHECK(has(*dup, R"("next_ch":24)")); // duplicate numbers stay consecutive stops
+    CHECK(has(*dup, R"("next_ch_id":"c24b")")); // stable sort keeps source order within a number
 }
 
 TEST_CASE("pages: boundary chapters omit the missing neighbor") {
@@ -72,6 +73,45 @@ TEST_CASE("pages: boundary chapters omit the missing neighbor") {
     REQUIRE(last);
     CHECK(has(*last, R"("prev_ch":2)"));
     CHECK(!has(*last, "next_ch"));
+}
+
+TEST_CASE("pages: duplicate numbers are individually reachable by id") {
+    const std::string dup = R"({"ok":true,"data":[)"
+                             R"({"id":"c23","number":23},)"
+                             R"({"id":"c24a","number":24},)"
+                             R"({"id":"c24b","number":24},)"
+                             R"({"id":"c25","number":25}]})"; // two releases numbered 24
+    const std::string pages_env = R"({"ok":true,"data":["a"]})";
+
+    const auto first = build_pages_response(dup, pages_env, {"m", "s", 24, "c24a"});
+    REQUIRE(first);
+    CHECK(has(*first, R"("ch_id":"c24a")"));
+    CHECK(has(*first, R"("prev_ch":23)"));
+    CHECK(has(*first, R"("prev_ch_id":"c23")"));
+    CHECK(has(*first, R"("next_ch":24)")); // sibling, same number
+    CHECK(has(*first, R"("next_ch_id":"c24b")"));
+
+    const auto second = build_pages_response(dup, pages_env, {"m", "s", 24, "c24b"});
+    REQUIRE(second);
+    CHECK(has(*second, R"("ch_id":"c24b")"));
+    CHECK(has(*second, R"("prev_ch":24)")); // sibling, same number
+    CHECK(has(*second, R"("prev_ch_id":"c24a")"));
+    CHECK(has(*second, R"("next_ch":25)"));
+    CHECK(has(*second, R"("next_ch_id":"c25")"));
+}
+
+TEST_CASE("pages: number-only path still resolves to the first entry (legacy)") {
+    const std::string dup = R"({"ok":true,"data":[)"
+                             R"({"id":"c24a","number":24},)"
+                             R"({"id":"c24b","number":24}]})";
+    const std::string pages_env = R"({"ok":true,"data":["a"]})";
+    const auto out = build_pages_response(dup, pages_env, {"m", "s", 24, ""});
+    REQUIRE(out);
+    CHECK(has(*out, R"("ch_id":"c24a")")); // first number match keeps the old behaviour
+
+    const auto fallback = build_pages_response(dup, pages_env, {"m", "s", 24, "no-such-id"});
+    REQUIRE(fallback);
+    CHECK(has(*fallback, R"("ch_id":"c24a")")); // unknown ch_id falls back the same way
 }
 
 TEST_CASE("pages: unknown chapter, empty pages or malformed envelope -> nullopt") {

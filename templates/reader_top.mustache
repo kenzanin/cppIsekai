@@ -33,10 +33,10 @@
   <!-- Right group: [chapter select with capped title] + page count -->
   <div class="flex items-center gap-2 min-w-0 max-w-[50vw] justify-end">
     <span class="text-xs text-zinc-400 tabular-nums shrink-0 hidden sm:inline" x-text="label()"></span>
-    <select :value="ch" @change="gotoChapter($event.target.value)" aria-label="Chapter"
+    <select :value="chId" @change="gotoChapter($event.target.value)" aria-label="Chapter"
             class="bg-zinc-900 border border-zinc-700 rounded px-2.5 py-1.5 text-xs text-zinc-200 truncate max-w-full focus:outline-none focus:border-zinc-500">
       <template x-for="c in chaptersList" :key="c.id">
-        <option :value="c.number" :selected="Number(c.number) === ch"
+        <option :value="c.id" :selected="String(c.id) === String(chId)"
                 x-text="formatChapterLabel(c)"></option>
       </template>
     </select>

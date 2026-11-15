@@ -11,6 +11,58 @@ namespace fs = std::filesystem;
 
 namespace {
 
+// Resolve the chapter id for the pages call: the `ch_id` query param picks the
+// exact entry when it matches a list entry, else the first number match. An
+// absent or unmatched ch_id behaves exactly as the number-only path (design
+// D1/D2). Used twice (before the pages call and inside build_pages_response)
+// so duplicates can never resolve differently on the two paths.
+std::string resolve_chapter_id(const std::string& chs_env, const std::string& wanted, double chd) {
+    const auto chs = envelope_data(chs_env);
+    if (!chs) {
+        return {};
+    }
+    const auto entry_id = [](const auto& item) -> std::string {
+        if (!item.is_object()) {
+            return {};
+        }
+        const auto& entry = item.get_object();
+        const auto* const idf = entry.find("id");
+        if (idf == entry.end()) {
+            return {};
+        }
+        if (const auto* s = std::get_if<std::string>(&idf->second.data)) {
+            return *s;
+        }
+        return {};
+    };
+    if (!wanted.empty()) {
+        for (const auto& item : *chs) {
+            if (entry_id(item) == wanted) {
+                return wanted;
+            }
+        }
+    }
+    for (const auto& item : *chs) {
+        if (!item.is_object()) {
+            continue;
+        }
+        const auto& entry = item.get_object();
+        const auto* const num = entry.find("number");
+        if (num == entry.end()) {
+            continue;
+        }
+        const auto* d = std::get_if<double>(&num->second.data);
+        if (!d || *d != chd) {
+            continue;
+        }
+        const std::string id = entry_id(item);
+        if (!id.empty()) {
+            return id;
+        }
+    }
+    return {};
+}
+
 // cache-full check for one chapter: <root>/img/<ns>/manga/<slug>/<chdir>/pNNN.ext
 // count >= pages. ch-dir matched by chNNN prefix (collision id8 variant counts too).
 // `ns` is the cache namespace from Cache::ns(), not the raw plugin id.
@@ -63,16 +115,17 @@ void register_content(Ctx& c) {
     auto& images = c.images;
 
     // reader-page D1: ordered page URL list for the reader UI. Pages through
-    // the stale layer; prev/next chapter resolved from the chapter list by
-    // number so the reader can walk chapters without refetching the whole
-    // list. Each entry is a host-rendered /cache/img URL (client never
-    // builds cache paths -- design D1: ratio suffixes, v3 rel_path and
-    // host-side transforms stay host-owned).
+    // the stale layer; prev/next chapter resolved from a number-stable-sorted
+    // copy of the list (design D3) so duplicate releases stay reachable. Each
+    // entry is a host-rendered /cache/img URL (client never builds cache
+    // paths -- design D1: ratio suffixes, v3 rel_path and host-side transforms
+    // stay host-owned). An optional `ch_id` query param picks the exact release.
     CROW_ROUTE(app, "/api/pages/<string>/<string>/<double>")
-    ([&](const crow::request& /*req*/, std::string plugin, std::string slug, double chd) -> crow::response {
+    ([&](const crow::request& req, std::string plugin, std::string slug, double chd) -> crow::response {
         if (!valid_title_pair(plugin, slug)) {
             return crow::response{404, R"({"ok":false,"error":"unknown title"})"};
         }
+        const std::string want_id = param(req, "ch_id"); // empty = number-only legacy path (design D1)
         crow::json::wvalue q;
         q["id"] = slug;
         const std::string chs_params = q.dump();
@@ -81,30 +134,9 @@ void register_content(Ctx& c) {
                                                     [&] { return plugins.call(plugin, "chapters", chs_params); });
             // Pre-resolve the chapter id from the list so the pages call
             // targets the right one even when the plugin's list is stale.
-            std::string chapter_id;
-            if (const auto chs = envelope_data(chs_env)) {
-                for (const auto& item : *chs) {
-                    if (!item.is_object()) {
-                        continue;
-                    }
-                    const auto& entry = item.get_object();
-                    const auto* const num = entry.find("number");
-                    if (num == entry.end()) {
-                        continue;
-                    }
-                    const auto* d = std::get_if<double>(&num->second.data);
-                    if (!d || *d != chd) {
-                        continue;
-                    }
-                    const auto* const idf = entry.find("id");
-                    if (idf != entry.end()) {
-                        if (const auto* s = std::get_if<std::string>(&idf->second.data)) {
-                            chapter_id = *s;
-                            break;
-                        }
-                    }
-                }
-            }
+            // A `ch_id` query param wins when it matches an entry; otherwise
+            // the first number match is used (design D1/D2).
+            const std::string chapter_id = resolve_chapter_id(chs_env, want_id, chd);
             if (chapter_id.empty()) {
                 return std::string{};
             }
@@ -113,7 +145,8 @@ void register_content(Ctx& c) {
             const std::string pages_params = pages_q.dump();
             const std::string pages_env = call_cached(store, plugin, "pages", pages_params,
                                                       [&] { return plugins.call(plugin, "pages", pages_params); });
-            return build_pages_response(chs_env, pages_env, PagesCtx{.plugin = plugin, .slug = slug, .ch = chd})
+            return build_pages_response(chs_env, pages_env,
+                                        PagesCtx{.plugin = plugin, .slug = slug, .ch = chd, .ch_id = chapter_id})
                 .value_or(std::string{});
         });
         crow::response r;

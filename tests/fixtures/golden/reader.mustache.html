@@ -82,10 +82,10 @@
     <!-- Right group: [chapter select with capped title] + page count -->
     <div class="flex items-center gap-2 min-w-0 max-w-[50vw] justify-end">
       <span class="text-xs text-zinc-400 tabular-nums shrink-0 hidden sm:inline" x-text="label()"></span>
-      <select :value="ch" @change="gotoChapter($event.target.value)" aria-label="Chapter"
+      <select :value="chId" @change="gotoChapter($event.target.value)" aria-label="Chapter"
               class="bg-zinc-900 border border-zinc-700 rounded px-2.5 py-1.5 text-xs text-zinc-200 truncate max-w-full focus:outline-none focus:border-zinc-500">
         <template x-for="c in chaptersList" :key="c.id">
-          <option :value="c.number" :selected="Number(c.number) === ch"
+          <option :value="c.id" :selected="String(c.id) === String(chId)"
                   x-text="formatChapterLabel(c)"></option>
         </template>
       </select>
@@ -131,7 +131,7 @@ function readerPage() {
   return {
     plugin: decodeURIComponent(parts[1] || ''),
     slug: decodeURIComponent(parts.slice(2).join('/')) || '',
-    ch: 1, chId: '', pages: [], prev_ch: 0, next_ch: 0,
+    ch: 1, chId: '', pages: [], prev_ch: 0, next_ch: 0, prev_ch_id: '', next_ch_id: '',
     page: 1, mode: 'paged', dir: 'ltr', zoom: 'fit-w', zoomPct: 100, wheelAt: 0,
     navShown: false, done: false,
     seen: [], err: '', io: null, chaptersList: [],
@@ -165,19 +165,25 @@ function readerPage() {
         .then(c => { this.chaptersList = c.data || []; })
         .catch(e => { this.err = String(e); });
       window.addEventListener('popstate', () => this._onPop());
-      await this.loadChapter(this.ch, this.page, {push: false});
+      await this.loadChapter(this.ch, this.page, {push: false, chId: q.get('ch_id') || ''});
     },
-    // fetch (or reuse prefetched) one chapter's pages and swap content in place; no document reload
+    // fetch (or reuse prefetched) one chapter's pages and swap content in place; no document reload.
+    // Navigation always targets a chapter id: the exact release the detail row
+    // linked, a neighbour id, the dropdown entry, or the server echo of what it
+    // resolved for a number (p.ch_id). Number-only links still work (first
+    // number match) for backward compatibility.
     async loadChapter(n, page, opts) {
       const push = !opts || opts.push !== false;
+      const chId = (opts && 'chId' in opts) ? opts.chId : this.chId;
       // flush any pending position POST against the OLD chapter before ch/chId change
       if (this.t) { clearTimeout(this.t); this.t = null; this.save(); }
       const token = ++this._reqToken;
-      const cached = this._prefetch.get(n);
-      this._prefetch.delete(n);
+      const cached = chId ? this._prefetch.get(chId) : null;
+      if (chId) this._prefetch.delete(chId);
       let p;
       try {
-        p = cached || await fetch(`/api/pages/${encodeURIComponent(this.plugin)}/${encodeURIComponent(this.slug)}/${n}`).then(r => r.json());
+        const suffix = chId ? `?ch_id=${encodeURIComponent(chId)}` : '';
+        p = cached || await fetch(`/api/pages/${encodeURIComponent(this.plugin)}/${encodeURIComponent(this.slug)}/${n}${suffix}`).then(r => r.json());
       } catch (e) { this.err = String(e); return; }
       await this._chaptersReady;
       if (token !== this._reqToken) return; // stale response: a newer switch is in flight
@@ -187,43 +193,44 @@ function readerPage() {
       this.pages = p.pages;
       this.prev_ch = p.prev_ch || 0;
       this.next_ch = p.next_ch || 0;
+      this.prev_ch_id = p.prev_ch_id || '';
+      this.next_ch_id = p.next_ch_id || '';
+      // The server echoes the chapter id it served; trust it over the request
+      // fallback so prev/prefetch keep matching the row even for a number-only URL.
+      this.chId = p.ch_id || chId || '';
       this.err = '';
       this.done = false;
-      // /api/pages exposes only the chapter number; the position store keys
-      // the plugin chapter id, so resolve it once for POST /reader/position.
-      // Duplicate numbers exist (multi-language releases): prefer the exact
-      // ch_id the detail row linked, else first number match.
-      const cid = new URLSearchParams(location.search).get('ch_id');
-      const hit = cid ? (this.chaptersList || []).find(x => x.id === cid)
-                      : (this.chaptersList || []).find(x => Number(x.number) === n);
-      this.chId = hit ? String(hit.id) : '';
       this.seen = [];
       if (this.io) this.io.disconnect();
       this.io = new IntersectionObserver(
           es => es.forEach(e => e.isIntersecting && this.mark(+e.target.dataset.vi)),
           {rootMargin: '400px'});
-      if (push) history.pushState({ch: n, page: this.page}, '', this.chUrl(n, this.page));
+      if (push) history.pushState({ch: n, page: this.page, chId: this.chId}, '', this.chUrl(n, this.page, this.chId));
       this.$nextTick(() => { this.observe(); this.preload(); this._resetScroll(); this._prefetchAdjacent(); });
     },
     _onPop() {
       const q = new URLSearchParams(location.search);
       const n = Number(q.get('ch'));
+      const cid = q.get('ch_id') || '';
       if (!Number.isFinite(n)) return;
       const page = Number(q.get('page')) || 1;
-      if (n === this.ch) { this.goto_page(page); return; }
-      this.loadChapter(n, page, {push: false});
+      if (n === this.ch && cid === this.chId) { this.goto_page(page); return; }
+      this.loadChapter(n, page, {push: false, chId: cid});
     },
-    // prefetch the adjacent chapters' page lists (next first, then previous)
+    // prefetch the adjacent chapters' page lists (next first, then previous), keyed by chapter id
     _prefetchAdjacent() {
-      const list = [this.next_ch, this.prev_ch].filter(Boolean);
-      for (const n of list) {
-        if (this._prefetch.has(n)) continue;
-        fetch(`/api/pages/${encodeURIComponent(this.plugin)}/${encodeURIComponent(this.slug)}/${n}`)
+      const list = [];
+      if (this.next_ch_id) list.push({id: this.next_ch_id, n: this.next_ch});
+      if (this.prev_ch_id) list.push({id: this.prev_ch_id, n: this.prev_ch});
+      for (const {id, n} of list) {
+        if (this._prefetch.has(id)) continue;
+        fetch(`/api/pages/${encodeURIComponent(this.plugin)}/${encodeURIComponent(this.slug)}/${n}?ch_id=${encodeURIComponent(id)}`)
           .then(r => r.json())
           .then(p => {
             if (!Array.isArray(p.pages)) return;
-            this._prefetch.set(n, p);
-            for (const k of [...this._prefetch.keys()]) if (Math.abs(k - this.ch) > 1) this._prefetch.delete(k);
+            this._prefetch.set(id, p);
+            const keep = new Set([this.chId, this.next_ch_id, this.prev_ch_id]);
+            for (const k of [...this._prefetch.keys()]) if (!keep.has(k)) this._prefetch.delete(k);
           })
           .catch(() => {});
       }
@@ -262,8 +269,9 @@ function readerPage() {
       const t = 'ch ' + c.number + (c.title ? ' \u2014 ' + c.title : '');
       return t.length > 64 ? t.slice(0, 63) + '\u2026' : t;
     },
-    chUrl(n, page) {
+    chUrl(n, page, chId) {
       const q = new URLSearchParams({ch: String(n), mode: this.mode, dir: this.dir, zoom: this.zoomSeed()});
+      if (chId) q.set('ch_id', chId);
       if (page) q.set('page', String(page));
       return `/read/${encodeURIComponent(this.plugin)}/${encodeURIComponent(this.slug)}?${q}`;
     },
@@ -271,17 +279,16 @@ function readerPage() {
     step(d) {
       const i = this.cur() + d;
       if (i < 0) {
-        if (this.prev_ch) {
-          // land on the LAST page of the previous chapter; prefetched list tells us the count
-          const cached = this._prefetch.get(this.prev_ch);
-          const prev = this.chaptersList.find(c => Number(c.number) === Number(this.prev_ch));
-          const last = (cached && cached.pages.length) || (prev && prev.pages) || 1;
-          this.loadChapter(this.prev_ch, last);
+        if (this.prev_ch_id) {
+          // land on the LAST page of the previous chapter; the prefetched list tells us the count
+          const cached = this._prefetch.get(this.prev_ch_id);
+          const last = cached ? cached.pages.length : 9999; // the route clamps to the last page
+          this.loadChapter(this.prev_ch, last, {chId: this.prev_ch_id});
         }
         return;
       }
       if (i >= this.views.length) {
-        if (this.next_ch) { this.loadChapter(this.next_ch, 1); }
+        if (this.next_ch_id) { this.loadChapter(this.next_ch, 1, {chId: this.next_ch_id}); }
         else { this.done = true; }
         return;
       }
@@ -300,7 +307,11 @@ function readerPage() {
         if (el) el.scrollIntoView();
       });
     },
-    gotoChapter(n) { this.loadChapter(Number(n), 1); },
+    gotoChapter(id) {
+      const e = (this.chaptersList || []).find(c => String(c.id) === String(id));
+      if (!e) return;
+      this.loadChapter(Number(e.number), 1, {chId: String(e.id)});
+    },
     wheel(e) {
       const shell = this.$root.querySelector('[data-shell]');
       if (shell && shell.scrollHeight > shell.clientHeight + 2) {

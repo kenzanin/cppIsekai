@@ -16,6 +16,7 @@ struct PagesCtx {
     std::string plugin;
     std::string slug;
     double ch{}; // chapter numbers are fractional in the wild (1, 1.5, ...)
+    std::string ch_id{}; // resolved chapter id: the route prefers a `ch_id` query param, else the first entry with `ch`
 };
 
 /** Reader page-list JSON from the chapters envelope and the target chapter's
