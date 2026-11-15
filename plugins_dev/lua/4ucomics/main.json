@@ -1,0 +1,10 @@
+{
+  "name": "4ucomics",
+  "id": "4ucomics",
+  "version": "1.0.0",
+  "website": "https://4ucomics.com",
+  "image_referer": "https://4ucomics.com/",
+  "runtime": "lua",
+  "capabilities": ["search", "detail", "chapters", "pages"],
+  "api": 1
+}
