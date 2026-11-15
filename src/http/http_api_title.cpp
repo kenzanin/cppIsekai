@@ -24,7 +24,7 @@ crow::response title_data_response(plugin::Host& plugins, BS::thread_pool<>& db,
     p["id"] = slug; // the slug IS the title key the cache layout and plugins mint
     const std::string params = p.dump();
 
-    std::string body = saved_detail_response(store, db, plugin, slug); // '' unless the row serves
+    std::string body = method == "detail" ? saved_detail_response(store, db, plugin, slug) : std::string{}; // '' unless the row serves
     const bool row_served = !body.empty();
     if (!row_served) {
         body = on_pool(plugin_pool, [&] {
