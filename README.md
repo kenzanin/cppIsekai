@@ -32,6 +32,35 @@ Everything below is implemented and verified against the running daemon.
 
 ## Architecture
 
+**Components**
+
+```mermaid
+flowchart TB
+    UI["Browser — crow templates, Alpine.js, htmx, Tailwind"] --> HTTP
+    subgraph daemon["cppIsekai daemon (Crow + asio)"]
+        HTTP["HTTP routes<br/>src/http/"] --> Store[("SQLite<br/>sqlite_orm")]
+        HTTP --> Stale{"Stale-first layer<br/>api_cache + disk LRU"}
+        Stale -- hit --> HTTP
+        Stale -- miss --> Plugins{"Plugin runtime"}
+        Plugins --> Lua["Lua 5.4 · sol2"]
+        Plugins --> Wasm["WASM · wasm3"]
+        Plugins --> Js["JS · quickjs-ng"]
+        HTTP --> Window["Reader window<br/>10-page sliding"]
+        Window -- prefetch queue --> Worker["Reader worker"]
+        Worker --> ImgCache{"Image cache<br/>disk · per-plugin tree"}
+        HTTP -- /cache/img --> ImgCache
+        ImgCache -- hit --> HTTP
+        ImgCache -- miss --> Curl["direct curl<br/>manifest image_referer"]
+        Curl --> Vips["vips transcode<br/>WebP/AVIF"] --> ImgCache
+    end
+    Lua --> Sites[("Manga sites")]
+    Wasm --> Sites
+    Js --> Sites
+    Curl -- image bytes --> Sites
+```
+
+**Request lifecycle**
+
 ```mermaid
 sequenceDiagram
     participant B as Browser
