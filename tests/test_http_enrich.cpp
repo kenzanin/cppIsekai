@@ -282,3 +282,32 @@ TEST_CASE("enrich: materialize_detail write-through and read-first serve (manga-
         CHECK(store.saved_get(plugin, slug)->synopsis_display == "chosen text"); // chosen rides the display
     }
 }
+
+TEST_CASE("enrich: apply_read_rollup heals total_ch and counts done (row-serve path, f039549 fix)") {
+    TempRoot root;
+    Store store = store_at(root.path);
+    BS::thread_pool<> db(1);
+    seed_saved(store, "mangadex", "rollup-heal"); // total_ch 0, like rows saved before the fix
+
+    const std::string env =
+        R"({"ok":true,"data":[{"number":1,"id":"a1","pages":3},{"number":2,"id":"b2","pages":4}]})";
+    using http::api::kStateHost;
+    store.state_set(kStateHost, "host/read/a1", "3"); // fully read
+    store.state_set(kStateHost, "host/read/b2", "2"); // partial progress
+
+    // A row-served detail open runs ONLY this rollup (no sync): total must
+    // heal from the chapters envelope and done must follow read_ch.
+    apply_read_rollup(store, db, "mangadex", "rollup-heal", env);
+    auto row = store.saved_get("mangadex", "rollup-heal");
+    REQUIRE(row.has_value());
+    CHECK_EQ(row->total_ch, 2);
+    CHECK_EQ(row->read_ch, 1); // partial entries do not count
+    CHECK((row->status_flags & 2) == 0);
+
+    store.state_set(kStateHost, "host/read/b2", "4"); // finish it
+    apply_read_rollup(store, db, "mangadex", "rollup-heal", env);
+    row = store.saved_get("mangadex", "rollup-heal");
+    REQUIRE(row.has_value());
+    CHECK_EQ(row->read_ch, 2);
+    CHECK((row->status_flags & 2) != 0); // done
+}

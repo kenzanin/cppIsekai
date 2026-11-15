@@ -376,6 +376,12 @@ TEST_CASE("Store: saved manga stats roundtrip (library-grid-stats 1.3/1.4)") {
         CHECK_EQ(store.saved_get(plugin, slug)->status_flags, 32 | 1 | 64);
         store.saved_clear_update(plugin, slug);
         CHECK_EQ(store.saved_get(plugin, slug)->status_flags, 32 | 64);
+
+        // negative total = "envelope absent": the stored count survives
+        // (regression -- a sync with a missing chapters cache zeroed
+        // total_ch and done = read_ch >= total_ch never fired)
+        store.saved_stats_update(plugin, slug, "", -1);
+        CHECK_EQ(store.saved_get(plugin, slug)->total_ch, 7);
     }
 
     SUBCASE("dim list returns exactly the rows with bit6 set") {
