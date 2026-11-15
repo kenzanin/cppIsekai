@@ -14,7 +14,7 @@
   <template x-if="pages.length > 24">
     <div class="flex justify-center px-2 py-2">
       <select :value="page" @change="goto_page(Number($event.target.value))" aria-label="Page"
-              class="bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm">
+              class="bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-zinc-500">
         <template x-for="n in pages.length" :key="n">
           <option :value="n" :selected="n === page" x-text="'p ' + n + ' / ' + pages.length"></option>
         </template>

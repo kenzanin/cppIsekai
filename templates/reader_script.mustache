@@ -7,7 +7,7 @@ function readerPage() {
     plugin: decodeURIComponent(parts[1] || ''),
     slug: decodeURIComponent(parts.slice(2).join('/')) || '',
     ch: 1, chId: '', pages: [], prev_ch: 0, next_ch: 0,
-    page: 1, mode: 'paged', dir: 'rtl', zoom: 'fit-h', zoomPct: 100, wheelAt: 0,
+    page: 1, mode: 'paged', dir: 'ltr', zoom: 'fit-w', zoomPct: 100, wheelAt: 0,
     navShown: false, done: false,
     seen: [], err: '', io: null, chaptersList: [],
     _prefetch: new Map(), _reqToken: 0, _chaptersReady: null, t: null,
@@ -103,16 +103,19 @@ function readerPage() {
           .catch(() => {});
       }
     },
-    // --- layout: one screen = one view; page is the view's first page number
+    // --- layout: one screen = one view; page is the view's first page number.
+    // Spread pairs (1,2) (3,4)...: odd page leads, even page joins the pair before it,
+    // so the pair holding the open page is (p, p+1) for odd p, (p-1, p) for even p.
+    // Tail alone when odd. Pure function of pages -- no anchor state to re-run.
     get pairing() { return this.mode === 'spread-h' || this.mode === 'spread-v'; },
-    get views() { // 1 alone, then (2,3) (4,5)...; odd tail alone
+    get views() {
       if (!this.pairing) return this.pages.map(u => [u]);
-      const v = this.pages.length ? [this.pages.slice(0, 1)] : [];
-      for (let i = 1; i < this.pages.length; i += 2) v.push(this.pages.slice(i, i + 2));
+      const v = [];
+      for (let i = 0; i < this.pages.length; i += 2) v.push(this.pages.slice(i, i + 2));
       return v;
     },
-    firstOf(i) { return this.pairing ? (i === 0 ? 1 : 2 * i) : i + 1; },
-    viewOf(p) { return this.pairing ? Math.floor(p / 2) : p - 1; },
+    firstOf(i) { return this.pairing ? 2 * i + 1 : i + 1; },
+    viewOf(p) { return this.pairing ? Math.floor((p - 1) / 2) : p - 1; },
     cur() { return Math.max(0, Math.min(this.viewOf(this.page), this.views.length - 1)); },
     label() {
       if (!this.pages.length) return '';
@@ -130,6 +133,10 @@ function readerPage() {
       }
     },
     zoomSeed() { return this.zoom === 'custom' ? 'custom:' + Math.round(this.zoomPct) : this.zoom; },
+    formatChapterLabel(c) { // 'ch N — Title'; cap keeps the open dropdown list sane (closed state truncates via CSS)
+      const t = 'ch ' + c.number + (c.title ? ' \u2014 ' + c.title : '');
+      return t.length > 64 ? t.slice(0, 63) + '\u2026' : t;
+    },
     chUrl(n, page) {
       const q = new URLSearchParams({ch: String(n), mode: this.mode, dir: this.dir, zoom: this.zoomSeed()});
       if (page) q.set('page', String(page));

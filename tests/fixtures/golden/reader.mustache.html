@@ -49,47 +49,52 @@
   </div>
   <!-- top overlay: back + chapter dropdown (synced) + mode/dir/zoom. Shown only while navShown. -->
   <div x-show="navShown && !done" x-cloak
-       class="fixed top-0 inset-x-0 z-30 flex items-center gap-2 px-2 py-2 flex-wrap bg-zinc-950/90 border-b border-zinc-800 backdrop-blur">
-    <a :href="'/view/manga/'+encodeURIComponent(plugin)+'/'+encodeURIComponent(slug)"
-       class="flex items-center gap-1.5 px-2 py-2 rounded border border-zinc-700 text-zinc-100 hover:bg-zinc-800" aria-label="Back to detail">
-      <svg class="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 19l-7-7 7-7"/><path d="M3.5 12H14"/><path d="M14 4h4a2 2 0 012 2v12a2 2 0 01-2 2h-4"/></svg>
-      <span class="text-sm font-medium">Detail</span>
-    </a>
-    <select :value="ch" @change="gotoChapter($event.target.value)" aria-label="Chapter"
-            class="bg-zinc-900 border border-zinc-700 rounded px-2 py-2 text-sm max-w-[35vw]">
-      <template x-for="c in chaptersList" :key="c.id">
-        <option :value="c.number" :selected="Number(c.number) === ch" x-text="'ch ' + c.number + (c.title ? ' — ' + c.title : '')"></option>
-      </template>
-    </select>
-    <select x-model="mode" @change="modeChanged()" aria-label="Reading mode"
-            class="bg-zinc-900 border border-zinc-700 rounded px-2 py-2 text-sm">
-      <option value="webtoon">webtoon</option>
-      <option value="paged">paged</option>
-      <option value="spread-h">spread h</option>
-      <option value="spread-v">spread v</option>
-    </select>
-    <select x-model="dir" x-show="mode !== 'webtoon'" @change="persist()" aria-label="Direction"
-            class="bg-zinc-900 border border-zinc-700 rounded px-2 py-2 text-sm">
-      <option value="ltr">ltr</option>
-      <option value="rtl">rtl</option>
-    </select>
-    <div class="flex items-center gap-1" role="group" aria-label="Image zoom">
-      <button @click="zoomOut()" :disabled="zoom === 'custom' && zoomPct <= 25" aria-label="Zoom out"
-              class="w-9 h-9 rounded border border-zinc-700 text-lg leading-none text-zinc-100 hover:bg-zinc-800 disabled:opacity-30">&#8722;</button>
-      <span class="w-12 text-center text-xs tabular-nums text-zinc-400 select-none" x-show="zoom === 'custom'" x-cloak x-text="zoomPct + '%'"></span>
-      <span class="w-12 text-center text-xs tabular-nums text-zinc-400 select-none" x-show="zoom !== 'custom'" x-cloak x-text="'—'"></span>
-      <button @click="zoomIn()" :disabled="zoom === 'custom' && zoomPct >= 400" aria-label="Zoom in"
-              class="w-9 h-9 rounded border border-zinc-700 text-lg leading-none text-zinc-100 hover:bg-zinc-800 disabled:opacity-30">+</button>
+       class="fixed top-0 inset-x-0 z-30 flex items-center justify-between gap-2 px-3 py-2 bg-zinc-950/95 border-b border-zinc-800 backdrop-blur">
+    <!-- Left group: [back to detail] [view mode] [zoom] [ltr/rtl] -->
+    <div class="flex items-center gap-2 shrink-0">
+      <a :href="'/view/manga/'+encodeURIComponent(plugin)+'/'+encodeURIComponent(slug)"
+         class="flex items-center gap-1.5 px-2.5 py-1.5 rounded border border-zinc-700 bg-zinc-900/80 text-zinc-100 hover:bg-zinc-800 transition-colors" aria-label="Back to detail">
+        <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 19l-7-7 7-7"/><path d="M3.5 12H14"/><path d="M14 4h4a2 2 0 012 2v12a2 2 0 01-2 2h-4"/></svg>
+        <span class="text-xs font-medium">Detail</span>
+      </a>
+      <select x-model="mode" @change="modeChanged()" aria-label="Reading mode"
+              class="bg-zinc-900 border border-zinc-700 rounded px-2.5 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-zinc-500">
+        <option value="webtoon">webtoon</option>
+        <option value="paged">paged</option>
+        <option value="spread-h">spread h</option>
+        <option value="spread-v">spread v</option>
+      </select>
+      <div class="flex items-center gap-1" role="group" aria-label="Image zoom">
+        <button @click="zoomOut()" :disabled="zoom === 'custom' && zoomPct <= 25" aria-label="Zoom out"
+                class="w-7 h-7 rounded border border-zinc-700 bg-zinc-900 text-sm leading-none text-zinc-100 hover:bg-zinc-800 disabled:opacity-30">&#8722;</button>
+        <select x-model="zoom" @change="zoomPresetChanged()" aria-label="Zoom preset"
+                class="bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-zinc-500">
+          <option value="fit-w">fit W</option>
+          <option value="fit-h">fit H</option>
+          <option value="1:1">1:1</option>
+          <option value="custom" x-text="zoom === 'custom' ? zoomPct + '%' : 'custom'"></option>
+        </select>
+        <button @click="zoomIn()" :disabled="zoom === 'custom' && zoomPct >= 400" aria-label="Zoom in"
+                class="w-7 h-7 rounded border border-zinc-700 bg-zinc-900 text-sm leading-none text-zinc-100 hover:bg-zinc-800 disabled:opacity-30">+</button>
+      </div>
+      <select x-model="dir" x-show="mode !== 'webtoon'" @change="persist()" aria-label="Direction"
+              class="bg-zinc-900 border border-zinc-700 rounded px-2.5 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-zinc-500">
+        <option value="ltr">ltr</option>
+        <option value="rtl">rtl</option>
+      </select>
     </div>
-    <select x-model="zoom" @change="zoomPresetChanged()" aria-label="Zoom"
-            class="bg-zinc-900 border border-zinc-700 rounded px-2 py-2 text-sm">
-      <option value="fit-h">fit H</option>
-      <option value="fit-w">fit W</option>
-      <option value="1:1">1:1</option>
-      <option value="custom">custom</option>
-    </select>
-    <span class="flex-1"></span>
-    <span class="text-xs text-zinc-500 tabular-nums pr-1" x-text="label()"></span>
+  
+    <!-- Right group: [chapter select with capped title] + page count -->
+    <div class="flex items-center gap-2 min-w-0 max-w-[50vw] justify-end">
+      <span class="text-xs text-zinc-400 tabular-nums shrink-0 hidden sm:inline" x-text="label()"></span>
+      <select :value="ch" @change="gotoChapter($event.target.value)" aria-label="Chapter"
+              class="bg-zinc-900 border border-zinc-700 rounded px-2.5 py-1.5 text-xs text-zinc-200 truncate max-w-full focus:outline-none focus:border-zinc-500">
+        <template x-for="c in chaptersList" :key="c.id">
+          <option :value="c.number" :selected="Number(c.number) === ch"
+                  x-text="formatChapterLabel(c)"></option>
+        </template>
+      </select>
+    </div>
   </div>
   <!-- bottom overlay: page list only. Shown only while navShown. -->
   <div x-show="navShown && !done" x-cloak
@@ -107,7 +112,7 @@
     <template x-if="pages.length > 24">
       <div class="flex justify-center px-2 py-2">
         <select :value="page" @change="goto_page(Number($event.target.value))" aria-label="Page"
-                class="bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm">
+                class="bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-zinc-500">
           <template x-for="n in pages.length" :key="n">
             <option :value="n" :selected="n === page" x-text="'p ' + n + ' / ' + pages.length"></option>
           </template>
@@ -126,7 +131,7 @@ function readerPage() {
     plugin: decodeURIComponent(parts[1] || ''),
     slug: decodeURIComponent(parts.slice(2).join('/')) || '',
     ch: 1, chId: '', pages: [], prev_ch: 0, next_ch: 0,
-    page: 1, mode: 'paged', dir: 'rtl', zoom: 'fit-h', zoomPct: 100, wheelAt: 0,
+    page: 1, mode: 'paged', dir: 'ltr', zoom: 'fit-w', zoomPct: 100, wheelAt: 0,
     navShown: false, done: false,
     seen: [], err: '', io: null, chaptersList: [],
     _prefetch: new Map(), _reqToken: 0, _chaptersReady: null, t: null,
@@ -222,16 +227,19 @@ function readerPage() {
           .catch(() => {});
       }
     },
-    // --- layout: one screen = one view; page is the view's first page number
+    // --- layout: one screen = one view; page is the view's first page number.
+    // Spread pairs (1,2) (3,4)...: odd page leads, even page joins the pair before it,
+    // so the pair holding the open page is (p, p+1) for odd p, (p-1, p) for even p.
+    // Tail alone when odd. Pure function of pages -- no anchor state to re-run.
     get pairing() { return this.mode === 'spread-h' || this.mode === 'spread-v'; },
-    get views() { // 1 alone, then (2,3) (4,5)...; odd tail alone
+    get views() {
       if (!this.pairing) return this.pages.map(u => [u]);
-      const v = this.pages.length ? [this.pages.slice(0, 1)] : [];
-      for (let i = 1; i < this.pages.length; i += 2) v.push(this.pages.slice(i, i + 2));
+      const v = [];
+      for (let i = 0; i < this.pages.length; i += 2) v.push(this.pages.slice(i, i + 2));
       return v;
     },
-    firstOf(i) { return this.pairing ? (i === 0 ? 1 : 2 * i) : i + 1; },
-    viewOf(p) { return this.pairing ? Math.floor(p / 2) : p - 1; },
+    firstOf(i) { return this.pairing ? 2 * i + 1 : i + 1; },
+    viewOf(p) { return this.pairing ? Math.floor((p - 1) / 2) : p - 1; },
     cur() { return Math.max(0, Math.min(this.viewOf(this.page), this.views.length - 1)); },
     label() {
       if (!this.pages.length) return '';
@@ -249,6 +257,10 @@ function readerPage() {
       }
     },
     zoomSeed() { return this.zoom === 'custom' ? 'custom:' + Math.round(this.zoomPct) : this.zoom; },
+    formatChapterLabel(c) { // 'ch N — Title'; cap keeps the open dropdown list sane (closed state truncates via CSS)
+      const t = 'ch ' + c.number + (c.title ? ' \u2014 ' + c.title : '');
+      return t.length > 64 ? t.slice(0, 63) + '\u2026' : t;
+    },
     chUrl(n, page) {
       const q = new URLSearchParams({ch: String(n), mode: this.mode, dir: this.dir, zoom: this.zoomSeed()});
       if (page) q.set('page', String(page));
