@@ -1,4 +1,6 @@
 ## 2026-11-15
+* **Update**: Updated concept `constraints/sol2-lua-version.md`.
+* **Update**: Updated concept `decisions/third-party-dependencies.md`.
 * **Update**: Linked `decisions/about-page-readme-single-source.md` to `decisions/static-assets-br.md` (About page renders markdown from the repo-root README.md using the same brotli-only vendored static asset serving decisions/static-assets-br defines (marked.min.js.br, mermaid.min.js.br via br_asset routes).).
 * **Creation**: Documented concept `decisions/about-page-readme-single-source.md` (About page renders README.md live).
 * **Update**: Linked `constraints/plugin-chapter-number-placeholders.md` to `decisions/chapter-zero-falsy-regression.md` (ch 0 is valid on mangadex; a plugin placeholder 0 must be told apart from a real prequel).

@@ -1,6 +1,6 @@
 # Decisions
 * [Build system: CMake + C++23, exe-only](build-toolchain-cpp23.md) - Single executable target, C++23, cmake floor 3.20; lib/tests follow once the first module lands.
-* [Dependency vendoring: system-shared first, minimal vendoring](third-party-dependencies.md) - Third-party dependency surface after xmake xrepo migration round 2
+* [Dependency vendoring: system-shared first, minimal vendoring](third-party-dependencies.md) - Third-party dependency surface after xrepo pinning of crow/cli11/asio/lua (2026-11-15 round 3); system shared deps reduced to libvips + curl
 * [Plugin data segregation: host .ini is host-only](plugin-data-segregation.md) - Where plugin data lives: host .ini is host-only config; static manifest in main.json; user credentials in gitignored config.json; dynamic state (OAuth tokens) via per-plugin storage host tool backed by the DB.
 * [Plugin dev layout: plugins_dev/<lang>/<site> + symlink deploy](plugin-dev-layout.md) - Plugin development happens in plugins_dev/<lang>/<site>/; testing symlinks/copies the plugin into data/plugins/; host ini carries no plugin sections.
 * [Dependencies & plugins: curl-first APIs, runtime parity, no hand-rolled crypto](deps-and-plugins.md) - User-confirmed 2026-11-07: curl-first REST routes (CBZ export = host route), plugin runtime parity same signature (quickjs-ng second runtime), no hand-rolled crypto (stbrumme/hash-library md5/sha1), base64 dari glaze, libzippp + pacman libzip, quickjs-ng vendored static.
