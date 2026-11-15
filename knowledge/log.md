@@ -1,4 +1,5 @@
 ## 2026-11-15
+* **Update**: Updated concept `architecture/reader-page-progress.md`.
 * **Update**: Linked `decisions/ui-polish-grid-accessibility-contrast.md` to `architecture/status-flags-bitfield.md`.
 * **Update**: Linked `decisions/ui-polish-grid-accessibility-contrast.md` to `architecture/per-manga-dim-blur.md`.
 * **Update**: Linked `decisions/ui-polish-grid-accessibility-contrast.md` to `references/rec-ui-polish.md` (Implementation of U1, U3, U5, and dark-theme contrast fix from rec-ui-polish).
