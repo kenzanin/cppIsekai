@@ -33,23 +33,40 @@ Everything below is implemented and verified against the running daemon.
 ## Architecture
 
 ```mermaid
-flowchart TB
-    UI["Browser — crow templates, Alpine.js, htmx, Tailwind"] --> HTTP
-    subgraph daemon["cppIsekai daemon (Crow + asio)"]
-        HTTP["HTTP routes<br/>src/http/"] --> Store[("SQLite<br/>sqlite_orm")]
-        HTTP --> Reader["Reader worker<br/>10-page window"]
-        HTTP --> Stale["Stale-first layer<br/>api_cache + disk LRU"]
-        Reader --> Cache2["prefetch + image cache"]
-        Stale --> Plugins{Plugin runtime}
-        Plugins --> Lua["Lua 5.4 · sol2"]
-        Plugins --> Wasm["WASM · wasm3"]
-        Plugins --> Js["JS · quickjs-ng"]
+sequenceDiagram
+    participant B as Browser
+    participant H as HTTP routes
+    participant S as Stale-first (api_cache + disk LRU)
+    participant P as Plugin runtime (Lua/WASM/JS)
+    participant X as Manga site
+    participant C as Image cache (disk, per-plugin tree)
+    participant W as Reader worker (10-page window)
+
+    B->>H: GET /view/... + /api/pages
+    H->>S: envelope (detail/chapters/pages)
+    alt cache hit
+        S-->>H: cached envelope
+    else miss
+        S->>P: call handler
+        P->>X: fetch
+        X-->>P: html/json
+        P-->>S: data
+        S-->>H: envelope (persisted)
     end
-    Cache2 --> Img["/cache/img<br/>vips WebP/AVIF"]
-    Lua --> Sites[("Manga sites")]
-    Wasm --> Sites
-    Js --> Sites
-    Sites --> Stale
+    H-->>B: page URLs (/cache/img) + prev/next
+
+    B->>H: GET /cache/img/…
+    H->>C: img_ensure(key, page_ctx)
+    alt disk hit
+        C-->>H: path -> 200 image
+    else miss
+        C->>X: direct curl + manifest image_referer
+        X-->>C: image bytes
+        C->>C: vips transcode (WebP/AVIF) -> store
+        C-->>H: path -> 200 image
+    end
+
+    note over W: prefetch loop, detached<br/>next 10 pages -> img_ensure (same hit/miss as above)
 ```
 
 ## Database
