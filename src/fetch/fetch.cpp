@@ -176,7 +176,7 @@ Result rendered_fetch(const Request& req) {
         // --stealth: consistent fingerprint + TLS impersonation. storage-dir is
         // best-effort (nightly persists nothing) but harmless.
         cmd += "obscura --stealth --storage-dir data/obscura fetch " + sh_quote(req.url) +
-               " --dump html --wait-until networkidle2 --timeout " + std::to_string(req.timeout_ms);
+               " --dump html --wait-until networkidle2 --timeout " + std::to_string(req.timeout_ms / 1000);
     } else {
         // 8s: enough for the challenge JS; more just burns the budget.
         cmd += "lightpanda fetch " + sh_quote(req.url) + " --dump html --wait-ms 8000";
