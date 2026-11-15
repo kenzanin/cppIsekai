@@ -1,49 +1,29 @@
 ---
 type: finding
-title: "Detail vs library title mismatch: apply_chosen trusts cached envelope with name:null"
-description: "Library card title vs detail h1 title resolve differently. Frontend detail h1 reads detail.name, which apply_chosen (src/http/enrich_internal.hpp) fills ONLY when envelope_ok() is true. cached api_cache payloads store ok as SQLite integer 1 (from jsonb), envelope_ok requires glz bool -> false -> ensure_name never runs -> live /api/detail serves payload with operator-injected status_flags + empty name -> h1 shows '…'. 2026-11-15 uncommitted fix: ensure_name() resolver (chosen title -> scraper title -> saved_manga.name, slug-junk guard) plus html Cache-Control:no-cache and exit-to-detail moved top-right."
-tags: [detail, library, apply_chosen, api-cache, envelope_ok, name, title, mangafreak, handoff]
-generated: { by: agent/mcp, at: "2026-11-15T02:32:14Z" }
+title: "Detail vs library title mismatch: fixed (glaze map insert invalidated the title view)"
+description: "Detail h1 was empty ('…') while the library card showed a title. Root cause was NOT the api_cache jsonb/ok theory recorded on 2026-11-15: json_type(payload,'$.ok') is 'true' and json(payload) emits literal true, so envelope_ok always passed. The real bug was inside apply_chosen's ensure_name() (src/http/enrich_internal.hpp): 'd[\"name\"].data = *s' assigned through a reference into the SAME glaze object, and glaze's object_t is a flat map (ordered_small_map) whose insertion of \"name\" relocates the title node -- the assignment then read moved memory and wrote an empty name (live /api/detail showed \"name\":\"\"). Fixed by copying the title into a local std::string first; regression test 'apply_chosen derives detail name from the scraper title' added. Committed 9966ecb."
+tags: [detail, apply_chosen, glaze, generic, ordered_small_map, dangling-reference, name, title, mangafreak, fixed]
+generated: { by: agent/mcp, at: "2026-11-15T02:42:38Z" }
 status: stable
 ---
 
 ## Symptom
-Detail page (/view/manga/<plugin>/<slug>) h1 is empty (`…`) for mangafreak titles while the library card of the same manga shows a title. Chapter select on /read was also reported empty; live checks showed it actually renders (Alpine formatChapterLabel fixed in the same working-tree batch).
+Detail page (/view/manga/<plugin>/<slug>) h1 rendered `…` for mangafreak titles while the library card of the same manga showed a title.
 
-## Root cause (two independent issues)
-1. enrich_internal.hpp apply_chosen(): `envelope_ok(env)` requires `ok` to be a glz bool (stale.hpp envelope_ok checks std::get_if<bool>). api_cache rows store the payload via `jsonb(?)` and read back via `json(payload)`; on this DB `json_extract(json(payload),'$.ok')` returns integer 1, not true, so a cached envelope fails envelope_ok and ensure_name() never executes. Fresh plugin envelopes may carry real true, so the bug is load-path dependent, not plugin dependent. This is why ANY plugin whose cached detail envelope was stored via jsonb shows an empty detail name until a real network refresh rewrites the cache.
-2. Scraper envelopes carry `title`, never `name`. The detail page h1 reads detail.name. ensure_name() (added 2026-11-15) was meant to bridge this, but it is skipped because of (1).
+## Root cause (falsifies the earlier jsonb theory)
+- Cached envelopes are fine: `json_type(payload,'$.ok')` = `true`, `json(payload)` emits literal `true`, so `envelope_ok()` passed all along. There is no int->bool coercion bug and no stale-envelope consumer is broken by it.
+- The bug lived in `apply_chosen()` -> `ensure_name()` (src/http/enrich_internal.hpp). Scraper envelopes carry `title` only while the detail h1 reads `name`, so ensure_name copied title -> name with `d["name"].data = *s`, where `*s` is a reference into the title node of the SAME `glz::generic` object. glaze's `object_t` is a flat map (`ordered_small_map`), so inserting the new `name` key relocates the title node; the assignment then read moved memory and produced an empty string. Live `/api/detail` showed `"name":""` next to a non-empty `title` -- the exact signature.
 
-## What landed where (2026-11-15, UNCOMMITTED working tree on branch ui-polish)
-Files changed in tree (not committed):
-- src/http/enrich_internal.hpp: ensure_name lambda in apply_chosen (resolves name = chosen title -> scraper data.title -> saved_manga.name, skipping saved name == slug). Signature of the fix is correct but does not run while envelope_ok rejects the payload. test_http_enrich make-envelope asserts `apply_chosen(...) == envelope` (no-row passthrough) and may fail once the fix is actually reached; re-lock expectations when fixing.
-- src/http/http_pages.cpp: html() now returns `Cache-Control: no-cache` so broken reader shells are not pinned by the browser.
-- templates/reader_top.mustache: exit-to-detail button moved to extreme top-right corner after the chapter select (right-facing exit icon, `hidden sm:inline` label).
-- tests/fixtures/golden/reader.mustache.html: re-locked goldens (CPPISEKAI_UPDATE_GOLDEN=1 test_templates), pass 54/54.
-Daemon :8090 (releasedbg) serves these patches; /health ok; live /api/detail/mangafreak/<slug> STILL returns "name":"" (see blocker).
+## Fix (committed 9966ecb)
+- src/http/enrich_internal.hpp: copy the title into a local `std::string` before inserting `name`.
+- tests/test_http_enrich.cpp: regression case `apply_chosen derives detail name from the scraper title` (title-only envelope, slug not in saved_manga).
+- Rule of thumb: inside a glaze object, never assign a node from a reference into that same object; copy first.
 
-## Saved_manga data repaired in-place (sqlite UPDATE, not migration)
-- Dungeon_Tou_De_Yadoya... (mangafreak): name set from cached scraper title.
-- 2 mangafreak rows (Isekai_Kaeri_No_Yuusha_Wa..., Shop_Skill_Saeareba...): NO cached title exists -> left as slug; they populate once detail refresh succeeds or enrichment runs.
+## Verification
+- Live: `/api/detail/mangafreak/Dungeon_Tou_De_Yadoya_O_Yarou_...` now returns `name` == the scraper title.
+- test_http_enrich 7/7 (51 assertions); full `xmake test` 18/18 targets green; goldens re-locked without the update flag.
 
-## Verification status
-- xmake -y ok (no incremental relink after header-only edit; binary mtime 09:16:46), test_templates pass, test_http_enrich 6/6 pass, /health ok.
-- Chapter list claim NOT reproduced: reader inline select renders ch 63..1; detail grid renders ch 063..044; atsumaru APIs OK. Treat as Alpine-shell-vs-stale-browser issue fixed by the no-cache header + goldens.
-- Live detail name STILL empty -> the bug is NOT closed. Verify with curl + sqlite json_extract commands below.
-
-## Fix for next model
-Pick one (1 preferred):
-1. In stale.hpp envelope_ok (or the jsonb round-trip), coerce int 1 to true before the bool check. E.g. in call_cached after read_json: if `ok` node holds a double -> rewrite to bool via `static_cast<bool>(*num != 0.0)`; or normalize at api_cache_put so cached rows never need bool coercion. This fixes ALL cached-envelope consumers, not just detail.
-2. Or make apply_chosen/title flow tolerate !envelope_ok payloads but preserve today's contract (rejected: spreads the fix and masks the storage bug).
-Then: rebuild, restart daemon (releasedbg), curl /api/detail/mangafreak/<slug> -> expect name from data.title / saved_manga.name fallback; re-lock any golden/tests asserting passthrough. Commit the reader/title work separately from UI-polish (AGENTS: worktree hygiene).
-
-## Open risks / notes
-- api_cache rows are jsonb; ANY consumer asserting glz bool on cached envelopes is broken the same way (chapters pages related too). Grep `envelope_ok` and `get_if<bool>` across src/http/stale.hpp, src/http/enrich_internal.hpp, src/http/api_ctx.hpp, src/http/http_api_enrich.cpp, src/http/http_api_content.cpp before trusting any cached envelope.
-- Chapter-list and title-empty symptoms were probably stale-shell/stale-envelope fallout, not plugin data bugs.
-- Do NOT commit .cache/build artifacts; templates and golden stay together in one commit; knowledge/ notes commit separately (already done earlier for reader-page).
-- codebase-memory confirmed exact qualified names: cppIsekai.src.http.http_pages.http.home_context (src/http/http_pages.cpp:25), cppIsekai.src.http.http_api_title.http::api.title_data_response (src/http/http_api_title.cpp:12-30). Library card title = home_context saved-mode loop: row[name] = ovl_title[i] (chosen_title -> title_meta) value_or m.name (saved_manga); detail h1 sources = literal detail.name from scraper envelope (apply_chosen). Two pipelines, so library shows, detail was blank.
-
-## Evidence commands
-- curl localhost:8090/api/detail/mangafreak/<slug> | tail -c 200
-- sqlite3 data/library.db "SELECT json_type(payload,'$.ok'), json_extract(json(payload),'$.ok'), json_extract(json(payload),'$.data.ok') FROM api_cache WHERE plugin_id='mangafreak' LIMIT 1;"
-- grep -n 'envelope_ok\|get_if<bool' src/http/stale.hpp src/http/enrich_internal.hpp src/http/api_ctx.hpp
+## Side observations (not fixed, not blocking)
+- 343 of 349 api_cache rows have a NULL payload (rows written before the payload column existed / failed jsonb writes). `api_cache_get` already treats an empty payload as a row-shaped miss, so these re-fetch quietly; a cleanup would only save lookups.
+- The 'chapter select is empty' report never reproduced: ch 63..1 renders on /read and ch 063..044 on detail. Stale browser shell, addressed by `Cache-Control: no-cache` on html() (commit c09cb7d).
+- Separate bug fixed the same day: [Start reading] opened the LAST chapter because `startOrContinue()` took `chapters[0]` from a newest-first list; it now takes the last row (= lowest chapter number).
