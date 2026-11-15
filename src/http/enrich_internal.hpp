@@ -453,12 +453,10 @@ inline std::string apply_chosen(Store& store, BS::thread_pool<>& db, const std::
     if (glz::read_json(env, envelope) || !envelope_ok(env) || !env.is_object()) {
         return envelope;
     }
-    if (!row) {
-        ensure_name(env);
-        return glz::write_json(env).value_or(envelope);
-    }
     glz::generic chosen;
-    if (glz::read_json(chosen, row->chosen) || !chosen.is_object()) {
+    // no title_meta row or an unusable `chosen`: envelope + the name resolver only
+    const bool have_chosen = row.has_value() && !glz::read_json(chosen, row->chosen) && chosen.is_object();
+    if (!have_chosen) {
         ensure_name(env);
         return glz::write_json(env).value_or(envelope);
     }
