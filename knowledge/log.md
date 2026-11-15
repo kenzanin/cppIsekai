@@ -1,4 +1,5 @@
 ## 2026-11-15
+* **Creation**: Documented concept `decisions/renderer-fetch-engines.md` (Renderer fetch engines: lightpanda/obscura profiles in the fetch gate).
 * **Creation**: Documented concept `constraints/host-chapter-state-keys.md` (Chapter state keys: one canonical (decoded) key space; rollup owns total_ch).
 * **Creation**: Documented concept `constraints/plugin-status-canonical-vocab.md` (Plugin status strings: canonical vocab, normalized in-plugin).
 * **Creation**: Documented concept `decisions/chapter-stats-total-cached-read.md` (Chapter rows: total/cached/read page counters).
