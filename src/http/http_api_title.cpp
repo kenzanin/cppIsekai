@@ -30,13 +30,13 @@ crow::response title_data_response(plugin::Host& plugins, BS::thread_pool<>& db,
         body = on_pool(plugin_pool, [&] {
             return call_cached(store, plugin, method, params, [&] { return plugins.call(plugin, method, params); });
         });
-        if (method == "detail") {
-            body = apply_chosen(store, db, plugin, slug, body); // chosen rides after stale-serve merge (3.4)
-            materialize_detail(store, db, plugin, slug, body);  // write-through (D2)
-        }
+    }
+    if (method == "detail") { // chosen rides BOTH paths: newer picker edits must win over the row
+        body = apply_chosen(store, db, plugin, slug, body);
     }
     if (method == "detail") {
         if (!row_served) {
+            materialize_detail(store, db, plugin, slug, body); // write-through (D2, post-merge)
             // library-grid-stats 2.2: saved-manga stat sync on detail open.
             // Reuse the stale-served envelopes already in api_cache (no extra
             // network); failures leave the last-known stats untouched. A row-

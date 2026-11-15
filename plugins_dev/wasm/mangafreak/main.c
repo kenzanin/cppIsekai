@@ -528,12 +528,16 @@ static void chapters_reply(const char *id, unsigned int idn) {
                     memset(c, 0, sizeof *c);
                     snprintf(c->id, sizeof c->id, "%.*s:%.*s", (int)idn, id, (int)plen, path);
                     memcpy(c->title, title_buf, tln < sizeof c->title - 1u ? tln : sizeof c->title - 1u);
-                    long long v = 0; // ch num = trailing digits of path
+                    long long v = 0; // ch num = digits of the trailing alnum token ("24b" -> 24)
                     unsigned int e2 = plen;
-                    while (e2 > 0 && path[e2 - 1] >= '0' && path[e2 - 1] <= '9') {
+                    while (e2 > 0 && ((path[e2 - 1] >= '0' && path[e2 - 1] <= '9') ||
+                                      ((path[e2 - 1] | 0x20) >= 'a' && (path[e2 - 1] | 0x20) <= 'z'))) {
                         --e2;
                     }
                     for (unsigned int d3 = e2; d3 < plen; ++d3) {
+                        if (path[d3] < '0' || path[d3] > '9') {
+                            continue; // letter suffix (24b): keep the numeric run only
+                        }
                         v = v * 10 + (path[d3] - '0');
                     }
                     c->num = v;
