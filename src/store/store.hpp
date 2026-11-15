@@ -43,13 +43,13 @@ struct ApiCacheRow {
  *  column; the raw value is what clients gate on). Bits 7+ stay free: a new
  *  plugin status costs one bit, not a migration. */
 enum class StatusFlag : unsigned {
-    kNew = 1u << 0,       // is_new: refresh observed chapter growth beyond stored total_ch
-    kDone = 1u << 1,      // is_done: total_ch > 0 and read_ch >= total_ch
-    kOngoing = 1u << 2,   // category: source status folds "ongoing"
-    kHiatus = 1u << 3,    // category: source status folds "hiatus"
-    kCanceled = 1u << 4,  // category: source status folds "canceled"/"cancelled"
-    kCompleted = 1u << 5, // category: source status folds "completed"
-    kDim = 1u << 6,       // is_dim: user toggled dim+blur on the entry
+    kNew = 1U << 0,       // is_new: refresh observed chapter growth beyond stored total_ch
+    kDone = 1U << 1,      // is_done: total_ch > 0 and read_ch >= total_ch
+    kOngoing = 1U << 2,   // category: source status folds "ongoing"
+    kHiatus = 1U << 3,    // category: source status folds "hiatus"
+    kCanceled = 1U << 4,  // category: source status folds "canceled"/"cancelled"
+    kCompleted = 1U << 5, // category: source status folds "completed"
+    kDim = 1U << 6,       // is_dim: user toggled dim+blur on the entry
 };
 
 /** One user-saved manga (library-save): denormalized name/cover so the grid
@@ -65,17 +65,17 @@ struct SavedManga {
     int read_ch{};                 // chapters fully read at the last rollup
     std::int64_t last_read_at{};   // reader position timestamp; 0 = never opened
     std::int64_t updated_at{};     // unix seconds of last envelope-derived change; 0 = never synced
-    std::string synopsis{};        // plugin-source detail envelope synopsis (or 'description'; NOT enrichment)
-    std::string alt_titles{};      // plugin-source detail envelope alt titles, JSON array verbatim
+    std::string synopsis;          // plugin-source detail envelope synopsis (or 'description'; NOT enrichment)
+    std::string alt_titles;        // plugin-source detail envelope alt titles, JSON array verbatim
     int dup_group{};               // 0 = unique; recomputed from FTS5 + Dice similarity (library-dedup 2.2)
     int status_flags{}; // StatusFlag bitfield: bit0=is_new, bit1=is_done, bit2-5=one-hot
                                    // category (ongoing/hiatus/canceled/completed), bit6=is_dim
     // manga-detail-table: materialized display detail (resolved envelope);
     // empty = not materialized yet (next open resolves)
-    std::string authors{};          // JSON array verbatim
-    std::string artists{};          // JSON array verbatim
-    std::string tags{};             // merged list the page renders, JSON array verbatim
-    std::string synopsis_display{}; // resolved display synopsis; '' falls back to source synopsis
+    std::string authors;          // JSON array verbatim
+    std::string artists;          // JSON array verbatim
+    std::string tags;             // merged list the page renders, JSON array verbatim
+    std::string synopsis_display; // resolved display synopsis; '' falls back to source synopsis
 };
 
 /** \brief manga-detail-table D3 predicate: the row carries materialized display
