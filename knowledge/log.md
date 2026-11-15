@@ -1,4 +1,6 @@
 ## 2026-11-15
+* **Update**: Linked `decisions/saved-manga-detail-source-of-truth.md` to `findings/detail-name-vs-library-card.md` (The 2026-11-15 empty-detail-name bug is what motivated storing resolved detail on saved_manga: the resolver ran but nothing durable held its output, so the next page open re-derived the name.).
+* **Creation**: Documented concept `decisions/saved-manga-detail-source-of-truth.md` (Saved manga detail lives on saved_manga (planned, openspec manga-detail-table)).
 * **Update**: Updated concept `findings/detail-name-vs-library-card.md`.
 * **Creation**: Documented concept `findings/detail-name-vs-library-card.md` (Detail vs library title mismatch: apply_chosen trusts cached envelope with name:null).
 * **Update**: Updated concept `architecture/reader-page-progress.md`.
