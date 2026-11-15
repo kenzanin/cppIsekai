@@ -38,6 +38,29 @@ TEST_CASE("pages: ordered host-rendered urls with prev/next neighbors") {
     CHECK(has(body, R"("chapter":2)"));
 }
 
+TEST_CASE("pages: descending plugin order still yields nearest neighbors") {
+    // mangafreak emits newest-first; walking the array used to make 36/1 win for every chapter.
+    const std::string desc = R"({"ok":true,"data":[)"
+                             R"({"id":"c36","number":36},)"
+                             R"({"id":"c24b","number":24},)"
+                             R"({"id":"c24a","number":24},)"
+                             R"({"id":"c23","number":23},)"
+                             R"({"id":"c3","number":3},)"
+                             R"({"id":"c2","number":2},)"
+                             R"({"id":"c1","number":1}]})";
+    const std::string pages_env = R"({"ok":true,"data":["a"]})";
+
+    const auto second = build_pages_response(desc, pages_env, {"m", "s", 2});
+    REQUIRE(second);
+    CHECK(has(*second, R"("prev_ch":1)"));
+    CHECK(has(*second, R"("next_ch":3)"));
+
+    const auto dup = build_pages_response(desc, pages_env, {"m", "s", 23});
+    REQUIRE(dup);
+    CHECK(has(*dup, R"("prev_ch":3)"));
+    CHECK(has(*dup, R"("next_ch":24)")); // duplicate numbers collapse to one stop
+}
+
 TEST_CASE("pages: boundary chapters omit the missing neighbor") {
     const std::string pages_env = R"({"ok":true,"data":["a"]})";
     const auto first = build_pages_response(chs_env, pages_env, {"m", "s", 1});

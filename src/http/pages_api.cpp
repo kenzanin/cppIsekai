@@ -33,9 +33,9 @@ std::string url_encode(const std::string& s) {
 
 std::optional<std::string> build_pages_response(const std::string& chs_env, const std::string& pages_env,
                                                 const PagesCtx& ctx) {
-    // Resolve the target chapter id + prev/next numbers from the ordered list.
-    // Chapter list is number-ascending: last strictly-less = closest prev,
-    // first strictly-greater = closest next.
+    // Resolve the target chapter id + prev/next numbers from the list.
+    // Plugin order is not trusted (mangafreak emits newest-first), so the
+    // neighbours are the nearest numbers on each side, not the walked order.
     std::string target_id;
     double prev = 0;
     double next = 0;
@@ -75,9 +75,11 @@ std::optional<std::string> build_pages_response(const std::string& chs_env, cons
                     }
                 }
             } else if (*d < ctx.ch) {
-                prev = *d;
-                have_prev = true;
-            } else if (*d > ctx.ch && !have_next) {
+                if (!have_prev || *d > prev) { // nearest below
+                    prev = *d;
+                    have_prev = true;
+                }
+            } else if (*d > ctx.ch && (!have_next || *d < next)) { // nearest above
                 next = *d;
                 have_next = true;
             }
