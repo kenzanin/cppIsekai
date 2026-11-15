@@ -1,4 +1,6 @@
 ## 2026-11-15
+* **Creation**: Documented concept `constraints/plugin-status-canonical-vocab.md` (Plugin status strings: canonical vocab, normalized in-plugin).
+* **Creation**: Documented concept `decisions/chapter-stats-total-cached-read.md` (Chapter rows: total/cached/read page counters).
 * **Update**: Updated concept `decisions/guest-runtime-language.md`.
 * **Update**: Updated concept `constraints/sol2-lua-version.md`.
 * **Update**: Updated concept `decisions/third-party-dependencies.md`.
