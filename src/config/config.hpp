@@ -287,7 +287,7 @@ inline int save(const std::map<std::string, std::string>& updates, const std::st
                 std::string* err = nullptr) {
     auto reject = [&](const std::string& why, int rc) {
         if (err != nullptr) {
-            *err = std::move(why);
+            *err = why;
         }
         return rc;
     };

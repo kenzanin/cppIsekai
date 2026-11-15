@@ -42,14 +42,14 @@ struct ApiCacheRow {
 /** Per-manga state bitfield on saved_manga.status_flags (single INTEGER
  *  column; the raw value is what clients gate on). Bits 7+ stay free: a new
  *  plugin status costs one bit, not a migration. */
-enum class StatusFlag : unsigned {
-    kNew = 1U << 0,       // is_new: refresh observed chapter growth beyond stored total_ch
-    kDone = 1U << 1,      // is_done: total_ch > 0 and read_ch >= total_ch
-    kOngoing = 1U << 2,   // category: source status folds "ongoing"
-    kHiatus = 1U << 3,    // category: source status folds "hiatus"
-    kCanceled = 1U << 4,  // category: source status folds "canceled"/"cancelled"
-    kCompleted = 1U << 5, // category: source status folds "completed"
-    kDim = 1U << 6,       // is_dim: user toggled dim+blur on the entry
+enum class StatusFlag : std::uint8_t {
+    kNew = 1U << 0U,       // is_new: refresh observed chapter growth beyond stored total_ch
+    kDone = 1U << 1U,      // is_done: total_ch > 0 and read_ch >= total_ch
+    kOngoing = 1U << 2U,   // category: source status folds "ongoing"
+    kHiatus = 1U << 3U,    // category: source status folds "hiatus"
+    kCanceled = 1U << 4U,  // category: source status folds "canceled"/"cancelled"
+    kCompleted = 1U << 5U, // category: source status folds "completed"
+    kDim = 1U << 6U,       // is_dim: user toggled dim+blur on the entry
 };
 
 /** One user-saved manga (library-save): denormalized name/cover so the grid

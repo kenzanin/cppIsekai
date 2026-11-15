@@ -22,7 +22,7 @@ inline moodycamel::ReaderWriterQueue<std::string> g_log_queue{1024};
 
 class QueueSink : public spdlog::sinks::base_sink<std::mutex> {
 protected:
-    void sink_it_(const spdlog::details::log_msg& msg) override {
+    static void sink_it_(const spdlog::details::log_msg& msg) override {
         spdlog::memory_buf_t buf;
         formatter_->format(msg, buf);
         g_log_queue.enqueue(fmt::to_string(buf));

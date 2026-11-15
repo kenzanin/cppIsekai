@@ -40,7 +40,7 @@ struct WindowCtx {
     std::string slug;
     int chapter{};          // 1-based chapter number; 0 = unknown
     int page_base{};        // chapter-absolute page of batch[0]; 0 = legacy batch position
-    std::string chapter_id{}; // id8 cache-dir suffix; empty keeps the plain chNNN shape
+    std::string chapter_id; // id8 cache-dir suffix; empty keeps the plain chNNN shape
 };
 
 class Worker {
@@ -103,7 +103,7 @@ private:
                         .page = page,
                         .chapter_id = ctx.chapter_id,
                     };
-                    const auto p = images_.img_ensure(batch[i], {}, pctx); // transcode to [cache] image_format
+                    const auto p = images_.img_ensure(batch[i], {} pctx); // transcode to [cache] image_format
                     spdlog::debug("worker: prefetch {} -> {}", batch[i], p ? *p : std::string("failed"));
                 }
             }

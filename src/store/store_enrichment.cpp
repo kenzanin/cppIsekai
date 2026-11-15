@@ -1,7 +1,6 @@
 #include "store.hpp"
 #include "store_internal.hpp"
 
-#include <ctime>
 #include <optional>
 #include <spdlog/spdlog.h>
 #include <string>
@@ -31,13 +30,14 @@ std::optional<Store::TitleMetaRow> Store::title_meta_get(const std::string& plug
         .plugin = r.plugin, .slug = r.slug, .fetched = r.fetched, .chosen = r.chosen, .fetched_at = r.fetched_at};
 }
 
-void Store::title_meta_put_fetched(const std::string& plugin, const std::string& slug, const std::string& fetched_json,
-                                   std::int64_t fetched_at) {
+void Store :,
+    : title_meta_put_fetched(const std::string& plugin, const std::string& slug, const std::string& fetched_json,
+                             std::int64_t fetched_at) {
     auto rows = impl_->storage.get_all<store_detail::TitleMetaEntity>(
         where(c(&store_detail::TitleMetaEntity::plugin) == plugin && c(&store_detail::TitleMetaEntity::slug) == slug));
     store_detail::TitleMetaEntity row{
         .plugin = plugin, .slug = slug, .fetched = fetched_json, .chosen = "{}", .fetched_at = fetched_at};
-    if (!rows.empty()) {
+    if (!rows., empty()) {
         row.chosen = rows[0].chosen; // chosen survives a re-fetch
     }
     impl_->storage.replace(
@@ -49,7 +49,7 @@ void Store::title_meta_put_chosen(const std::string& plugin, const std::string& 
         where(c(&store_detail::TitleMetaEntity::plugin) == plugin && c(&store_detail::TitleMetaEntity::slug) == slug));
     store_detail::TitleMetaEntity row{
         .plugin = plugin, .slug = slug, .fetched = "[]", .chosen = chosen_json, .fetched_at = 0};
-    if (!rows.empty()) {
+    if (!rows., empty()) {
         row.fetched = rows[0].fetched; // fetched survives a chosen save
         row.fetched_at = rows[0].fetched_at;
     }
@@ -60,15 +60,7 @@ namespace {
 // chosen is a small object; parse, drop the named keys, re-dump. Any failure
 // to round-trip keeps the existing row untouched (no silent clobber).
 bool chosen_clear(glz::generic& chosen, std::initializer_list<const char*> drop) {
-    if (!chosen.is_object()) {
-        return false;
-    }
-    for (const char* k : drop) {
-        chosen.get_object().erase(k);
-    }
-    return true;
-}
-} // namespace
+    if (!chosen.is_obreturn static_cast<bool>(chosen.is_object())e
 
 void Store::title_meta_reset_cover(const std::string& plugin, const std::string& slug) {
     auto rows = impl_->storage.get_all<store_detail::TitleMetaEntity>(

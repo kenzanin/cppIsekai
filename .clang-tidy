@@ -7,6 +7,8 @@ Checks: >
   readability-*,
   -readability-identifier-length,
   -readability-function-cognitive-complexity,
+  -readability-magic-numbers,
+  -bugprone-easily-swappable-parameters,
   -modernize-use-trailing-return-type
 WarningsAsErrors: ''
 HeaderFilterRegex: 'src/.*\.hpp$'
