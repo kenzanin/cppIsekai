@@ -79,7 +79,10 @@ Result run_with(const CurlApi& c, const Request& req, const std::string& profile
             hdrs = c.slist_append(hdrs, ("User-Agent: " + req.ua_header).c_str());
         }
         for (const auto& [k, v] : req.headers) {
-            hdrs = c.slist_append(hdrs, (k + ": " + v).c_str());
+            std::string header = k;
+            header += ": ";
+            header += v;
+            hdrs = c.slist_append(hdrs, header.c_str());
         }
         c.easy_setopt(e.get(), CURLOPT_URL, req.url.c_str());
         c.easy_setopt(e.get(), CURLOPT_FOLLOWLOCATION, 1L);
@@ -164,7 +167,7 @@ Result sync(const Request& req, const std::string& proxy) {
     // drop the handshake against big LBs).
     if (const CurlApi* sys = system_api()) {
         Result r = run_with(chrome_api(), req, profile, proxy);
-        if (r.error.empty() || r.error.find("SSL_CONNECT_ERROR") == std::string::npos) {
+        if (r.error.empty() || !r.error.contains("SSL_CONNECT_ERROR")) {
             return r;
         }
         // Impersonate TLS failed once; retry once on system OpenSSL before giving up.

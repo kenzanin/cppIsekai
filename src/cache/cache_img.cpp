@@ -34,10 +34,11 @@ std::optional<std::string> Cache::img_store(const std::string& key, const std::s
               "." + ext;
     }
 
-    const std::lock_guard lock(mu_);
+    const std::scoped_lock lock(mu_);
     auto stored = persist_locked((fs::path(conf_.root) / "img" / rel).string(), body);
-    if (!stored)
+    if (!stored) {
         return std::nullopt;
+    }
     return stored;
 }
 
@@ -54,9 +55,10 @@ std::optional<std::string> Cache::img_ensure(const std::string& key, const Cover
     // ponytail: exists()/erase run OUTSIDE mu_ — alive() is never called
     // under the lock (std::mutex would deadlock); erase is idempotent.
     const auto alive = [this](const std::string& p) {
-        if (fs::exists(p))
+        if (fs::exists(p)) {
             return true;
-        const std::lock_guard lock(mu_);
+        }
+        const std::scoped_lock lock(mu_);
         entries_.erase(p);
         spdlog::debug("cache: img stale index entry dropped {}", p);
         return false;
@@ -72,38 +74,43 @@ std::optional<std::string> Cache::img_ensure(const std::string& key, const Cover
 
     std::optional<std::string> hit; // candidate chosen under lock, verified outside
     {
-        const std::lock_guard lock(mu_);
+        const std::scoped_lock lock(mu_);
         if (!cover_ctx.cover) {
             const std::string prefix = internal::page_rel(ns(page_ctx.plugin), page_ctx.slug, page_ctx.chapter,
                                                           page_ctx.page, page_ctx.chapter_id) +
                                        ".";
-            for (const auto& [path, _] : entries_)
-                if (path.find(prefix) != std::string::npos && !path.ends_with(".json")) {
+            for (const auto& [path, _] : entries_) {
+                if (path.contains(prefix) && !path.ends_with(".json")) {
                     hit = path;
                     break;
                 }
-            if (!hit)
+            }
+            if (!hit) {
                 spdlog::debug("cache: img ctx-miss, fetching {} (ch{} p{} {})", key, page_ctx.chapter, page_ctx.page,
                               page_ctx.slug);
+            }
         }
     }
-    if (hit && !alive(*hit))
+    if (hit && !alive(*hit)) {
         hit.reset(); // deleted under us: fall through to fetch
+    }
     if (hit) {
-        const std::lock_guard lock(mu_);
+        const std::scoped_lock lock(mu_);
         auto it = entries_.find(*hit);
-        if (it != entries_.end())
+        if (it != entries_.end()) {
             it->second.tick = ++tick_; // recency bump
+        }
         spdlog::debug("cache: img hit {} ({})", *hit, key);
-        return *hit;
+        return std::move(hit);
     }
     if (cover_ctx.cover) {
         auto hit = cover_serve(cover_ctx.plugin, cover_ctx.url.empty() ? key : cover_ctx.url);
         if (hit && alive(*hit)) {
-            const std::lock_guard lock(mu_);
+            const std::scoped_lock lock(mu_);
             auto it = entries_.find(*hit);
-            if (it != entries_.end())
+            if (it != entries_.end()) {
                 it->second.tick = ++tick_;
+            }
             return hit;
         }
         spdlog::debug("cache: img cover-miss, fetching {} (plugin={})", key, cover_ctx.plugin);
@@ -128,8 +135,9 @@ std::optional<std::string> Cache::img_ensure(const std::string& key, const Cover
         ctx.h = tc.height;
     }
     auto stored = img_store(key, tc.bytes, ctx, page_ctx, tc.ext);
-    if (stored)
+    if (stored) {
         spdlog::debug("cache: img stored {} ({} B)", *stored, tc.bytes.size());
+    }
     return stored;
 }
 
@@ -137,12 +145,13 @@ std::optional<std::string> Cache::cover_serve(const std::string& plugin, const s
     // Extension-free lookup (D1): entries_ keys are full on-disk paths
     // (<root>/img/...); covers land at <root>/img/<plugin>/cover/<sha1(url)-16>-<r4>.<ext>.
     // Match the tail (hash prefix, any ratio suffix and ext).
-    const std::lock_guard lock(mu_);
+    const std::scoped_lock lock(mu_);
     const std::string tail =
         "img/" + (plugin.empty() ? std::string("common") : ns(plugin)) + "/cover/" + sha1_hex(url).substr(0, 16) + "-";
     for (const auto& [path, _] : entries_) {
-        if (path.find(tail) != std::string::npos)
+        if (path.contains(tail)) {
             return path;
+        }
     }
     return std::nullopt;
 }

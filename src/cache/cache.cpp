@@ -1,9 +1,9 @@
 #include "cache/cache.hpp"
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
-#include <sstream>
 #include <utility>
 #include <vector>
 
@@ -26,12 +26,14 @@ Cache::Cache(Config conf, Fetcher fetch, NsResolver ns)
     const fs::path root(conf_.root);
 
     std::error_code ec;
-    for (const char* kind : {"img"})
+    for (const char* kind : {"img"}) {
         fs::create_directories(root / kind, ec);
+    }
     std::vector<fs::path> stale; // rollback copies left by earlier boots
     for (const fs::directory_entry& e : fs::directory_iterator(root, ec)) {
-        if (e.path().filename().string().rfind(".legacy-", 0) == 0)
+        if (e.path().filename().string().starts_with(".legacy-")) {
             stale.push_back(e.path());
+        }
     }
     for (const fs::path& p : stale) {
         std::error_code rec;
@@ -48,8 +50,9 @@ Cache::Cache(Config conf, Fetcher fetch, NsResolver ns)
             for (const char* kind : {"img"}) {
                 std::error_code rec;
                 const fs::path from = root / kind;
-                if (fs::exists(from, rec))
+                if (fs::exists(from, rec)) {
                     fs::rename(from, root / (std::string(".legacy-") + kind), rec);
+                }
             }
         }
         std::ofstream marker(stamp, std::ios::binary); // v2 era begins: never purge again
@@ -65,8 +68,9 @@ Cache::Cache(Config conf, Fetcher fetch, NsResolver ns)
     if (ns_ && !fs::exists(ns_stamp, ec)) {
         std::error_code rec;
         const fs::path from = root / "img";
-        if (fs::exists(from, rec))
+        if (fs::exists(from, rec)) {
             fs::rename(from, root / ".legacy-img", rec);
+        }
         fs::create_directories(root / "img", rec);
         std::ofstream marker(ns_stamp, std::ios::binary);
     }
@@ -85,18 +89,23 @@ Cache::Cache(Config conf, Fetcher fetch, NsResolver ns)
             continue;
         }
         std::error_code fec;
-        if (!it->is_regular_file(fec) || fec)
+        if (!it->is_regular_file(fec) || fec) {
             continue;
+        }
         // ponytail: cover sidecars (<hash>.json next to covers) excluded from
         // LRU byte accounting (D3).
-        if (it->path().parent_path().filename() == "cover" && it->path().extension() == ".json")
+        if (it->path().parent_path().filename() == "cover" && it->path().extension() == ".json") {
             continue;
-        seeds.push_back({it->path().string(), static_cast<std::int64_t>(it->file_size(fec)), it->last_write_time(fec)});
+        }
+        seeds.push_back({.path = it->path().string(),
+                         .bytes = static_cast<std::int64_t>(it->file_size(fec)),
+                         .mtime = it->last_write_time(fec),
+                        });
     }
-    std::stable_sort(seeds.begin(), seeds.end(), [](const Seed& a, const Seed& b) { return a.mtime < b.mtime; });
+    std::ranges::stable_sort(seeds, [](const Seed& a, const Seed& b) { return a.mtime < b.mtime; });
     for (Seed& s : seeds) {
         bytes_ += s.bytes;
-        entries_.emplace(std::move(s.path), Entry{s.bytes, ++tick_});
+        entries_.emplace(std::move(s.path), Entry{.bytes = s.bytes, .tick = ++tick_});
     }
 }
 
@@ -105,10 +114,12 @@ std::string Cache::path_for(const std::string& key, const std::string& kind, con
     // fs-safe subpath. The img pool has no sha fallback (D5): a caller without
     // a placement path gets "" and stores nothing. The api pool keeps its v1
     // sha naming.
-    if (!rel_path.empty() && kind == "img")
+    if (!rel_path.empty() && kind == "img") {
         return (fs::path(conf_.root) / kind / rel_path).string();
-    if (kind == "img")
+    }
+    if (kind == "img") {
         return {};
+    }
     return (fs::path(conf_.root) / kind / (sha1_hex(key) + "." + internal::ext_of(key))).string();
 }
 
@@ -131,18 +142,19 @@ std::optional<std::string> Cache::persist_locked(const std::string& path, const 
     const auto bytes = static_cast<std::int64_t>(body.size());
     if (const auto known = entries_.find(path); known != entries_.end()) {
         bytes_ += bytes - known->second.bytes; // refresh of a live entry
-        known->second = Entry{bytes, ++tick_};
+        known->second = Entry{.bytes = bytes, .tick = ++tick_};
     } else {
         bytes_ += bytes;
-        entries_.emplace(path, Entry{bytes, ++tick_});
+        entries_.emplace(path, Entry{.bytes = bytes, .tick = ++tick_});
     }
     trim(path);
     return path;
 }
 
 std::string Cache::ns(const std::string& plugin) const {
-    if (!ns_ || plugin.empty())
+    if (!ns_ || plugin.empty()) {
         return plugin;
+    }
     std::string out = ns_(plugin);
     return out.empty() ? plugin : out;
 }
@@ -150,11 +162,12 @@ std::string Cache::ns(const std::string& plugin) const {
 std::optional<std::string> Cache::ensure(const std::string& key, const std::string& kind, const std::string& rel_path) {
     // ponytail: one lock across the (blocking) fetch serializes concurrent
     // misses; per-key inflight dedup when parallel workers actually starve.
-    std::lock_guard lock(mu_);
+    std::scoped_lock lock(mu_);
 
-    const std::string path = path_for(key, kind, rel_path);
-    if (path.empty())
+    std::string path = path_for(key, kind, rel_path);
+    if (path.empty()) {
         return std::nullopt; // no placement path (img pool, D5): nothing to store
+    }
 
     if (const auto hit = entries_.find(path); hit != entries_.end()) {
         hit->second.tick = ++tick_; // recency bump on serve
@@ -162,25 +175,27 @@ std::optional<std::string> Cache::ensure(const std::string& key, const std::stri
     }
 
     const std::optional<std::string> body = fetch_ ? fetch_(key, {}) : std::nullopt;
-    if (!body)
+    if (!body) {
         return std::nullopt;
+    }
 
     return persist_locked(path, *body);
 }
 
 std::optional<std::string> Cache::store(const std::string& key, const std::string& kind, const std::string& body,
                                         const std::string& rel_path) {
-    const std::lock_guard lock(mu_);
+    const std::scoped_lock lock(mu_);
     const std::string path = path_for(key, kind, rel_path);
     return path.empty() ? std::nullopt : persist_locked(path, body);
 }
 
 std::optional<std::string> Cache::peek(const std::string& key, const std::string& kind, const std::string& rel_path) {
-    const std::lock_guard lock(mu_);
+    const std::scoped_lock lock(mu_);
 
     const auto it = entries_.find(path_for(key, kind, rel_path));
-    if (it == entries_.end())
+    if (it == entries_.end()) {
         return std::nullopt;
+    }
 
     std::ifstream in(it->first, std::ios::binary);
     if (!in) {
@@ -204,8 +219,9 @@ void Cache::trim(const std::string& keep) {
                 victim = it;
             }
         }
-        if (victim == entries_.end())
+        if (victim == entries_.end()) {
             break; // only `keep` left: cap < one file
+        }
         bytes_ -= victim->second.bytes;
         std::error_code ec;
         fs::remove(victim->first, ec);

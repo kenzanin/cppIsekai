@@ -10,6 +10,9 @@
  * then every caller passes the profile explicitly and an empty profile
  * falls back to chrome116, the pre-gate pinned value. */
 
+#include <algorithm>
+#include <array>
+#include <cstdint>
 #include <curl/curl.h>
 
 #include <map>
@@ -58,24 +61,20 @@ inline void applyProxy(CURL* e, const std::string& proxy) {
 /** \brief Targets the curl-impersonate pair accept: chrome/edge/safari from
  *  the linked lib, ff* from the firefox sibling (both probed, v0.6.1). */
 inline bool is_known_target(std::string_view t) {
-    for (std::string_view k :
-         {"chrome99", "chrome100", "chrome101", "chrome104", "chrome107", "chrome110", "chrome116", "edge99", "edge101",
-          "safari15_3", "safari15_5",
-          "ff153", "ff154", "ff155", "firefox153", "firefox154", "firefox155", "tor145"}) { // ff/tor: served by system OpenSSL (NSS vs BoringSSL in-process)
-        if (t == k) {
-            return true;
-        }
-    }
-    return false;
+    static constexpr std::array<std::string_view, 18> kTargets{
+        "chrome99", "chrome100", "chrome101", "chrome104", "chrome107", "chrome110", "chrome116",
+        "edge99",   "edge101",   "safari15_3", "safari15_5", "ff153",    "ff154",     "ff155",
+        "firefox153", "firefox154", "firefox155", "tor145"}; // ff/tor: system OpenSSL (NSS vs BoringSSL)
+    return std::ranges::any_of(kTargets, [&](std::string_view k) { return t == k; });
 }
 
 /** \brief Which lib family serves the profile. Firefox is unsupported: the
  *  ff build (NSS) cannot be loaded alongside the linked chrome build (BoringSSL)
  *  in one process; ff* falls back to the chrome engine. */
-enum class Family { Chrome, Firefox };
+enum class Family : std::uint8_t { Chrome, Firefox };
 
 inline Family family_of(std::string_view profile) {
-    if (profile.rfind("ff", 0) == 0 || profile.rfind("firefox", 0) == 0) {
+    if (profile.starts_with("ff") || profile.starts_with("firefox")) {
         return Family::Firefox;
     }
     return Family::Chrome;

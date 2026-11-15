@@ -11,8 +11,16 @@ extern "C" CURLcode curl_easy_impersonate(CURL* easy, const char* client, unsign
 namespace fetch {
 
 const CurlApi& chrome_api() {
-    static const CurlApi api{&curl_easy_init,    &curl_easy_cleanup, &curl_easy_setopt,   &curl_easy_perform,
-                             &curl_easy_getinfo, &curl_slist_append, &curl_easy_strerror, &curl_easy_impersonate};
+    static const CurlApi api{
+        .easy_init = &curl_easy_init,
+        .easy_cleanup = &curl_easy_cleanup,
+        .easy_setopt = &curl_easy_setopt,
+        .easy_perform = &curl_easy_perform,
+        .easy_getinfo = &curl_easy_getinfo,
+        .slist_append = &curl_slist_append,
+        .easy_strerror = &curl_easy_strerror,
+        .easy_impersonate = &curl_easy_impersonate,
+    };
     return api;
 }
 

@@ -147,7 +147,7 @@ cxx_bin("test_cache", {
     files = {"tests/test_cache.cpp", CACHE_SRC},
     incs = {"src"},
     pkgs = {"vips"},
-    reqs = {"spdlog"},
+    reqs = {"spdlog", "hash-library"},
     test = true,
 })
 
@@ -181,7 +181,7 @@ cxx_bin("test_http_img", {
     files = {"tests/test_http_img.cpp", CACHE_SRC},
     incs = {"src"},
     pkgs = {"vips"},
-    reqs = {"spdlog"},
+    reqs = {"spdlog", "hash-library"},
     test = true,
 })
 
@@ -196,7 +196,7 @@ cxx_bin("test_stale", {
     files = {"tests/test_stale.cpp", STORE_SRC},
     incs = {"src"},
     pkgs = {"vips"},
-    reqs = {"glaze", "sqlite_orm", "spdlog", "sqlite3", "utf8proc"},
+    reqs = {"glaze", "sqlite_orm", "spdlog", "sqlite3", "utf8proc", "hash-library"},
     test = true,
 })
 
@@ -204,14 +204,14 @@ cxx_bin("test_http_enrich", {
     files = {"tests/test_http_enrich.cpp", STORE_SRC},
     incs = {"src"},
     pkgs = {"vips"},
-    reqs = {"glaze", "sqlite_orm", "thread-pool", "simpleini", "readerwriterqueue", "spdlog", "sqlite3", "utf8proc"},
+    reqs = {"glaze", "sqlite_orm", "thread-pool", "simpleini", "readerwriterqueue", "spdlog", "sqlite3", "utf8proc", "hash-library"},
     test = true,
 })
 
 cxx_bin("test_pages", {
     files = {"tests/test_pages.cpp", "src/http/pages_api.cpp"},
     incs = {"src"},
-    reqs = {"glaze", "spdlog"},
+    reqs = {"glaze", "spdlog", "hash-library"},
     test = true,
 })
 
@@ -231,7 +231,7 @@ cxx_bin("test_worker", {
     files = {"tests/test_worker.cpp", CACHE_SRC},
     incs = {"src"},
     pkgs = {"vips"},
-    reqs = {"spdlog"},
+    reqs = {"spdlog", "hash-library"},
     test = true,
 })
 
@@ -239,7 +239,7 @@ cxx_bin("test_saved_stats", {
     files = {"tests/test_saved_stats.cpp", STORE_SRC},
     incs = {"src"},
     pkgs = {"vips"},
-    reqs = {"glaze", "sqlite_orm", "thread-pool", "simpleini", "readerwriterqueue", "spdlog", "sqlite3", "utf8proc"},
+    reqs = {"glaze", "sqlite_orm", "thread-pool", "simpleini", "readerwriterqueue", "spdlog", "sqlite3", "utf8proc", "hash-library"},
     test = true,
 })
 

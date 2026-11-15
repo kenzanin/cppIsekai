@@ -21,8 +21,9 @@ inline constexpr std::size_t slug_max = 64;
 /** \brief Longest prefix <= max that ends on a UTF-8 character boundary. */
 inline std::size_t capped_len(std::string_view s, std::size_t max) {
     std::size_t n = std::min(s.size(), max);
-    while (n > 0 && n < s.size() && (static_cast<unsigned char>(s[n]) & 0xC0) == 0x80)
+    while (n > 0 && n < s.size() && (static_cast<unsigned char>(s[n]) & 0xC0) == 0x80) {
         --n;
+    }
     return n;
 }
 
@@ -38,7 +39,7 @@ inline std::string slug_base(std::string_view title) {
         if (c >= 0x80) {
             s.push_back(ch);
             sep = false;
-        } else if (std::isalnum(c)) {
+        } else if (std::isalnum(c) != 0) {
             s.push_back(static_cast<char>(std::tolower(c)));
             sep = false;
         } else if (!sep) {
@@ -46,8 +47,9 @@ inline std::string slug_base(std::string_view title) {
             sep = true;
         }
     }
-    while (!s.empty() && s.back() == '-')
+    while (!s.empty() && s.back() == '-') {
         s.pop_back();
+    }
     s.resize(capped_len(s, slug_max));
     return s.empty() ? std::string("untitled") : s;
 }
@@ -57,17 +59,20 @@ inline std::string slug_base(std::string_view title) {
  *  another id. */
 inline std::string manga_slug(const std::map<std::string, std::string>& titles, const std::string& id) {
     const auto self = titles.find(id);
-    if (self == titles.end())
+    if (self == titles.end()) {
         return {};
+    }
     const std::string base = slug_base(self->second);
     bool collide = false;
-    for (const auto& [oid, otitle] : titles)
+    for (const auto& [oid, otitle] : titles) {
         if (oid != id && slug_base(otitle) == base) {
             collide = true;
             break;
         }
-    if (!collide || id.empty())
+    }
+    if (!collide || id.empty()) {
         return base;
+    }
     const std::string tail = id.size() <= 8 ? id : id.substr(id.size() - 8);
     // ponytail: two same-titled ids sharing their last 8 chars still merge;
     // upgrade path: lengthen the tail to the full id.
@@ -84,8 +89,9 @@ inline std::string manga_slug(const std::map<std::string, std::string>& titles, 
  *  changing its id or folder name -- what has to stay stable is the display
  *  name. Two plugins sharing a display name share a cache directory. */
 inline std::string cache_ns(std::string_view plugin_id, std::string_view name) {
-    if (name.find_first_not_of(" \t\r\n") == std::string_view::npos)
+    if (name.find_first_not_of(" \t\r\n") == std::string_view::npos) {
         return std::string(plugin_id);
+    }
     std::string s = slug_base(name);
     return s == "untitled" ? std::string(plugin_id) : s;
 }

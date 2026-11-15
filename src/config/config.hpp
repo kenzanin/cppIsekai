@@ -8,7 +8,7 @@
 #include "registry.hpp"
 
 #include <CLI/CLI.hpp>
-#include <glaze/glaze.hpp>
+#include "glaze/glaze.hpp"
 
 #include <SimpleIni.h> // vendored 4.27; load is read-only, save() below is the comment-safe merge
 
@@ -285,7 +285,7 @@ inline std::string dump() {
  *  file cannot be written; \p err carries the reason when non-null. */
 inline int save(const std::map<std::string, std::string>& updates, const std::string& ini_path,
                 std::string* err = nullptr) {
-    auto reject = [&](std::string why, int rc) {
+    auto reject = [&](const std::string& why, int rc) {
         if (err != nullptr) {
             *err = std::move(why);
         }

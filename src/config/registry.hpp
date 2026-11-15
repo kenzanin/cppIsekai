@@ -7,10 +7,11 @@
 
 #include <array>
 #include <cstddef>
+#include <cstdint>
 
 namespace config {
 
-enum class Type { Int, Int64, Str };
+enum class Type : std::int8_t { Int, Int64, Str };
 
 struct Entry {
     const char* section;

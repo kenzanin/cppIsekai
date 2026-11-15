@@ -43,7 +43,7 @@ using NsResolver = std::function<std::string(const std::string& plugin_id)>;
 
 struct Config {
     std::string root = "data/cache";
-    std::int64_t max_bytes = 2048LL << 20; // cache_max_mb, default 2048
+    std::int64_t max_bytes = 2048ULL << 20U; // cache_max_mb, default 2048
     std::string image_format = "webp";     // [cache] image_format: webp|avif|jxl|none
     std::int64_t cover_max_px = 800;       // [cache] cover_max_px: cover resize cap
 };
@@ -94,7 +94,7 @@ public:
      *  (no sidecar). */
     struct CoverCtx {
         std::string url;
-        std::string plugin{};
+        std::string plugin;
         int w{}, h{};
         double ratio{};
         bool cover{};
@@ -104,7 +104,7 @@ public:
         std::string slug;
         int chapter{};
         int page{};
-        std::string chapter_id{}; // id8 dir-suffix source; empty keeps plain chNNN
+        std::string chapter_id; // id8 dir-suffix source; empty keeps plain chNNN
     };
     std::optional<std::string> img_store(const std::string& key, const std::string& body, const CoverCtx& cover_ctx,
                                          const PageCtx& page_ctx, const std::string& ext_override = {});
