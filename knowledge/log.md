@@ -1,4 +1,6 @@
 ## 2026-11-15
+* **Update**: Linked `constraints/plugin-chapter-number-placeholders.md` to `decisions/chapter-zero-falsy-regression.md` (ch 0 is valid on mangadex; a plugin placeholder 0 must be told apart from a real prequel).
+* **Creation**: Documented concept `constraints/plugin-chapter-number-placeholders.md` (Plugin chapter numbers are untrusted: order, duplicates and placeholder 0).
 * **Creation**: Documented concept `constraints/test-binary-releasedbg-vs-release.md` (xmake test runs releasedbg; hand-run release test binaries go stale).
 * **Update**: Updated concept `decisions/saved-manga-detail-source-of-truth.md`.
 * **Update**: Linked `decisions/saved-manga-detail-source-of-truth.md` to `findings/detail-name-vs-library-card.md` (The 2026-11-15 empty-detail-name bug is what motivated storing resolved detail on saved_manga: the resolver ran but nothing durable held its output, so the next page open re-derived the name.).

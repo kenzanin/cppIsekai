@@ -192,6 +192,8 @@ methods.chapters = function(params)
       if type(c) == "table" and c.id then
         -- upstream sends number=0 for entries that only carry a numeric name
         -- (e.g. title "48"); fall back to the leading number in the name.
+        -- ponytail: a genuine prequel ch 0 whose name starts with a number
+        -- (other than 0) would be renumbered; none seen on mangafire yet.
         local num = tonumber(c.number)
         if not num or num == 0 then
           num = tonumber(tostring(c.name or ""):match("^%s*(%d+%.?%d*)")) or num or 0
