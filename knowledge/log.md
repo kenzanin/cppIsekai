@@ -1,4 +1,6 @@
 ## 2026-11-15
+* **Update**: Updated concept `findings/detail-name-vs-library-card.md`.
+* **Creation**: Documented concept `findings/detail-name-vs-library-card.md` (Detail vs library title mismatch: apply_chosen trusts cached envelope with name:null).
 * **Update**: Updated concept `architecture/reader-page-progress.md`.
 * **Update**: Linked `decisions/ui-polish-grid-accessibility-contrast.md` to `architecture/status-flags-bitfield.md`.
 * **Update**: Linked `decisions/ui-polish-grid-accessibility-contrast.md` to `architecture/per-manga-dim-blur.md`.
