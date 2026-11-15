@@ -12,8 +12,7 @@ namespace fs = std::filesystem;
 
 namespace cache {
 
-std::optional<std::string> Cache::img_store(const std::string& key, const std::string& body, const CoverCtx& cover_ctx,
-                                            const PageCtx& page_ctx, const std::string& ext_override) {
+std::optional<std::string> Cache::img_store(const std::string& key, const std::string& body, const CoverCtx& cover_ctx, const PageCtx& page_ctx, const std::string& ext_override) {
     // V3 layout (D1-D4): cover -> <plugin>/cover/<urlhash16>.<ext> + sidecar;
     // page -> <plugin>/manga/<slug>/ch<n>-<id8>/pNNN.<ext> via page_rel.
     // No placement context -> store nothing: the img pool has no sha fallback
