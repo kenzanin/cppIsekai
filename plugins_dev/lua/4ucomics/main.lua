@@ -1,9 +1,16 @@
 -- 4ucomics: private JSON API v1 behind Cloudflare (the HTML shell is a JS
 -- SPA). API calls ride the lightpanda renderer profile -- the challenge
--- solver (decisions/renderer-fetch-engines); page/cover CDNs are open, the
--- host image path (plain curl + manifest image_referer) reaches them direct.
+-- solver (decisions/renderer-fetch-engines). Page/cover CDNs vary per title
+-- and some (mangadot.net) sit behind CF too: every image URL is wrapped in
+-- the site's own /api/v1/img proxy, fetched by the host with the manifest
+-- `image_engine` impersonation profile (image-engine-profile).
 -- Envelope { ok, data | error }; canonical manga fields per the mangafire plugin.
 local API = "https://4ucomics.com/api/v1"
+
+local function proxy_img(u)
+  if type(u) ~= "string" or u == "" then return u end
+  return API .. "/img?url=" .. host.url_encode(u)
+end
 
 -- Site vocab (anilist-style) -> canonical; unknown falls to normalize_status.
 local STATUS = {
@@ -54,7 +61,7 @@ methods.search = function(params)
     out[#out + 1] = {
       id = h.slug,
       title = h.title or "",
-      cover = h.cover or "",
+      cover = proxy_img(h.cover or ""),
       status = "",
       author = "",
       genres = {},
@@ -76,7 +83,7 @@ methods.detail = function(params)
   return { ok = true, data = {
     id = m.slug or slug,
     title = m.title or "",
-    cover = m.cover or "",
+    cover = proxy_img(m.cover or ""),
     status = status_of(m.statuses),
     author = table.concat(authors, ", "),
     artist = "",
@@ -113,7 +120,7 @@ methods.pages = function(params)
       local out = {}
       for _, p in ipairs(c.pages or {}) do
         local urls = p.pageURLs or {}
-        if urls[1] then out[#out + 1] = urls[1] end
+        if urls[1] then out[#out + 1] = proxy_img(urls[1]) end
       end
       return { ok = true, data = out }
     end

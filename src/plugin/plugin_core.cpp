@@ -57,6 +57,12 @@ std::string Host::image_referer(const std::string& id) const {
     return path == std::string::npos ? site : site.substr(0, path);
 }
 
+std::string Host::image_engine(const std::string& id) const {
+    const std::scoped_lock lock(impl_->mu);
+    const auto it = impl_->plugins.find(id);
+    return it != impl_->plugins.end() ? it->second->info.image_engine : std::string{};
+}
+
 std::string Host::logo_path(const std::string& id) const {
     std::shared_ptr<Runtime> rt;
     {

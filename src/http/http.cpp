@@ -1,6 +1,7 @@
 #include "http.hpp"
 #include "http_routes.hpp"
 
+#include "fetch/fetch.hpp"
 #include "reader/cover_worker.hpp"
 #include "reader/worker.hpp"
 
@@ -16,8 +17,21 @@
 // CLI (OpenSSL) is the only engine proven to handshake there; promote to a
 // dedicated out-of-process fetch helper if anything heavier than images
 // ever needs it.
-cache::Fetcher makeCurlFetcher(const std::string& /*proxy*/, const plugin::Host& plugins) {
-    return [&plugins](const std::string& url, const std::string& plugin) -> std::optional<std::string> {
+cache::Fetcher makeCurlFetcher(const std::string& proxy, const plugin::Host& plugins) {
+    return [&plugins, proxy](const std::string& url, const std::string& plugin) -> std::optional<std::string> {
+        // Manifest `image_engine` opt-in: CF-fronted image CDNs need the
+        // chrome impersonation fingerprint; stock curl eats a 403 challenge.
+        if (const std::string engine = plugins.image_engine(plugin); !engine.empty()) {
+            fetch::Request rq{.url = url, .timeout_ms = 30000, .profile = engine};
+            if (const std::string referer = plugins.image_referer(plugin); !referer.empty()) {
+                rq.headers = {{"Referer", referer}};
+            }
+            const fetch::Result r = fetch::sync(rq, proxy);
+            if (r.error.empty() && r.status >= 200 && r.status < 300) {
+                return r.body;
+            }
+            return std::nullopt;
+        }
         // Shell-safe single-quote for argv fragments (URL and Referer alike).
         const auto quote = [](const std::string& s) {
             std::string out;

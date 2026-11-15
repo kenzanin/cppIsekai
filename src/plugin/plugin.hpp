@@ -50,7 +50,7 @@ struct Config {
 };
 
 struct PluginInfo {
-    std::string id, name, version, runtime, entry, website, image_referer;
+    std::string id, name, version, runtime, entry, website, image_referer, image_engine;
     std::vector<std::string> capabilities;
     int api{};
     std::string dir;
@@ -121,6 +121,11 @@ public:
      *  `image_referer` override when set, else the origin of `website`.
      *  Empty on unknown id / nothing to derive (js-image-referer-gap). */
     [[nodiscard]] std::string image_referer(const std::string& id) const;
+
+    /** \brief curl-impersonate profile for this plugin's image fetches; empty
+     *  = legacy plain curl (stock TLS). CF-fronted image CDNs opt in
+     *  (image-engine-profile). */
+    [[nodiscard]] std::string image_engine(const std::string& id) const;
 
     /** \brief Last-call outcome for id; ok-when-unknown when never called. */
     [[nodiscard]] CallHealth health(const std::string& id) const;
