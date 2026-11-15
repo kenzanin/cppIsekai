@@ -190,7 +190,12 @@ methods.chapters = function(params)
     if #items == 0 then break end
     for _, c in ipairs(items) do
       if type(c) == "table" and c.id then
-        local num = tonumber(c.number) or 0
+        -- upstream sends number=0 for entries that only carry a numeric name
+        -- (e.g. title "48"); fall back to the leading number in the name.
+        local num = tonumber(c.number)
+        if not num or num == 0 then
+          num = tonumber(tostring(c.name or ""):match("^%s*(%d+%.?%d*)")) or num or 0
+        end
         local cid = tonumber(c.id)
         out[#out + 1] = {
           id = cid and string.format("%.0f", cid) or tostring(c.id),
