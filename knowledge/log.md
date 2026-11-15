@@ -1,4 +1,5 @@
 ## 2026-11-15
+* **Update**: Updated concept `decisions/guest-runtime-language.md`.
 * **Update**: Updated concept `constraints/sol2-lua-version.md`.
 * **Update**: Updated concept `decisions/third-party-dependencies.md`.
 * **Update**: Linked `decisions/about-page-readme-single-source.md` to `decisions/static-assets-br.md` (About page renders markdown from the repo-root README.md using the same brotli-only vendored static asset serving decisions/static-assets-br defines (marked.min.js.br, mermaid.min.js.br via br_asset routes).).

@@ -3,7 +3,7 @@ type: constraint
 title: sol2 3.5.0 rejects Lua 5.5 from Arch pacman
 description: "sol2 3.5.0 compat header rejects Lua 5.5 (LUA_ERRGCMM undeclared). Since 2026-11-15 both sol2 and lua come from xrepo: sol2 3.5.0 with configs={includes_lua=false}, lua pinned 5.4.8 because bare xrepo 'lua' resolves to 5.5"
 tags: [sol2, lua, constraint, xrepo]
-generated: { by: agent/mcp, at: "2026-11-15T14:51:22Z" }
+generated: { by: agent/mcp, at: "2026-11-15T15:47:10Z" }
 status: stable
 ---
 

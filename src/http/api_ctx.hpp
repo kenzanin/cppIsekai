@@ -42,6 +42,7 @@ struct Ctx {
 inline constexpr const char* kStateHost = "host";
 inline constexpr const char* kSkipPrefix = "host/skip/";
 inline constexpr const char* kReadPrefix = "host/read/";
+inline constexpr const char* kTotalPrefix = "host/total/";
 inline constexpr const char* kPositionKey = "host/pos";
 
 // Typed readers for request/state JSON: absent or wrong-typed -> default.

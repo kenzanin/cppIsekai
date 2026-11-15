@@ -258,8 +258,8 @@
            class="text-sm font-medium w-20 shrink-0 hover:text-emerald-300" x-text="chLabel(ch)"></a>
         <span class="text-xs text-zinc-300 flex-1 truncate" x-text="ch.title"></span>
         <span class="text-xs text-zinc-300" x-text="fmtDate(ch.release_at)"></span>
-        <!-- read/total counter; total when the plugin reports it -->
-        <span class="text-xs text-zinc-300 tabular-nums" x-show="readMax(ch) > 0" x-text="readMax(ch)+(ch.pages ? '/'+ch.pages : '')"></span>
+        <!-- total/cached/read counter; '-' when unknown (read always known) -->
+        <span class="text-xs text-zinc-300 tabular-nums" title="total page/cached/read" x-text="chStats(ch)"></span>
         <!-- check: read state, lit when fully read -->
         <button @click="toggleRead(ch)" class="shrink-0" :class="isRead(ch) ? 'text-emerald-400' : 'text-zinc-400 hover:text-zinc-200'"
                 :title="isRead(ch) ? 'unread' : 'mark read'" :aria-label="isRead(ch) ? 'Mark chapter unread' : 'Mark chapter read'">
@@ -324,17 +324,19 @@ function detailPage() {
     chPageRows() { return this.visibleChapters().slice(this.chPage * 20, this.chPage * 20 + 20); },
     hiddenCount() { return this.chapters.length - this.visibleChapters().length; },
     readMax(ch) { return (this.readState[ch.id] && this.readState[ch.id].read) || 0; },
-    isRead(ch) { return ch.pages ? this.readMax(ch) >= ch.pages : this.readMax(ch) > 0; },
+    chStats(ch) { const s = this.readState[ch.id] || {}; return ((typeof s.total === 'number') ? s.total : '-') + '/' + ((typeof s.cached === 'number') ? s.cached : '-') + '/' + this.readMax(ch); },
+    totalOf(ch) { const t = this.readState[ch.id] && this.readState[ch.id].total; return (typeof t === 'number' && t > 0) ? t : 0; },
+    isRead(ch) { const t = this.totalOf(ch); return t ? this.readMax(ch) >= t : this.readMax(ch) > 0; },
     async loadChapterState() {
       if (!this.chapters.length) return;
       try {
         const r = await fetch('/chapter/state', {method: 'POST', headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ids: this.chapters.map(c => c.id)})});
+          body: JSON.stringify({plugin: this.plugin, slug: this.slug, ids: this.chapters.map(c => c.id)})});
         if (r.ok) { const j = await r.json(); this.chapters.forEach(c => { if (j[c.id]) c.done = !!j[c.id].skip; }); this.readState = j; }
       } catch (e) { /* list renders without state */ }
     },
     async toggleRead(ch) {
-      const to = this.isRead(ch) ? 0 : (ch.pages || 1);
+      const to = this.isRead(ch) ? 0 : (this.totalOf(ch) || ch.pages || 1);
       this.readState[ch.id] = {...(this.readState[ch.id] || {}), read: to || undefined};
       if (!to) delete this.readState[ch.id].read;
       try { await fetch(`/chapter/${encodeURIComponent(ch.id)}/read`, {method: 'POST',
@@ -542,7 +544,7 @@ function detailPage() {
       // per-chapter cache-full probe for the cbz button gate.
       for (const ch of this.chapters) {
         const n = Number(ch.number);
-        const total = ch.pages || 0;
+        const total = this.totalOf(ch) || ch.pages || 0;
         if (!Number.isFinite(n) || n <= 0 || !total || this.cbzReady[ch.id]) continue;
         try {
           const r = await fetch(`/api/cbz-ready?plugin=${encodeURIComponent(this.plugin)}&slug=${encodeURIComponent(this.slug)}&ch=${n}&pages=${total}`);

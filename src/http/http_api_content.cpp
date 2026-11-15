@@ -110,6 +110,7 @@ namespace http::api {
 void register_content(Ctx& c) {
     auto& app = c.app;
     auto& store = c.store;
+    auto& db = c.db;
     auto& plugin_pool = c.plugin_pool;
     auto& plugins = c.plugins;
     auto& images = c.images;
@@ -129,6 +130,10 @@ void register_content(Ctx& c) {
         crow::json::wvalue q;
         q["id"] = slug;
         const std::string chs_params = q.dump();
+        // Total page count for this release, persisted host-side for the
+        // chapter list; derived from the pages payload, zero plugin help.
+        std::string total_id;
+        int total_pages = 0;
         const std::string body = on_pool(plugin_pool, [&] {
             const std::string chs_env = call_cached(store, plugin, "chapters", chs_params,
                                                     [&] { return plugins.call(plugin, "chapters", chs_params); });
@@ -145,10 +150,20 @@ void register_content(Ctx& c) {
             const std::string pages_params = pages_q.dump();
             const std::string pages_env = call_cached(store, plugin, "pages", pages_params,
                                                       [&] { return plugins.call(plugin, "pages", pages_params); });
+            if (const auto pages = envelope_data(pages_env)) {
+                total_id = chapter_id;
+                total_pages = static_cast<int>(pages->size());
+            }
             return build_pages_response(chs_env, pages_env,
                                         PagesCtx{.plugin = plugin, .slug = slug, .ch = chd, .ch_id = chapter_id})
                 .value_or(std::string{});
         });
+        if (total_pages > 0 && !total_id.empty()) {
+            on_pool(db, [&] {
+                store.state_set(kStateHost, std::string(kTotalPrefix) + total_id, std::to_string(total_pages));
+                return 0;
+            });
+        }
         crow::response r;
         if (body.empty()) {
             r.code = 404;
