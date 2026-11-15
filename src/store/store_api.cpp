@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <ctime>
+#include <stdexcept>
 #include <utility>
 using namespace sqlite_orm;
 

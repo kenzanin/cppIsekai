@@ -428,19 +428,13 @@ inline std::string apply_chosen(Store& store, BS::thread_pool<>& db, const std::
     // (detail h1 reads it; raw envelopes carry `title` only).
     const auto saved = on_pool(db, [&] { return store.saved_get(plugin, slug); });
     auto ensure_name = [&](glz::generic& env) {
-        if (!env.is_object()) {
-            return;
-        }
+        if (!env.is_object()) return;
         auto& obj = env.get_object();
         auto* data = obj.find("data");
-        if (data == obj.end() || !data->second.is_object()) {
-            return;
-        }
+        if (data == obj.end() || !data->second.is_object()) return;
         auto& d = data->second.get_object();
         if (auto* n = d.find("name"); n != d.end()) {
-            if (const auto* s = std::get_if<std::string>(&n->second.data); s != nullptr && !s->empty()) {
-                return;
-            }
+            if (const auto* s = std::get_if<std::string>(&n->second.data); s != nullptr && !s->empty()) return;
         }
         if (auto* t = d.find("title"); t != d.end()) { // scraper title beats saved_manga.name (library rows can hold the slug)
             if (const auto* s = std::get_if<std::string>(&t->second.data); s != nullptr && !s->empty()) {
@@ -585,14 +579,14 @@ inline void materialize_detail(Store& store, BS::thread_pool<>& db, const std::s
     }
     auto& d = data->second.get_object();
     const auto arr_json = [&d](const char* key) {
-        auto* const it = d.find(key);
+        const auto it = d.find(key);
         if (it == d.end() || !it->second.is_array()) {
             return std::string{};
         }
         return glz::write_json(it->second).value_or(std::string{});
     };
     const auto str_of = [&d](const char* key) {
-        auto* const it = d.find(key);
+        const auto it = d.find(key);
         if (it == d.end()) {
             return std::string{};
         }
@@ -651,7 +645,7 @@ inline std::string saved_detail_response(Store& store, BS::thread_pool<>& db, co
         glz::generic chosen;
         if (!glz::read_json(chosen, row->chosen) && chosen.is_object()) {
             const auto& cd = chosen.get_object();
-            if (const auto* const it = cd.find("cover"); it != cd.end()) {
+            if (const auto it = cd.find("cover"); it != cd.end()) {
                 if (const auto* s = std::get_if<std::string>(&it->second.data); s != nullptr && !s->empty()) {
                     glz::generic cv;
                     cv.data = *s;

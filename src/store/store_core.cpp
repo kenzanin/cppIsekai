@@ -3,8 +3,10 @@
 
 #include <ctime>
 #include <spdlog/spdlog.h>
+#include <stdexcept>
 #include <string_view>
 #include <unordered_set>
+#include <utility>
 using namespace sqlite_orm;
 
 namespace {

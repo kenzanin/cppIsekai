@@ -29,7 +29,7 @@ add_requires("pkgconfig::lua54", {system = true})
 -- sol2 is header-only: tell its recipe not to pull a Lua dep (Arch's system lua54 covers runtime + headers),
 -- because xmake resolves bare "lua" to Arch's pacman lua 5.5 which sol2 3.5.0 rejects.
 add_requires("sol2 3.5.0", {configs = {includes_lua = false}})
-add_requires("glaze 7.9.0", "thread-pool 5.1.0", "readerwriterqueue 1.0.7", "lexbor 3.0.0",
+add_requires("glaze 9.1.0", "thread-pool 5.1.0", "readerwriterqueue 1.0.7", "lexbor 3.0.0",
     "libzippp 7.1", "quickjs-ng 0.15.1", "simpleini 4.27", "sqlite_orm 1.9.1",
     "spdlog 1.17.0", "zlib 1.3.2", "sqlite3 3.54.0+100", "utf8proc 2.11.3", "re2 2025.11.05",
     "date 3.0.4", "hash-library 2021.09.29", "pugixml 1.16", "backward-cpp")

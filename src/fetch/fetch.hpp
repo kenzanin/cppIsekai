@@ -64,8 +64,7 @@ inline bool is_known_target(std::string_view t) {
     static constexpr std::array<std::string_view, 18> kTargets{
         "chrome99", "chrome100", "chrome101", "chrome104", "chrome107", "chrome110", "chrome116",
         "edge99",   "edge101",   "safari15_3", "safari15_5", "ff153",    "ff154",     "ff155",
-        "firefox153", "firefox154", "firefox155", "tor145",
-    }; // ff/tor: system OpenSSL (NSS vs BoringSSL)
+        "firefox153", "firefox154", "firefox155", "tor145"}; // ff/tor: system OpenSSL (NSS vs BoringSSL)
     return std::ranges::any_of(kTargets, [&](std::string_view k) { return t == k; });
 }
 

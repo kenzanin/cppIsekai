@@ -144,7 +144,7 @@ TokenMultiset tokenize(const std::string& s) {
         out[std::move(cur)] += 1;
         cur.clear();
     };
-    const utf8proc_ssize_t max_cp = (static_cast<utf8proc_ssize_t>(s.size()) * 4) + 16;
+    const utf8proc_ssize_t max_cp = static_cast<utf8proc_ssize_t>(s.size()) * 4 + 16;
     std::vector<utf8proc_int32_t> buffer(max_cp);
     const utf8proc_ssize_t ncp = utf8proc_decompose(
         reinterpret_cast<const utf8proc_uint8_t*>(s.data()),
@@ -155,7 +155,7 @@ TokenMultiset tokenize(const std::string& s) {
         return out; // undecomposable input: no tokens
     }
     for (utf8proc_ssize_t i = 0; i < ncp; ++i) {
-        const auto cp = static_cast<uint32_t>(buffer[i]);
+        const uint32_t cp = static_cast<uint32_t>(buffer[i]);
         if (is_separator(cp)) {
             flush();
             continue;
@@ -401,15 +401,13 @@ void Store::upsert_plugin(const std::string& id, const std::string& name, const 
         impl_->storage.update(rows[0]);
         return;
     }
-    impl_->storage.insert(store_detail::PluginEntity{
-        .id = 0,
-        .name = name,
-        .plugin_id = id,
-        .version = version,
-        .capabilities = capabilities,
-        .enabled = 1,
-        .runtime = runtime,
-    });
+    impl_->storage.insert(store_detail::PluginEntity{.id = 0,
+                                                     .name = name,
+                                                     .plugin_id = id,
+                                                     .version = version,
+                                                     .capabilities = capabilities,
+                                                     .enabled = 1,
+                                                     .runtime = runtime});
 }
 
 void Store::set_plugin_enabled(std::int64_t id, bool on) {
@@ -492,10 +490,7 @@ std::optional<std::string> Store::state_get(const std::string& plugin_id, const 
 
 void Store::state_set(const std::string& plugin_id, const std::string& key, const std::string& value) {
     impl_->storage.replace(store_detail::StateEntity{
-        .plugin_id = plugin_id,
-        .key = key,
-        .value = value,
-    }); // INSERT OR REPLACE on the composite pk: upsert
+        .plugin_id = plugin_id, .key = key, .value = value}); // INSERT OR REPLACE on the composite pk: upsert
 }
 
 std::vector<std::string> Store::state_keys_value(const std::string& plugin_id, const std::string& key_prefix,
@@ -625,10 +620,9 @@ unsigned status_category_mask(std::string_view status) {
 int compose_flags(const store_detail::SavedMangaEntity& e, const std::string& status, bool is_new) {
     const unsigned cat = status_category_mask(status.empty() ? e.status : status);
     const bool done = e.total_ch > 0 && e.read_ch >= e.total_ch;
-    const unsigned new_bit = (is_new && !done) ? static_cast<unsigned>(std::to_underlying(StatusFlag::kNew)) : 0U;
+    const unsigned new_bit = (is_new && !done) ? static_cast<unsigned>(std::to_underlying(StatusFlag::kNew)) : 0u;
     const unsigned dim = static_cast<unsigned>(e.status_flags) & static_cast<unsigned>(std::to_underlying(StatusFlag::kDim));
-    return static_cast<int>(cat | (done ? static_cast<unsigned>(std::to_underlying(StatusFlag::kDone)) : 0U) | new_bit |
-                            dim);
+    return static_cast<int>(cat | (done ? static_cast<unsigned>(std::to_underlying(StatusFlag::kDone)) : 0u) | new_bit | dim);
 }
 } // namespace
 

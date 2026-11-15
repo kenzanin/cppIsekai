@@ -95,7 +95,7 @@ int main(int argc, char** argv) {
 
     // [cache]: one shared disk-LRU (img now, api in 3.3); cap resolved in MiB.
     const std::int64_t cache_max_bytes = cfg.cache_max_mb << 20;
-    cache::Config ccfg{.root = "data/cache", .max_bytes = cache_max_bytes};
+    cache::Config ccfg{"data/cache", cache_max_bytes};
     ccfg.image_format = cfg.image_format; // ponytail: must ride Config, else ini knob silently ignored
     ccfg.cover_max_px = cfg.cover_max_px;
     // Cache namespace: <root>/img/<dir> is keyed by the plugin display name
@@ -103,9 +103,8 @@ int main(int argc, char** argv) {
     // cached files. Snapshot at boot: a reload that renames a display name is
     // picked up on the next restart.
     std::map<std::string, std::string> cache_ns_by_id;
-    for (const auto& p : store.plugins()) {
+    for (const auto& p : store.plugins())
         cache_ns_by_id[p.plugin_id] = cache::cache_ns(p.plugin_id, p.name);
-    }
     cache::Cache images{ccfg, makeCurlFetcher(cfg.proxy, plugins),
                         [ns = std::move(cache_ns_by_id)](const std::string& id) {
                             const auto it = ns.find(id);
