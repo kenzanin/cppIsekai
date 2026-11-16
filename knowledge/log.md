@@ -1,4 +1,8 @@
 ## 2026-11-16
+* **Update**: Linked `findings/store-serialized-ops.md` to `architecture/store-orm-migration.md`.
+* **Update**: Linked `architecture/store-orm-migration.md` to `findings/store-serialized-ops.md`.
+* **Update**: Linked `decisions/api-cache-lock-miss-regression.md` to `findings/store-serialized-ops.md`.
+* **Creation**: Documented concept `findings/store-serialized-ops.md` (database is locked: concurrent store ops on the one shared connection).
 * **Update**: Linked `constraints/host-text-trim-preserves-casing.md` to `architecture/plugin-system.md`.
 * **Update**: Linked `findings/1manga-site-quirks.md` to `references/plugin-porting-matrix-goIsekai.md`.
 * **Creation**: Documented concept `constraints/host-text-trim-preserves-casing.md` (host.text.trim / strip_html preserve casing).

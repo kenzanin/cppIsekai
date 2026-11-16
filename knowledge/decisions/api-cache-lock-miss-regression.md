@@ -3,7 +3,7 @@ type: Decision
 title: "api_cache db-lock treated as cache miss: local-first regression (mitigated)"
 description: "db-lock on api_cache_get was indistinguishable from a cache miss -> call_cached fetched despite a cached row; MITIGATED 2026-11-11 by busy_timeout 3s on ORM + raw opens (1b63e59); unknown-title half was valid_title_pair lowercase-only charset (fixed 4091b5c)."
 tags: [regression, sqlite, lock, api-cache, local-first, stale-serve, fixed]
-generated: { by: agent/mcp, at: "2026-11-11T13:15:00Z" }
+generated: { by: agent/mcp, at: "2026-11-16T11:42:12Z" }
 status: stable
 ---
 
@@ -22,3 +22,6 @@ status: stable
 **Related fix (4091b5c)**: the unknown-title half of the symptom was NOT this bug — `valid_title_pair` (`http/api_ctx.hpp`) had a lowercase-only charset and rejected atsumaru's uppercase ids (`H6P2Z`) with 404 `unknown title`. Charset now case-preserving (A-Z added), traversal guards (`..`, separators) untouched; locked by test_http_enrich `valid_title_pair accepts plugin-minted case, rejects traversal`.
 
 Relates to `architecture/local-first-reads` (violation, now restored) and `decisions/api-cache-null-payload` (same look-aside, different failure mode).
+
+# Related Concepts
+- Related to [database is locked: concurrent store ops on the one shared connection](../findings/store-serialized-ops.md)

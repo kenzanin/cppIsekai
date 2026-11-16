@@ -3,7 +3,7 @@ type: decision
 title: Store migrated to sqlite_orm (Pimpl)
 description: "Store on sqlite_orm 1.9.1 behind Pimpl, API unchanged; five handoff-vs-header deltas recorded; on_db deadlock fixed; LIKE escaping preserved and verified"
 tags: [database, orm, store]
-generated: { by: agent/mcp, at: "2026-11-06T13:50:06Z" }
+generated: { by: agent/mcp, at: "2026-11-16T11:42:12Z" }
 status: stable
 ---
 
@@ -24,3 +24,4 @@ LIKE escaping preserved (regression-caught and fixed): like_pattern() escapes %,
 # Related Concepts
 - [Source layer map and rules (store / log / http)](../references/code-layers.md): ORM migration realizes the code-layer rules: Store remains the sole SQL gate, now via sqlite_orm
 - [cppIsekai dependency API surface](../references/dependency-api.md): sqlite_orm entry in the dependency API reference with the escape/limit/pragma caveats
+- Related to [database is locked: concurrent store ops on the one shared connection](../findings/store-serialized-ops.md)
