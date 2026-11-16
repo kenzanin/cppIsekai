@@ -1,0 +1,13 @@
+{
+  "name": "SanaScans",
+  "timeout": 30,
+  "site_url": "https://sanascans.com",
+  "logo": "logo.png",
+  "contract_version": 1,
+  "params": {
+    "site_url": "https://sanascans.com"
+  },
+  "runtime": "lua",
+  "version": "1.0.0",
+  "api": 1
+}

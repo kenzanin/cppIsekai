@@ -1,0 +1,15 @@
+{
+  "verify_url": "https://dynasty-scans.com",
+  "thumb_ratio": 0.703,
+  "name": "DynastyScan",
+  "site_url": "https://dynasty-scans.com",
+  "logo": "logo.png",
+  "contract_version": 1,
+  "paginates": true,
+  "params": {
+    "site_url": "https://dynasty-scans.com"
+  },
+  "runtime": "lua",
+  "version": "1.0.0",
+  "api": 1
+}

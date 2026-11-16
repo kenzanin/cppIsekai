@@ -1,0 +1,13 @@
+{
+  "name": "Comik",
+  "timeout": 60,
+  "site_url": "https://comik.to",
+  "logo": "logo.png",
+  "contract_version": 1,
+  "params": {
+    "site_url": "https://comik.to"
+  },
+  "runtime": "lua",
+  "version": "1.0.0",
+  "api": 1
+}

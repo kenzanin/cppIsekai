@@ -304,8 +304,9 @@ static void pages_reply(const std::string &id) {
     const std::string slug = id.substr(0, colon), ch = id.substr(colon + 1);
     const size_t dot = ch.find('.');
     const std::string suffix = dot == std::string::npos ? "0" : ch.substr(dot + 1);
-    const std::string reader = std::string(BASE) + "/manga/" + slug + "/" + ch + "/1.html";
-    if (!fetch(reader, "{}")) return reply_err("fetch failed");
+    const std::string reader = std::string(BASE) + "/manga/" + slug + "/c" + ch + "/1.html";
+    const std::string reader_opts = std::string("{\"cookie\":true,\"headers\":{\"Referer\":\"") + reader + "\"}}";
+    if (!fetch(reader, reader_opts.c_str())) return reply_err("fetch failed");
     auto t = rx("imagecount=([0-9]+)", body_buf(), rb1());
     auto cid = rx("chapterid *= *([0-9]+)", body_buf(), rb2());
     if (t.empty() || t[0].size() < 2 || cid.empty() || cid[0].size() < 2) return reply_err("no reader vars");
@@ -316,7 +317,7 @@ static void pages_reply(const std::string &id) {
     for (long k = 1; (long)urls.size() < total && k <= total + 2; k += 2) {
         const std::string cf =
             std::string(BASE) + "/chapterfun.ashx?cid=" + c + "&page=" + std::to_string(k) + "&key=";
-        const std::string opts = std::string("{\"Referer\":\"") + reader + "\"}";
+        const std::string opts = std::string("{\"cookie\":true,\"headers\":{\"Referer\":\"") + reader + "\"}}";
         if (!fetch(cf, opts.c_str())) break;
         const std::string js = unpack(body_buf());
         if (js.empty()) break;

@@ -1,0 +1,15 @@
+{
+  "verify_url": "https://www.topmanhua.fan",
+  "thumb_ratio": 0.694,
+  "name": "TopManhua",
+  "site_url": "https://www.topmanhua.fan/",
+  "logo": "logo.png",
+  "contract_version": 1,
+  "params": {
+    "base": "https://www.topmanhua.fan",
+    "cdn": "https://img-r1.2xstorage.com/"
+  },
+  "runtime": "lua",
+  "version": "1.0.0",
+  "api": 1
+}

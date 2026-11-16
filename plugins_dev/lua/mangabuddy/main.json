@@ -1,0 +1,14 @@
+{
+  "verify_url": "https://mangabuddy1.co.uk",
+  "thumb_ratio": 0.667,
+  "name": "MangaBuddy",
+  "site_url": "https://mangabuddy1.co.uk",
+  "logo": "logo.png",
+  "contract_version": 1,
+  "params": {
+    "site_url": "https://mangabuddy1.co.uk"
+  },
+  "runtime": "lua",
+  "version": "1.0.0",
+  "api": 1
+}

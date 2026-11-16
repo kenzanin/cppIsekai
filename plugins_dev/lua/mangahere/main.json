@@ -1,0 +1,12 @@
+{
+  "thumb_ratio": 0.703,
+  "name": "MangaHere",
+  "timeout": 60,
+  "site_url": "https://www.mangahere.cc",
+  "logo": "logo.png",
+  "contract_version": 1,
+  "paginates": true,
+  "runtime": "lua",
+  "version": "1.0.0",
+  "api": 1
+}

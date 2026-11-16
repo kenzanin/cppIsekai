@@ -3,7 +3,7 @@ type: decision
 title: "Plugin cookie jars: libcurl-native, per-plugin file state"
 description: "User approved 2026-11-08: native libcurl cookie engine (CURLOPT_COOKIEFILE/JAR), one jar per plugin at data/plugin-state/<id>.cookies.txt, enabled via a fetch-gate option; no new dependencies; implementation lands in change fetch-gate."
 tags: [cookie, curl, plugin-state, fetch, security]
-generated: { by: agent/mcp, at: "2026-11-08T09:00:00Z" }
+generated: { by: agent/mcp, at: "2026-11-16T00:39:08Z" }
 status: stable
 ---
 

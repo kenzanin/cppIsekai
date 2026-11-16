@@ -1,0 +1,12 @@
+{
+  "thumb_ratio": 0.703,
+  "name": "FanFox",
+  "timeout": 60,
+  "site_url": "https://m.fanfox.net",
+  "logo": "logo.png",
+  "contract_version": 1,
+  "paginates": true,
+  "runtime": "lua",
+  "version": "1.0.0",
+  "api": 1
+}

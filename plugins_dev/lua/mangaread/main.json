@@ -1,0 +1,14 @@
+{
+  "verify_url": "https://www.mangaread.org",
+  "thumb_ratio": 0.703,
+  "name": "MangaRead",
+  "site_url": "https://www.mangaread.org",
+  "logo": "logo.png",
+  "contract_version": 1,
+  "params": {
+    "site_url": "https://www.mangaread.org"
+  },
+  "runtime": "lua",
+  "version": "1.0.0",
+  "api": 1
+}

@@ -1,0 +1,14 @@
+{
+  "name": "MangaHome",
+  "timeout": 60,
+  "site_url": "https://www.mangahome.com",
+  "logo": "logo.png",
+  "contract_version": 1,
+  "paginates": true,
+  "params": {
+    "site_url": "https://www.mangahome.com"
+  },
+  "runtime": "lua",
+  "version": "1.0.0",
+  "api": 1
+}

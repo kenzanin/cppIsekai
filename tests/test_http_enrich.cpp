@@ -179,6 +179,18 @@ TEST_CASE("enrich: valid_title_pair accepts plugin-minted case, rejects traversa
     CHECK(!valid_title_pair("mangadex", "a..b"));
     CHECK(!valid_title_pair("mangadex", "a b"));
     CHECK(!valid_title_pair("mangadex", std::string(200, 'a')));
+    // unicode slugs pass now (host handles utf8); apostrophe/exclamation/colon too
+    CHECK(valid_title_pair("sanascans", "a-contract-marriage-as-the-marquis's-villainous-wife"));
+    CHECK(valid_title_pair("sanascans", "i'll-divorce-you-gracefully!"));
+    CHECK(valid_title_pair("sanascans", "escaping-my-charming-sister:-a-mind-reading-lady's-path"));
+    CHECK(valid_title_pair("mangadex", "海贼王"));
+    CHECK(valid_title_pair("mangadex", "pO3vrpjr|one-piece"));
+    CHECK(!valid_title_pair("mangadex", "a%2fb"));
+    CHECK(!valid_title_pair("mangadex", "a\\b"));
+    CHECK(!valid_title_pair("mangadex", "a?b"));
+    CHECK(!valid_title_pair("mangadex", "a#b"));
+    CHECK(!valid_title_pair("mangadex", "a\x7f" "b"));
+    CHECK(!valid_title_pair("mangadex", "a\x1f" "b"));
 }
 
 TEST_CASE("enrich: normalize_chosen related_add validation") {

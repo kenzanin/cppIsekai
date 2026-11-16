@@ -41,6 +41,11 @@ void open_sandbox(lua_State* L) {
     lua_pop(L, 1);
 }
 
+// Host tools for the Lua runtime. Build with clang only (xmake set_toolchains):
+// GCC folds every same-signature lambda to ONE type name, and sol2 3.5.0 keys its
+// functor metatables on that name (upstream #1743) -- at lua_close it then runs the
+// wrong destructor and segfaults. clang names include the source location, so the
+// keys stay distinct. See knowledge/findings/sol2-lua-functor-teardown-corruption.
 void install_host_tools(lua_State* L, const std::string& id, const Config& conf, const glz::generic& cfg, bool has_cfg,
                         const StateGet& sget, const StateSet& sset, const std::string& dir,
                         const LiveProfile& live_profile, const std::map<std::string, std::string>& params) {
@@ -134,8 +139,10 @@ end
 
     // config.get: values from the plugin's own config.json, parsed once at load.
     // Absent file or key -> nil; the sandbox itself stays file-read-free.
+    // Captured BY VALUE: rt.cfg dies with scan_dir's frame, so a reference capture
+    // dangles for every config.get call made after plugin load.
     sol::table config = sv.create_named_table("config");
-    config["get"] = [&cfg, has_cfg](const std::string& key, sol::this_state ts) -> sol::object {
+    config["get"] = [cfg, has_cfg](const std::string& key, sol::this_state ts) -> sol::object {
         const auto* obj = std::get_if<glz::generic::object_t>(&cfg.data);
         if (!has_cfg || obj == nullptr) {
             return sol::make_object(ts, sol::lua_nil);
@@ -157,9 +164,10 @@ end
     storage["set"] = [id, sset](const std::string& key, const std::string& val) { sset(id, key, val); };
     fs_tab["storage"] = storage;
 
-    // host.plugin.param: read manifest params; nil when absent.
+    // host.plugin.param: read manifest params; nil when absent. By value for the
+    // same lifetime reason as config.get.
     sol::table plugin_tbl = sv.create_table();
-    plugin_tbl["param"] = [&params](const std::string& key, sol::this_state ts) -> sol::object {
+    plugin_tbl["param"] = [params](const std::string& key, sol::this_state ts) -> sol::object {
         const auto it = params.find(key);
         if (it != params.end()) {
             return sol::make_object(ts, it->second);

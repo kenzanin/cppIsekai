@@ -3,7 +3,7 @@ type: Reference
 title: "WASM guest authoring pitfalls (wasm3, from mangafreak pilot)"
 description: "Repeated failure modes when writing cppIsekai WASM guests: shared-scratch clobber, static pool aliasing, reply envelope shape, silent zero on truncation, missing __wasm_call_ctors init (no start fn => null-table trap), raw query-key params (q not title)."
 tags: [wasm, wasm3, guest, pitfalls, mangafreak, plugin]
-generated: { by: agent/mcp, at: "2026-11-14T03:42:21Z" }
+generated: { by: agent/mcp, at: "2026-11-16T00:39:22Z" }
 status: stable
 ---
 
@@ -41,3 +41,4 @@ The call envelope params mirror the HTTP query verbatim: `?q=...` arrives as `"q
 
 # Related Concepts
 - Related to [goIsekai -> cppIsekai plugin porting matrix](plugin-porting-matrix-goIsekai.md)
+- Related to [host.http.fetch* writes body only on HTTP 200 (wasm imports)](../constraints/host-http-fetch-200-only.md)

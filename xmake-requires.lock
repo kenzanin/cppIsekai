@@ -3,7 +3,7 @@
         ["abseil <=20260107.0#f56260b5"] = {
             repo = {
                 branch = "master",
-                commit = "e3180f3c56182ce55e1f90082a653d3a2474fef1",
+                commit = "e651350be2dca5d0dcb08c77ae0eb0c4166b2f84",
                 url = "https://gitlab.com/tboox/xmake-repo.git"
             },
             version = "20260107.0"
@@ -11,7 +11,7 @@
         ["asio 1.36.0#d194f4a9"] = {
             repo = {
                 branch = "master",
-                commit = "e3180f3c56182ce55e1f90082a653d3a2474fef1",
+                commit = "e651350be2dca5d0dcb08c77ae0eb0c4166b2f84",
                 url = "https://gitlab.com/tboox/xmake-repo.git"
             },
             version = "1.36.0"
@@ -19,7 +19,7 @@
         ["asio#f56260b5"] = {
             repo = {
                 branch = "master",
-                commit = "e3180f3c56182ce55e1f90082a653d3a2474fef1",
+                commit = "e651350be2dca5d0dcb08c77ae0eb0c4166b2f84",
                 url = "https://gitlab.com/tboox/xmake-repo.git"
             },
             version = "1.36.0"
@@ -27,7 +27,7 @@
         ["backward-cpp#f56260b5"] = {
             repo = {
                 branch = "master",
-                commit = "e3180f3c56182ce55e1f90082a653d3a2474fef1",
+                commit = "e651350be2dca5d0dcb08c77ae0eb0c4166b2f84",
                 url = "https://gitlab.com/tboox/xmake-repo.git"
             },
             version = "v1.6"
@@ -35,7 +35,7 @@
         ["cli11 2.7.2#3ef3fffc"] = {
             repo = {
                 branch = "master",
-                commit = "e3180f3c56182ce55e1f90082a653d3a2474fef1",
+                commit = "e651350be2dca5d0dcb08c77ae0eb0c4166b2f84",
                 url = "https://gitlab.com/tboox/xmake-repo.git"
             },
             version = "v2.7.2"
@@ -43,7 +43,7 @@
         ["cmake#f56260b5"] = {
             repo = {
                 branch = "master",
-                commit = "e3180f3c56182ce55e1f90082a653d3a2474fef1",
+                commit = "e651350be2dca5d0dcb08c77ae0eb0c4166b2f84",
                 url = "https://gitlab.com/tboox/xmake-repo.git"
             },
             version = "4.3.4"
@@ -51,7 +51,7 @@
         ["convertutf#f56260b5"] = {
             repo = {
                 branch = "master",
-                commit = "e3180f3c56182ce55e1f90082a653d3a2474fef1",
+                commit = "e651350be2dca5d0dcb08c77ae0eb0c4166b2f84",
                 url = "https://gitlab.com/tboox/xmake-repo.git"
             },
             version = "v1.0.1"
@@ -59,23 +59,15 @@
         ["crow 1.3.5#d194f4a9"] = {
             repo = {
                 branch = "master",
-                commit = "e3180f3c56182ce55e1f90082a653d3a2474fef1",
+                commit = "e651350be2dca5d0dcb08c77ae0eb0c4166b2f84",
                 url = "https://gitlab.com/tboox/xmake-repo.git"
             },
             version = "v1.3.5"
         },
-        ["date 3.0.4#f56260b5"] = {
-            repo = {
-                branch = "master",
-                commit = "e3180f3c56182ce55e1f90082a653d3a2474fef1",
-                url = "https://gitlab.com/tboox/xmake-repo.git"
-            },
-            version = "v3.0.4"
-        },
         ["glaze 9.1.0#f56260b5"] = {
             repo = {
                 branch = "master",
-                commit = "e3180f3c56182ce55e1f90082a653d3a2474fef1",
+                commit = "e651350be2dca5d0dcb08c77ae0eb0c4166b2f84",
                 url = "https://gitlab.com/tboox/xmake-repo.git"
             },
             version = "v9.1.0"
@@ -83,7 +75,7 @@
         ["hash-library 2021.09.29#f56260b5"] = {
             repo = {
                 branch = "master",
-                commit = "e3180f3c56182ce55e1f90082a653d3a2474fef1",
+                commit = "e651350be2dca5d0dcb08c77ae0eb0c4166b2f84",
                 url = "https://gitlab.com/tboox/xmake-repo.git"
             },
             version = "2021.09.29"
@@ -91,7 +83,7 @@
         ["lexbor 3.0.0#f56260b5"] = {
             repo = {
                 branch = "master",
-                commit = "e3180f3c56182ce55e1f90082a653d3a2474fef1",
+                commit = "e651350be2dca5d0dcb08c77ae0eb0c4166b2f84",
                 url = "https://gitlab.com/tboox/xmake-repo.git"
             },
             version = "v3.0.0"
@@ -99,7 +91,7 @@
         ["libzippp 7.1#f56260b5"] = {
             repo = {
                 branch = "master",
-                commit = "e3180f3c56182ce55e1f90082a653d3a2474fef1",
+                commit = "e651350be2dca5d0dcb08c77ae0eb0c4166b2f84",
                 url = "https://gitlab.com/tboox/xmake-repo.git"
             },
             version = "7.1"
@@ -107,7 +99,7 @@
         ["libzip v1.10.1#f56260b5"] = {
             repo = {
                 branch = "master",
-                commit = "e3180f3c56182ce55e1f90082a653d3a2474fef1",
+                commit = "e651350be2dca5d0dcb08c77ae0eb0c4166b2f84",
                 url = "https://gitlab.com/tboox/xmake-repo.git"
             },
             version = "v1.10.1"
@@ -115,7 +107,7 @@
         ["lua 5.4.8#f56260b5"] = {
             repo = {
                 branch = "master",
-                commit = "e3180f3c56182ce55e1f90082a653d3a2474fef1",
+                commit = "e651350be2dca5d0dcb08c77ae0eb0c4166b2f84",
                 url = "https://gitlab.com/tboox/xmake-repo.git"
             },
             version = "v5.4.8"
@@ -123,7 +115,7 @@
         ["ninja#f56260b5"] = {
             repo = {
                 branch = "master",
-                commit = "e3180f3c56182ce55e1f90082a653d3a2474fef1",
+                commit = "e651350be2dca5d0dcb08c77ae0eb0c4166b2f84",
                 url = "https://gitlab.com/tboox/xmake-repo.git"
             },
             version = "v1.13.2"
@@ -134,7 +126,7 @@
         ["pugixml 1.16#f56260b5"] = {
             repo = {
                 branch = "master",
-                commit = "e3180f3c56182ce55e1f90082a653d3a2474fef1",
+                commit = "e651350be2dca5d0dcb08c77ae0eb0c4166b2f84",
                 url = "https://gitlab.com/tboox/xmake-repo.git"
             },
             version = "v1.16"
@@ -142,7 +134,7 @@
         ["quickjs-ng 0.15.1#f56260b5"] = {
             repo = {
                 branch = "master",
-                commit = "e3180f3c56182ce55e1f90082a653d3a2474fef1",
+                commit = "e651350be2dca5d0dcb08c77ae0eb0c4166b2f84",
                 url = "https://gitlab.com/tboox/xmake-repo.git"
             },
             version = "v0.15.1"
@@ -150,7 +142,7 @@
         ["re2 2025.11.05#f56260b5"] = {
             repo = {
                 branch = "master",
-                commit = "e3180f3c56182ce55e1f90082a653d3a2474fef1",
+                commit = "e651350be2dca5d0dcb08c77ae0eb0c4166b2f84",
                 url = "https://gitlab.com/tboox/xmake-repo.git"
             },
             version = "2025.11.05"
@@ -158,7 +150,7 @@
         ["readerwriterqueue 1.0.7#f56260b5"] = {
             repo = {
                 branch = "master",
-                commit = "e3180f3c56182ce55e1f90082a653d3a2474fef1",
+                commit = "e651350be2dca5d0dcb08c77ae0eb0c4166b2f84",
                 url = "https://gitlab.com/tboox/xmake-repo.git"
             },
             version = "v1.0.7"
@@ -166,7 +158,7 @@
         ["simpleini 4.27#f56260b5"] = {
             repo = {
                 branch = "master",
-                commit = "e3180f3c56182ce55e1f90082a653d3a2474fef1",
+                commit = "e651350be2dca5d0dcb08c77ae0eb0c4166b2f84",
                 url = "https://gitlab.com/tboox/xmake-repo.git"
             },
             version = "v4.27"
@@ -174,7 +166,7 @@
         ["sol2 3.5.0#08b57da3"] = {
             repo = {
                 branch = "master",
-                commit = "e3180f3c56182ce55e1f90082a653d3a2474fef1",
+                commit = "e651350be2dca5d0dcb08c77ae0eb0c4166b2f84",
                 url = "https://gitlab.com/tboox/xmake-repo.git"
             },
             version = "v3.5.0"
@@ -182,7 +174,7 @@
         ["spdlog 1.17.0#f56260b5"] = {
             repo = {
                 branch = "master",
-                commit = "e3180f3c56182ce55e1f90082a653d3a2474fef1",
+                commit = "e651350be2dca5d0dcb08c77ae0eb0c4166b2f84",
                 url = "https://gitlab.com/tboox/xmake-repo.git"
             },
             version = "v1.17.0"
@@ -190,7 +182,7 @@
         ["sqlite3#f56260b5"] = {
             repo = {
                 branch = "master",
-                commit = "e3180f3c56182ce55e1f90082a653d3a2474fef1",
+                commit = "e651350be2dca5d0dcb08c77ae0eb0c4166b2f84",
                 url = "https://gitlab.com/tboox/xmake-repo.git"
             },
             version = "3.54.0+100"
@@ -198,7 +190,7 @@
         ["sqlite_orm 1.9.1#f56260b5"] = {
             repo = {
                 branch = "master",
-                commit = "e3180f3c56182ce55e1f90082a653d3a2474fef1",
+                commit = "e651350be2dca5d0dcb08c77ae0eb0c4166b2f84",
                 url = "https://gitlab.com/tboox/xmake-repo.git"
             },
             version = "v1.9.1"
@@ -206,7 +198,7 @@
         ["thread-pool 5.1.0#f56260b5"] = {
             repo = {
                 branch = "master",
-                commit = "e3180f3c56182ce55e1f90082a653d3a2474fef1",
+                commit = "e651350be2dca5d0dcb08c77ae0eb0c4166b2f84",
                 url = "https://gitlab.com/tboox/xmake-repo.git"
             },
             version = "v5.1.0"
@@ -214,7 +206,7 @@
         ["utf8proc 2.11.3#f56260b5"] = {
             repo = {
                 branch = "master",
-                commit = "e3180f3c56182ce55e1f90082a653d3a2474fef1",
+                commit = "e651350be2dca5d0dcb08c77ae0eb0c4166b2f84",
                 url = "https://gitlab.com/tboox/xmake-repo.git"
             },
             version = "v2.11.3"
@@ -222,7 +214,7 @@
         ["zlib#f56260b5"] = {
             repo = {
                 branch = "master",
-                commit = "e3180f3c56182ce55e1f90082a653d3a2474fef1",
+                commit = "e651350be2dca5d0dcb08c77ae0eb0c4166b2f84",
                 url = "https://gitlab.com/tboox/xmake-repo.git"
             },
             version = "v1.3.2"

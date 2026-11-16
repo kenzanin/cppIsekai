@@ -3,7 +3,7 @@ type: Reference
 title: MangaFox (fanfox.net) site quirks (wasm guest)
 description: "fanfox mobile chapter list server-renders only for some titles (JS shell for others); chapter anchors carry no title attr; house-key detail envelope. Guest: plugins_dev/wasm/mangafox."
 tags: [mangafox, fanfox, wasm, guest, site-quirks, plugin]
-generated: { by: agent/mcp, at: "2026-11-14T03:42:56Z" }
+generated: { by: agent/mcp, at: "2026-11-16T00:39:25Z" }
 status: stable
 ---
 
@@ -19,3 +19,4 @@ Facts for the wasm guest (plugins_dev/wasm/mangafox, verified against live site 
 
 # Related Concepts
 - Related to [WASM guest authoring pitfalls (wasm3, from mangafreak pilot)](wasm-guest-pitfalls.md)
+- Related to [host.http.fetch* writes body only on HTTP 200 (wasm imports)](../constraints/host-http-fetch-200-only.md)

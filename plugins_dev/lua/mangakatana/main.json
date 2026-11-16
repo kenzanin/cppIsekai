@@ -1,0 +1,14 @@
+{
+  "verify_url": "https://mangakatana.com",
+  "thumb_ratio": 0.703,
+  "name": "MangaKatana",
+  "site_url": "https://mangakatana.com",
+  "logo": "logo.png",
+  "contract_version": 1,
+  "params": {
+    "site_url": "https://mangakatana.com"
+  },
+  "runtime": "lua",
+  "version": "1.0.0",
+  "api": 1
+}

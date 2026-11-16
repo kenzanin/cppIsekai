@@ -36,15 +36,22 @@ EnvLookup fake_env(std::map<std::string, std::string> m) {
     };
 }
 
-Overrides parse_args(std::initializer_list<const char*> args) {
+// Overrides keeps Option* INTO the App that created it -- the App must outlive
+// the Options users (resolve reads o.opt[i]->count()). Keep both in one holder.
+struct ParsedArgs {
+    std::unique_ptr<CLI::App> app;
     Overrides o;
-    CLI::App app{"test"};
-    build_cli(app, o);
+};
+
+ParsedArgs parse_args(std::initializer_list<const char*> args) {
+    auto app = std::make_unique<CLI::App>("test");
+    Overrides o;
+    build_cli(*app, o);
     std::vector<std::string> argv;
     for (const char* a : args) argv.emplace_back(a);
     std::reverse(argv.begin(), argv.end()); // CLI11 vector<string> overload consumes reversed
-    app.parse(argv);
-    return o;
+    app->parse(argv);
+    return {std::move(app), std::move(o)};
 }
 
 } // namespace
@@ -83,14 +90,15 @@ TEST_CASE("config: layered resolve default < ini < env < flag") {
 
     SUBCASE("explicit flag beats env; unset flag keeps ini") {
         auto ini = tmp_ini("[server]\nport = 1234\n[cache]\ncache_max_mb = 64\n");
-        Overrides flagged = parse_args({"--port", "9000"});
-        Config c = resolve(flagged, ini, fake_env({{"CPPISEKAI_PORT", "2222"}}));
+        auto args = parse_args({"--port", "9000"});
+        Config c = resolve(args.o, ini, fake_env({{"CPPISEKAI_PORT", "2222"}}));
         CHECK(c.port == 9000);
         CHECK(c.cache_max_mb == 64); // --cache-max-mb not passed: ini value survives
     }
 
     SUBCASE("alias --server-port binds the same knob") {
-        CHECK(resolve(parse_args({"--server-port", "7777"}), "no-such-cfg.ini", fake_env({})).port == 7777);
+        auto srv = parse_args({"--server-port", "7777"});
+        CHECK(resolve(srv.o, "no-such-cfg.ini", fake_env({})).port == 7777);
     }
 
     SUBCASE("update knobs: defaults, bounds and round-trip") {
@@ -130,8 +138,8 @@ TEST_CASE("config: layered resolve default < ini < env < flag") {
         CHECK(b.image_format == "jxl");
         CHECK(b.cover_max_px == 1200);
 
-        Overrides flagged = parse_args({"--image-format", "none", "--cover-max-px", "600"});
-        Config c = resolve(flagged, ini, fake_env({{"CPPISEKAI_IMAGE_FORMAT", "jxl"}}));
+        auto args = parse_args({"--image-format", "none", "--cover-max-px", "600"});
+        Config c = resolve(args.o, ini, fake_env({{"CPPISEKAI_IMAGE_FORMAT", "jxl"}}));
         CHECK(c.image_format == "none"); // explicit flag beats env and ini
         CHECK(c.cover_max_px == 600);
     }
@@ -338,7 +346,7 @@ TEST_CASE("config: describe() projects registry with layer provenance (D1/D3)") 
 
     // flag beats env beats ini
     auto flagged = parse_args({"--port", "7777"});
-    const auto d2 = describe(ini, flagged, fake_env({{"CPPISEKAI_PORT", "9999"}}));
+    const auto d2 = describe(ini, flagged.o, fake_env({{"CPPISEKAI_PORT", "9999"}}));
     for (const auto& x : d2)
         if (x.full_key == "server.port") {
             CHECK(x.value == "7777");

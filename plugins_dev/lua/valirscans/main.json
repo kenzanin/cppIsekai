@@ -1,0 +1,15 @@
+{
+  "verify_url": "https://valirscans.org",
+  "thumb_ratio": 0.703,
+  "name": "ValirScans",
+  "site_url": "https://valirscans.org",
+  "logo": "logo.png",
+  "contract_version": 1,
+  "params": {
+    "media": "https://media.valirscans.org",
+    "site_url": "https://valirscans.org"
+  },
+  "runtime": "lua",
+  "version": "1.0.0",
+  "api": 1
+}

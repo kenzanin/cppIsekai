@@ -1,0 +1,17 @@
+{
+  "verify_url": "https://mangahub.io",
+  "thumb_ratio": 0.703,
+  "name": "MangaHub",
+  "site_url": "https://mangahub.io",
+  "logo": "logo.png",
+  "contract_version": 1,
+  "paginates": true,
+  "params": {
+    "api": "https://api.mghcdn.com/graphql",
+    "img_cdn": "https://imgx.mghcdn.com/",
+    "thumb_cdn": "https://thumb.mghcdn.com/"
+  },
+  "runtime": "lua",
+  "version": "1.0.0",
+  "api": 1
+}

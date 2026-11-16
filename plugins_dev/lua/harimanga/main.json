@@ -1,0 +1,14 @@
+{
+  "verify_url": "https://www.harimanga.cc",
+  "thumb_ratio": 0.703,
+  "name": "HariManga",
+  "site_url": "https://www.harimanga.cc",
+  "logo": "logo.png",
+  "contract_version": 1,
+  "params": {
+    "site_url": "https://www.harimanga.cc"
+  },
+  "runtime": "lua",
+  "version": "1.0.0",
+  "api": 1
+}
