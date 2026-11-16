@@ -53,9 +53,15 @@ int main(int argc, char** argv) {
     }
     const config::Config cfg = config::resolve(overrides, ini_path);
     // Boot-time level from the registry (log.level); bad values keep info.
+    // One knob owns both stream owners: spdlog's gate + crow's own, and crow
+    // records are re-emitted through the default spdlog logger (CrowSpdlogHandler).
     {
-        const auto lvl = spdlog::level::from_str(cfg.log_level);
-        spdlog::set_level(lvl == spdlog::level::off && cfg.log_level != "off" ? spdlog::level::info : lvl);
+        const auto parsed = spdlog::level::from_str(cfg.log_level);
+        const auto eff = parsed == spdlog::level::off && cfg.log_level != "off" ? spdlog::level::info : parsed;
+        spdlog::set_level(eff);
+        static CrowSpdlogHandler crow_handler;
+        crow::logger::setHandler(&crow_handler);
+        crow::logger::setLogLevel(crow_log_level(eff));
     }
 
     std::filesystem::create_directories(cfg.data_dir); // [paths] data_dir, boot-created (D6)

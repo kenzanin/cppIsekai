@@ -115,6 +115,34 @@ TEST_CASE("ABI envelope dispatch") {
     }
 }
 
+TEST_CASE("crow log stream sinks into spdlog") {
+    LogSetup ls;
+    static CrowSpdlogHandler handler;
+    crow::logger::setHandler(&handler);
+    crow::logger::setLogLevel(crow::LogLevel::Info);
+
+    CROW_LOG_INFO << "bridge probe marker";
+
+    LogBuffer drain("test_crow_bridge.log");
+    drain.drain();
+    bool seen = false;
+    for (const auto& line : drain.snapshot())
+        if (line.find("bridge probe marker") != std::string::npos && line.find("[info]") != std::string::npos)
+            seen = true;
+    CHECK(seen);
+
+    // level knob gates crow's side too: error+ hides info lines
+    crow::logger::setLogLevel(crow::LogLevel::Error);
+    CROW_LOG_INFO << "bridge hidden marker";
+    crow::logger::setLogLevel(crow::LogLevel::Info);
+    LogBuffer drain2("test_crow_bridge.log");
+    drain2.drain();
+    bool hidden = true;
+    for (const auto& line : drain2.snapshot())
+        if (line.find("bridge hidden marker") != std::string::npos) hidden = false;
+    CHECK(hidden);
+}
+
 TEST_CASE("host tools: log + now") {
     LogSetup ls;
     Store store("test_plugin_tools.db");
