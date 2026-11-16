@@ -1,4 +1,7 @@
 ## 2026-11-16
+* **Update**: Updated concept `decisions/comix-adoption-route-2026-11-16.md`.
+* **Creation**: Documented concept `decisions/comix-adoption-route-2026-11-16.md` (Comix.to adoption for cppIsekai: host needs (Route A lightpanda run evaluate)).
+* **Creation**: Documented concept `decisions/weebcentral-port-2026-11-16.md` (Weeb Central ported as Lua plugin (plain-HTML, CF-safe)).
 * **Update**: Linked `architecture/1manga-plugin-split.md` to `findings/lua-plugin-audit-2026-11-16.md` (1manga was split into module-per-purpose files and used as the healthy reference for the plugin fleet audit.).
 * **Update**: Updated concept `findings/lua-plugin-audit-2026-11-16.md`.
 * **Creation**: Documented concept `architecture/1manga-plugin-split.md` (1manga plugin source split into purpose modules).
@@ -336,3 +339,4 @@
 * **Creation**: Documented concept `decisions/source-layout-policy.md` (Post-split layout policy: crown facades, ~200-loc units, per-runtime seams, clang-doc doc-comments; sub-200 prune; audits in source-split-clangdoc/codeloc-final.txt).
 * **Update**: Updated concept `decisions/fetch-profile-gate.md` (firefox pulled into phase 1: dual-.so dlopen vtable, family routing; user steer 2026-11-08).
 * **Update**: Updated concept `decisions/fetch-profile-gate.md` (shipped state: real ff soname v0.6.1 pair vendored, probed safari15_3/_5 + ff target list, chrome-degrade path; change fetch-gate 6/6).
+* **Creation**: Documented concept `decisions/weebcentral-port-2026-11-16.md` (weebcentral.com ported to Lua plugin, e2e verified 2026-11-16; HAR audit verdicts: todaymanga CF-502/unreachable, xbato timeout + CF challenge + image-decrypt JS, webnex live but RSC-streamed + 2 challenge-platform hits, not a clean CF-safe port).
