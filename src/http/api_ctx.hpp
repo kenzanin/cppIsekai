@@ -55,15 +55,20 @@ inline long num_field(const crow::json::rvalue& j, const char* key, long def) {
 }
 
 // manga-detail 1.1: the {plugin, slug} path pair guard. Slugs are our own
-// cache-layout keys (fs-safe, case-preserving; plugin ids like atsumaru's H6P2Z carry uppercase); anything carrying
-// separators or dot segments is not a slug we minted -> 404 before any plugin or fs touch (design D5). Returns false
-// when the pair needs the not-found response.
+// cache-layout keys; the whitelist used to be [a-zA-Z0-9-_.] but real-world slugs
+// carry unicode/apostrophes/exclamation marks. The guard now denies only
+// path-significant or control bytes and dot segments: `/` `\` `?` `#` `%`,
+// space, C0/DEL controls; `..` is always refused. Returns false when the pair
+// needs the not-found response.
 inline bool valid_title_pair(const std::string& plugin, const std::string& slug) {
     const auto ok = [](const std::string& s) {
-        if (s.empty() || s.size() > 128 ||
-            s !=
-                s.substr(0, s.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_."))) {
+        if (s.empty() || s.size() > 128) {
             return false;
+        }
+        for (const unsigned char c : s) {
+            if (c == '/' || c == '\\' || c == '?' || c == '#' || c == '%' || c == 0x20 || c < 0x20 || c == 0x7f) {
+                return false;
+            }
         }
         if (s.contains("..")) {
             return false;
@@ -274,7 +279,7 @@ inline std::string refresh_error_text(const std::string& method, const std::stri
     return "refresh failed: " + method;
 }
 
-enum class RefreshResult { kOk, kRejected, kDisabled, kUpstreamFailed };
+enum class RefreshResult : std::int8_t { kOk, kRejected, kDisabled, kUpstreamFailed };
 
 struct RefreshOutcome {
     RefreshResult result = RefreshResult::kOk;
