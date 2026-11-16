@@ -17,6 +17,7 @@ static bool title_meta_row_bad(const std::string& json) {
 }
 
 std::optional<Store::TitleMetaRow> Store::title_meta_get(const std::string& plugin, const std::string& slug) {
+    const store_detail::OpTrace _op{"title_meta_get"};
     auto rows = impl_->storage.get_all<store_detail::TitleMetaEntity>(
         where(c(&store_detail::TitleMetaEntity::plugin) == plugin && c(&store_detail::TitleMetaEntity::slug) == slug));
     if (rows.empty()) {
@@ -33,6 +34,7 @@ std::optional<Store::TitleMetaRow> Store::title_meta_get(const std::string& plug
 
 void Store::title_meta_put_fetched(const std::string& plugin, const std::string& slug, const std::string& fetched_json,
                                    std::int64_t fetched_at) {
+    const store_detail::OpTrace _op{"title_meta_put_fetched"};
     auto rows = impl_->storage.get_all<store_detail::TitleMetaEntity>(
         where(c(&store_detail::TitleMetaEntity::plugin) == plugin && c(&store_detail::TitleMetaEntity::slug) == slug));
     store_detail::TitleMetaEntity row{
@@ -45,6 +47,7 @@ void Store::title_meta_put_fetched(const std::string& plugin, const std::string&
 }
 
 void Store::title_meta_put_chosen(const std::string& plugin, const std::string& slug, const std::string& chosen_json) {
+    const store_detail::OpTrace _op{"title_meta_put_chosen"};
     auto rows = impl_->storage.get_all<store_detail::TitleMetaEntity>(
         where(c(&store_detail::TitleMetaEntity::plugin) == plugin && c(&store_detail::TitleMetaEntity::slug) == slug));
     store_detail::TitleMetaEntity row{
@@ -71,6 +74,7 @@ bool chosen_clear(glz::generic& chosen, std::initializer_list<const char*> drop)
 } // namespace
 
 void Store::title_meta_reset_cover(const std::string& plugin, const std::string& slug) {
+    const store_detail::OpTrace _op{"title_meta_reset_cover"};
     auto rows = impl_->storage.get_all<store_detail::TitleMetaEntity>(
         where(c(&store_detail::TitleMetaEntity::plugin) == plugin && c(&store_detail::TitleMetaEntity::slug) == slug));
     if (rows.empty()) {
@@ -87,6 +91,7 @@ void Store::title_meta_reset_cover(const std::string& plugin, const std::string&
 }
 
 void Store::title_meta_reset_detail(const std::string& plugin, const std::string& slug) {
+    const store_detail::OpTrace _op{"title_meta_reset_detail"};
     auto rows = impl_->storage.get_all<store_detail::TitleMetaEntity>(
         where(c(&store_detail::TitleMetaEntity::plugin) == plugin && c(&store_detail::TitleMetaEntity::slug) == slug));
     if (rows.empty()) {

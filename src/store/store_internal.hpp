@@ -2,6 +2,8 @@
 /** \file store_internal.hpp
  *  \brief Storage entities + Impl plumbing shared by the store TUs.
  */
+#include "store_ops.hpp"
+
 #include <memory>
 #include <sqlite3.h>
 #include <string>

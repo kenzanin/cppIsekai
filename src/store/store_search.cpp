@@ -1,4 +1,5 @@
 #include "store.hpp"
+#include "store_busy.hpp"
 #include "store_internal.hpp"
 
 #include <algorithm>
@@ -31,7 +32,7 @@ void fts_sync(StoreImpl& impl, const std::string& plugin, const std::string& slu
         }
         return;
     }
-    sqlite3_busy_timeout(db, 3000);
+    store_detail::attach_busy(db);
     { // tokenized text: name + alt titles (raw JSON) + synopsis; FTS5 tokenizes free text
         sqlite3_stmt* del = nullptr;
         const char* dsql = "DELETE FROM library_fts WHERE plugin=? AND slug=?";
@@ -66,7 +67,7 @@ void fts_delete(StoreImpl& impl, const std::string& plugin, const std::string& s
         }
         return;
     }
-    sqlite3_busy_timeout(db, 3000);
+    store_detail::attach_busy(db);
     sqlite3_stmt* del = nullptr;
     if (sqlite3_prepare_v2(db, "DELETE FROM library_fts WHERE plugin=? AND slug=?", -1, &del, nullptr) == SQLITE_OK) {
         sqlite3_bind_text(del, 1, plugin.c_str(), -1, SQLITE_TRANSIENT);
@@ -198,6 +199,7 @@ double dice(const TokenMultiset& a, const TokenMultiset& b) {
 } // namespace
 
 void Store::recompute_dup_groups() {
+    const store_detail::OpTrace _op{"recompute_dup_groups"};
     // library-dedup 2.2 (design D3): FTS5 MATCH candidates, bm25-ordered, Dice
     // similarity >= 0.6, union-find components. All writes in ONE txn.
     auto rows =
@@ -214,7 +216,7 @@ void Store::recompute_dup_groups() {
             }
             return;
         }
-        sqlite3_busy_timeout(db, 3000);
+        store_detail::attach_busy(db);
         sqlite3_exec(db, "BEGIN IMMEDIATE", nullptr, nullptr, nullptr);
         for (const auto& r : rows) {
             if (r.dup_group != 0) {
@@ -265,7 +267,7 @@ void Store::recompute_dup_groups() {
         }
         return;
     }
-    sqlite3_busy_timeout(db, 3000);
+    store_detail::attach_busy(db);
     for (std::size_t i = 0; i < n; ++i) {
         // candidate set: title tokens, OR-joined (alnum so MATCH-safe); skip pure-stopword noise
         std::string match;
@@ -364,6 +366,7 @@ void Store::recompute_dup_groups() {
 }
 
 std::vector<Plugin> Store::plugins() {
+    const store_detail::OpTrace _op{"plugins"};
     auto rows = impl_->storage.select(
         columns(&store_detail::PluginEntity::id, &store_detail::PluginEntity::name,
                 sqlite_orm::count(&store_detail::TitleEntity::id), &store_detail::PluginEntity::plugin_id,
@@ -391,6 +394,7 @@ std::vector<Plugin> Store::plugins() {
 
 void Store::upsert_plugin(const std::string& id, const std::string& name, const std::string& version,
                           const std::string& capabilities, const std::string& runtime) {
+    const store_detail::OpTrace _op{"upsert_plugin"};
     auto rows =
         impl_->storage.get_all<store_detail::PluginEntity>(where(c(&store_detail::PluginEntity::plugin_id) == id));
     if (!rows.empty()) {
@@ -411,11 +415,13 @@ void Store::upsert_plugin(const std::string& id, const std::string& name, const 
 }
 
 void Store::set_plugin_enabled(std::int64_t id, bool on) {
+    const store_detail::OpTrace _op{"set_plugin_enabled"};
     impl_->storage.update_all(set(c(&store_detail::PluginEntity::enabled) = on ? 1 : 0),
                               where(c(&store_detail::PluginEntity::id) == id));
 }
 
 bool Store::plugin_enabled(const std::string& plugin_id) {
+    const store_detail::OpTrace _op{"plugin_enabled"};
     auto rows = impl_->storage.get_all<store_detail::PluginEntity>(
         where(c(&store_detail::PluginEntity::plugin_id) == plugin_id));
     if (rows.empty()) {
@@ -439,6 +445,7 @@ std::string like_pattern(const std::string& query) {
 } // namespace
 
 int Store::count(const std::string& plugin, const std::string& query) {
+    const store_detail::OpTrace _op{"count"};
     const auto pattern = like_pattern(query);
     if (plugin.empty()) {
         return impl_->storage.count<store_detail::TitleEntity>(
@@ -456,6 +463,7 @@ int Store::count(const std::string& plugin, const std::string& query) {
 }
 
 std::vector<Title> Store::search(const std::string& plugin, const std::string& query, int limit, int offset) {
+    const store_detail::OpTrace _op{"search"};
     const auto pattern = like_pattern(query);
     // LIKE '%' on plugin matches every row: one condition shape, no empty-branch special case.
     auto rows = impl_->storage.select(
@@ -480,6 +488,7 @@ std::vector<Title> Store::search(const std::string& plugin, const std::string& q
 }
 
 std::optional<std::string> Store::state_get(const std::string& plugin_id, const std::string& key) {
+    const store_detail::OpTrace _op{"state_get"};
     auto rows = impl_->storage.get_all<store_detail::StateEntity>(
         where(c(&store_detail::StateEntity::plugin_id) == plugin_id && c(&store_detail::StateEntity::key) == key));
     if (rows.empty()) {
@@ -489,12 +498,14 @@ std::optional<std::string> Store::state_get(const std::string& plugin_id, const 
 }
 
 void Store::state_set(const std::string& plugin_id, const std::string& key, const std::string& value) {
+    const store_detail::OpTrace _op{"state_set"};
     impl_->storage.replace(store_detail::StateEntity{
         .plugin_id = plugin_id, .key = key, .value = value}); // INSERT OR REPLACE on the composite pk: upsert
 }
 
 std::vector<std::string> Store::state_keys_value(const std::string& plugin_id, const std::string& key_prefix,
                                                  const std::string& value) {
+    const store_detail::OpTrace _op{"state_keys_value"};
     std::string pat;
     pat.reserve(key_prefix.size() + 1);
     for (char ch : key_prefix) {
@@ -517,6 +528,7 @@ std::vector<std::string> Store::state_keys_value(const std::string& plugin_id, c
 }
 
 void Store::position_set(const ReaderPosition& pos) {
+    const store_detail::OpTrace _op{"position_set"};
     // REPLACE on the (plugin, slug) PK: the route layers optional fields over
     // the stored row, this just persists the result. updated_at stamped here.
     impl_->storage.replace(store_detail::ReaderPositionEntity{
@@ -533,6 +545,7 @@ void Store::position_set(const ReaderPosition& pos) {
 }
 
 std::optional<ReaderPosition> Store::position_get(const std::string& plugin, const std::string& slug) {
+    const store_detail::OpTrace _op{"position_get"};
     auto rows = impl_->storage.get_all<store_detail::ReaderPositionEntity>(
         where(c(&store_detail::ReaderPositionEntity::plugin) == plugin &&
               c(&store_detail::ReaderPositionEntity::slug) == slug));
@@ -554,6 +567,7 @@ std::optional<ReaderPosition> Store::position_get(const std::string& plugin, con
 }
 
 std::optional<ReaderPosition> Store::position_last() {
+    const store_detail::OpTrace _op{"position_last"};
     auto rows = impl_->storage.get_all<store_detail::ReaderPositionEntity>(
         order_by(&store_detail::ReaderPositionEntity::updated_at).desc(), limit(1));
     if (rows.empty()) {
@@ -589,6 +603,10 @@ static store_detail::SavedMangaEntity saved_row(const SavedManga& m, std::int64_
         .alt_titles = m.alt_titles,
         .dup_group = m.dup_group,
         .status_flags = m.status_flags,
+        .authors = m.authors,
+        .artists = m.artists,
+        .tags = m.tags,
+        .synopsis_display = m.synopsis_display,
     };
 }
 
@@ -627,6 +645,7 @@ int compose_flags(const store_detail::SavedMangaEntity& e, const std::string& st
 } // namespace
 
 void Store::save_manga(const SavedManga& m) {
+    const store_detail::OpTrace _op{"save_manga"};
     // REPLACE on the (plugin, slug) PK: refreshes name/cover/added_at on re-save.
     // Preserve any existing stat columns so a plain re-save never resets progress.
     auto rows = impl_->storage.get_all<store_detail::SavedMangaEntity>(where(
@@ -655,6 +674,7 @@ void Store::save_manga(const SavedManga& m) {
 
 void Store::saved_stats_update(const std::string& plugin, const std::string& slug, const std::string& status,
                                int total_ch) {
+    const store_detail::OpTrace _op{"saved_stats_update"};
     auto rows = impl_->storage.get_all<store_detail::SavedMangaEntity>(where(
         c(&store_detail::SavedMangaEntity::plugin) == plugin && c(&store_detail::SavedMangaEntity::slug) == slug));
     if (rows.empty()) {
@@ -682,6 +702,7 @@ void Store::saved_stats_update(const std::string& plugin, const std::string& slu
 
 void Store::saved_signal_update(const std::string& plugin, const std::string& slug, const std::string& synopsis,
                                 const std::string& alt_titles_json) {
+    const store_detail::OpTrace _op{"saved_signal_update"};
     auto rows = impl_->storage.get_all<store_detail::SavedMangaEntity>(where(
         c(&store_detail::SavedMangaEntity::plugin) == plugin && c(&store_detail::SavedMangaEntity::slug) == slug));
     if (rows.empty()) {
@@ -706,6 +727,7 @@ void Store::saved_signal_update(const std::string& plugin, const std::string& sl
 
 void Store::saved_read_rollup(const std::string& plugin, const std::string& slug, int read_ch,
                               std::int64_t last_read_at) {
+    const store_detail::OpTrace _op{"saved_read_rollup"};
     auto rows = impl_->storage.get_all<store_detail::SavedMangaEntity>(where(
         c(&store_detail::SavedMangaEntity::plugin) == plugin && c(&store_detail::SavedMangaEntity::slug) == slug));
     if (rows.empty()) {
@@ -725,6 +747,7 @@ void Store::saved_read_rollup(const std::string& plugin, const std::string& slug
 }
 
 void Store::saved_clear_update(const std::string& plugin, const std::string& slug) {
+    const store_detail::OpTrace _op{"saved_clear_update"};
     auto rows = impl_->storage.get_all<store_detail::SavedMangaEntity>(where(
         c(&store_detail::SavedMangaEntity::plugin) == plugin && c(&store_detail::SavedMangaEntity::slug) == slug));
     if (rows.empty()) {
@@ -743,6 +766,7 @@ void Store::saved_clear_update(const std::string& plugin, const std::string& slu
 bool Store::saved_detail_put(const std::string& plugin, const std::string& slug, const std::string& name,
                              const std::string& authors_json, const std::string& artists_json,
                              const std::string& tags_json, const std::string& synopsis_display) {
+    const store_detail::OpTrace _op{"saved_detail_put"};
     auto rows = impl_->storage.get_all<store_detail::SavedMangaEntity>(where(
         c(&store_detail::SavedMangaEntity::plugin) == plugin && c(&store_detail::SavedMangaEntity::slug) == slug));
     if (rows.empty()) {
@@ -774,6 +798,7 @@ bool Store::saved_detail_put(const std::string& plugin, const std::string& slug,
 }
 
 void Store::saved_detail_clear(const std::string& plugin, const std::string& slug) {
+    const store_detail::OpTrace _op{"saved_detail_clear"};
     auto rows = impl_->storage.get_all<store_detail::SavedMangaEntity>(where(
         c(&store_detail::SavedMangaEntity::plugin) == plugin && c(&store_detail::SavedMangaEntity::slug) == slug));
     if (rows.empty()) {
@@ -791,6 +816,7 @@ void Store::saved_detail_clear(const std::string& plugin, const std::string& slu
 }
 
 void Store::saved_dim_update(const std::string& plugin, const std::string& slug, bool on) {
+    const store_detail::OpTrace _op{"saved_dim_update"};
     auto rows = impl_->storage.get_all<store_detail::SavedMangaEntity>(where(
         c(&store_detail::SavedMangaEntity::plugin) == plugin && c(&store_detail::SavedMangaEntity::slug) == slug));
     if (rows.empty()) {
@@ -803,6 +829,7 @@ void Store::saved_dim_update(const std::string& plugin, const std::string& slug,
 }
 
 std::vector<std::pair<std::string, std::string>> Store::saved_dim_list() {
+    const store_detail::OpTrace _op{"saved_dim_list"};
     const int dim = static_cast<int>(std::to_underlying(StatusFlag::kDim));
     auto rows = impl_->storage.select(
         columns(&store_detail::SavedMangaEntity::plugin, &store_detail::SavedMangaEntity::slug),
@@ -816,12 +843,14 @@ std::vector<std::pair<std::string, std::string>> Store::saved_dim_list() {
 }
 
 void Store::unsave_manga(const std::string& plugin, const std::string& slug) {
+    const store_detail::OpTrace _op{"unsave_manga"};
     impl_->storage.remove_all<store_detail::SavedMangaEntity>(where(
         c(&store_detail::SavedMangaEntity::plugin) == plugin && c(&store_detail::SavedMangaEntity::slug) == slug));
     fts_delete(*impl_, plugin, slug); // library-dedup 1.4
 }
 
 std::vector<SavedManga> Store::saved_list() {
+    const store_detail::OpTrace _op{"saved_list"};
     // added_at has second resolution, and REPLACE re-stamps it on re-save, so
     // newest-first by added_at alone is stable enough for the single-user grid.
     auto rows = impl_->storage.get_all<store_detail::SavedMangaEntity>(

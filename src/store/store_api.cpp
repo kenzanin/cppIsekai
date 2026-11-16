@@ -1,4 +1,5 @@
 #include "store.hpp"
+#include "store_busy.hpp"
 #include "store_internal.hpp"
 
 #include <algorithm>
@@ -8,12 +9,13 @@
 using namespace sqlite_orm;
 
 std::optional<ApiCacheRow> Store::api_cache_get(const std::string& plugin_id, const std::string& query_hash) {
+    const store_detail::OpTrace _op{"api_cache_get"};
     // Raw connection: payload is JSONB binary — sqlite_orm has no mapping for it.
     sqlite3* db = nullptr;
     if (sqlite3_open(impl_->path.c_str(), &db) != SQLITE_OK) {
         return std::nullopt;
     }
-    sqlite3_busy_timeout(db, 3000);
+    store_detail::attach_busy(db);
     sqlite3_stmt* stmt = nullptr;
     std::optional<ApiCacheRow> row;
     const char* sql = "SELECT params_json, json(payload), fetched_at, ttl_s FROM api_cache "
@@ -45,11 +47,12 @@ std::optional<ApiCacheRow> Store::api_cache_get(const std::string& plugin_id, co
 
 void Store::api_cache_put(const std::string& plugin_id, const std::string& query_hash, const std::string& params_json,
                           const std::string& payload, std::int64_t fetched_at, std::int64_t ttl_s) {
+    const store_detail::OpTrace _op{"api_cache_put"};
     sqlite3* db = nullptr;
     if (sqlite3_open(impl_->path.c_str(), &db) != SQLITE_OK) {
         return;
     }
-    sqlite3_busy_timeout(db, 3000);
+    store_detail::attach_busy(db);
     sqlite3_stmt* stmt = nullptr;
     // jsonb(?) rejects malformed JSON -> the write fails loudly, never stores garbage.
     const char* sql = "INSERT INTO api_cache(plugin_id, query_hash, params_json, fetched_at, ttl_s, payload) "
@@ -71,12 +74,13 @@ void Store::api_cache_put(const std::string& plugin_id, const std::string& query
 }
 
 int Store::api_cache_clear(const std::string& plugin_id) {
+    const store_detail::OpTrace _op{"api_cache_clear"};
     // Empty id clears every plugin; else just that plugin's envelopes.
     sqlite3* db = nullptr;
     if (sqlite3_open(impl_->path.c_str(), &db) != SQLITE_OK) {
         return -1;
     }
-    sqlite3_busy_timeout(db, 3000);
+    store_detail::attach_busy(db);
     sqlite3_stmt* stmt = nullptr;
     const char* sql = plugin_id.empty() ? "DELETE FROM api_cache" : "DELETE FROM api_cache WHERE plugin_id = ?";
     int changes = -1;
@@ -93,6 +97,7 @@ int Store::api_cache_clear(const std::string& plugin_id) {
 }
 
 std::optional<SavedManga> Store::saved_get(const std::string& plugin, const std::string& slug) {
+    const store_detail::OpTrace _op{"saved_get"};
     auto rows = impl_->storage.get_all<store_detail::SavedMangaEntity>(where(
         c(&store_detail::SavedMangaEntity::plugin) == plugin && c(&store_detail::SavedMangaEntity::slug) == slug));
     if (rows.empty()) {
@@ -124,6 +129,7 @@ std::optional<SavedManga> Store::saved_get(const std::string& plugin, const std:
 
 void Store::upsert_update_attempt(const std::string& plugin, const std::string& slug, const std::string& outcome,
                                   const std::string& error) {
+    const store_detail::OpTrace _op{"upsert_update_attempt"};
     const auto now = static_cast<std::int64_t>(std::time(nullptr));
     auto rows = impl_->storage.get_all<store_detail::UpdateAttemptsEntity>(
         where(c(&store_detail::UpdateAttemptsEntity::plugin) == plugin &&
@@ -148,6 +154,7 @@ void Store::upsert_update_attempt(const std::string& plugin, const std::string& 
 }
 
 std::optional<UpdateAttempt> Store::update_attempt_get(const std::string& plugin, const std::string& slug) {
+    const store_detail::OpTrace _op{"update_attempt_get"};
     auto rows = impl_->storage.get_all<store_detail::UpdateAttemptsEntity>(
         where(c(&store_detail::UpdateAttemptsEntity::plugin) == plugin &&
               c(&store_detail::UpdateAttemptsEntity::slug) == slug));
@@ -167,13 +174,14 @@ std::optional<UpdateAttempt> Store::update_attempt_get(const std::string& plugin
 }
 
 std::vector<UpdateAttempt> Store::update_candidates(std::int64_t now, int per_plugin_limit) {
+    const store_detail::OpTrace _op{"update_candidates"};
     // Window function: rank per plugin, keep the first N by never-attempted-first then oldest last_attempt_at.
     // read_ch <= 1: barely-read titles only. Backed-off rows are excluded.
     sqlite3* db = nullptr;
     if (sqlite3_open(impl_->path.c_str(), &db) != SQLITE_OK) {
         return {};
     }
-    sqlite3_busy_timeout(db, 3000);
+    store_detail::attach_busy(db);
     const char* sql = "SELECT plugin, slug, COALESCE(last_attempt_at,0), COALESCE(outcome,''), COALESCE(error,''), "
                       "       COALESCE(consecutive_errors,0), COALESCE(backoff_until,0) "
                       "FROM (SELECT s.plugin AS plugin, s.slug AS slug, a.last_attempt_at, a.outcome, a.error, "
@@ -208,6 +216,7 @@ std::vector<UpdateAttempt> Store::update_candidates(std::int64_t now, int per_pl
 }
 
 std::vector<std::string> Store::plugin_prune_absent(const std::vector<std::string>& keep_ids) {
+    const store_detail::OpTrace _op{"plugin_prune_absent"};
     // folder-removal GC (plugin-lifecycle 2.1): one transaction per gone
     // plugin, children first -- title hangs off the registry row id, the rest
     // key on the string plugin id. The plugin row dies last.
@@ -216,7 +225,7 @@ std::vector<std::string> Store::plugin_prune_absent(const std::vector<std::strin
     if (sqlite3_open(impl_->path.c_str(), &db) != SQLITE_OK) {
         return removed;
     }
-    sqlite3_busy_timeout(db, 3000);
+    store_detail::attach_busy(db);
     std::vector<std::string> all;
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db, "SELECT plugin_id FROM plugin WHERE plugin_id <> ''", -1, &stmt, nullptr) == SQLITE_OK) {
