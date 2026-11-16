@@ -21,8 +21,8 @@ Everything below is implemented and verified against the running daemon.
 - **Saved-row detail** — detail/chapters for saved rows serve from SQLite without calling the plugin; enrichment data (MangaDex/MangaUpdates: authors, artists, tags, synopsis) is materialized onto the row. Chosen alt-title/cover overrides apply on both live-fetch and row-serve paths.
 - **Stale-first fetch** — plugin API responses are cached in `api_cache` (SQLite, with raw-JSONB payload) and served stale-on-error; image bytes land in a disk LRU under `cache/` (layout v2: `<plugin>/covers/<slug>.<ext>`, `<plugin>/<slug>/chNNN/pNNN.<ext>`; whole-file eviction on overflow).
 - **Reader** — 10-page window, RTL/LTR, skip-aware, position resumed from the store, prev/next resolved by stable number order + index so duplicate chapter numbers (24a/24b) stay individually reachable; the reader links and prefetches by chapter id (`?ch_id=`), old number-only URLs keep working.
-- **Plugins** — per-site plugin-per-runtime; hosts expose a JSON ABI plus `http.fetch`, `storage.*`, `log.*`, `host.re2`, `host.html`, `host.crypto`, `host.text` (NFKD/casefold, `date_to_iso`).
-  - Lua 5.4 (sol2): anisascans, atsumaru, mangadex, mangafire (+ metadata-only enrichment sources `enrichment-mangadex`, `enrichment-mangaupdates`)
+- **Plugins** — per-site plugin-per-runtime; hosts expose a JSON ABI plus `http.fetch`, `storage.*`, `log.*`, `host.re2`, `host.html`, `host.crypto`, `host.text` (NFKD/casefold, `date_to_iso`) and `host.browser` (see Browser automation).
+  - Lua 5.4 (sol2): anisascans, atsumaru, comix, mangadex, mangafire (+ metadata-only enrichment sources `enrichment-mangadex`, `enrichment-mangaupdates`)
   - WASM (wasm3): mangafox, mangafreak
   - JavaScript (quickjs-ng): mangatown
   - mangafox reader is currently broken (upstream URL/shape change); tracked in `openspec/changes/plugin-port-multi-runtime/`.
@@ -97,6 +97,33 @@ sequenceDiagram
 
     note over W: prefetch loop, detached<br/>next 10 pages -> img_ensure (same hit/miss as above)
 ```
+
+## Browser automation
+
+Some sites (comix) render their page lists client-side only, so the host can drive a headless
+browser: [lightpanda](https://github.com/lightpanda-io/browser) speaking MCP over HTTP. The daemon
+supervises it in-process (reproc):
+
+- at boot the daemon probes `browser.lightpanda_url` (default `http://127.0.0.1:8899`, ini-only
+  `[browser]` section); a healthy listener is **adopted** (never killed at shutdown), otherwise an
+  app-owned child is spawned from `browser.lightpanda_command` (default `lightpanda`; set an
+  absolute path under systemd's minimal `PATH`) and readiness is polled ~5 s. Boot aborts when
+  neither works.
+- one crash recovery per incident: the next browser call after a transport failure respawns the
+  child, drops the session and retries once; a second consecutive failure marks the backend dead
+  for the process lifetime and later calls fail fast. Restarting the app resets it.
+- all browser calls share one mutex and one MCP session; localhost traffic bypasses the global
+  `proxy` (loopback exemption in the fetch gate).
+
+Plugins reach it through one passthrough, e.g. the comix page harvest:
+
+```lua
+host.browser.call("goto", { url = chapter_url })
+local out = host.browser.call("evaluate", { script = HARVEST }) -- promise: scroll slots, collect img src
+```
+
+Manifest knob: `"image_referer": "none"` sends image fetches with no `Referer` at all (comix CDN
+403s any referer); any other value overrides the derived origin.
 
 ## Database
 
