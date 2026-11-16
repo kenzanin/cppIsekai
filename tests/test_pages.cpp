@@ -59,7 +59,7 @@ TEST_CASE("pages: descending plugin order still yields nearest neighbors") {
     REQUIRE(dup);
     CHECK(has(*dup, R"("prev_ch":3)"));
     CHECK(has(*dup, R"("next_ch":24)")); // duplicate numbers stay consecutive stops
-    CHECK(has(*dup, R"("next_ch_id":"c24b")")); // stable sort keeps source order within a number
+    CHECK(has(*dup, R"("next_ch_id":"c24a")")); // ties read in id order: a before b
 }
 
 TEST_CASE("pages: boundary chapters omit the missing neighbor") {

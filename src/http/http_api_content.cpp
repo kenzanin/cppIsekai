@@ -42,6 +42,11 @@ std::string resolve_chapter_id(const std::string& chs_env, const std::string& wa
             }
         }
     }
+    // Number match with ties going to the id-min duplicate: pages_api sorts
+    // equal numbers by id, so the neighbor chain starts at the id-min entry --
+    // the fallback must land on that same release, not the raw-first one
+    // (mangafreak emits `_24b` before `_24a`).
+    std::string best;
     for (const auto& item : *chs) {
         if (!item.is_object()) {
             continue;
@@ -56,11 +61,11 @@ std::string resolve_chapter_id(const std::string& chs_env, const std::string& wa
             continue;
         }
         const std::string id = entry_id(item);
-        if (!id.empty()) {
-            return id;
+        if (!id.empty() && (best.empty() || id < best)) {
+            best = id;
         }
     }
-    return {};
+    return best;
 }
 
 // cache-full check for one chapter: <root>/img/<ns>/manga/<slug>/<chdir>/pNNN.ext

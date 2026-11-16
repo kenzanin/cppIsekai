@@ -66,8 +66,14 @@ std::optional<std::string> build_pages_response(const std::string& chs_env, cons
             order.emplace_back(*d, std::move(id));
         }
     }
-    std::stable_sort(order.begin(), order.end(),
-                     [](const auto& a, const auto& b) { return a.first < b.first; });
+    // ties by id: equal-number releases (mangafreak `_24a`/`_24b`) read in
+    // suffix order no matter which direction the plugin array ran.
+    std::stable_sort(order.begin(), order.end(), [](const auto& a, const auto& b) {
+        if (a.first != b.first) {
+            return a.first < b.first;
+        }
+        return a.second < b.second;
+    });
     size_t target_idx = order.size();
     if (!ctx.ch_id.empty()) {
         for (size_t i = 0; i < order.size(); ++i) {

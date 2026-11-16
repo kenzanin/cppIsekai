@@ -12,7 +12,14 @@ std::vector<WindowPart> window_parts(const std::vector<Chapter>& chapters, const
     }
 
     std::vector<Chapter> ordered = chapters; // never trust the caller's order
-    std::ranges::stable_sort(ordered, [](const Chapter& a, const Chapter& b) { return a.number < b.number; });
+    // tie-break equal numbers by id: same canonical order as pages_api, so the
+    // prefetch window walks `_24a` then `_24b` like the reader does.
+    std::ranges::stable_sort(ordered, [](const Chapter& a, const Chapter& b) {
+        if (a.number != b.number) {
+            return a.number < b.number;
+        }
+        return a.id < b.id;
+    });
 
     std::size_t at = ordered.size(); // past-the-end: position chapter unknown -> empty window
     for (std::size_t i = 0; i < ordered.size(); ++i) {
