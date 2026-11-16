@@ -1,4 +1,5 @@
 ## 2026-11-16
+* **Creation**: Documented concept `findings/reader-spill-cached-overcount.md` (Reader prefetch spill wrote next-chapter pages into the current chapter dir (cached>total)).
 * **Update**: Updated concept `decisions/comix-adoption-route-2026-11-16.md`.
 * **Creation**: Documented concept `decisions/comix-adoption-route-2026-11-16.md` (Comix.to adoption for cppIsekai: host needs (Route A lightpanda run evaluate)).
 * **Creation**: Documented concept `decisions/weebcentral-port-2026-11-16.md` (Weeb Central ported as Lua plugin (plain-HTML, CF-safe)).
