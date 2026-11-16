@@ -1,3 +1,35 @@
+## 2026-11-16
+* **Update**: Linked `findings/plugins-reload-segfault.md` to `findings/sol2-lua-functor-teardown-corruption.md` (This was the surface symptom; the toolchain-rooted analysis lives there.).
+* **Update**: Linked `findings/sol2-lua-functor-teardown-corruption.md` to `constraints/lua-host-tools-require-clang.md` (The finding's resolution is this constraint: the corruption only exists under GCC, and the project toolchain is clang.).
+* **Creation**: Documented concept `constraints/lua-host-tools-require-clang.md` (Lua host tools require the clang toolchain).
+* **Update**: Updated concept `findings/sol2-lua-functor-teardown-corruption.md`.
+* **Update**: Linked `findings/sol2-lua-functor-teardown-corruption.md` to `decisions/luajit-migration.md` (LuaJIT was previously evaluated and skipped; it does not resolve this bug — the corruption is in sol2’s metatable dispatch, not in the Lua interpreter, so the Lua VM is not the lever.).
+* **Update**: Linked `findings/sol2-lua-functor-teardown-corruption.md` to `constraints/sol2-lua-version.md` (Both are sol2 environment constraints discovered this session: Lua pinned to 5.4.8 (compat header rejects 5.5) + Linux xrepo recipe falls back to pacman::sol2, which silently resolved system headers until the system sol2 was removed this evening.).
+* **Update**: Linked `findings/plugins-reload-segfault.md` to `findings/sol2-lua-functor-teardown-corruption.md` (Same crash; the corruption detail concept holds the ASan backtrace, ruled-out list, upstream links, and verified-fix candidates.).
+* **Creation**: Documented concept `findings/sol2-lua-functor-teardown-corruption.md` (sol2 3.5.0 corrupts Lua functor teardown (plugins/reload segfault)).
+* **Update**: Updated concept `findings/plugins-reload-segfault.md`.
+* **Update**: Updated concept `findings/valid-title-pair-charset.md`.
+* **Creation**: Documented concept `findings/lua-plugin-audit-2026-11-16.md` (Lua plugin end-to-end audit 2026-11-16 (search/detail/chapters/save)).
+* **Creation**: Documented concept `findings/valid-title-pair-charset.md` (valid_title_pair rejects real-world manga slugs (apostrophes, exclamation marks)).
+* **Creation**: Documented concept `findings/re2-findall-one-indexed.md` (host.re2.find_all is 1-indexed in Lua: m[1] = full match, groups start at m[2]).
+* **Creation**: Documented concept `findings/plugins-reload-segfault.md` (/plugins/reload segfaults the cppIsekai daemon).
+* **Update**: Updated concept `findings/mangasushi-cover-404-case-rename.md`.
+* **Update**: Linked `findings/mangasushi-cover-404-case-rename.md` to `architecture/cover-prefetch-worker.md` (Broken covers surfaced through the /cache/img?cover=1 CoverCtx serving path; diagnosis of upstream 404s for stale lowercase URLs.).
+* **Creation**: Documented concept `findings/mangasushi-cover-404-case-rename.md` (mangasushi: 2 covers 404, upstream case-renamed files, daemon emits stale lowercase URLs).
+* **Creation**: Documented concept `decisions/drop-date-dependency.md` (Drop date (HowardHinnant) dependency; host_text dates via stdlib).
+* **Creation**: Documented concept `findings/test-crashes-gdb-artifact.md` (Phantom test crashes were gdb-session artifacts; verify plain-run first).
+* **Update**: Linked `decisions/openspec-crush-harness.md` to `references/tooling.md` (Tooling reference now also covers the OpenSpec harness dirs).
+* **Creation**: Documented concept `decisions/openspec-crush-harness.md` (OpenSpec harness wiring: Crush gets .crush/ (local), universal copy stays in .agents/).
+* **Update**: Linked `architecture/verified-layer-map.md` to `architecture/http-layer-gotchas.md` (Reconfirms the precompressed-asset trap; br_asset still does not negotiate Accept-Encoding).
+* **Update**: Linked `architecture/verified-layer-map.md` to `references/code-layers.md` (Fresh 2026-11-16 survey; supersedes the stale plugin counts, /history route and pool sizing in this concept).
+* **Creation**: Documented concept `architecture/verified-layer-map.md` (Verified layer map 2026-11-16 (runtimes, tables, cache v3, drift)).
+* **Update**: Linked `references/site-quirks-mangafox.md` to `constraints/host-http-fetch-200-only.md`.
+* **Update**: Linked `references/wasm-guest-pitfalls.md` to `constraints/host-http-fetch-200-only.md`.
+* **Update**: Updated concept `decisions/plugin-cookie-jars.md`.
+* **Creation**: Documented concept `constraints/host-http-fetch-200-only.md` (host.http.fetch* writes body only on HTTP 200 (wasm imports)).
+* **Update**: Updated concept `references/wasm-guest-pitfalls.md`.
+* **Update**: Updated concept `references/site-quirks-mangafox.md`.
+
 ## 2026-11-15
 * **Creation**: Documented concept `decisions/renderer-fetch-engines.md` (Renderer fetch engines: lightpanda/obscura profiles in the fetch gate).
 * **Creation**: Documented concept `constraints/host-chapter-state-keys.md` (Chapter state keys: one canonical (decoded) key space; rollup owns total_ch).
