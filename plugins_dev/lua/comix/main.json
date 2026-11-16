@@ -4,6 +4,7 @@
   "logo": "logo.png",
   "runtime": "lua",
   "version": "1.0.0",
+  "image_referer": "none",
   "api": 1,
   "params": {
     "site_url": "https://comix.to"
