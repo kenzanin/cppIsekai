@@ -33,7 +33,10 @@ function detailPage() {
       try {
         const r = await fetch('/chapter/state', {method: 'POST', headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({plugin: this.plugin, slug: this.slug, ids: this.chapters.map(c => c.id)})});
-        if (r.ok) { const j = await r.json(); this.chapters.forEach(c => { if (j[c.id]) c.done = !!j[c.id].skip; }); this.readState = j; }
+        if (r.ok) { const j = await r.json(); this.chapters.forEach(c => { if (j[c.id]) c.done = !!j[c.id].skip;
+          const t = j[c.id] && j[c.id].total, cc = j[c.id] && j[c.id].cached;
+          if (t > 0 && cc >= t) this.cbzReady[c.id] = true; // fully cached -> cbz button on
+        }); this.readState = j; }
       } catch (e) { /* list renders without state */ }
     },
     async toggleRead(ch) {
@@ -225,8 +228,7 @@ function detailPage() {
         this.hiddenTags = (this.enrichment && this.enrichment.chosen && this.enrichment.chosen.tags_hidden) || [];
         this.chapters = (c.data || []).slice().sort((a, b) => (b.number ?? 0) - (a.number ?? 0));
         this.mergeSavedRelated(); // re-merge chosen.related_add now that /api/detail is in
-        this.checkCbz();
-        await this.loadChapterState(); // chapters are fresh objects -- re-apply done/read flags
+        await this.loadChapterState(); // chapters are fresh objects -- re-apply done/read flags + cbz gating
       } catch (e) { this.err = String(e); }
       this.loading = false;
     },
@@ -241,19 +243,6 @@ function detailPage() {
     chNum(n) { const [i, f] = String(n).split('.'); return i.padStart(3, '0') + (f ? '.' + f : ''); },
     chLabel(ch) { const n = Number(ch.number); return Number.isFinite(n) ? 'ch ' + this.chNum(n) : (ch.title || 'ch'); },
     chSlug(ch) { const n = Number(ch.number); return Number.isFinite(n) ? 'ch' + this.chNum(n) : 'chx'; },
-    async checkCbz() {
-      // per-chapter cache-full probe for the cbz button gate.
-      for (const ch of this.chapters) {
-        const n = Number(ch.number);
-        const total = this.totalOf(ch) || ch.pages || 0;
-        if (!Number.isFinite(n) || n <= 0 || !total || this.cbzReady[ch.id]) continue;
-        try {
-          const r = await fetch(`/api/cbz-ready?plugin=${encodeURIComponent(this.plugin)}&slug=${encodeURIComponent(this.slug)}&ch=${n}&pages=${total}`);
-          const j = r.ok ? await r.json() : null;
-          this.cbzReady[ch.id] = !!(j && j.full);
-        } catch (e) { this.cbzReady[ch.id] = false; }
-      }
-    },
     fmtDate(ts) { if (!ts) return ''; const d = new Date(ts * 1000); return isNaN(d) ? '' : d.toISOString().slice(0, 10); },
     scraperRelated: [], // base list from the scraper plugin; chosen.related_add is merged on top
     mergeSavedRelated() {
