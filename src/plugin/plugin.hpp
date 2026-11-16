@@ -17,7 +17,7 @@
 #include <string>
 #include <vector>
 
-struct Store;
+class Store;
 
 namespace plugin {
 
@@ -63,7 +63,7 @@ struct CallHealth {
     std::int64_t at{}; // unix seconds
 };
 
-struct Host; // fwd: Impl defined in plugin.cpp as plugin::Host::Impl
+class Host; // fwd: Impl defined in plugin.cpp as plugin::Host::Impl
 
 /** \brief Registry + runtime holder. One instance for the process; safe to
  *  call from pool threads. */
