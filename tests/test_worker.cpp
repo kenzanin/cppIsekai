@@ -66,6 +66,12 @@ struct Rig {
 
 } // namespace
 
+// Window parts as the routes now nudge them: one slice per chapter, first_page
+// 1-based. Empty chapter_id keeps the plain chNNN dir shape.
+static reader::WindowPart part(double number, int first, std::vector<std::string> urls, std::string id = {}) {
+    return {.chapter_id = std::move(id), .number = number, .first_page = first, .urls = std::move(urls)};
+}
+
 TEST_CASE("worker: delta only -- seeded urls are skipped, misses fetched in window order") {
     Rig rig;
     rig.seed("w/a", 1);
@@ -76,7 +82,7 @@ TEST_CASE("worker: delta only -- seeded urls are skipped, misses fetched in wind
     // state, so nudge -> stop is a deterministic single-batch run: stop
     // drains before join returns.
     reader::Worker worker{rig.cache};
-    worker.nudge({"w/a", "w/b", "w/c", "w/d", "w/e"}, reader::WindowCtx{"md", "slug-a", 1});
+    worker.nudge({part(1, 1, {"w/a", "w/b", "w/c", "w/d", "w/e"})}, "md", "slug-a");
     worker.stop();
 
     CHECK(rig.fake.fetched == std::vector<std::string>{"w/b", "w/d", "w/e"});
@@ -89,7 +95,7 @@ TEST_CASE("worker: failed fetch is best-effort, the rest of the window still lan
     rig.fake.bodies = {{"w/a", "a"}}; // w/missing not in bodies -> fetch fails
 
     reader::Worker worker{rig.cache};
-    worker.nudge({"w/missing", "w/a"}, reader::WindowCtx{"md", "slug-a", 1});
+    worker.nudge({part(1, 1, {"w/missing", "w/a"})}, "md", "slug-a");
     worker.stop();
 
     CHECK(rig.fake.fetched == std::vector<std::string>{"w/missing", "w/a"});
@@ -115,7 +121,7 @@ TEST_CASE("worker: structured placement -- complete ctx lands <plugin>/manga/<sl
     // position in the batch, so ch001/p001 < ch001/p002 in lex order.
     {
         reader::Worker worker{rig.cache};
-        worker.nudge({"http://x/1.jpg", "http://x/2.jpg"}, reader::WindowCtx{"md", "slug-a", 1});
+        worker.nudge({part(1, 1, {"http://x/1.jpg", "http://x/2.jpg"})}, "md", "slug-a");
         worker.stop();
     }
     const auto r1 = "md/manga/slug-a/ch001/p001.jpg";
@@ -127,7 +133,7 @@ TEST_CASE("worker: structured placement -- complete ctx lands <plugin>/manga/<sl
     // windows (each drained on stop) keep ch001 and ch002 side by side.
     {
         reader::Worker worker{rig.cache};
-        worker.nudge({"http://y/1.jpg"}, reader::WindowCtx{"md", "slug-a", 2});
+        worker.nudge({part(2, 1, {"http://y/1.jpg"})}, "md", "slug-a");
         worker.stop();
     }
     const auto r3 = "md/manga/slug-a/ch002/p001.jpg";
@@ -143,7 +149,7 @@ TEST_CASE("worker: a nudge without full placement context is dropped, never sha-
 
     {
         reader::Worker w{rig.cache};
-        w.nudge({"http://x/a.png"}); // no ctx at all
+        w.nudge({part(1, 1, {"http://x/a.png"})}, "", ""); // no plugin/slug at all
         w.stop();
     }
     CHECK(rig.fake.fetched.empty()); // not even fetched
@@ -152,7 +158,7 @@ TEST_CASE("worker: a nudge without full placement context is dropped, never sha-
     // ctx present but slug missing -> same: dropped, nothing written.
     {
         reader::Worker w{rig.cache};
-        w.nudge({"http://x/a.png"}, reader::WindowCtx{"md", "", 1});
+        w.nudge({part(1, 1, {"http://x/a.png"})}, "md", "");
         w.stop();
     }
     CHECK(rig.fake.fetched.empty());
@@ -162,7 +168,7 @@ TEST_CASE("worker: a nudge without full placement context is dropped, never sha-
     // structured landing still applies.
     {
         reader::Worker w{rig.cache};
-        w.nudge({"http://x/plain"}, reader::WindowCtx{"md", "slug-a", 1});
+        w.nudge({part(1, 1, {"http://x/plain"})}, "md", "slug-a");
         w.stop();
     }
     CHECK(rig.on_disk_rel("http://x/plain", "md/manga/slug-a/ch001/p001.bin"));
@@ -171,16 +177,15 @@ TEST_CASE("worker: a nudge without full placement context is dropped, never sha-
 TEST_CASE("worker: store reuse -- peek with the same rel_path hits, a second rel refetches") {
     Rig rig;
     rig.fake.bodies = {{"http://x/a.jpg", "body-a"}};
-    const reader::WindowCtx ctx{"md", "slug-a", 1};
 
     {
         reader::Worker worker{rig.cache};
-        worker.nudge({"http://x/a.jpg"}, ctx); // ch001 window
+        worker.nudge({part(1, 1, {"http://x/a.jpg"})}, "md", "slug-a"); // ch001 window
         worker.stop(); // coalescing is newest-wins: drain before the next nudge
     }
     {
         reader::Worker worker{rig.cache};
-        worker.nudge({"http://x/a.jpg"}, reader::WindowCtx{"md", "slug-a", 2}); // second rel
+        worker.nudge({part(2, 1, {"http://x/a.jpg"})}, "md", "slug-a"); // second rel
         worker.stop();
     }
     // Passthrough transcode (fake body is not a real image) keeps the key's
@@ -192,4 +197,19 @@ TEST_CASE("worker: store reuse -- peek with the same rel_path hits, a second rel
     const int calls = rig.fake.fetched.size();
     CHECK(rig.on_disk_rel("http://x/a.jpg", ra1)); // peek = hit, no fetch
     CHECK(rig.fake.fetched.size() == calls);
+}
+
+TEST_CASE("worker: a spilled window part lands in its own chapter dir at its real page") {
+    Rig rig;
+    rig.fake.bodies = {{"http://x/last.jpg", "l"}, {"http://y/first.jpg", "f"}};
+
+    // The 4ucomics cached>total regression: the window ends ch001's page 48
+    // and spills into ch001... no -- into ch002. The spill slice must land as
+    // ch002 p001, never as ch001 p049 (a page the reader never requests).
+    reader::Worker worker{rig.cache};
+    worker.nudge({part(1, 48, {"http://x/last.jpg"}), part(2, 1, {"http://y/first.jpg"})}, "md", "slug-a");
+    worker.stop();
+
+    CHECK(rig.on_disk_rel("http://x/last.jpg", "md/manga/slug-a/ch001/p048.jpg"));
+    CHECK(rig.on_disk_rel("http://y/first.jpg", "md/manga/slug-a/ch002/p001.jpg"));
 }

@@ -4,11 +4,11 @@
 
 namespace reader {
 
-std::vector<std::string> next_window(const std::vector<Chapter>& chapters, const PagesOf& pages_of, const Position& pos,
+std::vector<WindowPart> window_parts(const std::vector<Chapter>& chapters, const PagesOf& pages_of, const Position& pos,
                                      const Skipped& skipped, const std::size_t limit) {
-    std::vector<std::string> out;
+    std::vector<WindowPart> parts;
     if (!pages_of) {
-        return out;
+        return parts;
     }
 
     std::vector<Chapter> ordered = chapters; // never trust the caller's order
@@ -22,18 +22,35 @@ std::vector<std::string> next_window(const std::vector<Chapter>& chapters, const
         }
     }
 
-    for (std::size_t i = at; i < ordered.size() && out.size() < limit; ++i) {
-        const auto flag = skipped.find(ordered[i].id);
+    std::size_t total = 0;
+    for (std::size_t i = at; i < ordered.size() && total < limit; ++i) {
+        const Chapter& ch = ordered[i];
+        const auto flag = skipped.find(ch.id);
         if (flag != skipped.end() && flag->second) {
             continue; // skipped: no pages, keep walking
         }
 
-        const std::vector<std::string> pages = pages_of(ordered[i].id);
+        const std::vector<std::string> pages = pages_of(ch.id);
         // the position chapter contributes only pages after the current one
-        const std::size_t begin = (i == at && pos.page > 0) ? static_cast<std::size_t>(pos.page) : 0;
-        for (std::size_t p = std::min(begin, pages.size()); p < pages.size() && out.size() < limit; ++p) {
-            out.push_back(pages[p]);
+        const std::size_t begin = (i == at && pos.page > 0) ? std::min<std::size_t>(pos.page, pages.size()) : 0;
+        if (begin >= pages.size()) {
+            continue;
         }
+        WindowPart part{.chapter_id = ch.id, .number = ch.number, .first_page = static_cast<int>(begin) + 1, .urls = {}};
+        for (std::size_t p = begin; p < pages.size() && total < limit; ++p) {
+            part.urls.push_back(pages[p]);
+            ++total;
+        }
+        parts.push_back(std::move(part));
+    }
+    return parts;
+}
+
+std::vector<std::string> next_window(const std::vector<Chapter>& chapters, const PagesOf& pages_of, const Position& pos,
+                                     const Skipped& skipped, const std::size_t limit) {
+    std::vector<std::string> out;
+    for (const auto& part : window_parts(chapters, pages_of, pos, skipped, limit)) {
+        out.insert(out.end(), part.urls.begin(), part.urls.end());
     }
     return out;
 }

@@ -97,19 +97,17 @@ void register_state(Ctx& c) {
                 const std::string& chapter = last->chapter_id;
                 if (!plugin.empty() && !manga.empty() && !chapter.empty()) {
                     const reader::Position where{.chapter_id = chapter, .page = last->page};
-                    const std::vector<std::string> found =
+                    const std::vector<reader::WindowPart> found =
                         reader_window(store, db, plugin_pool, plugins, plugin, manga, where);
-                    for (const auto& url : found) {
-                        window.emplace_back(url);
+                    for (const auto& part : found) {
+                        for (const auto& url : part.urls) {
+                            window.emplace_back(url);
+                        }
                     }
                     if (!found.empty()) {
-                        // Placement context is not optional: the worker drops a
-                        // batch without it, so mirror the reader route's nudge.
-                        prefetch.nudge(found, {.plugin = plugin,
-                                               .slug = manga,
-                                               .chapter = static_cast<int>(last->chapter_number),
-                                               .page_base = last->page + 1,
-                                               .chapter_id = chapter}); // rerun delta (3.3)
+                        // Per-part placement, mirroring the reader route's nudge:
+                        // each slice lands in its own chapter dir (rerun delta 3.3).
+                        prefetch.nudge(found, plugin, manga);
                     }
                 }
             }

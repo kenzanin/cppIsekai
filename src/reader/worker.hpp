@@ -6,17 +6,18 @@
  *  /chapter/<id>/skip.
  *
  *  The endpoint has already re-run the window against the new state; it hands
- *  the resulting urls over and the worker walks them in order through
- *  cache::ensure, which IS the delta filter (hit: on disk, no fetch; miss:
- *  one fetch) -- sequential, on the shared img pool with /cache/img,
- *  concurrent-miss dedup included. Each batch must carry the window context
- *  {plugin, slug, chapter}: the file lands under the plugin namespace at
- *  <ns>/manga/<slug>/chNNN/pNNN.<ext>. A batch without that context is
- *  dropped -- the img pool has no context-free path. Nothing here touches
- *  routes or state: the queue is the only worker state, newest list wins. */
+ *  the resulting per-chapter parts over and the worker walks them in order
+ *  through cache::ensure, which IS the delta filter (hit: on disk, no fetch;
+ *  miss: one fetch) -- sequential, on the shared img pool with /cache/img,
+ *  concurrent-miss dedup included. Each part carries its own chapter id plus
+ *  number and first page, so a window spilled into the next chapter lands in
+ *  that chapter's own dir at its real page -- never as chapter N page N+1.
+ *  A nudge without plugin/slug is dropped -- the img pool has no
+ *  context-free path. Nothing here touches routes or state: the queue is the
+ *  only worker state, newest list wins. */
 
 #include "cache/cache.hpp"
-#include "cache/sha1.hpp"
+#include "reader/window.hpp"
 
 #include <spdlog/spdlog.h>
 
@@ -38,9 +39,6 @@ namespace reader {
 struct WindowCtx {
     std::string plugin;
     std::string slug;
-    int chapter{};          // 1-based chapter number; 0 = unknown
-    int page_base{};        // chapter-absolute page of batch[0]; 0 = legacy batch position
-    std::string chapter_id; // id8 cache-dir suffix; empty keeps the plain chNNN shape
 };
 
 class Worker {
@@ -54,13 +52,14 @@ public:
     /** \brief Event: queue the freshest window. Coalesces -- a pending list
      *  is replaced, re-run semantics (only the latest position/skip matters).
      *
-     *  ctx: placement for the batch. A nudge without plugin/slug/chapter is
-     *  dropped by the loop -- the img pool has no context-free path. */
-    void nudge(std::vector<std::string> urls, WindowCtx ctx = {}) {
+     *  parts: placement per chapter slice (window_parts). Empty plugin/slug
+     *  or empty parts drops the batch: no placement path, no sha fallback. */
+    void nudge(std::vector<WindowPart> parts, std::string plugin, std::string slug) {
         {
             const std::scoped_lock lock(mu_);
-            pending_ = std::move(urls);
-            ctx_ = std::move(ctx);
+            pending_ = std::move(parts);
+            plugin_ = std::move(plugin);
+            slug_ = std::move(slug);
         }
         cv_.notify_one();
     }
@@ -86,25 +85,35 @@ private:
             if (!pending_) {
                 return; // stop_ and nothing left to drain
             }
-            const std::vector<std::string> batch = std::move(*pending_);
-            const WindowCtx ctx = std::move(ctx_);
-            ctx_ = {};
+            const std::vector<WindowPart> batch = std::move(*pending_);
+            const std::string plugin = std::move(plugin_);
+            const std::string slug = std::move(slug_);
+            plugin_.clear();
+            slug_.clear();
             pending_.reset();
             lock.unlock();
-            // No plugin/slug/chapter = no placement path; the img pool has no
+            // No plugin/slug = no placement path; the img pool has no
             // context-free slot, so drop the batch instead of writing junk.
-            if (!ctx.plugin.empty() && !ctx.slug.empty() && ctx.chapter >= 1) {
-                for (std::size_t i = 0; i < batch.size(); ++i) {
-                    const int page = ctx.page_base > 0 ? ctx.page_base + static_cast<int>(i) : static_cast<int>(i) + 1;
-                    const cache::Cache::PageCtx pctx{
-                        .plugin = ctx.plugin,
-                        .slug = ctx.slug,
-                        .chapter = ctx.chapter,
-                        .page = page,
-                        .chapter_id = ctx.chapter_id,
-                    };
-                    const auto p = images_.img_ensure(batch[i], {}, pctx); // transcode to [cache] image_format
-                    spdlog::debug("worker: prefetch {} -> {}", batch[i], p ? *p : std::string("failed"));
+            // Per-part chapter/first-page: each url lands in its OWN chapter
+            // dir at its real page (spill included), matching the path the
+            // reader's /cache/img request will hit.
+            if (!plugin.empty() && !slug.empty()) {
+                for (const auto& part : batch) {
+                    const int chapter = static_cast<int>(part.number);
+                    if (chapter < 1 || part.first_page < 1) {
+                        continue; // unnumbered chapter: no trustworthy dir
+                    }
+                    for (std::size_t i = 0; i < part.urls.size(); ++i) {
+                        const cache::Cache::PageCtx pctx{
+                            .plugin = plugin,
+                            .slug = slug,
+                            .chapter = chapter,
+                            .page = part.first_page + static_cast<int>(i),
+                            .chapter_id = part.chapter_id
+                        };
+                        const auto p = images_.img_ensure(part.urls[i], {}, pctx); // transcode to [cache] image_format
+                        spdlog::debug("worker: prefetch {} -> {}", part.urls[i], p ? *p : std::string("failed"));
+                    }
                 }
             }
             lock.lock();
@@ -114,8 +123,9 @@ private:
     cache::Cache& images_;
     std::mutex mu_;
     std::condition_variable cv_;
-    std::optional<std::vector<std::string>> pending_;
-    WindowCtx ctx_;
+    std::optional<std::vector<WindowPart>> pending_;
+    std::string plugin_;
+    std::string slug_;
     bool stop_ = false;
     std::thread thread_; // last: touches every member above once running
 };

@@ -80,12 +80,13 @@ inline bool valid_title_pair(const std::string& plugin, const std::string& slug)
 
 // The reader window composition (image-cache): chapter list + pages through
 // the cached ABI path (stale-serve included), skip flags from plugin_state,
-// math in reader::next_window. Empty result on any plugin failure -- the
+// math in reader::window_parts. Empty result on any plugin failure -- the
 // reader merely loses its prefetch. The worker (task 3.3) mirrors this shape.
 // Defined in http_api_reader.cpp; the state TU reuses it for the skip-rerun.
-std::vector<std::string> reader_window(Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool,
-                                       plugin::Host& plugins, const std::string& plugin_id, const std::string& manga_id,
-                                       const reader::Position& pos);
+// Per-chapter parts: the prefetch nudge needs them; flatten for the response.
+std::vector<reader::WindowPart> reader_window(Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool,
+                                              plugin::Host& plugins, const std::string& plugin_id,
+                                              const std::string& manga_id, const reader::Position& pos);
 
 // Route-group registration, one TU each (http_api_*.cpp).
 void register_admin(Ctx& /*c*/); // plugin registry/admin + config endpoints

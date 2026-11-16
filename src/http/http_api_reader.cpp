@@ -7,12 +7,12 @@ namespace http::api {
 
 // The reader window composition (image-cache): chapter list + pages through
 // the cached ABI path (stale-serve included), skip flags from plugin_state,
-// math in reader::next_window. Empty result on any plugin failure -- the
+// math in reader::window_parts. Empty result on any plugin failure -- the
 // reader merely loses its prefetch. The worker (task 3.3) mirrors this shape.
 // Declared in api_ctx.hpp; the state TU reuses it for the skip-rerun.
-std::vector<std::string> reader_window(Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool,
-                                       plugin::Host& plugins, const std::string& plugin_id, const std::string& manga_id,
-                                       const reader::Position& pos) {
+std::vector<reader::WindowPart> reader_window(Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool,
+                                              plugin::Host& plugins, const std::string& plugin_id,
+                                              const std::string& manga_id, const reader::Position& pos) {
     crow::json::wvalue query;
     query["id"] = manga_id;
     const std::string chapters_query = query.dump();
@@ -77,8 +77,12 @@ std::vector<std::string> reader_window(Store& store, BS::thread_pool<>& db, BS::
         return urls;
     };
 
-    const std::vector<std::string> window = reader::next_window(chapters, pages_of, pos, skip);
-    spdlog::info("reader window {} p{} -> {} page(s)", pos.chapter_id, pos.page, window.size());
+    const std::vector<reader::WindowPart> window = reader::window_parts(chapters, pages_of, pos, skip);
+    std::size_t n = 0;
+    for (const auto& part : window) {
+        n += part.urls.size();
+    }
+    spdlog::info("reader window {} p{} -> {} page(s) in {} part(s)", pos.chapter_id, pos.page, n, window.size());
     return window;
 }
 
@@ -193,21 +197,22 @@ void register_reader(Ctx& c) {
                 return 0;
             });
 
-            const std::vector<std::string> found = reader_window(store, db, plugin_pool, plugins, plugin, manga, pos);
+            const std::vector<reader::WindowPart> found = reader_window(store, db, plugin_pool, plugins, plugin, manga, pos);
             std::vector<crow::json::wvalue> window;
-            for (const auto& url : found) {
-                window.emplace_back(url);
+            for (const auto& part : found) {
+                for (const auto& url : part.urls) {
+                    window.emplace_back(url);
+                }
             }
-            // No chapter number = no placement path, so no prefetch: the worker
-            // would have nowhere to put the files the reader can find again.
-            if (!found.empty() && chapter_number) {
-                spdlog::debug("nudge {} urls, ctx {}.{} ch{} base-p{}", found.size(), plugin, manga, *chapter_number,
-                              pos.page + 1);
-                prefetch.nudge(found, {.plugin = plugin,
-                                       .slug = manga,
-                                       .chapter = static_cast<int>(*chapter_number),
-                                       .page_base = pos.page + 1,
-                                       .chapter_id = pos.chapter_id});
+            // Parts carry their own chapter id/number/first-page: the worker
+            // lands each slice in that chapter's dir, spill included.
+            if (!found.empty()) {
+                std::size_t n = 0;
+                for (const auto& p : found) {
+                    n += p.urls.size();
+                }
+                spdlog::debug("nudge {} urls in {} part(s), {}.{}", n, found.size(), plugin, manga);
+                prefetch.nudge(found, plugin, manga);
             }
 
             crow::json::wvalue out;
