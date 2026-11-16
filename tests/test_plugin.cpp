@@ -536,6 +536,9 @@ TEST_CASE("host.text P3: trim / unescape / strip_html") {
     CHECK(plugin::host_text::trim("   ") == "");
     // NFKD: fullwidth chars normalize to ASCII
     CHECK(plugin::host_text::trim("\u3000h\u3000") == "h"); // ideographic spaces
+    // casing is preserved -- trim must not casefold titles/metadata
+    CHECK(plugin::host_text::trim("  Martial Peak \n") == "Martial Peak");
+    CHECK(plugin::host_text::trim("MOMO (莫默)") == "MOMO (莫默)");
 
     // unescape: HTML entities
     CHECK(plugin::host_text::unescape("&amp;") == "&");
@@ -550,6 +553,7 @@ TEST_CASE("host.text P3: trim / unescape / strip_html") {
     CHECK(plugin::host_text::strip_html("&lt;p&gt;&amp;lt;&lt;&lt;/&amp;gt;&lt;/p&gt;")
           .find("<p>&lt;<") == 0); // entity-decoded then tag-stripped
     CHECK(plugin::host_text::strip_html("<br>") == "");
+    CHECK(plugin::host_text::strip_html("<b>Martial Peak</b>") == "Martial Peak"); // case kept
     CHECK(plugin::host_text::strip_html("") == "");
 }
 

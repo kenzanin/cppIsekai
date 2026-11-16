@@ -252,40 +252,38 @@ inline std::optional<std::string> date_to_iso(std::string_view raw) {
 // trim (P3, utf8proc)
 // ---------------------------------------------------------------------------
 
-/** \brief UTF-8-aware trim: NFKD normalize, casefold, strip leading/trailing
- *         whitespace and control characters. */
+/** \brief UTF-8-aware trim: strip leading/trailing whitespace and control
+ *         codepoints; text is otherwise preserved byte-for-byte (no casefold --
+ *         titles/metadata must keep their casing). */
 inline std::string trim(std::string_view raw) {
-    const std::string s{raw};
-    const utf8proc_ssize_t max_cp = static_cast<utf8proc_ssize_t>(s.size()) * 4 + 16;
-    std::vector<utf8proc_int32_t> buf(max_cp);
-    const utf8proc_ssize_t ncp = utf8proc_decompose(
-        reinterpret_cast<const utf8proc_uint8_t*>(s.data()),
-        static_cast<utf8proc_ssize_t>(s.size()),
-        buf.data(), max_cp,
-        static_cast<utf8proc_option_t>(UTF8PROC_COMPAT | UTF8PROC_DECOMPOSE | UTF8PROC_CASEFOLD | UTF8PROC_STRIPCC));
-    if (ncp < 0) {
-        return s; // undecomposable input: verbatim
-    }
-    auto is_ws = [](uint32_t cp) {
-        return cp == ' ' || cp == '\t' || cp == '\n' || cp == '\r' || cp == '\f' || cp == 0x3000 ||
-               (cp >= 0x2000 && cp <= 0x200F) || cp == 0x2028 || cp == 0x2029;
+    const auto is_trim_cp = [](utf8proc_int32_t cp) {
+        return cp == ' ' || cp == '\t' || cp == '\n' || cp == '\r' || cp == '\f' || cp == 0x00A0 ||
+               (cp >= 0x2000 && cp <= 0x200F) || cp == 0x2028 || cp == 0x2029 || cp == 0x3000 ||
+               cp == 0xFEFF || cp < 0x20;
     };
-    utf8proc_ssize_t b = 0, e = ncp;
-    while (b < e && is_ws(static_cast<uint32_t>(buf[b]))) {
-        ++b;
+    const auto* bytes = reinterpret_cast<const utf8proc_uint8_t*>(raw.data());
+    utf8proc_int32_t cp = 0;
+    size_t b = 0;
+    while (b < raw.size()) {
+        const auto n = utf8proc_iterate(bytes + b, static_cast<utf8proc_ssize_t>(raw.size() - b), &cp);
+        if (n <= 0 || !is_trim_cp(cp)) {
+            break;
+        }
+        b += static_cast<size_t>(n);
     }
-    while (e > b && is_ws(static_cast<uint32_t>(buf[e - 1]))) {
-        --e;
+    size_t e = raw.size();
+    while (e > b) {
+        size_t start = e - 1;
+        while (start > b && (raw[start] & 0xC0) == 0x80) {
+            --start;
+        }
+        const auto n = utf8proc_iterate(bytes + start, static_cast<utf8proc_ssize_t>(e - start), &cp);
+        if (n <= 0 || static_cast<size_t>(n) != e - start || !is_trim_cp(cp)) {
+            break;
+        }
+        e = start;
     }
-    const auto* in = buf.data() + b;
-    const utf8proc_ssize_t len = e - b;
-    char out[8];
-    std::string res;
-    for (utf8proc_ssize_t i = 0; i < len; ++i) {
-        utf8proc_ssize_t w = utf8proc_encode_char(in[i], reinterpret_cast<utf8proc_uint8_t*>(out));
-        res.append(out, static_cast<size_t>(w));
-    }
-    return res;
+    return std::string(raw.substr(b, e - b));
 }
 
 // ---------------------------------------------------------------------------
