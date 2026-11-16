@@ -1,4 +1,5 @@
 #include "store.hpp"
+#include "store_busy.hpp"
 #include "store_internal.hpp"
 
 #include <ctime>
@@ -88,7 +89,7 @@ Store::Store(const std::string& path) : impl_(std::make_unique<StoreImpl>(path))
     impl_->storage.pragma.journal_mode(journal_mode::WAL);
     // wait on writers instead of failing instantly: raw api_cache opens and this
     // ORM connection are concurrent writers (db-lock regression).
-    impl_->storage.pragma.busy_timeout(3000);
+    impl_->storage.busy_handler([](int count) { return store_detail::busy_wait(count); });
     // FK: pragma_t has no foreign_keys setter in v1.9.1; make_storage enables it
     // automatically because the schema declares a foreign_key.
     //
@@ -137,7 +138,7 @@ Store::Store(const std::string& path) : impl_(std::make_unique<StoreImpl>(path))
     {
         sqlite3* db = nullptr;
         if (sqlite3_open(path.c_str(), &db) == SQLITE_OK) {
-            sqlite3_busy_timeout(db, 3000);
+            store_detail::attach_busy(db);
             const char* ddl = "CREATE VIRTUAL TABLE IF NOT EXISTS library_fts"
                               " USING fts5(plugin UNINDEXED, slug UNINDEXED, name, alt_titles, synopsis)";
             char* err = nullptr;
