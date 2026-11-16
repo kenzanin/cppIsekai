@@ -1,0 +1,11 @@
+{
+  "name": "Comix",
+  "site_url": "https://comix.to",
+  "logo": "logo.png",
+  "runtime": "lua",
+  "version": "1.0.0",
+  "api": 1,
+  "params": {
+    "site_url": "https://comix.to"
+  }
+}

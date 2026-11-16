@@ -1,0 +1,11 @@
+{
+  "thumb_ratio": 0.7,
+  "name": "Comico",
+  "site_url": "https://comico.moe",
+  "logo": "logo.png",
+  "paginates": false,
+  "contract_version": 1,
+  "runtime": "lua",
+  "version": "1.0.0",
+  "api": 1
+}

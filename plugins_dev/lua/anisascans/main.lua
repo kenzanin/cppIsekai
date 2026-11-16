@@ -145,7 +145,7 @@ methods.detail = function(params)
   local gblock = find1(body, [[(?s)class="genres-content">(.*?)</div>]]) or ""
   local tags = {}
   for _, g in ipairs(find_all(gblock, [[<a[^>]*>([^<]+)</a>]])) do
-    local name = unescape(trim(g[1]))
+    local name = unescape(trim(g[2] or ""))
     if name ~= "" then tags[#tags + 1] = name end
   end
 
@@ -206,7 +206,7 @@ methods.chapters = function(params)
   -- fallback: chapter links in the page body
   if #out == 0 then
     for _, m in ipairs(find_all(body, [[(?s)<a[^>]*href="([^"]*chapter-[^"]+)"[^>]*>\s*([^<]+)\s*</a>]])) do
-      local href, label = m[1], m[2]
+      local href, label = m[2], m[3]
       local cid = find1(href, [[/([^/]+)/?$]])
       if cid and not seen[cid] then
         seen[cid] = true

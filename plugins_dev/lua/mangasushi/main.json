@@ -1,0 +1,14 @@
+{
+  "verify_url": "https://mangasushi.org",
+  "thumb_ratio": 0.703,
+  "name": "Mangasushi",
+  "site_url": "https://mangasushi.org",
+  "logo": "logo.png",
+  "contract_version": 1,
+  "params": {
+    "site_url": "https://mangasushi.org"
+  },
+  "runtime": "lua",
+  "version": "1.0.0",
+  "api": 1
+}
