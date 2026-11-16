@@ -79,8 +79,10 @@ TEST_CASE("htmltext: lenient on bad HTML / selector") {
 }
 
 TEST_CASE("host: lua parity fixture (host.* resolves, no bare globals)") {
-    plugin::Host host{test_conf()};
+    // destruction order: host (declared after store) goes first, so the
+    // store outlives the Lua runtimes that reference it.
     Store store("test_htmltext.db");
+    plugin::Host host{test_conf()};
     CHECK(host.load_all(store) >= 1);
     // good fixture migrated to host.* (host.log.info / host.now).
     const std::string res = host.call("good", "ping", "{}");
@@ -88,8 +90,8 @@ TEST_CASE("host: lua parity fixture (host.* resolves, no bare globals)") {
 }
 
 TEST_CASE("host: js parity fixture (host.* resolves)") {
-    plugin::Host host{test_conf()};
     Store store("test_htmltext.db");
+    plugin::Host host{test_conf()};
     host.load_all(store);
     const std::string res = host.call("jsfix", "ping", "{}");
     CHECK(res.find("\"ok\":true") != std::string::npos);
@@ -97,8 +99,8 @@ TEST_CASE("host: js parity fixture (host.* resolves)") {
 }
 
 TEST_CASE("host: wasm parity fixture (host.* via env.* imports)") {
-    plugin::Host host{test_conf()};
     Store store("test_htmltext.db");
+    plugin::Host host{test_conf()};
     host.load_all(store);
     const std::string res = host.call("wasmfix", "ping", "{}");
     CHECK(res.find("\"ok\":true") != std::string::npos);
