@@ -10,7 +10,6 @@
 #pragma once
 
 #include <re2/re2.h>
-#include <date/date.h>
 #include <lexbor/dom/dom.h>
 #include <lexbor/html/html.h>
 #include <utf8proc.h>
@@ -19,9 +18,9 @@
 #include <chrono>
 #include <cctype>
 #include <cstdint>
+#include <ctime>
 #include <map>
 #include <optional>
-#include <sstream>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -130,9 +129,13 @@ inline std::optional<float> chapter_num(std::string_view s) {
 
 namespace detail {
 
-/// Format a time_point to "YYYY-MM-DD" in UTC using date::format.
+/// Format a time_point to "YYYY-MM-DD" in UTC (gmtime_r, no tz dependency).
 inline std::string format_date(std::chrono::system_clock::time_point tp) {
-    return date::format("%Y-%m-%d", tp);
+    const std::time_t t = std::chrono::system_clock::to_time_t(tp);
+    std::tm tm{};
+    gmtime_r(&t, &tm);
+    char out[16];
+    return std::string(out, std::strftime(out, sizeof out, "%Y-%m-%d", &tm));
 }
 
 } // namespace detail
@@ -218,7 +221,7 @@ inline std::optional<std::string> date_to_iso(std::string_view raw) {
         }
     }
 
-    // --- fixed layouts via date::parse ---------------------------------------
+    // --- fixed layouts via strptime -------------------------------------------
     // The layouts the host knows; Go dateLayouts port.
     static const char* kLayouts[] = {
         "%Y-%m-%dT%H:%M:%S",        // RFC3339 (no tz) / ISO 8601
@@ -236,16 +239,10 @@ inline std::optional<std::string> date_to_iso(std::string_view raw) {
         "%a %d %b %y %H:%M",      // RFC822-ish: Wed 02 Jan 06 15:04
     };
     for (const char* fmt : kLayouts) {
-        try {
-            date::sys_seconds tp{};
-            std::istringstream ss(s);
-            date::from_stream(ss, fmt, tp);
-            if (ss.fail()) {
-                continue; // try next layout
-            }
-            return detail::format_date(tp);
-        } catch (...) {
-            continue; // date::parse throws on invalid input; try next layout
+        std::tm tm{};
+        if (strptime(s.c_str(), fmt, &tm) != nullptr) {
+            char out[16];
+            return std::string(out, std::strftime(out, sizeof out, "%Y-%m-%d", &tm));
         }
     }
     return std::nullopt;

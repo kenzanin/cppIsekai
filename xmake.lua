@@ -2,6 +2,7 @@ set_project("cppIsekai")
 set_version("0.1.0")
 
 set_languages("c23", "c++23")
+set_toolchains("clang")
 add_rules("mode.debug", "mode.release", "mode.releasedbg")
 set_config("mode", "release") -- daemon runs from this build
 set_policy("package.requires_lock", true) -- lock resolved versions (xmake-requires.lock); bump via the pins below
@@ -34,7 +35,7 @@ add_requires("lua 5.4.8")
 add_requires("glaze 9.1.0", "thread-pool 5.1.0", "readerwriterqueue 1.0.7", "lexbor 3.0.0",
     "libzippp 7.1", "quickjs-ng 0.15.1", "simpleini 4.27", "sqlite_orm 1.9.1",
     "spdlog 1.17.0", "zlib 1.3.2", "sqlite3 3.54.0+100", "utf8proc 2.11.3", "re2 2025.11.05",
-    "date 3.0.4", "hash-library 2021.09.29", "pugixml 1.16", "backward-cpp")
+    "hash-library 2021.09.29", "pugixml 1.16", "backward-cpp")
 
 -- crow + cli11: both header-only (static into the binary), pinned via xrepo.
 -- crow's SSL build is skipped: the daemon serves plain HTTP.
@@ -111,7 +112,7 @@ cxx_bin("cppIsekai", {
     incs = {"src"},
     deps = {"wasm3", "tiny-aes256"},
     pkgs = {"vips"},
-    reqs = {"lua", "crow", "cli11", "asio", "glaze", "sol2", "thread-pool", "readerwriterqueue", "lexbor", "libzippp", "quickjs-ng", "simpleini", "sqlite_orm", "spdlog", "zlib", "sqlite3", "utf8proc", "re2", "date", "hash-library", "pugixml", "backward-cpp"},
+    reqs = {"lua", "crow", "cli11", "asio", "glaze", "sol2", "thread-pool", "readerwriterqueue", "lexbor", "libzippp", "quickjs-ng", "simpleini", "sqlite_orm", "spdlog", "zlib", "sqlite3", "utf8proc", "re2", "hash-library", "pugixml", "backward-cpp"},
     ldflags = {CURL_SO},
     rpath = {CURL_LIB},
     defs = {'CPPISEKAI_FETCH_LIB_DIR="' .. CURL_LIB .. '"', "CROW_USE_LOCALTIMEZONE", "CROW_ENABLE_COMPRESSION"},
@@ -130,7 +131,7 @@ cxx_bin("test_plugin", {
     incs = {"src"},
     deps = {"wasm3", "tiny-aes256"},
 
-    reqs = {"lua", "glaze", "sol2", "thread-pool", "lexbor", "sqlite_orm", "readerwriterqueue", "quickjs-ng", "spdlog", "sqlite3", "utf8proc", "re2", "date", "hash-library", "pugixml"},
+    reqs = {"lua", "glaze", "sol2", "thread-pool", "lexbor", "sqlite_orm", "readerwriterqueue", "quickjs-ng", "spdlog", "sqlite3", "utf8proc", "re2", "hash-library", "pugixml"},
     ldflags = {CURL_SO},
     rpath = {CURL_LIB},
     defs = {'TEST_PLUGIN_FIXTURES="$(projectdir)/tests/fixtures/plugins"'},
@@ -142,7 +143,7 @@ cxx_bin("test_htmltext", {
     incs = {"src"},
     deps = {"wasm3", "tiny-aes256"},
 
-    reqs = {"lua", "glaze", "sol2", "thread-pool", "lexbor", "sqlite_orm", "readerwriterqueue", "quickjs-ng", "spdlog", "sqlite3", "utf8proc", "re2", "date", "hash-library", "pugixml"},
+    reqs = {"lua", "glaze", "sol2", "thread-pool", "lexbor", "sqlite_orm", "readerwriterqueue", "quickjs-ng", "spdlog", "sqlite3", "utf8proc", "re2", "hash-library", "pugixml"},
     ldflags = {CURL_SO},
     rpath = {CURL_LIB},
     defs = {'TEST_PLUGIN_FIXTURES="$(projectdir)/tests/fixtures/plugins"'},
