@@ -12,13 +12,13 @@ local function proxy_img(u)
   return API .. "/img?url=" .. host.url_encode(u)
 end
 
--- Site vocab (anilist-style) -> canonical; unknown falls to normalize_status.
+-- Site vocab (anilist-style) -> canonical lowercase; unknown falls to "unknown".
 local STATUS = {
-  RELEASING = "Ongoing", ONGOING = "Ongoing",
-  FINISHED = "Completed", COMPLETED = "Completed",
-  HIATUS = "Hiatus",
-  CANCELLED = "Dropped", DROPPED = "Dropped",
-  NOT_YET_RELEASED = "Upcoming", UPCOMING = "Upcoming",
+  RELEASING = "ongoing", ONGOING = "ongoing",
+  FINISHED = "completed", COMPLETED = "completed",
+  HIATUS = "hiatus",
+  CANCELLED = "dropped", DROPPED = "dropped",
+  NOT_YET_RELEASED = "upcoming", UPCOMING = "upcoming",
 }
 
 local function status_of(list)
@@ -26,7 +26,7 @@ local function status_of(list)
     local m = STATUS[string.upper(tostring(s))]
     if m then return m end
   end
-  return "Unknown"
+  return "unknown"
 end
 
 local function get_json(path)
@@ -60,12 +60,9 @@ methods.search = function(params)
   for _, h in ipairs(d.hits or {}) do
     out[#out + 1] = {
       id = h.slug,
-      title = h.title or "",
+      name = h.title or "",
       cover = proxy_img(h.cover or ""),
-      status = "",
-      author = "",
-      genres = {},
-      description = "",
+      status = status_of(h.statuses),
     }
   end
   -- UI contract: {items, total} envelope, not a bare array (search_script run()).
@@ -79,16 +76,29 @@ methods.detail = function(params)
   if err then return { ok = false, error = err } end
   local m = d.manga or {}
   local authors = {}
-  for _, a in ipairs(m.authors or {}) do authors[#authors + 1] = tostring(a) end
+  local function names_of(raw)
+    if type(raw) == "string" then return { raw } end
+    if type(raw) ~= "table" then return {} end
+    local out = {}
+    if raw[1] ~= nil then
+      for _, a in ipairs(raw) do out[#out + 1] = tostring(a) end
+      return out
+    end
+    for _, a in pairs(raw) do out[#out + 1] = tostring(a) end
+    return out
+  end
+  for _, a in ipairs(names_of(m.authors)) do authors[#authors + 1] = a end
   return { ok = true, data = {
     id = m.slug or slug,
-    title = m.title or "",
+    name = m.title or "",
     cover = proxy_img(m.cover or ""),
     status = status_of(m.statuses),
-    author = table.concat(authors, ", "),
-    artist = "",
-    genres = m.genres or {},
+    tags = m.genres or {},
+    authors = authors,
+    artists = {},
     description = m.description or "",
+    release_at = 0,
+    url = "https://4ucomics.com/manga/" .. (m.slug or slug),
   } }
 end
 
@@ -102,7 +112,15 @@ methods.chapters = function(params)
   for _, c in ipairs(m.chapters or {}) do
     local name = tostring(c.name or c.rawChapter or "")
     if name ~= "" then
-      out[#out + 1] = { id = slug .. ":" .. name, number = number_of(name), title = "Chapter " .. name }
+      local dstr = tostring(c.date or "")
+      out[#out + 1] = {
+        id = slug .. ":" .. name,
+        number = number_of(name),
+        title = "",
+        release_at = (dstr ~= "") and dstr:sub(1, 10) or 0,
+        created_at = (dstr ~= "") and dstr:sub(1, 10) or 0,
+        pages = 0,
+      }
     end
   end
   return { ok = true, data = out }
