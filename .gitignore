@@ -12,3 +12,5 @@ build/
 .xmake/
 packages/
 compile_commands.json
+.tmp-*
+session-*.md
