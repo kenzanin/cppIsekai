@@ -1,0 +1,11 @@
+{
+  "name": "Weeb Central",
+  "id": "weebcentral",
+  "version": "1.0.0",
+  "website": "https://weebcentral.com",
+  "image_referer": "https://weebcentral.com/",
+  "image_engine": "chrome116",
+  "runtime": "lua",
+  "capabilities": ["search", "detail", "chapters", "pages", "genres"],
+  "api": 1
+}
