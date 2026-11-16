@@ -54,7 +54,9 @@ crow::json::wvalue home_context(Store& store, BS::thread_pool<>& db, const crow:
         ++saved_by_plugin[m.plugin];
     }
 
-    std::vector<crow::json::wvalue> plugin_rows;
+    // Most-used plugin first: sort sidebar rows by saved-library count (desc, stable = registry order within ties).
+    std::vector<std::pair<int, crow::json::wvalue>> counted_rows;
+    counted_rows.reserve(plugins.size());
     for (const auto& item : plugins) {
         // plugin-lifecycle: disabled stays listed in the library sidebar —
         // only the search picker drops it (search_script.mustache p.enabled).
@@ -67,7 +69,14 @@ crow::json::wvalue home_context(Store& store, BS::thread_pool<>& db, const crow:
         if (!item.plugin_id.empty()) {
             row["logo"] = item.plugin_id; // absent key renders no <img> in the partial
         }
-        plugin_rows.push_back(std::move(row));
+        counted_rows.emplace_back(saved_by_plugin[item.plugin_id], std::move(row));
+    }
+    std::stable_sort(counted_rows.begin(), counted_rows.end(),
+                     [](const auto& a, const auto& b) { return a.first > b.first; });
+    std::vector<crow::json::wvalue> plugin_rows;
+    plugin_rows.reserve(counted_rows.size());
+    for (auto& p : counted_rows) {
+        plugin_rows.push_back(std::move(p.second));
     }
     ctx["plugins"] = std::move(plugin_rows);
 
