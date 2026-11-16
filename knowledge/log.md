@@ -1,4 +1,7 @@
 ## 2026-11-16
+* **Update**: Linked `architecture/1manga-plugin-split.md` to `findings/lua-plugin-audit-2026-11-16.md` (1manga was split into module-per-purpose files and used as the healthy reference for the plugin fleet audit.).
+* **Update**: Updated concept `findings/lua-plugin-audit-2026-11-16.md`.
+* **Creation**: Documented concept `architecture/1manga-plugin-split.md` (1manga plugin source split into purpose modules).
 * **Update**: Linked `findings/store-serialized-ops.md` to `architecture/store-orm-migration.md`.
 * **Update**: Linked `architecture/store-orm-migration.md` to `findings/store-serialized-ops.md`.
 * **Update**: Linked `decisions/api-cache-lock-miss-regression.md` to `findings/store-serialized-ops.md`.
