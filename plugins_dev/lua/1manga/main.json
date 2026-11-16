@@ -1,17 +1,14 @@
 {
-  "verify_url": "https://1manga.co",
-  "thumb_ratio": 0.703,
   "name": "1Manga",
-  "site_url": "https://1manga.co",
-  "logo": "logo.png",
-  "contract_version": 1,
-  "paginates": true,
-  "params": {
-    "api": "https://api.mghcdn.com/graphql",
-    "img_cdn": "https://imgx.mghcdn.com/",
-    "thumb_cdn": "https://thumb.mghcdn.com/"
-  },
+  "id": "1manga",
+  "version": "2.0.0",
+  "website": "https://1manga.co",
+  "image_referer": "https://1manga.co/",
   "runtime": "lua",
-  "version": "1.0.0",
+  "paginates": false,
+  "capabilities": ["search", "detail", "chapters", "pages", "genres"],
+  "params": {
+    "site_url": "https://1manga.co"
+  },
   "api": 1
 }
