@@ -1,4 +1,8 @@
 ## 2026-11-16
+* **Update**: Linked `constraints/host-text-trim-preserves-casing.md` to `architecture/plugin-system.md`.
+* **Update**: Linked `findings/1manga-site-quirks.md` to `references/plugin-porting-matrix-goIsekai.md`.
+* **Creation**: Documented concept `constraints/host-text-trim-preserves-casing.md` (host.text.trim / strip_html preserve casing).
+* **Creation**: Documented concept `findings/1manga-site-quirks.md` (1manga.co scraping quirks (HTML port)).
 * **Update**: Linked `findings/plugins-reload-segfault.md` to `findings/sol2-lua-functor-teardown-corruption.md` (This was the surface symptom; the toolchain-rooted analysis lives there.).
 * **Update**: Linked `findings/sol2-lua-functor-teardown-corruption.md` to `constraints/lua-host-tools-require-clang.md` (The finding's resolution is this constraint: the corruption only exists under GCC, and the project toolchain is clang.).
 * **Creation**: Documented concept `constraints/lua-host-tools-require-clang.md` (Lua host tools require the clang toolchain).
