@@ -39,6 +39,61 @@ struct Book {
 
 } // namespace
 
+TEST_CASE("window: parts carry per-chapter placement for the prefetch worker") {
+    const Book book;
+
+    // boundary spill: one part per chapter, first_page 1-based from the top
+    const auto parts = reader::window_parts(book.ordered, book.of(), Position{"c1", 5}, {});
+    REQUIRE(parts.size() == 2);
+    CHECK(parts[0].chapter_id == "c2");
+    CHECK(parts[0].number == 2);
+    CHECK(parts[0].first_page == 1);
+    CHECK(parts[0].urls == std::vector<std::string>{"c2/p1", "c2/p2", "c2/p3", "c2/p4", "c2/p5"});
+    CHECK(parts[1].chapter_id == "c3");
+    CHECK(parts[1].first_page == 1);
+
+    // the position chapter's part starts AFTER the current page; the limit
+    // (10) cuts inside the third chapter
+    const auto mid = reader::window_parts(book.ordered, book.of(), Position{"c2", 3}, {});
+    REQUIRE(mid.size() == 3);
+    CHECK(mid[0].chapter_id == "c2");
+    CHECK(mid[0].first_page == 4);
+    CHECK(mid[0].urls == std::vector<std::string>{"c2/p4", "c2/p5"});
+    CHECK(mid[1].chapter_id == "c3");
+    CHECK(mid[1].urls.size() == 5);
+    CHECK(mid[2].chapter_id == "c4");
+    CHECK(mid[2].first_page == 1);
+    CHECK(mid[2].urls.size() == 3); // 2 + 5 + 3 = the 10 limit
+
+    // position page past the end: no empty part for that chapter, the window
+    // just continues with the next one
+    const auto beyond = reader::window_parts(book.ordered, book.of(), Position{"c2", 99}, {});
+    REQUIRE(beyond.size() == 2);
+    CHECK(beyond[0].chapter_id == "c3");
+}
+
+TEST_CASE("window: parts skip empties and honor the limit across parts") {
+    const Book book;
+
+    // skipped chapter: no part at all, the window reroutes past it
+    const auto skipped = reader::window_parts(book.ordered, book.of(), Position{"c1", 5}, Skipped{{"c2", true}});
+    REQUIRE(skipped.size() == 2);
+    CHECK(skipped[0].chapter_id == "c3");
+    CHECK(skipped[1].chapter_id == "c4");
+
+    // a limit inside the second part: c2 gives 2, the rest comes from c3
+    const auto cut = reader::window_parts(book.ordered, book.of(), Position{"c2", 3}, {}, 3);
+    REQUIRE(cut.size() == 2);
+    CHECK(cut[0].chapter_id == "c2");
+    CHECK(cut[0].first_page == 4);
+    CHECK(cut[0].urls.size() == 2);
+    CHECK(cut[1].chapter_id == "c3");
+    CHECK(cut[1].urls.size() == 1);
+
+    // unknown position chapter: no anchor, no parts
+    CHECK(reader::window_parts(book.ordered, book.of(), Position{"nope", 1}, {}).empty());
+}
+
 TEST_CASE("window: boundary spill fills from the next chapter") {
     const Book book;
 

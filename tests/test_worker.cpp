@@ -199,6 +199,19 @@ TEST_CASE("worker: store reuse -- peek with the same rel_path hits, a second rel
     CHECK(rig.fake.fetched.size() == calls);
 }
 
+TEST_CASE("worker: an unnumbered part is skipped, numbered siblings still land") {
+    Rig rig;
+    rig.fake.bodies = {{"http://x/a.jpg", "a"}, {"http://y/b.jpg", "b"}};
+
+    // number 0 = untrustworthy dir key: that part is dropped, the rest of the
+    // batch prefetches normally
+    reader::Worker worker{rig.cache};
+    worker.nudge({part(0, 1, {"http://x/a.jpg"}), part(2, 1, {"http://y/b.jpg"})}, "md", "slug-a");
+    worker.stop();
+
+    CHECK(rig.fake.fetched == std::vector<std::string>{"http://y/b.jpg"}); // x never even fetched
+    CHECK(rig.on_disk_rel("http://y/b.jpg", "md/manga/slug-a/ch002/p001.jpg"));
+}
 TEST_CASE("worker: a spilled window part lands in its own chapter dir at its real page") {
     Rig rig;
     rig.fake.bodies = {{"http://x/last.jpg", "l"}, {"http://y/first.jpg", "f"}};
