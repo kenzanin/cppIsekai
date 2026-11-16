@@ -1,6 +1,7 @@
 #include "wasm_internal.hpp"
 #include "wasm_rt.hpp"
 
+#include "browser/mcp.hpp"
 #include "plugin/fs.hpp"
 #include "plugin/host_codecs.hpp"
 #include "plugin/host_crypto.hpp"
@@ -928,6 +929,36 @@ const void* host_crypto_aes_gcm_decrypt(IM3Runtime, IM3ImportContext ctx, uint64
     return m3Err_none;
 }
 
+// browser.call (browser-host D5): (tool_off,tool_len,args_off,args_len,out,cap)
+// -> len; kNotFound covers tool/RPC/transport failure, kTruncated on cap.
+const void* host_browser_call(IM3Runtime, IM3ImportContext ctx, uint64_t* sp, void*) {
+    auto& self = *static_cast<Instance*>(ctx->userdata);
+    uint64_t* args = sp + 1;
+    const uint32_t tool_off = arg_i32(args);
+    const uint32_t tool_len = arg_i32(args);
+    const uint32_t args_off = arg_i32(args);
+    const uint32_t args_len = arg_i32(args);
+    const uint32_t out = arg_i32(args);
+    const uint32_t cap = arg_i32(args);
+
+    int32_t rc = kNotFound;
+    const auto tool = guest_str(self, tool_off, tool_len);
+    const auto call_args = guest_str(self, args_off, args_len);
+    if (tool && call_args) {
+        std::string err;
+        std::string res = ::browser::call(*tool, *call_args, &err);
+        if (!res.empty() || err.empty()) {
+            if (guest_write(self, out, cap, res)) {
+                rc = static_cast<int32_t>(res.size());
+            } else {
+                rc = kTruncated;
+            }
+        }
+    }
+    *reinterpret_cast<int32_t*>(sp) = rc;
+    return m3Err_none;
+}
+
 // P8/P9: host.html.xpath(expr, html) -- values as a JSON string array (house
 // list convention); kBadPattern on xpath error, kNotFound on guest faults.
 const void* host_html_xpath(IM3Runtime, IM3ImportContext ctx, uint64_t* sp, void*) {
@@ -1010,6 +1041,7 @@ constexpr std::array kImports{
     Import{"crypto_md5_hex", "i(iiii)", host_crypto_md5_hex},
     Import{"crypto_hmac_sha256_hex", "i(iiiiii)", host_crypto_hmac_sha256_hex},
     Import{"crypto_aes_gcm_decrypt", "i(iiiiiiiiii)", host_crypto_aes_gcm_decrypt},
+    Import{"browser_call", "i(iiiiii)", host_browser_call},
 };
 
 } // namespace

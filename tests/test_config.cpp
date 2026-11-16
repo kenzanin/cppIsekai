@@ -175,7 +175,7 @@ TEST_CASE("config: dump projects registry as commented ini template (D4)") {
         CHECK(row[key][1] == "; " + std::string(e.doc));
         CHECK(row[key][2] == key + " = " + std::string(e.def));
     }
-    CHECK(headers == 6); // one header per group: server plugin cache paths log update
+    CHECK(headers == 7); // one header per group: server plugin cache paths log update lightpanda
 
     // And the template is honest ini: SimpleIni reads every default back.
     CSimpleIniA ini;

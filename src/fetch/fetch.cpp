@@ -207,7 +207,10 @@ Result rendered_fetch(const Request& req) {
 
 } // namespace
 
-Result sync(const Request& req, const std::string& proxy) {
+Result sync(const Request& req, const std::string& proxy_in) {
+    // D6 loopback exemption: the local browser daemon is reached direct even
+    // when a host-wide proxy is configured; external hosts unchanged.
+    const std::string proxy = (!proxy_in.empty() && is_loopback_url(req.url)) ? std::string {} : proxy_in;
     std::string profile = req.profile.empty() ? std::string("chrome116") : req.profile;
     if ((profile == "lightpanda" || profile == "obscura") && (req.method.empty() || req.method == "GET")) {
         return rendered_fetch(req);

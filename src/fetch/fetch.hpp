@@ -58,6 +58,34 @@ inline void applyProxy(CURL* e, const std::string& proxy) {
     }
 }
 
+/** \brief Loopback-url check for the proxy exemption (change browser-host D6):
+ *  the local MCP daemon must never ride the host-wide proxy. Host = whatever
+ *  sits between scheme:// and the first /?#, v6 brackets kept then stripped,
+ *  port ignored. */
+inline bool is_loopback_url(std::string_view url) {
+    const auto scheme = url.find("://");
+    if (scheme == std::string_view::npos) {
+        return false;
+    }
+    url.remove_prefix(scheme + 3);
+    const auto path = url.find_first_of("/?#");
+    if (path != std::string_view::npos) {
+        url = url.substr(0, path);
+    }
+    if (!url.empty() && url.front() == '[') { // [::1]:8890
+        const auto close = url.find(']');
+        if (close != std::string_view::npos) {
+            url = url.substr(1, close - 1);
+        }
+    } else {
+        const auto colon = url.find(':');
+        if (colon != std::string_view::npos) {
+            url = url.substr(0, colon);
+        }
+    }
+    return url == "127.0.0.1" || url == "::1" || url == "localhost";
+}
+
 /** \brief Targets the curl-impersonate pair accept: chrome/edge/safari from
  *  the linked lib, ff* from the firefox sibling (both probed, v0.6.1). */
 inline bool is_known_target(std::string_view t) {

@@ -19,7 +19,7 @@ local PLUGIN_SRC = {"src/plugin/plugin_core.cpp", "src/plugin/plugin_load.cpp", 
                     "src/plugin/lua/bridge.cpp", "src/plugin/lua/lua_runtime.cpp", "src/plugin/http_client.cpp",
                     "src/plugin/wasm/wasm_rt.cpp", "src/plugin/wasm/wasm_load.cpp", "src/plugin/wasm/wasm_imports.cpp",
                     "src/plugin/js/js_rt.cpp", "src/plugin/js/js_bindings.cpp", "src/plugin/htmltext_re2.cpp",
-                    "src/plugin/htmltext_html.cpp"}
+                    "src/plugin/htmltext_html.cpp", "src/browser/mcp.cpp"}
 local FETCH_SRC = {"src/fetch/fetch.cpp", "src/fetch/fetch_curl.cpp"}
 
 -- system shared libs via pkg-config; the rest pinned from xrepo (locked in xmake-requires.lock)
@@ -42,6 +42,9 @@ add_requires("glaze 9.1.0", "thread-pool 5.1.0", "readerwriterqueue 1.0.7", "lex
 -- asio is pulled by crow's recipe with no version constraint of its own.
 add_requires("asio 1.36.0", "crow 1.3.5", {configs = {ssl = false}})
 add_requires("cli11 2.7.2", {configs = {cmake = false}})
+
+-- reproc++ (browser-host D10): in-process spawn/supervise of the lightpanda MCP child.
+add_requires("reproc 14.2.5")
 
 -- add_files needs flat strings; cfg.files may embed the shared groups above
 local function flatten(list)
@@ -112,13 +115,22 @@ cxx_bin("cppIsekai", {
     incs = {"src"},
     deps = {"wasm3", "tiny-aes256"},
     pkgs = {"vips"},
-    reqs = {"lua", "crow", "cli11", "asio", "glaze", "sol2", "thread-pool", "readerwriterqueue", "lexbor", "libzippp", "quickjs-ng", "simpleini", "sqlite_orm", "spdlog", "zlib", "sqlite3", "utf8proc", "re2", "hash-library", "pugixml", "backward-cpp"},
+    reqs = {"lua", "crow", "cli11", "asio", "glaze", "sol2", "thread-pool", "readerwriterqueue", "lexbor", "libzippp", "quickjs-ng", "simpleini", "sqlite_orm", "spdlog", "zlib", "sqlite3", "utf8proc", "re2", "hash-library", "pugixml", "backward-cpp", "reproc"},
     ldflags = {CURL_SO},
     rpath = {CURL_LIB},
     defs = {'CPPISEKAI_FETCH_LIB_DIR="' .. CURL_LIB .. '"', "CROW_USE_LOCALTIMEZONE", "CROW_ENABLE_COMPRESSION"},
 })
 
 -- --- tests (doctest, system package; `xmake test` runs all) ---
+cxx_bin("test_fetch", {
+    files = {"tests/test_fetch.cpp", FETCH_SRC, "src/browser/mcp.cpp"},
+    incs = {"src"},
+    reqs = {"glaze", "spdlog"},
+    ldflags = {CURL_SO},
+    rpath = {CURL_LIB},
+    test = true,
+})
+
 cxx_bin("test_store", {
     files = {"tests/test_store.cpp", STORE_SRC},
     incs = {"src"},

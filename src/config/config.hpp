@@ -42,6 +42,8 @@ struct Config {
     int update_interval_days{};    // [update] interval_days: days between auto-update runs
     int update_per_plugin_limit{}; // [update] per_plugin_limit: max chapter-list refreshes per plugin per run
     int update_request_delay_ms{}; // [update] request_delay_ms: pause between auto-update requests
+    std::string lightpanda_url;    // [lightpanda] url: browser MCP endpoint (ini-only)
+    std::string lightpanda_command; // [lightpanda] command: supervised browser binary (ini-only)
 };
 
 // Per-knob CLI state. Explicit = opt->count() > 0 (D7), never value comparison;
@@ -56,6 +58,9 @@ struct Overrides {
 inline void build_cli(CLI::App& app, Overrides& o) {
     for (std::size_t i = 0; i < kEntryCount; ++i) {
         const Entry& e = kEntries[i];
+        if (e.flag == nullptr || *e.flag == 0) {
+            continue; // ini-only knob (e.g. [lightpanda]): no CLI surface, opt stays null
+        }
         std::string names = std::string("--") + e.flag;
         if ((e.alias != nullptr) && ((*e.alias) != 0)) {
             names += std::string(",--") + e.alias;
@@ -109,6 +114,8 @@ inline Config to_config(const std::array<std::string, kEntryCount>& v) {
     if (c.update_request_delay_ms < 0) {
         c.update_request_delay_ms = num_or<int>(kEntries[17].def, kEntries[17].def); // min 0
     }
+    c.lightpanda_url = v[18];
+    c.lightpanda_command = v[19];
     if (c.port <= 0) {
         c.port = num_or<int>(kEntries[0].def, kEntries[0].def); // design ceiling: port > 0
     }

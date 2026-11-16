@@ -65,6 +65,13 @@ int main(int argc, char** argv) {
     }
 
     std::filesystem::create_directories(cfg.data_dir); // [paths] data_dir, boot-created (D6)
+    browser::configure(cfg.lightpanda_url, cfg.proxy); // browser-host: endpoint + loopback-exempt proxy
+    std::string browser_err;
+    if (!browser::supervise_boot(cfg.lightpanda_command, &browser_err)) {
+        spdlog::error("browser backend: {}", browser_err); // D10: no browser => comix pages dead; abort loud
+        return 3;
+    }
+    browser::on_death(browser::recover); // D13: one respawn per incident, 3s cooldown
     Store store(cfg.db);
     LogBuffer logs(cfg.log_file);
 
@@ -124,5 +131,6 @@ int main(int argc, char** argv) {
     spdlog::info("cppIsekai listening on :{} (config: {})", cfg.port, ini_path);
     serve(store, db_pool, plugin_pool, plugins, logs, images, cfg.port, ini_path, overrides, cfg.templates_dir);
     scheduler.stop();
+    browser::shutdown(); // app-owned child only; adopted externals survive (D12)
     running.store(false);
 }

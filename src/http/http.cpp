@@ -23,7 +23,8 @@ cache::Fetcher makeCurlFetcher(const std::string& proxy, const plugin::Host& plu
         // chrome impersonation fingerprint; stock curl eats a 403 challenge.
         if (const std::string engine = plugins.image_engine(plugin); !engine.empty()) {
             fetch::Request rq{.url = url, .timeout_ms = 30000, .profile = engine};
-            if (const std::string referer = plugins.image_referer(plugin); !referer.empty()) {
+            if (const std::string referer = plugins.image_referer(plugin);
+                !referer.empty() && referer != "none") { // "none": sentinel, no header (D-sentinel)
                 rq.headers = {{"Referer", referer}};
             }
             const fetch::Result r = fetch::sync(rq, proxy);
@@ -45,7 +46,7 @@ cache::Fetcher makeCurlFetcher(const std::string& proxy, const plugin::Host& plu
         // plugin's manifest `image_referer` override, else `website` origin.
         std::string referer;
         if (!plugin.empty()) {
-            if (const std::string ref = plugins.image_referer(plugin); !ref.empty()) {
+            if (const std::string ref = plugins.image_referer(plugin); !ref.empty() && ref != "none") {
                 referer = " -e '" + quote(ref) + "'";
             }
         }

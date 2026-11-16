@@ -1,4 +1,5 @@
 #include "bridge.hpp"
+#include "browser/mcp.hpp"
 #include "plugin/url_codec.hpp"
 
 #include "plugin/host_text.hpp"
@@ -542,6 +543,35 @@ end
         return pt ? sol::make_object(ts, *pt) : sol::make_object(ts, sol::lua_nil);
     };
     fs_tab["crypto"] = crypto;
+
+    // browser (change browser-host D5): one passthrough, host.browser.call(tool, args)
+    // -> (result, err) like http.fetch. args = Lua table (encoded here) or raw JSON
+    // string; result is the tool text, err carries transport/RPC/isError diagnostics.
+    sol::table browser_tab = sv.create_table();
+    browser_tab["call"] = [id](const std::string& tool, const sol::object& args, sol::this_state ts)
+                              -> std::pair<sol::object, std::optional<std::string>> {
+        const auto fail = [&](std::string why) {
+            spdlog::warn("[plugin:{}] browser.{} failed: {}", id, tool, why);
+            return std::make_pair(sol::make_object(ts, sol::lua_nil), std::optional(std::move(why)));
+        };
+        std::string args_json;
+        if (args.is<std::string>()) {
+            args_json = args.as<std::string>();
+        } else if (args.is<sol::table>()) {
+            args_json = dump_json(sol_to_json(args));
+        } else if (!args.valid() || args == sol::lua_nil) {
+            args_json = "{}";
+        } else {
+            return fail("browser: args must be a table or json string");
+        }
+        std::string err;
+        std::string out = ::browser::call(tool, args_json, &err);
+        if (out.empty() && !err.empty()) {
+            return fail(std::move(err));
+        }
+        return std::make_pair(sol::make_object(ts, std::move(out)), std::optional<std::string>{});
+    };
+    fs_tab["browser"] = browser_tab;
 
     sol::table html = sv.create_table();
     const auto to_table = [](sol::this_state ts, const std::vector<std::string>& vals) {

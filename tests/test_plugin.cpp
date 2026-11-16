@@ -62,6 +62,13 @@ TEST_CASE("plugin loader") {
         CHECK(host.call("future", "ping", "{}").find("no plugin") != std::string::npos);
     }
 
+    SUBCASE("image_referer: sentinel none passes through, absent derives origin (4.1)") {
+        host.load_all(store);
+        CHECK(host.image_referer("referer_none") == "none");
+        CHECK(host.image_referer("referer_derive") == "https://derive.example");
+        CHECK(host.image_referer("nope").empty());
+    }
+
     SUBCASE("broken plugins absent from store upserts") {
         host.load_all(store);
         bool found = false;

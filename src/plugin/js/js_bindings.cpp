@@ -1,6 +1,7 @@
 #include "js_internal.hpp"
 #include "js_rt.hpp"
 
+#include "browser/mcp.hpp"
 #include "plugin/fs.hpp"        // plugin::fs_read -- the fs.read body
 #include "plugin/host_codecs.hpp"
 #include "plugin/host_crypto.hpp"
@@ -743,6 +744,21 @@ JSValue js_crypto_aes_gcm_decrypt(JSContext* ctx, JSValueConst /*this*/, int arg
     return JS_NewStringLen(ctx, pt->data(), pt->size());
 }
 
+// host.browser.call (browser-host D5): JSON-string args in, tool text out;
+// null with a warn on transport/RPC/isError failure -- lua pair parity.
+JSValue js_browser_call(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
+    if (argc != 2 || !JS_IsString(argv[0]) || !JS_IsString(argv[1])) {
+        return JS_ThrowTypeError(ctx, "browser.call(tool, args_json)");
+    }
+    std::string err;
+    const std::string out = ::browser::call(arg_str(ctx, argv[0]), arg_str(ctx, argv[1]), &err);
+    if (out.empty() && !err.empty()) {
+        spdlog::warn("[plugin:{}] browser.call failed: {}", self(ctx).id, err);
+        return JS_NULL;
+    }
+    return JS_NewStringLen(ctx, out.data(), out.size());
+}
+
 // P8/P9: host.html.xpath(expr, html) -- array of string values (attr value /
 // text), null on xpath or parse error.
 JSValue js_html_xpath(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
@@ -833,6 +849,11 @@ void bind_host_globals(JSContext* c) {
     bind(crypto, "hmac_sha256_hex", JS_NewCFunction(c, js_crypto_hmac_sha256_hex, "hmac_sha256_hex", 2));
     bind(crypto, "aes_gcm_decrypt", JS_NewCFunction(c, js_crypto_aes_gcm_decrypt, "aes_gcm_decrypt", 4));
     bind(host, "crypto", crypto);
+
+    // browser-host D5: host.browser.call(tool, args_json) -> string|null.
+    JSValue browser_tbl = JS_NewObject(c);
+    bind(browser_tbl, "call", JS_NewCFunction(c, js_browser_call, "call", 2));
+    bind(host, "browser", browser_tbl);
 
     JSValue plugin_tbl = JS_NewObject(c);
     bind(plugin_tbl, "param", JS_NewCFunction(c, js_plugin_param, "param", 1));

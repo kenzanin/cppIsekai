@@ -3,6 +3,8 @@
 #include "cache/slug.hpp"
 #include "config/config.hpp"
 #include "http/http.hpp"
+#include "browser/mcp.hpp"
+#include "browser/supervise.hpp"
 #include "log/log.hpp"
 #include "plugin/plugin.hpp"
 #include "store/store.hpp"

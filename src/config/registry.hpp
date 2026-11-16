@@ -26,7 +26,7 @@ struct Entry {
 };
 
 // Order is the projection order consumed by config.hpp -- do not reorder.
-inline constexpr std::array<Entry, 18> kEntries{
+inline constexpr std::array<Entry, 20> kEntries{
     {
         // section      key                   flag                 alias          env def doc
         // type
@@ -211,6 +211,26 @@ inline constexpr std::array<Entry, 18> kEntries{
             .def = "1000",
             .doc = "Delay between auto-update chapter-list requests (ms, 0 = no delay)",
             .type = Type::Int,
+        },
+        {
+            .section = "lightpanda",
+            .key = "url",
+            .flag = "",
+            .alias = "",
+            .env = "CPPISEKAI_LIGHTPANDA_URL",
+            .def = "http://127.0.0.1:8899",
+            .doc = "Browser automation MCP endpoint (ini-only; no CLI flag)",
+            .type = Type::Str,
+        },
+        {
+            .section = "lightpanda",
+            .key = "command",
+            .flag = "",
+            .alias = "",
+            .env = "CPPISEKAI_LIGHTPANDA_COMMAND",
+            .def = "lightpanda",
+            .doc = "Browser daemon binary for in-process supervision; absolute path on minimal-PATH units",
+            .type = Type::Str,
         },
     },
 };
