@@ -1,4 +1,5 @@
 ## 2026-11-17
+* **Update**: Updated concept `findings/browser-session-waf-2026-11-17.md`.
 * **Creation**: Documented concept `findings/browser-session-waf-2026-11-17.md` (comix WAF turnstile unsolvable in lightpanda headless; session ops notes).
 
 ## 2026-11-16
