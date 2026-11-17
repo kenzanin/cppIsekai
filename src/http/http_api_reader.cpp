@@ -50,10 +50,10 @@ std::vector<reader::WindowPart> reader_window(Store& store, BS::thread_pool<>& d
 
     reader::Skipped skip;
     on_pool(db, [&] {
-        for (const auto& ch : chapters) {
-            if (const std::optional<std::string> v = store.state_get(kStateHost, std::string(kSkipPrefix) + ch.id)) {
-                skip[ch.id] = *v == "1";
-            }
+        // chapter-store 3.4: skip lives in the chapters.flags bitfield now
+        // (bit1); the legacy host/skip keys ride in via chapters_upsert (D2).
+        for (const auto& [ch_id, flags] : store.chapter_flags_list(plugin_id, manga_id)) {
+            skip[ch_id] = (flags & std::to_underlying(ChapterFlag::kSkip)) != 0;
         }
         return 0; // on_pool is value-based
     });
@@ -189,6 +189,15 @@ void register_reader(Ctx& c) {
                     const int p = pos.page > 1 ? pos.page : 1;
                     const int now = std::max(prev, p);
                     store.state_set(kStateHost, std::string(kReadPrefix) + chapter, std::to_string(now));
+                    // chapter-store 3.3: the read bit is host-set the moment
+                    // progress reaches the stored page count (D5) -- last page
+                    // turned == read, no client flagging. count==0 = pages
+                    // never parsed here; no threshold to reach yet.
+                    const int total = store.chapter_pages_count(plugin, manga, chapter);
+                    if (total > 0 && now >= total) {
+                        store.chapter_flags_apply(plugin, manga, {chapter}, false,
+                                                  std::to_underlying(ChapterFlag::kRead), 0);
+                    }
                 }
                 // library-grid-stats 2.4: reader touch stamps last_read_at + clears the New bit.
                 store.saved_clear_update(plugin, manga);

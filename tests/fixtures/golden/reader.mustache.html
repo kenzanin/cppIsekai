@@ -254,16 +254,28 @@ function readerPage() {
       const f = this.firstOf(this.cur());
       return (this.views[this.cur()].length > 1 ? `p ${f}\u2013${f + 1}` : `p ${f}`) + ` / ${this.pages.length}p`;
     },
-    applyZoomSeed(z) { // 'fit-h' | 'fit-w' | '1:1' | 'custom:NN'
-      if (typeof z === 'string' && z.indexOf('custom:') === 0) {
-        const pct = Number(z.slice(7));
-        this.zoom = 'custom';
-        this.zoomPct = Number.isFinite(pct) ? Math.min(400, Math.max(25, Math.round(pct))) : 100;
-      } else if (z === 'fit-h' || z === 'fit-w' || z === '1:1' || z === 'custom') {
-        this.zoom = z;
-        if (z !== 'custom') this.zoomPct = 100;
-      }
-    },
+      applyZoomSeed(z) { // 'fit-h' | 'fit-w' | '1:1' | 'custom:NN' | 'custom'
+        if (typeof z === 'string' && z.indexOf('custom:') === 0) {
+          const pct = Number(z.slice(7));
+          this.zoom = 'custom';
+          this.zoomPct = Number.isFinite(pct) ? Math.min(400, Math.max(25, Math.round(pct))) : 100;
+        } else if (z === 'custom') {
+          this.zoom = 'custom';
+          const pct = this.currentZoomPct();
+          this.zoomPct = pct ? Math.min(400, Math.max(25, Math.round(pct))) : 100;
+        } else if (z === 'fit-w' || z === 'fit-h' || z === '1:1') {
+          this.zoom = z;
+          // Determine the actual on‑screen zoom for this mode (fit‑w/h may already enlarge the image).
+          const pct = this.currentZoomPct();
+          this.zoomPct = pct ? Math.min(400, Math.max(25, Math.round(pct))) : 100;
+        }
+      },
+      // Effective scale of the on-screen image, %: clientWidth / naturalWidth (0 if not measurable).
+      currentZoomPct() {
+        const img = this.$root.querySelector(`[data-vi="${this.cur()}"] img`);
+        if (!img || !img.naturalWidth || !img.clientWidth) return 0;
+        return Math.round((img.clientWidth / img.naturalWidth) * 100);
+      },
     zoomSeed() { return this.zoom === 'custom' ? 'custom:' + Math.round(this.zoomPct) : this.zoom; },
     formatChapterLabel(c) { // 'ch N — Title'; cap keeps the open dropdown list sane (closed state truncates via CSS)
       const t = 'ch ' + c.number + (c.title ? ' \u2014 ' + c.title : '');
@@ -327,8 +339,15 @@ function readerPage() {
       this.wheelAt = now;
       this.step(d);
     },
-    zoomIn() { this.zoom = 'custom'; this.zoomPct = Math.min(400, this.zoomPct + 15); this.persist(); },
-    zoomOut() { this.zoom = 'custom'; this.zoomPct = Math.max(25, this.zoomPct - 15); this.persist(); },
+    // Entering custom adopts the on-screen scale as the base, so +/- continues
+    // from the size the user actually sees (fit-w on a wide screen may be ~140%).
+    _adoptVisibleZoom() {
+      if (this.zoom === 'custom') return;
+      const pct = this.currentZoomPct();
+      if (pct) this.zoomPct = Math.min(400, Math.max(25, pct));
+    },
+    zoomIn() { this._adoptVisibleZoom(); this.zoom = 'custom'; this.zoomPct = Math.min(400, this.zoomPct + 15); this.persist(); },
+    zoomOut() { this._adoptVisibleZoom(); this.zoom = 'custom'; this.zoomPct = Math.max(25, this.zoomPct - 15); this.persist(); },
     _scrollBy(f) { window.scrollBy({top: f * window.innerHeight, behavior: 'smooth'}); },
     _resetScroll() { const shell = this.$root.querySelector('[data-shell]'); if (shell) shell.scrollTop = 0; },
     keys(e) {

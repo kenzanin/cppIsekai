@@ -63,6 +63,11 @@ crow::response title_data_response(plugin::Host& plugins, BS::thread_pool<>& db,
         });
         body = detail::inject_status_flags(body, flags);
     }
+    if (method == "chapters") {
+        // chapter-store 2.1: every chapters parse materializes identity rows
+        // (the UI's canonical list path; flags/legacy-inherit ride inside).
+        materialize_chapters(store, db, plugin, slug, body);
+    }
     crow::response r{std::move(body)};
     r.set_header("Content-Type", "application/json");
     return r;

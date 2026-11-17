@@ -303,20 +303,26 @@ TEST_CASE("enrich: apply_read_rollup heals total_ch and counts done (row-serve p
 
     const std::string env =
         R"({"ok":true,"data":[{"number":1,"id":"a1","pages":3},{"number":2,"id":"b2","pages":4}]})";
-    using http::api::kStateHost;
-    store.state_set(kStateHost, "host/read/a1", "3"); // fully read
-    store.state_set(kStateHost, "host/read/b2", "2"); // partial progress
-
     // A row-served detail open runs ONLY this rollup (no sync): total must
-    // heal from the chapters envelope and done must follow read_ch.
+    // heal from the chapters envelope. chapter-state D5: the read count comes
+    // from the per-chapter bit0 rows -- progress keys alone no longer count;
+    // the host stamps the bit at last-page (3.3) and bulk routes set it
+    // directly, so the rollup only reads flags.
     apply_read_rollup(store, db, "mangadex", "rollup-heal", env);
     auto row = store.saved_get("mangadex", "rollup-heal");
     REQUIRE(row.has_value());
     CHECK_EQ(row->total_ch, 2);
-    CHECK_EQ(row->read_ch, 1); // partial entries do not count
+    CHECK_EQ(row->read_ch, 0); // no bits yet
     CHECK((row->status_flags & 2) == 0);
 
-    store.state_set(kStateHost, "host/read/b2", "4"); // finish it
+    store.chapter_flags_apply("mangadex", "rollup-heal", {"a1"}, false, 1, 0); // host sets bit0
+    apply_read_rollup(store, db, "mangadex", "rollup-heal", env);
+    row = store.saved_get("mangadex", "rollup-heal");
+    REQUIRE(row.has_value());
+    CHECK_EQ(row->read_ch, 1);
+    CHECK((row->status_flags & 2) == 0);
+
+    store.chapter_flags_apply("mangadex", "rollup-heal", {"b2"}, false, 1, 0); // finish it
     apply_read_rollup(store, db, "mangadex", "rollup-heal", env);
     row = store.saved_get("mangadex", "rollup-heal");
     REQUIRE(row.has_value());

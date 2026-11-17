@@ -179,11 +179,9 @@ methods.pages = function(params)
   local imgblock = cap([=[(?s)"images"\s*:\s*\[(.*?)\]]=], run) or ""
 
   local out = {}
-  if imgblock ~= "" then
-    for _, m in ipairs(host.re2.find_all([[(https?:[^"]+?\.webp)]], imgblock)) do
+    for _, m in ipairs(host.re2.find_all([[(https?:[^\"]+?\.(webp|jpg|jpeg|png|avif))]], imgblock)) do
       local src = trim(host.re2.replace([[\\]], "", m[2]))
       if src ~= "" then out[#out + 1] = src end
-    end
   end
   if #out == 0 then
     return { ok = false, error = "en-thunderscans: no pages for " .. path }

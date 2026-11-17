@@ -7,6 +7,7 @@
  *  ponytail: sqlite_orm is not thread-safe; all calls must come from the db
  *  worker. */
 #include <cstdint>
+#include <map>
 #include <memory>
 #include <optional>
 #include <string>
@@ -50,6 +51,33 @@ enum class StatusFlag : unsigned {
     kCanceled = 1U << 4,  // category: source status folds "canceled"/"cancelled"
     kCompleted = 1U << 5, // category: source status folds "completed"
     kDim = 1U << 6,       // is_dim: user toggled dim+blur on the entry
+};
+
+/** Per-chapter state bitfield on chapters.flags (chapter-state D1; same
+ *  pattern as StatusFlag). Bits 2+ stay free: a new state costs one bit.
+ *  bit1 doubles as the reader-skip flag (legacy host/skip keys); a row-hide
+ *  UI would take the next free bit, not this one. */
+enum class ChapterFlag : unsigned {
+    kRead = 1U << 0, // explicit/derived read mark
+    kSkip = 1U << 1, // reader window skips the chapter (legacy "hidden")
+};
+
+/** Reserved plugin_state rows for host bookkeeping: per-chapter skip/read
+ *  progress legacy keys (chapter-state D2 inheritance) + the position key.
+ *  Flags themselves live in chapters.flags; these remain the progress-count
+ *  and legacy-inheritance source. */
+inline constexpr const char* kStateHost = "host";
+inline constexpr const char* kSkipPrefix = "host/skip/";
+inline constexpr const char* kReadPrefix = "host/read/";
+inline constexpr const char* kTotalPrefix = "host/total/";
+
+/** One parsed chapter identity for chapters_upsert (chapter-store): the
+ *  plugin-emitted view of a chapter, flags-free (the store preserves them). */
+struct ChapterSeed {
+    std::string chapter_id;
+    double number{};
+    std::string title;
+    std::string url; // source href; '' when the envelope omits it
 };
 
 /** One user-saved manga (library-save): denormalized name/cover so the grid
@@ -157,6 +185,30 @@ public:
     /** \brief Values '1' under \p key_prefix; returns the full keys. */
     std::vector<std::string> state_keys_value(const std::string& plugin_id, const std::string& key_prefix,
                                               const std::string& value);
+
+    // --- chapter-store (chapter-state): identity rows + flag bitfield ---
+    /** \brief Upsert parsed chapter identities keyed (plugin, slug,
+     *  chapter_id); flags/updated history preserved on re-parse, updated_at
+     *  restamped. First sight of an id inherits the legacy host/skip //
+     *  host/read>=host/total state (D2: the parse that claims the id is the
+     *  attribution; keys carry no manga identity). One transaction. */
+    void chapters_upsert(const std::string& plugin, const std::string& slug, const std::vector<ChapterSeed>& rows);
+    /** \brief Replace the page-url rows of one chapter (chapter-store D4):
+     *  delete+insert in parse order, one transaction. */
+    void chapter_pages_replace(const std::string& plugin, const std::string& slug, const std::string& chapter_id,
+                               const std::vector<std::string>& urls);
+    /** \brief flags = (flags | set) & ~clear over the selected rows; empty
+     *  \p ids with \p all selects the whole manga. Returns chapter_id -> new
+     *  flags for touched rows; absent ids are silently skipped. One transaction. */
+    std::map<std::string, int> chapter_flags_apply(const std::string& plugin, const std::string& slug,
+                                                   const std::vector<std::string>& ids, bool all, int set, int clear);
+    /** \brief flags of one chapter; nullopt when the row does not exist. */
+    std::optional<int> chapter_flags_get(const std::string& plugin, const std::string& slug,
+                                         const std::string& chapter_id);
+    /** \brief chapter_id -> flags for every row of the manga. */
+    std::map<std::string, int> chapter_flags_list(const std::string& plugin, const std::string& slug);
+    /** \brief Stored page-url count (completion threshold); 0 when unparsed. */
+    int chapter_pages_count(const std::string& plugin, const std::string& slug, const std::string& chapter_id);
 
     /** \brief Upsert the last-read position of one manga; updated_at is
      *  stamped here, any nonzero value in \p pos is ignored. */

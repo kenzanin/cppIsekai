@@ -77,15 +77,33 @@ void register_state(Ctx& c) {
         .methods(crow::HTTPMethod::POST)([&](const crow::request& req, std::string id) -> crow::response {
             id = plugin::url_decode(id); // crow leaves %3A etc. encoded in path params
             bool skipped = false;
-            if (const auto body = crow::json::load(req.body); body && body.has("skipped")) {
-                const auto t = body["skipped"].t();
-                if (t == crow::json::type::True || t == crow::json::type::False) {
-                    skipped = body["skipped"].b();
+            std::string plugin, slug;
+            if (const auto body = crow::json::load(req.body); body) {
+                if (body.has("skipped")) {
+                    const auto t = body["skipped"].t();
+                    if (t == crow::json::type::True || t == crow::json::type::False) {
+                        skipped = body["skipped"].b();
+                    }
+                }
+                // chapter-store 3.4: identity-carrying callers land the bit
+                // directly; the key write below stays the legacy record.
+                if (body.has("plugin") && body["plugin"].t() == crow::json::type::String) {
+                    plugin = body["plugin"].s();
+                }
+                if (body.has("slug") && body["slug"].t() == crow::json::type::String) {
+                    slug = body["slug"].s();
                 }
             }
 
             on_pool(db, [&] {
                 store.state_set(kStateHost, std::string(kSkipPrefix) + id, skipped ? "1" : "0");
+                if (!plugin.empty() && !slug.empty()) {
+                    if (skipped) {
+                        store.chapter_flags_apply(plugin, slug, {id}, false, std::to_underlying(ChapterFlag::kSkip), 0);
+                    } else {
+                        store.chapter_flags_apply(plugin, slug, {id}, false, 0, std::to_underlying(ChapterFlag::kSkip));
+                    }
+                }
                 return 0;
             });
 
@@ -122,19 +140,96 @@ void register_state(Ctx& c) {
         });
 
     // Chapter read progress (chapter-list-controls 1.1): max pages read per
-    // chapter under host/read/<uuid>; page 0 clears the marker.
+    // chapter under host/read/<uuid>; page 0 clears the marker. Callers that
+    // also send plugin/slug get the host-set read bit at the same threshold
+    // as the position path (chapter-store 3.3 / D5); page 0 clears it.
     CROW_ROUTE(app, "/chapter/<string>/read")
         .methods(crow::HTTPMethod::POST)([&](const crow::request& req, std::string id) -> crow::response {
             id = plugin::url_decode(id); // keep state keys identical to the reader/body paths
             const auto body = crow::json::load(req.body);
             const int page = static_cast<int>(std::max(0L, num_field(body, "page", 0)));
+            std::string plugin, slug;
+            if (body) {
+                if (body.has("plugin") && body["plugin"].t() == crow::json::type::String) {
+                    plugin = body["plugin"].s();
+                }
+                if (body.has("slug") && body["slug"].t() == crow::json::type::String) {
+                    slug = body["slug"].s();
+                }
+            }
+            bool done = false;
             on_pool(db, [&] {
                 store.state_set(kStateHost, std::string(kReadPrefix) + id, std::to_string(page));
+                if (!plugin.empty() && !slug.empty()) {
+                    if (page <= 0) {
+                        store.chapter_flags_apply(plugin, slug, {id}, false, 0,
+                                                  std::to_underlying(ChapterFlag::kRead));
+                    } else if (const int total = store.chapter_pages_count(plugin, slug, id);
+                               total > 0 && page >= total) {
+                        store.chapter_flags_apply(plugin, slug, {id}, false,
+                                                  std::to_underlying(ChapterFlag::kRead), 0);
+                        done = true;
+                    }
+                }
                 return 0;
             });
             crow::json::wvalue out;
             out["id"] = id;
             out["read"] = page;
+            out["done"] = done;
+            crow::response r{out};
+            r.set_header("Content-Type", "application/json");
+            return r;
+        });
+
+    // chapter-store 3.1: one generic bits endpoint -- set/clear any flag
+    // combination over ids or the whole manga; range logic stays client-side
+    // (D3, Suwayomi updateChapters parity).
+    CROW_ROUTE(app, "/chapter/flags")
+        .methods(crow::HTTPMethod::POST)([&](const crow::request& req) -> crow::response {
+            const auto body = crow::json::load(req.body);
+            std::vector<std::string> ids;
+            bool all = false;
+            int set = 0, clear = 0;
+            std::string plugin, slug;
+            if (body) {
+                if (body.has("ids") && body["ids"].t() == crow::json::type::List) {
+                    for (const auto& v : body["ids"]) {
+                        if (v.t() == crow::json::type::String) {
+                            ids.push_back(v.s());
+                        }
+                    }
+                }
+                if (body.has("all") && body["all"].t() == crow::json::type::True) {
+                    all = true;
+                }
+                if (body.has("set") && body["set"].t() == crow::json::type::Number) {
+                    set = static_cast<int>(body["set"].i());
+                }
+                if (body.has("clear") && body["clear"].t() == crow::json::type::Number) {
+                    clear = static_cast<int>(body["clear"].i());
+                }
+                if (body.has("plugin") && body["plugin"].t() == crow::json::type::String) {
+                    plugin = body["plugin"].s();
+                }
+                if (body.has("slug") && body["slug"].t() == crow::json::type::String) {
+                    slug = body["slug"].s();
+                }
+            }
+            if (plugin.empty() || plugin.contains('/') || slug.empty() || slug.contains('/') || (!all && ids.empty())) {
+                crow::response r{R"({"ok":false,"error":"plugin, slug and ids|all are required"})"};
+                r.code = 400;
+                r.set_header("Content-Type", "application/json");
+                return r;
+            }
+            crow::json::wvalue out;
+            auto touched = on_pool(db, [&] { return store.chapter_flags_apply(plugin, slug, ids, all, set, clear); });
+            out["ok"] = true;
+            crow::json::wvalue flags(crow::json::type::Object);
+            for (const auto& [cid, f] : touched) {
+                flags[cid] = f;
+            }
+            out["flags"] = std::move(flags);
             crow::response r{out};
             r.set_header("Content-Type", "application/json");
             return r;
@@ -208,9 +303,18 @@ void register_state(Ctx& c) {
         };
         crow::json::wvalue out;
         on_pool(db, [&] {
+            // chapter-store 3.2: skip/read DONE come from the flags bitfield
+            // (single truth); progress/total/cached stay key/table derived.
+            const std::map<std::string, int> flags =
+                plugin.empty() ? std::map<std::string, int>{} : store.chapter_flags_list(plugin, slug);
             for (const auto& id : ids) {
-                if (const auto s = store.state_get(kStateHost, std::string(kSkipPrefix) + id); s && *s == "1") {
-                    out[id]["skip"] = true;
+                if (const auto f = flags.find(id); f != flags.end()) {
+                    if (f->second & std::to_underlying(ChapterFlag::kSkip)) {
+                        out[id]["skip"] = true;
+                    }
+                    if (f->second & std::to_underlying(ChapterFlag::kRead)) {
+                        out[id]["done"] = true;
+                    }
                 }
                 if (const auto r = store.state_get(kStateHost, std::string(kReadPrefix) + id);
                     r && !r->empty() && *r != "0") {

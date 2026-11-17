@@ -18,7 +18,9 @@
 
 #include <cstdlib>
 #include <ctime>
+#include <map>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace http::api {
@@ -164,15 +166,17 @@ inline std::string inject_status_flags(const std::string& envelope, int flags) {
 }
 } // namespace detail
 
-// Read a chapters envelope, count entries flagged read in the store, and
-// write the rollup onto the saved-manga row. No-op when the envelope is
-// missing (a cached-only open must not zero an existing read count).
-inline void apply_read_rollup(Store& store, BS::thread_pool<>& db, const std::string& plugin, const std::string& slug, const std::string& chapters_env) {
+// chapter-store 2.1: materialize chapters rows from a parsed chapters
+// envelope (identity upsert; flags ride through, D2 legacy keys inherit on
+// first sight). No-op when the envelope is missing or carries no ids.
+inline void materialize_chapters(Store& store, BS::thread_pool<>& db, const std::string& plugin,
+                                 const std::string& slug, const std::string& chapters_env) {
     const auto chs = envelope_data(chapters_env);
     if (!chs) {
         return;
     }
-    int completed = 0;
+    std::vector<ChapterSeed> seeds;
+    seeds.reserve(chs->size());
     for (const auto& item : *chs) {
         if (!item.is_object()) {
             continue;
@@ -182,23 +186,53 @@ inline void apply_read_rollup(Store& store, BS::thread_pool<>& db, const std::st
         if (id_it == entry.end()) {
             continue;
         }
-        const auto* id_s = std::get_if<std::string>(&id_it->second.data);
-        if (id_s == nullptr) {
+        const auto* const id_s = std::get_if<std::string>(&id_it->second.data);
+        if (id_s == nullptr || id_s->empty()) {
             continue;
         }
-        int pages = 0;
-        if (const auto* const p = entry.find("pages"); p != entry.end()) {
-            if (const auto* d = std::get_if<double>(&p->second.data)) {
-                pages = static_cast<int>(*d);
+        double number = 0;
+        if (const auto* const n = entry.find("number"); n != entry.end()) {
+            if (const auto* d = std::get_if<double>(&n->second.data)) {
+                number = *d;
             }
-        }        const auto stored = http::on_pool(
-            db, [&] { return store.state_get(http::api::kStateHost, std::string(http::api::kReadPrefix) + *id_s); });
-        if (!stored || stored->empty()) {
-            continue;
         }
-        const int read = std::atoi(stored->c_str());
-        if (pages > 0 ? read >= pages : read > 0) {
-            ++completed;
+        seeds.push_back(ChapterSeed{.chapter_id = *id_s,
+                                    .number = number,
+                                    .title = detail::envelope_str(entry, "title"),
+                                    .url = detail::envelope_str(entry, "url")});
+    }
+    if (!seeds.empty()) {
+        http::on_pool(db, [&] {
+            store.chapters_upsert(plugin, slug, seeds);
+            return 0;
+        });
+    }
+}
+
+// Read a chapters envelope, count entries flagged read in the store, and
+// write the rollup onto the saved-manga row. No-op when the envelope is
+// missing (a cached-only open must not zero an existing read count).
+inline void apply_read_rollup(Store& store, BS::thread_pool<>& db, const std::string& plugin, const std::string& slug, const std::string& chapters_env) {
+    materialize_chapters(store, db, plugin, slug, chapters_env);
+    const auto chs = envelope_data(chapters_env);
+    if (!chs) {
+        return;
+    }
+    // chapter-store 1.8: the read rollup counts bit0 rows (single truth), no
+    // longer the per-id progress>=pages derive.
+    // chapter-store 1.8: the read rollup counts bit0 rows (single truth), no
+    // longer the per-id progress>=pages derive.
+    int completed = 0;
+    {
+        std::map<std::string, int> flags;
+        http::on_pool(db, [&] {
+            flags = store.chapter_flags_list(plugin, slug);
+            return 0;
+        });
+        for (const auto& [id, f] : flags) {
+            if (f & std::to_underlying(ChapterFlag::kRead)) {
+                ++completed;
+            }
         }
     }
     // The chapters envelope is in hand, so total_ch is refreshed here too:

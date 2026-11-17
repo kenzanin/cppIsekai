@@ -13,7 +13,6 @@
 
 namespace {
 constexpr const char* kLastRunKey = "update/last_run";
-constexpr const char* kStateHost = "host";
 } // namespace
 
 namespace update {

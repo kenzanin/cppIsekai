@@ -77,6 +77,25 @@ struct TitleMetaEntity {
     std::int64_t fetched_at{}; // last fetch watermark (unix seconds)
 };
 
+struct ChapterEntity {
+    std::string plugin;        // composite PK with slug+chapter_id
+    std::string slug;
+    std::string chapter_id;    // plugin's own id: stable across retcon/dup/renumber
+    double number{};           // plugin-emitted; display/sort only, never identity
+    std::string title;
+    std::string url;           // source href, verbatim; '' when the envelope omits it
+    int flags{};               // ChapterFlag bitfield (chapter-state D1)
+    std::int64_t updated_at{}; // unix seconds; stamped by the store on write
+};
+
+struct ChapterPageEntity {
+    std::string plugin;     // composite PK with slug/chapter_id/idx
+    std::string slug;
+    std::string chapter_id;
+    int idx{};              // 0-based reading order
+    std::string url;        // source image URL; cache FILES stay fs-derived (D4)
+};
+
 struct UpdateAttemptsEntity {
     std::string plugin; // composite PK with slug: one row per manga
     std::string slug;
@@ -151,6 +170,18 @@ inline auto create_storage(const std::string& path) {
                    make_column("consecutive_errors", &UpdateAttemptsEntity::consecutive_errors, default_value(0)),
                    make_column("backoff_until", &UpdateAttemptsEntity::backoff_until, default_value(0)),
                    primary_key(&UpdateAttemptsEntity::plugin, &UpdateAttemptsEntity::slug)),
+        make_table("chapter_pages", make_column("plugin", &ChapterPageEntity::plugin),
+                   make_column("slug", &ChapterPageEntity::slug),
+                   make_column("chapter_id", &ChapterPageEntity::chapter_id),
+                   make_column("idx", &ChapterPageEntity::idx), make_column("url", &ChapterPageEntity::url),
+                   primary_key(&ChapterPageEntity::plugin, &ChapterPageEntity::slug, &ChapterPageEntity::chapter_id,
+                               &ChapterPageEntity::idx)),
+        make_table("chapters", make_column("plugin", &ChapterEntity::plugin),
+                   make_column("slug", &ChapterEntity::slug), make_column("chapter_id", &ChapterEntity::chapter_id),
+                   make_column("number", &ChapterEntity::number), make_column("title", &ChapterEntity::title),
+                   make_column("url", &ChapterEntity::url), make_column("flags", &ChapterEntity::flags, default_value(0)),
+                   make_column("updated_at", &ChapterEntity::updated_at, default_value(0)),
+                   primary_key(&ChapterEntity::plugin, &ChapterEntity::slug, &ChapterEntity::chapter_id)),
         make_table("api_cache", make_column("plugin_id", &ApiCacheEntity::plugin_id),
                    make_column("query_hash", &ApiCacheEntity::query_hash),
                    make_column("params_json", &ApiCacheEntity::params_json),

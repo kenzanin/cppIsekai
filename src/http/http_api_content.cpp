@@ -158,6 +158,16 @@ void register_content(Ctx& c) {
             if (const auto pages = envelope_data(pages_env)) {
                 total_id = chapter_id;
                 total_pages = static_cast<int>(pages->size());
+                // chapter-store 2.2: page-url rows ride every parse (D4
+                // replace-all); the reader-visible list stays the same shape.
+                std::vector<std::string> urls;
+                urls.reserve(pages->size());
+                for (const auto& el : *pages) {
+                    if (const auto* s = std::get_if<std::string>(&el.data)) {
+                        urls.emplace_back(*s);
+                    }
+                }
+                store.chapter_pages_replace(plugin, slug, chapter_id, urls);
             }
             return build_pages_response(chs_env, pages_env,
                                         PagesCtx{.plugin = plugin, .slug = slug, .ch = chd, .ch_id = chapter_id})
