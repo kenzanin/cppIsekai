@@ -1,24 +1,16 @@
--- scratch: fetch-gate engine probe (lightpanda / obscura headless renderers).
--- Lane-scrap; delete with the engine lane once real plugins land.
+-- scratch: in-daemon browser probe (runs inside the daemon's lightpanda
+-- session via host.browser). Diagnostic lane for the comix WAF hunt.
 local methods = {}
 
-local URLS = {
-  u4 = "https://4ucomics.com/",
-  tk = "https://toonkotsu.com/",
-}
-
-local function probe(engine, key)
-  local r = host.http.fetch(URLS[key], { profile = engine, timeout_ms = 90000 })
-  local title = r.body and r.body:match("<title>([^<]*)") or "none"
-  return { status = r.status, bytes = r.body and #r.body or 0, title = title }
-end
-
-methods.probe = function(params)
-  local engine = params.engine or "lightpanda"
-  local key = params.key or "u4"
-  local ok, res = pcall(probe, engine, key)
-  if not ok then return { ok = false, error = tostring(res) } end
-  return { ok = true, data = res }
+methods.eval = function(params)
+  local url = params.url or "https://comix.to/"
+  local script = params.script or "document.title"
+  local tmo = tonumber(params.tmo) or 0
+  local _, gerr = host.browser.call("goto", { url = url, timeout_ms = tmo > 0 and tmo or nil })
+  if gerr ~= nil then return { ok = false, error = "goto: " .. gerr } end
+  local out, eerr = host.browser.call("evaluate", { script = script, timeout_ms = tmo > 0 and tmo or nil })
+  if eerr ~= nil then return { ok = false, error = "eval: " .. eerr } end
+  return { ok = true, data = out }
 end
 
 function handle(req)

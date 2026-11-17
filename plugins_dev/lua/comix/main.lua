@@ -162,21 +162,40 @@ end
 
 -- ── chapters ───────────────────────────────────────────────────────────────
 
+-- Chapter rows are client-rendered AND client-paginated: the title page
+-- carries 20 rows plus a .npager ("Showing 1 to 20 of N", num buttons) —
+-- no per-page URL, the pager is buttons. So the harvest runs in the page:
+-- grab rows, click the next .npager__num, wait for the row set to change,
+-- repeat. Dedupe by href across pages; cap 40 pages / 30s.
+local CH_HARVEST = '(function(){return new Promise(function(res){var t0=Date.now();var all={},order=[]; function rows(){return Array.prototype.slice.call(document.querySelectorAll("a.mchap-row__primary")).map(function(a){var r=a.closest(".mchap-row")||a.parentElement;var c=r&&r.querySelector(".mchap-row__ch");var t=r&&r.querySelector(".mchap-row__time");return{h:a.getAttribute("href")||"",c:c?c.textContent.trim():"",t:t?t.textContent.trim():""};});} function absorb(){rows().forEach(function(r){if(r.h&&!(r.h in all)){all[r.h]=1;order.push(r);}});} function btn(n){var bs=document.querySelectorAll(".npager__num");for(var i=0;i<bs.length;i++){if(bs[i].textContent.trim()===String(n))return bs[i];}return null;} function hint(){var h=document.querySelector(".mchap-foot__hint");return h?h.textContent.replace(/\\s+/g," "):"";} function perPage(){var m=hint().match(/to\\s+(\\d+)\\s+of/);return m?parseInt(m[1],10):0;} function total(){var m=hint().match(/of\\s+(\\d+)/);return m?parseInt(m[1],10):0;} function first(){var a=document.querySelector("a.mchap-row__primary");return a?a.getAttribute("href"):"";} function done(){res(JSON.stringify(order));} function page(n){absorb();var tot=total();if((tot&&order.length>=tot)||n>40||Date.now()-t0>45000)return done(); var b=btn(n);if(!b)return done(); var pp=perPage();var want=pp?String((n-1)*pp+1):null; var before=hint()+"|"+first();var start=Date.now();var tries=0; (function w(){var h=hint(); var ok=want?(h.indexOf(want+" to ")>=0):(h+"|"+first()!==before); if(ok){setTimeout(function(){absorb();page(n+1);},150);} else if(Date.now()-start>6000){ if(tries<1){tries++;var nb=btn(n);if(nb)nb.click();start=Date.now();setTimeout(w,200);} else{absorb();page(n+1);} } else setTimeout(w,150);})();} (function boot(){if(document.querySelector("a.mchap-row__primary")){absorb();page(2);}else if(Date.now()-t0>15000){done();}else{setTimeout(boot,150);}})(); });})()'
+
 methods.chapters = function(params)
   local slug = params.id or ""
   if slug == "" then return { ok = true, data = {} } end
 
-  -- Chapter rows are client-rendered by the SPA; the lightpanda render wait
-  -- covers it. Row shape: anchor.mchap-row__primary + .mchap-row__ch time
-  -- .mchap-row__time (all rows carry a time cell upstream; a missing one
-  -- would splice two rows -- same fields the source's DOM probe read).
-  local pat = [[(?s)<a class="[^"]*mchap-row__primary[^"]*" href="([^"]+)".*?mchap-row__ch[^>]*>([^<]*)<.*?mchap-row__time[^>]*>([^<]*)<]]
-  local body, err = render(BASE .. "/title/" .. host.url_encode(slug))
-  if err ~= nil then return { ok = false, error = err } end
+  local _, gerr = host.browser.call("goto", { url = BASE .. "/title/" .. host.url_encode(slug), timeout_ms = 60000 })
+  if gerr ~= nil then return { ok = false, error = "comix: goto failed: " .. gerr } end
+  local out, eerr = host.browser.call("evaluate", { script = CH_HARVEST, timeout_ms = 60000 })
+  if eerr ~= nil then return { ok = false, error = "comix: harvest failed: " .. eerr } end
+  local ok, rows = pcall(json.decode, out or "")
+  if not ok or type(rows) ~= "table" then
+    return { ok = false, error = "comix: unexpected chapter harvest for " .. slug }
+  end
+  if #rows == 0 then
+    -- upstream /api/v1 sits behind an on/off CF turnstile; one clean retry
+    -- (fresh goto re-runs the page's own challenge path) before giving up
+    local _, _ = host.browser.call("goto", { url = BASE .. "/title/" .. host.url_encode(slug) })
+    out, eerr = host.browser.call("evaluate", { script = CH_HARVEST, timeout_ms = 60000 })
+    if eerr ~= nil then return { ok = false, error = "comix: harvest failed: " .. eerr } end
+    ok, rows = pcall(json.decode, out or "")
+    if not ok or type(rows) ~= "table" then
+      return { ok = false, error = "comix: unexpected chapter harvest for " .. slug }
+    end
+  end
 
   local out = {}
-  for _, m in ipairs(host.re2.find_all(pat, body)) do
-    local href, chtxt, when = m[2], m[3], m[4]
+  for _, r in ipairs(rows) do
+    local href, chtxt, when = r.h or "", r.c or "", r.t or ""
     local chid = string.match(href or "", "/([^/]+)$") or ""
     if chid ~= "" then
       -- Chapter number from "Ch.43.2" or the URL tail.
@@ -218,9 +237,9 @@ methods.pages = function(params)
   if not slug or not chid or slug == "" then
     return { ok = false, error = "comix: chapter id must be slug:chapterId, got " .. tostring(composite) }
   end
-  local _, gerr = host.browser.call("goto", { url = BASE .. "/title/" .. host.url_encode(slug) .. "/" .. host.url_encode(chid) })
+  local _, gerr = host.browser.call("goto", { url = BASE .. "/title/" .. host.url_encode(slug) .. "/" .. host.url_encode(chid), timeout_ms = 60000 })
   if gerr ~= nil then return { ok = false, error = "comix: goto failed: " .. gerr } end
-  local out, eerr = host.browser.call("evaluate", { script = HARVEST })
+  local out, eerr = host.browser.call("evaluate", { script = HARVEST, timeout_ms = 60000 })
   if eerr ~= nil then return { ok = false, error = "comix: harvest failed: " .. eerr } end
   local ok, urls = pcall(json.decode, out or "")
   if not ok or type(urls) ~= "table" then

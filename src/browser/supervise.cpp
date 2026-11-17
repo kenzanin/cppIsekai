@@ -137,6 +137,13 @@ bool recover() {
         return false; // mid-incident: no respawn storm
     }
     s_last_recover = now;
+    // A client-side timeout against a healthy listener is not a crash: if
+    // something still answers, keep the child AND the session (the call
+    // retries in place) instead of killing a working backend.
+    if (probe_ok()) {
+        spdlog::info("browser: recover probe ok -- backend alive, keeping child/session");
+        return true;
+    }
     if (s_owned) {
         stop_child();
     }

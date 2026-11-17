@@ -5,6 +5,7 @@
 #include "glaze/glaze.hpp"
 #include "spdlog/spdlog.h"
 
+#include <sstream>
 #include <string>
 
 namespace browser {
@@ -20,11 +21,11 @@ constexpr const char* kAccept = "application/json, text/event-stream"; // D2: pl
 constexpr long kTimeoutMs = 15000; // hard RPC cap; per-tool timeouts ride in args (design Risks)
 
 /** \brief One POST to /mcp with the current session (if any). */
-fetch::Result post(const std::string& body) {
+fetch::Result post(const std::string& body, long timeout_ms) {
     fetch::Request r;
     r.url = g_url + "/mcp";
     r.method = "POST";
-    r.timeout_ms = kTimeoutMs;
+    r.timeout_ms = timeout_ms;
     r.accept_header = kAccept;
     r.headers.emplace_back("Content-Type", "application/json");
     if (!g_session.empty()) {
@@ -40,7 +41,7 @@ bool init_session(std::string* err) {
     g_session.clear();
     const fetch::Result res = post(
         R"({"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},)"
-        R"("clientInfo":{"name":"cppisekai","version":"0.1"}}})");
+        R"("clientInfo":{"name":"cppisekai","version":"0.1"}}})", kTimeoutMs);
     if (!res.error.empty() || res.status != 200) {
         if (err != nullptr) {
             *err = "initialize failed: " + (res.error.empty() ? "http " + std::to_string(res.status) : res.error);
@@ -55,14 +56,32 @@ bool init_session(std::string* err) {
         return false;
     }
     g_session = sid->second;
-    (void)post(R"({"jsonrpc":"2.0","method":"notifications/initialized"})");
+    (void)post(R"({"jsonrpc":"2.0","method":"notifications/initialized"})", kTimeoutMs);
     return true;
 }
 
 /** \brief Envelope -> result text. RPC error object or isError => failure. */
 std::string envelope_result(const std::string& body, std::string* err) {
+    // Slow tool calls come back as an SSE frame (Accept allows it): reduce to
+    // the JSON carried by the last "data:" line before parsing.
+    std::string json = body;
+    if (body.find("event:") != std::string::npos) {
+        std::string line;
+        std::istringstream in(body);
+        while (std::getline(in, line)) {
+            if (line.rfind("data:", 0) == 0) {
+                std::string payload = line.substr(5);
+                if (!payload.empty() && payload.front() == ' ') {
+                    payload.erase(0, 1);
+                }
+                if (!payload.empty()) {
+                    json = payload;
+                }
+            }
+        }
+    }
     glz::generic v;
-    if (auto ec = glz::read_json(v, body); ec || !v.is_object()) {
+    if (auto ec = glz::read_json(v, json); ec || !v.is_object()) {
         if (err != nullptr) {
             *err = "bad jsonrpc envelope";
         }
@@ -148,6 +167,16 @@ std::string call(const std::string& tool, const std::string& args_json, std::str
     if (auto ec = glz::read_json(args, args_json); ec || !args.is_object()) {
         return fail("browser: args is not a json object");
     }
+    // per-call timeout rides in args (design Risks): "timeout_ms", else 15 s cap
+    long timeout_ms = kTimeoutMs;
+    if (args.is_object()) {
+        auto& obj = args.get_object();
+        if (const auto t = obj.find("timeout_ms"); t != obj.end() && t->second.is_number()) {
+            const long v = static_cast<long>(t->second.get<double>());
+            if (v > 0) timeout_ms = v;
+        }
+    }
+    spdlog::debug("[browser] {} timeout_ms={} session='{}'", tool, timeout_ms, g_session);
     glz::generic env;
     env["jsonrpc"] = "2.0";
     env["id"] = ++g_id;
@@ -165,7 +194,7 @@ std::string call(const std::string& tool, const std::string& args_json, std::str
             }
             return {}; // err already set by init_session
         }
-        const fetch::Result res = post(body);
+        const fetch::Result res = post(body, timeout_ms);
         if (!res.error.empty()) {
             // D13: transport death gets exactly one recover attempt (respawn +
             // session drop); a second consecutive failure is final for the call.
