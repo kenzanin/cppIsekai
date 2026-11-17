@@ -1,5 +1,6 @@
 #include "api_ctx.hpp"
 
+#include "cache/slug.hpp"
 #include "plugin/url_codec.hpp"
 
 #include <filesystem>
@@ -262,7 +263,7 @@ void register_state(Ctx& c) {
         // suffix-shaped dirs are reported here.
         std::map<std::string, int> cached_dirs;
         if (!plugin.empty() && !plugin.contains('/') && !slug.empty() && !slug.contains('/')) {
-            const fs::path base = fs::path("data/cache") / "img" / images.ns(plugin) / "manga" / slug;
+            const fs::path base = fs::path("data/cache") / "img" / images.ns(plugin) / "manga" / cache::slug_dir(slug);
             std::error_code ec;
             if (fs::is_directory(base, ec)) {
                 for (const auto& e : fs::directory_iterator(base, ec)) {

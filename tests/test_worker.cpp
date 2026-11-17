@@ -10,6 +10,7 @@
 
 #include "cache/cache.hpp"
 #include "cache/sha1.hpp"
+#include "cache/slug.hpp"
 #include "reader/worker.hpp"
 
 namespace fs = std::filesystem;
@@ -48,12 +49,18 @@ struct Rig {
     cache::Cache cache{cache::Config{dir.path.string(), 1 << 20},
                        [this](const std::string& k, const std::string&) { return fake.get(k); }};
 
+    // slug-a lands as "<prefix40>-<hash8>" (slug_dir); one helper keeps every
+    // expected rel_path on the same transform the host applies.
+    static std::string sa(const std::string& rest) {
+        return "md/manga/" + cache::slug_dir("slug-a") + "/" + rest;
+    }
+
     // The img pool has no sha fallback, so seeded/peeked files need a
     // placement path: seed into the exact slot a worker batch would fill.
     static std::string slot(int page) {
         std::string n = std::to_string(page);
         while (n.size() < 3) n = "0" + n;
-        return "md/manga/slug-a/ch001/p" + n + ".bin";
+        return sa("ch001/p" + n + ".bin");
     }
     void seed(const std::string& key, int page) {
         REQUIRE(cache.store(key, "img", "body:" + key, slot(page)).has_value());
@@ -124,8 +131,8 @@ TEST_CASE("worker: structured placement -- complete ctx lands <plugin>/manga/<sl
         worker.nudge({part(1, 1, {"http://x/1.jpg", "http://x/2.jpg"})}, "md", "slug-a");
         worker.stop();
     }
-    const auto r1 = "md/manga/slug-a/ch001/p001.jpg";
-    const auto r2 = "md/manga/slug-a/ch001/p002.jpg";
+    const auto r1 = Rig::sa("ch001/p001.jpg");
+    const auto r2 = Rig::sa("ch001/p002.jpg");
     CHECK(rig.on_disk_rel("http://x/1.jpg", r1));
     CHECK(rig.on_disk_rel("http://x/2.jpg", r2));
 
@@ -136,7 +143,7 @@ TEST_CASE("worker: structured placement -- complete ctx lands <plugin>/manga/<sl
         worker.nudge({part(2, 1, {"http://y/1.jpg"})}, "md", "slug-a");
         worker.stop();
     }
-    const auto r3 = "md/manga/slug-a/ch002/p001.jpg";
+    const auto r3 = Rig::sa("ch002/p001.jpg");
     CHECK(rig.on_disk_rel("http://y/1.jpg", r3));
     // Zero-pad keeps ch001..ch010 in reading order across a full chapter span.
     const std::vector<std::string> dirs = {"ch001", "ch002", "ch010"};
@@ -171,7 +178,7 @@ TEST_CASE("worker: a nudge without full placement context is dropped, never sha-
         w.nudge({part(1, 1, {"http://x/plain"})}, "md", "slug-a");
         w.stop();
     }
-    CHECK(rig.on_disk_rel("http://x/plain", "md/manga/slug-a/ch001/p001.bin"));
+    CHECK(rig.on_disk_rel("http://x/plain", Rig::sa("ch001/p001.bin")));
 }
 
 TEST_CASE("worker: store reuse -- peek with the same rel_path hits, a second rel refetches") {
@@ -190,8 +197,8 @@ TEST_CASE("worker: store reuse -- peek with the same rel_path hits, a second rel
     }
     // Passthrough transcode (fake body is not a real image) keeps the key's
     // ext, so the structured landing path is taken. Ch002 ctx -> sibling dir.
-    const auto ra1 = "md/manga/slug-a/ch001/p001.jpg";
-    const auto ra2 = "md/manga/slug-a/ch002/p001.jpg";
+    const auto ra1 = Rig::sa("ch001/p001.jpg");
+    const auto ra2 = Rig::sa("ch002/p001.jpg");
     CHECK(rig.on_disk_rel("http://x/a.jpg", ra1));
     CHECK(rig.on_disk_rel("http://x/a.jpg", ra2));
     const int calls = rig.fake.fetched.size();
@@ -210,7 +217,7 @@ TEST_CASE("worker: an unnumbered part is skipped, numbered siblings still land")
     worker.stop();
 
     CHECK(rig.fake.fetched == std::vector<std::string>{"http://y/b.jpg"}); // x never even fetched
-    CHECK(rig.on_disk_rel("http://y/b.jpg", "md/manga/slug-a/ch002/p001.jpg"));
+    CHECK(rig.on_disk_rel("http://y/b.jpg", Rig::sa("ch002/p001.jpg")));
 }
 TEST_CASE("worker: a spilled window part lands in its own chapter dir at its real page") {
     Rig rig;
@@ -223,6 +230,6 @@ TEST_CASE("worker: a spilled window part lands in its own chapter dir at its rea
     worker.nudge({part(1, 48, {"http://x/last.jpg"}), part(2, 1, {"http://y/first.jpg"})}, "md", "slug-a");
     worker.stop();
 
-    CHECK(rig.on_disk_rel("http://x/last.jpg", "md/manga/slug-a/ch001/p048.jpg"));
-    CHECK(rig.on_disk_rel("http://y/first.jpg", "md/manga/slug-a/ch002/p001.jpg"));
+    CHECK(rig.on_disk_rel("http://x/last.jpg", Rig::sa("ch001/p048.jpg")));
+    CHECK(rig.on_disk_rel("http://y/first.jpg", Rig::sa("ch002/p001.jpg")));
 }

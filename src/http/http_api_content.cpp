@@ -1,5 +1,6 @@
 #include "api_ctx.hpp"
 
+#include "cache/slug.hpp"
 #include "export_cbz.hpp"
 #include "img.hpp"
 #include "pages_api.hpp"
@@ -75,7 +76,7 @@ bool chapter_cached(const std::string& ns, const std::string& slug, int chapter,
     if (chapter <= 0 || pages <= 0) {
         return false;
     }
-    const fs::path base = fs::path("data/cache") / "img" / ns / "manga" / slug;
+    const fs::path base = fs::path("data/cache") / "img" / ns / "manga" / cache::slug_dir(slug);
     const std::string prefix = "ch" +
                                (chapter < 10    ? std::string("00")
                                 : chapter < 100 ? std::string("0")

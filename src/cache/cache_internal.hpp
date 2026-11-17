@@ -12,6 +12,8 @@
 #include <string>
 #include <vector>
 
+#include "cache/slug.hpp"
+
 namespace cache::internal {
 
 namespace fs = std::filesystem;
@@ -128,7 +130,7 @@ inline std::string page_rel(const std::string& plugin, const std::string& slug, 
         dir += '-';
         dir += chapter_id.size() <= 8 ? chapter_id : chapter_id.substr(chapter_id.size() - 8);
     }
-    return plugin + "/manga/" + slug + "/" + dir + "/p" + pad(page);
+    return plugin + "/manga/" + slug_dir(slug) + "/" + dir + "/p" + pad(page);
 }
 
 } // namespace cache::internal

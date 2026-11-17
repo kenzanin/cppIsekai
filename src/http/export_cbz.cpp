@@ -1,5 +1,7 @@
 #include "export_cbz.hpp"
 
+#include "cache/slug.hpp"
+
 #include <algorithm>
 #include <libzippp/libzippp.h>
 
@@ -133,7 +135,7 @@ std::optional<std::string> build(const std::string& cache_root, const std::strin
         const auto slash = slug.find('/');
         const std::string manga = slash == std::string::npos ? slug : slug.substr(0, slash);
         const std::string ch_filter = slash == std::string::npos ? "" : slug.substr(slash + 1);
-        const fs::path base = fs::path(cache_root) / "img" / plugin / "manga" / manga;
+        const fs::path base = fs::path(cache_root) / "img" / plugin / "manga" / cache::slug_dir(manga);
         std::error_code ec;
         for (const auto& ch : fs::directory_iterator(base, ec)) {
             if (ec) {

@@ -14,9 +14,14 @@
 #include <string>
 #include <string_view>
 
+#include "cache/sha1.hpp"
+
 namespace cache {
 
 inline constexpr std::size_t slug_max = 64;
+
+/** Directory component width: 40 slug chars + '-' + 8 hash hex. */
+inline constexpr std::size_t slug_dir_max = 40;
 
 /** \brief Longest prefix <= max that ends on a UTF-8 character boundary. */
 inline std::size_t capped_len(std::string_view s, std::size_t max) {
@@ -80,6 +85,17 @@ inline std::string manga_slug(const std::map<std::string, std::string>& titles, 
     slug += '-';
     slug += tail;
     return slug;
+}
+
+/** \brief On-disk directory component for a manga slug, uniform for every
+ *  length: "<first 40 chars>-<sha1-8>". A slug doubles as a cache directory
+ *  name and real ones reach 202 chars; the hash suffix also separates titles
+ *  sharing a long common prefix. Pure: slug in, name out, no DB. */
+inline std::string slug_dir(std::string_view slug) {
+    std::string dir{slug.substr(0, capped_len(slug, slug_dir_max))};
+    dir += '-';
+    dir += sha1_hex(std::string(slug)).substr(0, 8);
+    return dir;
 }
 
 /** \brief Cache namespace for a plugin: the slugified display name, falling

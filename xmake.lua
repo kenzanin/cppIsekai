@@ -206,6 +206,7 @@ cxx_bin("test_transcode", {
 cxx_bin("test_slug", {
     files = {"tests/test_slug.cpp"},
     incs = {"src"},
+    reqs = {"hash-library"},
     test = true,
 })
 
@@ -232,8 +233,8 @@ cxx_bin("test_http_img", {
 
 cxx_bin("test_export", {
     files = {"tests/test_export.cpp", "src/http/export_cbz.cpp"},
-    incs = {"src/http"},
-    reqs = {"libzippp"},
+    incs = {"src", "src/http"},
+    reqs = {"libzippp", "hash-library"},
     test = true,
 })
 

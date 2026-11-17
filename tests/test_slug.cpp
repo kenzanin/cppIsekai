@@ -86,3 +86,29 @@ TEST_CASE("cache_ns: the display name keys the cache, the id is only the fallbac
     CHECK(fs_safe(cache::cache_ns("x", "Atsu.moe Reader")));
     CHECK(cache::cache_ns("x", std::string(100, 'A')).size() == cache::slug_max);
 }
+
+TEST_CASE("slug_dir: uniform bound, stable, collision-separated") {
+    // Every slug, short or 202-char, gets the same shape: prefix'-hash8.
+    const auto simple = cache::slug_dir("one-piece");
+    CHECK(simple.starts_with("one-piece-"));
+    CHECK(fs_safe(simple));
+    CHECK(simple.size() == 18); // "one-piece" (9) + '-' + 8 hash hex
+    CHECK(cache::slug_dir("one-piece") == simple);
+    CHECK(simple.size() <= 49);
+
+    // The real 4ucomics slug (202 chars) is bounded; its 40-prefix survives.
+    const auto long_a = cache::slug_dir(std::string(202, 'a'));
+    CHECK(long_a.size() == 49);
+    CHECK(long_a.substr(0, 41) == std::string(40, 'a') + '-');
+
+    // A different title sharing the first 40 chars still lands elsewhere.
+    const auto long_b = cache::slug_dir(std::string(100, 'a') + "b" + std::string(101, 'a'));
+    CHECK(long_a != long_b);
+
+    // UTF-8: the prefix never splits a codepoint (slug_dir takes an
+    // already-slugged id; no case folding here).
+    const auto jp = cache::slug_dir("frieren-葬送のフリーレン-pad-pad-pad-pad-pad-pad");
+    CHECK(jp.size() <= 49);
+    CHECK(jp.starts_with("frieren-"));
+    CHECK(fs_safe(jp));
+}

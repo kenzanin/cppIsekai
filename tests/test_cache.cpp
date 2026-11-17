@@ -11,6 +11,7 @@
 
 #include "cache/cache.hpp"
 #include "cache/sha1.hpp"
+#include "cache/slug.hpp"
 
 namespace fs = std::filesystem;
 
@@ -38,6 +39,8 @@ struct TempRoot {
                ("cppisekai_cache_test_" +
                 std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()))) {
         fs::create_directories(path);
+        // Tests boot pre-v4 trees: the slug-dir cutover below is stamped off.
+        std::ofstream(path / ".cache-v4-slugdir", std::ios::binary);
     }
     ~TempRoot() {
         std::error_code ec;
@@ -219,6 +222,24 @@ TEST_CASE("cache: boot walk spans tree depth; trim evicts across pools by mtime"
     CHECK(fs::exists(*n));
 }
 
+TEST_CASE("cache: slug-dir cutover -- raw-slug manga trees aside once, swept next boot") {
+    const auto root = fs::temp_directory_path() /
+                      ("cppisekai_v4_" +
+                       std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    fs::create_directories(root / "img/md/manga/some-long-slug/ch001");
+    std::ofstream(root / "img/md/manga/some-long-slug/ch001/p001.webp", std::ios::binary) << forty('a');
+
+    cache::Cache first(cache::Config{root.string(), 1 << 20}, {});
+    CHECK(fs::exists(root / ".legacy-img/md/manga/some-long-slug/ch001/p001.webp"));
+    CHECK(fs::exists(root / "img")); // recreated empty, ready for hashed dirs
+    CHECK(fs::exists(root / ".cache-v4-slugdir"));
+
+    cache::Cache again(cache::Config{root.string(), 1 << 20}, {});
+    CHECK_FALSE(fs::exists(root / ".legacy-img")); // prior copy swept
+    std::error_code ec;
+    fs::remove_all(root, ec);
+}
+
 TEST_CASE("cache: one-time purge flattens v1 pools; rollback copy swept next boot") {
     TempRoot root;
     const auto img = root.path / "img";
@@ -255,7 +276,7 @@ TEST_CASE("cache v3: page landing paths + duplicate chapter disambiguation") {
                              .chapter = 12, .page = 3};
     const auto p = cache.img_store("http://x/p3.png", "B", {}, pg);
     REQUIRE(ok(p));
-    CHECK(*p == (root.path / "img" / "mangadex" / "manga" / "solo-leveling" /
+    CHECK(*p == (root.path / "img" / "mangadex" / "manga" / cache::slug_dir("solo-leveling") /
                  "ch012" / "p003.png").string());
 
     // zero-pad: ch 2 -> ch002
@@ -398,12 +419,14 @@ TEST_CASE("cache: namespace resolver keys the on-disk directory, id is the fallb
     cache::Cache::PageCtx pg{.plugin = "mangadex", .slug = "solo-leveling", .chapter = 3, .page = 1};
     const auto p = cache.img_ensure("http://x/page.jpg", {}, pg);
     REQUIRE(ok(p));
-    CHECK(fs::path(*p).generic_string().find("img/mangadex-name/manga/solo-leveling/ch003/p001") !=
+    CHECK(fs::path(*p).generic_string().find("img/mangadex-name/manga/" + cache::slug_dir("solo-leveling") +
+                                             "/ch003/p001") !=
           std::string::npos);
 
     cache::Cache::PageCtx p2 = pg;
     p2.plugin = "other";
     const auto p2p = cache.img_ensure("http://x/page.jpg", {}, p2);
     REQUIRE(ok(p2p));
-    CHECK(fs::path(*p2p).generic_string().find("img/other/manga/solo-leveling/") != std::string::npos);
+    CHECK(fs::path(*p2p).generic_string().find("img/other/manga/" + cache::slug_dir("solo-leveling") + "/") !=
+          std::string::npos);
 }

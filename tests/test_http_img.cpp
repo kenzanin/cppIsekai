@@ -10,6 +10,8 @@
 
 #include "http/img.hpp"
 
+#include "cache/slug.hpp"
+
 namespace fs = std::filesystem;
 
 namespace {
@@ -131,7 +133,8 @@ TEST_CASE("img: page-context miss fetches and lands in the v3 tree") {
     // Stored under the context layout, not the sha fallback.
     bool v3_landed = false;
     for (const auto& e : fs::recursive_directory_iterator(root.path / "img"))
-        if (!e.is_directory() && e.path().string().find("manga/slug-x/ch002/p001.") != std::string::npos)
+        if (!e.is_directory() &&
+            e.path().string().find("manga/" + cache::slug_dir("slug-x") + "/ch002/p001.") != std::string::npos)
             v3_landed = true;
     CHECK(v3_landed);
 

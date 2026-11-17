@@ -75,6 +75,21 @@ Cache::Cache(Config conf, Fetcher fetch, NsResolver ns)
         std::ofstream marker(ns_stamp, std::ios::binary);
     }
 
+    // Slug-dir cutover: manga folders are now "<slug40>-<sha1-8>" (uniform
+    // bound, collision-safe); pre-v4 folders carry the raw slug. One-shot
+    // aside, next boot's .legacy sweep deletes it. A cold image cache is the
+    // accepted cost; every file is refetchable and DB rows keep the URLs.
+    const fs::path v4_stamp = root / ".cache-v4-slugdir";
+    if (!fs::exists(v4_stamp, ec)) {
+        std::error_code rec;
+        const fs::path from = root / "img";
+        if (fs::exists(from, rec)) {
+            fs::rename(from, root / ".legacy-img", rec);
+        }
+        fs::create_directories(root / "img", rec);
+        std::ofstream marker(v4_stamp, std::ios::binary);
+    }
+
     struct Seed {
         std::string path;
         std::int64_t bytes;
