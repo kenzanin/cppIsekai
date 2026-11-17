@@ -1,4 +1,6 @@
 ## 2026-11-17
+* **Update**: Updated concept `decisions/comix-adoption-route-2026-11-16.md`.
+* **Update**: Updated concept `decisions/comix-turnstile-token-2026-11-17.md`.
 * **Creation**: Documented concept `decisions/comix-turnstile-token-2026-11-17.md` (comix turnstile token: how to mint the WAF cookie for headless harvest (DRAFT - for discussion)).
 * **Update**: Updated concept `findings/browser-session-waf-2026-11-17.md`.
 * **Creation**: Documented concept `findings/browser-session-waf-2026-11-17.md` (comix WAF turnstile unsolvable in lightpanda headless; session ops notes).

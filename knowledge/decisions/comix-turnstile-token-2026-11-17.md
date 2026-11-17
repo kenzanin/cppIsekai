@@ -1,10 +1,10 @@
 ---
 type: decision
 title: "comix turnstile token: how to mint the WAF cookie for headless harvest (DRAFT - for discussion)"
-description: "DRAFT, pending discussion. Last unsolved piece: /api/v1 needs the site's waf cookie, set only by POST /@waf/verify with a real turnstile token. Flow mapped: challenge #ts shell renders, iframe does NOT auto-mount, turnstile.reset('#ts') mounts it, token lands in input[id$=_response], glue auto-POSTs verify. Fails headless: token never completes in lightpanda (response input empty >25s). Options: A) solve once in user Chrome, export to jar, --cookie loads at boot until expiry (zero code); B) drive user Chrome via Blueprint/CDP to re-solve automatically; C) keep digging lightpanda turnstile internals (one nightly crash seen; upstream-report candidate). Lean A now, B if manual re-solve annoys, C background only. Evidence: findings/browser-session-waf-2026-11-17."
+description: "SUPERSEDED 2026-11-17: the browser backend is now app-local headless Chrome (vendored cdp-cpp) and the WAF/turnstile solves itself in real-Chrome headless -- comix chapters/pages/images verified e2e (111 chapters, 14 pages, /cache/img 200). No jar minting, no --cookie, no token replay. Options A/B/C below were never needed."
 tags: [comix, turnstile, waf, lightpanda, decision]
-generated: { by: agent/mcp, at: "2026-11-17T03:13:45Z" }
-status: stable
+generated: { by: agent/mcp, at: "2026-11-17T11:08:47Z" }
+status: deprecated
 ---
 
 ## Context
@@ -28,4 +28,3 @@ What fails headless: the token never completes in lightpanda - response input st
 ## Leaning
 
 A now, B if the manual re-solve cadence hurts, C only as a filed issue upstream. The cookie persist loop (graceful stop -> jar -> boot load) makes A's expiry the only manual touchpoint.
-

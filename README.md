@@ -100,20 +100,21 @@ sequenceDiagram
 
 ## Browser automation
 
-Some sites (comix) render their page lists client-side only, so the host can drive a headless
-browser: [lightpanda](https://github.com/lightpanda-io/browser) speaking MCP over HTTP. The daemon
-supervises it in-process (reproc):
+Some sites (comix) render their page lists client-side only, so the host drives a headless
+**Chrome** over CDP, using the vendored [CDP-for-CPP](https://github.com/ByteAshen/CDP-for-CPP)
+(`third_party/cdp-cpp`, MIT). No external daemon, no second engine — the app spawns its own
+Chrome (temp profile, killed with the app):
 
-- at boot the daemon probes `browser.lightpanda_url` (default `http://127.0.0.1:8899`, ini-only
-  `[browser]` section); a healthy listener is **adopted** (never killed at shutdown), otherwise an
-  app-owned child is spawned from `browser.lightpanda_command` (default `lightpanda`; set an
-  absolute path under systemd's minimal `PATH`) and readiness is polled ~5 s. Boot aborts when
-  neither works.
-- one crash recovery per incident: the next browser call after a transport failure respawns the
-  child, drops the session and retries once; a second consecutive failure marks the backend dead
-  for the process lifetime and later calls fail fast. Restarting the app resets it.
-- all browser calls share one mutex and one MCP session; localhost traffic bypasses the global
-  `proxy` (loopback exemption in the fetch gate).
+- at boot the daemon spawns headless Chrome; `chrome.command` (ini-only `[chrome]` section,
+  `CPPISEKAI_CHROME_COMMAND`) overrides the binary, empty = auto-discover (stable channel first).
+  Boot aborts when Chrome cannot be launched.
+- one crash recovery per incident: the next browser call after a failure relaunches Chrome and
+  retries once (3 s cooldown); a failed relaunch marks the backend dead for the process lifetime
+  and later calls fail fast. Restarting the app resets it.
+- all browser calls share one mutex and one working page; a harvest is never interleaved.
+  `evaluate` awaits Promises (60 s cap inside the vendored eval), so one call can run a whole
+  click-through harvest.
+- localhost traffic bypasses the global `proxy` (loopback exemption in the fetch gate).
 
 Plugins reach it through one passthrough, e.g. the comix page harvest:
 

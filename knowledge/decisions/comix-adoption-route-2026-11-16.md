@@ -1,10 +1,10 @@
 ---
 type: decision
 title: "Comix.to adoption for cppIsekai: external lightpanda daemon + hand-rolled JSON-RPC (supersedes Route A recommendation)"
-description: "Study + probes + final route: lightpanda mcp daemon over HTTP/JSON-RPC; one host.browser.call primitive; image_referer none sentinel; openspec change browser-host holds the plan"
+description: "SUPERSEDED 2026-11-17 by the app-local headless-Chrome backend (commit 9b0f374): lightpanda MCP daemon retired; same host.browser.call contract, vendored cdp-cpp CDP client, Chrome solves comix WAF+pager natively. Kept for the host-gap analysis history."
 tags: [plugin, comix, lightpanda, browser, host-api]
-generated: { by: agent/mcp, at: "2026-11-16T15:23:19Z" }
-status: draft
+generated: { by: agent/mcp, at: "2026-11-17T11:08:47Z" }
+status: deprecated
 ---
 
 Study of adopting goIsekai's examples/plugins/lua/comix into cppIsekai. goIsekai's comix is architected around a headless-browser host API (host.browser.fetch / host.browser.evaluate_with_init via CDP+rod). cppIsekai has no browser primitive, so the port must answer: what must the host add? All findings below are empirical (probes run 2026-11-16 against the live daemon and the lightpanda CLI), not inference. IMAGE ROUTE DO NOT BYPASS: comix search/detail/chapters/genres work without any new host code.
