@@ -1,4 +1,7 @@
 ## 2026-11-17
+* **Update**: Linked `findings/browser-chrome-backend-2026-11-17.md` to `decisions/comix-turnstile-token-2026-11-17.md` (Chrome swap made turnstile minting moot: real-Chrome engine solves the WAF transparently; decision left deprecated.).
+* **Update**: Linked `findings/browser-chrome-backend-2026-11-17.md` to `findings/browser-host-apply-2026-11-17.md` (Supersedes the lightpanda-era backend; its invariants (D13, single-session) carry over re-shaped.).
+* **Creation**: Documented concept `findings/browser-chrome-backend-2026-11-17.md` (Chrome/CDP browser backend: invariants, wait tool, and the comix tomy2x redeploy breakage).
 * **Update**: Updated concept `decisions/comix-adoption-route-2026-11-16.md`.
 * **Update**: Updated concept `decisions/comix-turnstile-token-2026-11-17.md`.
 * **Creation**: Documented concept `decisions/comix-turnstile-token-2026-11-17.md` (comix turnstile token: how to mint the WAF cookie for headless harvest (DRAFT - for discussion)).
