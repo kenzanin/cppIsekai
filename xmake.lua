@@ -19,7 +19,7 @@ local PLUGIN_SRC = {"src/plugin/plugin_core.cpp", "src/plugin/plugin_load.cpp", 
                     "src/plugin/lua/bridge.cpp", "src/plugin/lua/lua_runtime.cpp", "src/plugin/http_client.cpp",
                     "src/plugin/wasm/wasm_rt.cpp", "src/plugin/wasm/wasm_load.cpp", "src/plugin/wasm/wasm_imports.cpp",
                     "src/plugin/js/js_rt.cpp", "src/plugin/js/js_bindings.cpp", "src/plugin/htmltext_re2.cpp",
-                    "src/plugin/htmltext_html.cpp", "src/browser/mcp.cpp"}
+                    "src/plugin/htmltext_html.cpp", "src/browser/chrome.cpp"}
 local FETCH_SRC = {"src/fetch/fetch.cpp", "src/fetch/fetch_curl.cpp"}
 
 -- system shared libs via pkg-config; the rest pinned from xrepo (locked in xmake-requires.lock)
@@ -43,8 +43,8 @@ add_requires("glaze 9.1.0", "thread-pool 5.1.0", "readerwriterqueue 1.0.7", "lex
 add_requires("asio 1.36.0", "crow 1.3.5", {configs = {ssl = false}})
 add_requires("cli11 2.7.2", {configs = {cmake = false}})
 
--- reproc++ (browser-host D10): in-process spawn/supervise of the lightpanda MCP child.
-add_requires("reproc 14.2.5")
+-- reproc++ retired with the lightpanda backend; the browser is app-local CDP
+-- via vendored cdp-cpp (third_party/cdp-cpp, MIT) driving headless Chrome.
 
 -- add_files needs flat strings; cfg.files may embed the shared groups above
 local function flatten(list)
@@ -109,13 +109,38 @@ target("tiny-aes256")
     add_includedirs(TP .. "/tiny-aes", {public = true})
     add_defines("AES256=1")
 
+-- Vendored CDP-for-CPP (MIT): the Chrome DevTools client behind the browser
+-- backend. Upstream ships 30 warnings; compiled as-is, outside our gate
+-- (same policy as every third_party target).
+target("cdp-cpp")
+    set_kind("static")
+    set_languages("c++23")
+    -- upstream's own source list (CMakeLists) + the posix platform pair;
+    -- domains/*.cpp and the win32 pair are not part of the shipped lib.
+    add_files(TP .. "/cdp-cpp/src/core/Json.cpp",
+        TP .. "/cdp-cpp/src/core/Base64.cpp",
+        TP .. "/cdp-cpp/src/core/SHA1.cpp",
+        TP .. "/cdp-cpp/src/net/HttpClient.cpp",
+        TP .. "/cdp-cpp/src/net/WebSocket.cpp",
+        TP .. "/cdp-cpp/src/protocol/CDPConnection.cpp",
+        TP .. "/cdp-cpp/src/protocol/CDPClient.cpp",
+        TP .. "/cdp-cpp/src/browser/QuickStart.cpp",
+        TP .. "/cdp-cpp/src/browser/ChromeLauncher_posix.cpp",
+        TP .. "/cdp-cpp/src/highlevel/Page.cpp",
+        TP .. "/cdp-cpp/src/highlevel/ElementHandle.cpp",
+        TP .. "/cdp-cpp/src/highlevel/NetworkInterceptor.cpp",
+        TP .. "/cdp-cpp/src/highlevel/Browser.cpp",
+        TP .. "/cdp-cpp/src/net/Socket_posix.cpp")
+    add_includedirs(TP .. "/cdp-cpp/include", {public = true})
+    add_syslinks("pthread")
+
 -- --- daemon ---
 cxx_bin("cppIsekai", {
     files = {"src/**.cpp"},
     incs = {"src"},
-    deps = {"wasm3", "tiny-aes256"},
+    deps = {"wasm3", "tiny-aes256", "cdp-cpp"},
     pkgs = {"vips"},
-    reqs = {"lua", "crow", "cli11", "asio", "glaze", "sol2", "thread-pool", "readerwriterqueue", "lexbor", "libzippp", "quickjs-ng", "simpleini", "sqlite_orm", "spdlog", "zlib", "sqlite3", "utf8proc", "re2", "hash-library", "pugixml", "backward-cpp", "reproc"},
+    reqs = {"lua", "crow", "cli11", "asio", "glaze", "sol2", "thread-pool", "readerwriterqueue", "lexbor", "libzippp", "quickjs-ng", "simpleini", "sqlite_orm", "spdlog", "zlib", "sqlite3", "utf8proc", "re2", "hash-library", "pugixml", "backward-cpp"},
     ldflags = {CURL_SO},
     rpath = {CURL_LIB},
     defs = {'CPPISEKAI_FETCH_LIB_DIR="' .. CURL_LIB .. '"', "CROW_USE_LOCALTIMEZONE", "CROW_ENABLE_COMPRESSION"},
@@ -123,8 +148,9 @@ cxx_bin("cppIsekai", {
 
 -- --- tests (doctest, system package; `xmake test` runs all) ---
 cxx_bin("test_fetch", {
-    files = {"tests/test_fetch.cpp", FETCH_SRC, "src/browser/mcp.cpp"},
+    files = {"tests/test_fetch.cpp", FETCH_SRC, "src/browser/chrome.cpp"},
     incs = {"src"},
+    deps = {"cdp-cpp"},
     reqs = {"glaze", "spdlog"},
     ldflags = {CURL_SO},
     rpath = {CURL_LIB},
@@ -141,7 +167,7 @@ cxx_bin("test_store", {
 cxx_bin("test_plugin", {
     files = {"tests/test_plugin.cpp", PLUGIN_SRC, STORE_SRC, FETCH_SRC},
     incs = {"src"},
-    deps = {"wasm3", "tiny-aes256"},
+    deps = {"wasm3", "tiny-aes256", "cdp-cpp"},
 
     reqs = {"lua", "glaze", "sol2", "thread-pool", "lexbor", "sqlite_orm", "readerwriterqueue", "quickjs-ng", "spdlog", "sqlite3", "utf8proc", "re2", "hash-library", "pugixml"},
     ldflags = {CURL_SO},
@@ -153,7 +179,7 @@ cxx_bin("test_plugin", {
 cxx_bin("test_htmltext", {
     files = {"tests/test_htmltext.cpp", PLUGIN_SRC, STORE_SRC, FETCH_SRC},
     incs = {"src"},
-    deps = {"wasm3", "tiny-aes256"},
+    deps = {"wasm3", "tiny-aes256", "cdp-cpp"},
 
     reqs = {"lua", "glaze", "sol2", "thread-pool", "lexbor", "sqlite_orm", "readerwriterqueue", "quickjs-ng", "spdlog", "sqlite3", "utf8proc", "re2", "hash-library", "pugixml"},
     ldflags = {CURL_SO},

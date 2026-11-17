@@ -155,14 +155,6 @@
             },
             version = "v1.0.7"
         },
-        ["reproc 14.2.5#f56260b5"] = {
-            repo = {
-                branch = "master",
-                commit = "e651350be2dca5d0dcb08c77ae0eb0c4166b2f84",
-                url = "https://gitlab.com/tboox/xmake-repo.git"
-            },
-            version = "v14.2.5"
-        },
         ["simpleini 4.27#f56260b5"] = {
             repo = {
                 branch = "master",

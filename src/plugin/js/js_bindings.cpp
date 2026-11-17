@@ -1,7 +1,7 @@
 #include "js_internal.hpp"
 #include "js_rt.hpp"
 
-#include "browser/mcp.hpp"
+#include "browser/chrome.hpp"
 #include "plugin/fs.hpp"        // plugin::fs_read -- the fs.read body
 #include "plugin/host_codecs.hpp"
 #include "plugin/host_crypto.hpp"

@@ -26,7 +26,7 @@ struct Entry {
 };
 
 // Order is the projection order consumed by config.hpp -- do not reorder.
-inline constexpr std::array<Entry, 21> kEntries{
+inline constexpr std::array<Entry, 19> kEntries{
     {
         // section      key                   flag                 alias          env def doc
         // type
@@ -213,33 +213,13 @@ inline constexpr std::array<Entry, 21> kEntries{
             .type = Type::Int,
         },
         {
-            .section = "lightpanda",
-            .key = "url",
-            .flag = "",
-            .alias = "",
-            .env = "CPPISEKAI_LIGHTPANDA_URL",
-            .def = "http://127.0.0.1:8899",
-            .doc = "Browser automation MCP endpoint (ini-only; no CLI flag)",
-            .type = Type::Str,
-        },
-        {
-            .section = "lightpanda",
+            .section = "chrome",
             .key = "command",
             .flag = "",
             .alias = "",
-            .env = "CPPISEKAI_LIGHTPANDA_COMMAND",
-            .def = "lightpanda",
-            .doc = "Browser daemon binary for in-process supervision; absolute path on minimal-PATH units",
-            .type = Type::Str,
-        },
-        {
-            .section = "lightpanda",
-            .key = "extra_args",
-            .flag = "",
-            .alias = "",
-            .env = "CPPISEKAI_LIGHTPANDA_EXTRA_ARGS",
+            .env = "CPPISEKAI_CHROME_COMMAND",
             .def = "",
-            .doc = "Extra argv appended to the supervised spawn, whitespace-split (ini-only); e.g. --user-agent ... --wait 2s",
+            .doc = "Browser binary for the CDP backend; empty = auto-discover (google-chrome-stable first). Absolute path on minimal-PATH units",
             .type = Type::Str,
         },
     },

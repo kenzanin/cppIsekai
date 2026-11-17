@@ -1,5 +1,5 @@
 #include "bridge.hpp"
-#include "browser/mcp.hpp"
+#include "browser/chrome.hpp"
 #include "plugin/url_codec.hpp"
 
 #include "plugin/host_text.hpp"

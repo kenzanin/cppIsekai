@@ -65,13 +65,12 @@ int main(int argc, char** argv) {
     }
 
     std::filesystem::create_directories(cfg.data_dir); // [paths] data_dir, boot-created (D6)
-    browser::configure(cfg.lightpanda_url, cfg.proxy); // browser-host: endpoint + loopback-exempt proxy
+    browser::configure(cfg.chrome_command);
     std::string browser_err;
-    if (!browser::supervise_boot(cfg.lightpanda_command, cfg.lightpanda_extra_args, &browser_err)) {
-        spdlog::error("browser backend: {}", browser_err); // D10: no browser => comix pages dead; abort loud
+    if (!browser::boot(&browser_err)) {
+        spdlog::error("browser backend: {}", browser_err); // no browser => comix pages dead; abort loud
         return 3;
     }
-    browser::on_death(browser::recover); // D13: one respawn per incident, 3s cooldown
     Store store(cfg.db);
     LogBuffer logs(cfg.log_file);
 

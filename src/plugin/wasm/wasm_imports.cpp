@@ -1,7 +1,7 @@
 #include "wasm_internal.hpp"
 #include "wasm_rt.hpp"
 
-#include "browser/mcp.hpp"
+#include "browser/chrome.hpp"
 #include "plugin/fs.hpp"
 #include "plugin/host_codecs.hpp"
 #include "plugin/host_crypto.hpp"
