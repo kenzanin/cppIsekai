@@ -892,23 +892,30 @@ void Store::chapters_upsert(const std::string& plugin, const std::string& slug,
     }
     auto& st = impl_->storage;
     const std::int64_t now = std::time(nullptr);
+    // Reads happen BEFORE the write transaction: a deferred transaction that
+    // reads and then writes upgrades its snapshot, and the upgrade surfaces as
+    // an instant "database is locked" (SQLITE_BUSY_SNAPSHOT) whenever another
+    // connection committed in between -- which is what wedged this method.
+    auto existing = st.get_all<store_detail::ChapterEntity>(
+        where(c(&store_detail::ChapterEntity::plugin) == plugin && c(&store_detail::ChapterEntity::slug) == slug));
+    std::map<std::string, store_detail::ChapterEntity> known;
+    for (auto& e : existing) {
+        known.emplace(e.chapter_id, std::move(e));
+    }
+    std::vector<store_detail::ChapterEntity> writes;
+    writes.reserve(rows.size());
     int inherited = 0;
-    st.begin_transaction();
     for (const auto& r : rows) {
         if (r.chapter_id.empty()) {
             continue;
         }
-        auto found = st.get_all<store_detail::ChapterEntity>(
-            where(c(&store_detail::ChapterEntity::plugin) == plugin &&
-                  c(&store_detail::ChapterEntity::slug) == slug &&
-                  c(&store_detail::ChapterEntity::chapter_id) == r.chapter_id));
-        if (!found.empty()) {
-            auto e = found.front();
+        if (auto it = known.find(r.chapter_id); it != known.end()) {
+            auto e = it->second; // flags ride through untouched
             e.number = r.number;
             e.title = r.title;
             e.url = r.url;
             e.updated_at = now;
-            st.update(e); // flags ride through untouched
+            writes.push_back(std::move(e));
             continue;
         }
         store_detail::ChapterEntity e{.plugin = plugin,
@@ -935,10 +942,19 @@ void Store::chapters_upsert(const std::string& plugin, const std::string& slug,
             }
         }
         e.flags = static_cast<int>(legacy);
-        st.replace(e); // composite-PK upsert; insert() misbinds NOT NULL cols here
         inherited += legacy != 0 ? 1 : 0;
+        writes.push_back(std::move(e));
     }
-    st.commit();
+    if (writes.empty()) {
+        return;
+    }
+    store_detail::TxGuard tx{st};
+    st.begin_transaction();
+    for (auto& e : writes) {
+        // composite-PK upsert for new rows; insert() misbinds NOT NULL cols here
+        known.contains(e.chapter_id) ? st.update(e) : st.replace(e);
+    }
+    tx.commit();
     if (inherited > 0) {
         spdlog::debug("chapter-store: {} legacy flag(s) inherited for {}/{}", inherited, plugin, slug);
     }
@@ -951,6 +967,7 @@ void Store::chapter_pages_replace(const std::string& plugin, const std::string& 
         return;
     }
     auto& st = impl_->storage;
+    store_detail::TxGuard tx{st};
     st.begin_transaction();
     st.remove_all<store_detail::ChapterPageEntity>(
         where(c(&store_detail::ChapterPageEntity::plugin) == plugin &&
@@ -963,7 +980,7 @@ void Store::chapter_pages_replace(const std::string& plugin, const std::string& 
                                                   .idx = static_cast<int>(i),
                                                   .url = urls[i]});
     }
-    st.commit();
+    tx.commit();
 }
 
 std::map<std::string, int> Store::chapter_flags_apply(const std::string& plugin, const std::string& slug,
@@ -988,6 +1005,7 @@ std::map<std::string, int> Store::chapter_flags_apply(const std::string& plugin,
                   in(&store_detail::ChapterEntity::chapter_id, std::move(want))));
     }
     const std::int64_t now = std::time(nullptr);
+    store_detail::TxGuard tx{st};
     st.begin_transaction();
     for (auto& e : rows) {
         e.flags = (e.flags | set) & ~clear;
@@ -995,7 +1013,7 @@ std::map<std::string, int> Store::chapter_flags_apply(const std::string& plugin,
         st.update(e);
         out.emplace(e.chapter_id, e.flags);
     }
-    st.commit();
+    tx.commit();
     return out;
 }
 

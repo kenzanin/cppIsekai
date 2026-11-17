@@ -18,6 +18,7 @@
  */
 #include <chrono>
 #include <cstring>
+#include <exception>
 #include <functional>
 #include <mutex>
 #include <string>
@@ -31,6 +32,37 @@ namespace store_detail {
 
 /// Wall time above which a finished op warns.
 inline constexpr double kSlowOpMs = 50.0;
+
+/// RAII over one explicit sqlite transaction: rolls back when the scope is
+/// left without commit(). Without it a throw between BEGIN and COMMIT leaves
+/// the transaction open on the one shared connection, and every later BEGIN
+/// fails with "cannot start a transaction within a transaction" -- a wedged
+/// daemon that only a restart cures.
+template <typename Storage>
+class TxGuard {
+public:
+    explicit TxGuard(Storage& st) : st_(st) {}
+    TxGuard(const TxGuard&) = delete;
+    TxGuard& operator=(const TxGuard&) = delete;
+    ~TxGuard() {
+        if (done_) {
+            return;
+        }
+        try {
+            st_.rollback();
+        } catch (const std::exception& e) {
+            spdlog::error("store: rollback failed: {}", e.what());
+        }
+    }
+    void commit() {
+        st_.commit();
+        done_ = true;
+    }
+
+private:
+    Storage& st_;
+    bool done_ = false;
+};
 
 inline std::string tid_str() {
     return std::to_string(std::hash<std::thread::id>{}(std::this_thread::get_id()) % 10000);
