@@ -21,8 +21,9 @@
 namespace browser {
 
 /// Boot-time probe/adopt/spawn. Registers nothing; wire the D13 hook via
-/// browser::on_death(&browser::recover) from main. Fatal => false + err.
-bool supervise_boot(const std::string& command, std::string* err);
+/// browser::on_death(&browser::recover) from main. `extra_args` is appended
+/// verbatim to the spawn argv (whitespace-split). Fatal => false + err.
+bool supervise_boot(const std::string& command, const std::string& extra_args, std::string* err);
 
 /// D13 death hook: one respawn (owned child restarted; adopted instance
 /// replaced by an owned one on the same port). Must hold browser::mutex().

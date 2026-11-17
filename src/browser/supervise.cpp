@@ -9,6 +9,7 @@
 
 #include <chrono>
 #include <cctype>
+#include <sstream>
 #include <string>
 #include <thread>
 #include <vector>
@@ -54,6 +55,10 @@ int endpoint_port() {
     return port > 0 ? port : 8899;
 }
 
+/// Extra argv words appended after the fixed `mcp --port --host` tail
+/// (whitespace-split; empty => default spawn). Set via `[lightpanda] extra_args`.
+std::string s_extra;
+
 void stop_child() {
     if (!s_child_alive) {
         return; // never started / already reaped
@@ -68,7 +73,14 @@ void stop_child() {
 bool spawn_and_wait(std::string* err) {
     const std::string cmd = s_command.empty() ? "lightpanda" : s_command;
     const std::string port = std::to_string(endpoint_port());
-    const std::vector<std::string> args{cmd, "mcp", "--port", port, "--host", "127.0.0.1"};
+    std::vector<std::string> args{cmd, "mcp", "--port", port, "--host", "127.0.0.1"};
+    // ponytail: whitespace split, no quotes — flags with embedded spaces can
+    // wait until a real user appears.
+    std::istringstream extra(s_extra);
+    std::string w;
+    while (extra >> w) {
+        args.push_back(w);
+    }
 
     reproc::options o;
     o.redirect.discard = true; // quiet child; daemon logs carry the state
@@ -98,9 +110,10 @@ bool spawn_and_wait(std::string* err) {
 
 } // namespace
 
-bool supervise_boot(const std::string& command, std::string* err) {
+bool supervise_boot(const std::string& command, const std::string& extra_args, std::string* err) {
     std::lock_guard lock(mutex());
     s_command = command;
+    s_extra = extra_args;
     if (probe_ok()) {
         s_owned = false; // D12: adopt; never kill an external instance
         spdlog::info("browser: reusing external lightpanda on {}", endpoint());

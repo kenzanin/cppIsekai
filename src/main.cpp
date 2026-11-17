@@ -67,7 +67,7 @@ int main(int argc, char** argv) {
     std::filesystem::create_directories(cfg.data_dir); // [paths] data_dir, boot-created (D6)
     browser::configure(cfg.lightpanda_url, cfg.proxy); // browser-host: endpoint + loopback-exempt proxy
     std::string browser_err;
-    if (!browser::supervise_boot(cfg.lightpanda_command, &browser_err)) {
+    if (!browser::supervise_boot(cfg.lightpanda_command, cfg.lightpanda_extra_args, &browser_err)) {
         spdlog::error("browser backend: {}", browser_err); // D10: no browser => comix pages dead; abort loud
         return 3;
     }

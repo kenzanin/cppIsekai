@@ -26,7 +26,7 @@ struct Entry {
 };
 
 // Order is the projection order consumed by config.hpp -- do not reorder.
-inline constexpr std::array<Entry, 20> kEntries{
+inline constexpr std::array<Entry, 21> kEntries{
     {
         // section      key                   flag                 alias          env def doc
         // type
@@ -230,6 +230,16 @@ inline constexpr std::array<Entry, 20> kEntries{
             .env = "CPPISEKAI_LIGHTPANDA_COMMAND",
             .def = "lightpanda",
             .doc = "Browser daemon binary for in-process supervision; absolute path on minimal-PATH units",
+            .type = Type::Str,
+        },
+        {
+            .section = "lightpanda",
+            .key = "extra_args",
+            .flag = "",
+            .alias = "",
+            .env = "CPPISEKAI_LIGHTPANDA_EXTRA_ARGS",
+            .def = "",
+            .doc = "Extra argv appended to the supervised spawn, whitespace-split (ini-only); e.g. --user-agent ... --wait 2s",
             .type = Type::Str,
         },
     },

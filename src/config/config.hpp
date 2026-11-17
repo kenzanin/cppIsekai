@@ -44,6 +44,7 @@ struct Config {
     int update_request_delay_ms{}; // [update] request_delay_ms: pause between auto-update requests
     std::string lightpanda_url;    // [lightpanda] url: browser MCP endpoint (ini-only)
     std::string lightpanda_command; // [lightpanda] command: supervised browser binary (ini-only)
+    std::string lightpanda_extra_args; // [lightpanda] extra_args: appended verbatim to the spawn argv (ini-only)
 };
 
 // Per-knob CLI state. Explicit = opt->count() > 0 (D7), never value comparison;
@@ -116,6 +117,7 @@ inline Config to_config(const std::array<std::string, kEntryCount>& v) {
     }
     c.lightpanda_url = v[18];
     c.lightpanda_command = v[19];
+    c.lightpanda_extra_args = v[20];
     if (c.port <= 0) {
         c.port = num_or<int>(kEntries[0].def, kEntries[0].def); // design ceiling: port > 0
     }
