@@ -860,4 +860,27 @@ TEST_CASE("Store: chapter flags bitfield (chapter-state 1.3-1.6)") {
         REQUIRE(all.size() == 1);
         CHECK(all.at("a1") == 2);
     }
+
+    SUBCASE("failed transaction rolls back and leaves the connection usable") {
+        // Regression: a throw between BEGIN and COMMIT used to leave the one
+        // shared connection inside an open transaction, so every later BEGIN
+        // failed with "cannot start a transaction within a transaction" and the
+        // API stayed 500 for every title until the daemon restarted.
+        store.chapters_upsert(plugin, slug, {seed("keep1", 1)}); // pre-existing row
+        sqlite3* raw = nullptr;
+        REQUIRE(sqlite3_open("test_store.db", &raw) == SQLITE_OK);
+        const auto exec = [&](const char* sql) { return sqlite3_exec(raw, sql, nullptr, nullptr, nullptr); };
+        REQUIRE(exec("DROP TRIGGER IF EXISTS t_store_wedge") == SQLITE_OK);
+        REQUIRE(exec("CREATE TRIGGER t_store_wedge BEFORE INSERT ON chapters "
+                     "BEGIN SELECT RAISE(ABORT, 'boom'); END") == SQLITE_OK);
+
+        CHECK_THROWS(store.chapters_upsert(plugin, slug, {seed("keep1", 1), seed("boom2", 2)}));
+
+        REQUIRE(exec("DROP TRIGGER t_store_wedge") == SQLITE_OK);
+        sqlite3_close(raw);
+        // The connection survived: a new transaction commits normally.
+        CHECK(store.chapter_flags_apply(plugin, slug, {"keep1"}, false, 1, 0).at("keep1") == 1);
+        store.chapters_upsert(plugin, slug, {seed("keep1", 1), seed("boom2", 2)});
+        CHECK(store.chapter_flags_get(plugin, slug, "boom2") == 0);
+    }
 }
