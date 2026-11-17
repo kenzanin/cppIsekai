@@ -178,7 +178,14 @@ TEST_CASE("enrich: valid_title_pair accepts plugin-minted case, rejects traversa
     CHECK(!valid_title_pair("mangadex", ".."));
     CHECK(!valid_title_pair("mangadex", "a..b"));
     CHECK(!valid_title_pair("mangadex", "a b"));
-    CHECK(!valid_title_pair("mangadex", std::string(200, 'a')));
+    // 4ucomics ids ARE the site slug; its 202-char one used to 404 the whole
+    // title (detail/chapters/pages). Ceiling is NAME_MAX, not a display length.
+    CHECK(valid_title_pair(
+        "4ucomics",
+        "the-strongest-demon-king-at-0-months-old-im-a-reincarnator-with-a-cheat-ability-that-makes-me-grow-stronger"
+        "-just-by-eating-but-since-im-a-baby-ill-grow-up-on-the-heroes-breast-milk-and-become-invincible"));
+    CHECK(valid_title_pair("mangadex", std::string(200, 'a')));
+    CHECK(!valid_title_pair("mangadex", std::string(256, 'a')));
     // unicode slugs pass now (host handles utf8); apostrophe/exclamation/colon too
     CHECK(valid_title_pair("sanascans", "a-contract-marriage-as-the-marquis's-villainous-wife"));
     CHECK(valid_title_pair("sanascans", "i'll-divorce-you-gracefully!"));

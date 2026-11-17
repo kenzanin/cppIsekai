@@ -64,7 +64,10 @@ inline long num_field(const crow::json::rvalue& j, const char* key, long def) {
 // needs the not-found response.
 inline bool valid_title_pair(const std::string& plugin, const std::string& slug) {
     const auto ok = [](const std::string& s) {
-        if (s.empty() || s.size() > 128) {
+        // The slug IS the site-minted id (4ucomics: 202 chars) and doubles as the
+        // per-title cache dir component, so the ceiling is the filesystem's
+        // NAME_MAX, not a display length.
+        if (s.empty() || s.size() > 255) {
             return false;
         }
         for (const unsigned char c : s) {
