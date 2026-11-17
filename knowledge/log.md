@@ -1,4 +1,24 @@
 ## 2026-11-17
+* **Update**: Linked `decisions/drop-date-dependency.md` to `findings/plugin-date-shapes-2026-11-18.md` (Host date conversion is stdlib-only; the same epoch-vs-ISO split shows up at the template boundary.).
+* **Update**: Linked `findings/re2-findall-one-indexed.md` to `constraints/plugin-image-url-regex.md` (The extension group is m[2] because host re2 tables are 1-based -- the indexing fact this regex rule depends on.).
+* **Update**: Linked `decisions/renderer-fetch-engines.md` to `architecture/4ucomics-plugin.md` (4ucomics requires the lightpanda fetch profile for every call; plain curl gets the Cloudflare challenge.).
+* **Update**: Linked `constraints/plugin-status-canonical-vocab.md` to `architecture/4ucomics-plugin.md` (4ucomics returns an empty statuses array for every title, so its status is legitimately outside the canonical vocabulary.).
+* **Update**: Linked `constraints/host-chapter-state-keys.md` to `architecture/chapter-state-flags.md` (Host-side chapter state keys are the identity contract the flags bitfield rides on.).
+* **Update**: Linked `findings/store-serialized-ops.md` to `architecture/chapter-state-flags.md` (The chapter-state store methods are what exposed the dangling-transaction wedge; TxGuard now wraps them.).
+* **Update**: Linked `architecture/chapter-state-flags.md` to `constraints/plugin-chapter-number-placeholders.md` (Why manga-wide position bitmaps were rejected: chapter numbers are untrusted, duplicated and non-unique.).
+* **Update**: Linked `architecture/chapter-state-flags.md` to `architecture/status-flags-bitfield.md` (Chapter flags follow the same bitfield convention as saved_manga.status_flags.).
+* **Update**: Linked `findings/plugin-probe-param-keys.md` to `architecture/manga-detail-page.md` (call_cached serves rows at any age, so a bad probe's cache row behaves like a stale-serve hit.).
+* **Update**: Linked `constraints/plugin-image-url-regex.md` to `findings/lua-plugin-audit-2026-11-16.md` (The webp-only regex was found after the audit's plugin sweep; same failure shape as the regex bugs listed there.).
+* **Update**: Linked `architecture/4ucomics-plugin.md` to `findings/valid-title-pair-charset.md` (4ucomics' 202-char slug is what forced the valid_title_pair cap to 255.).
+* **Update**: Linked `findings/plugin-date-shapes-2026-11-18.md` to `architecture/4ucomics-plugin.md` (4ucomics is the ISO-date emitter whose dates were blank on the detail page.).
+* **Update**: Linked `findings/plugin-date-shapes-2026-11-18.md` to `architecture/normalization-contract.md` (Recorded divergence: plugins emit ISO date strings as well as epoch seconds; the template boundary accepts both.).
+* **Creation**: Documented concept `architecture/chapter-state-flags.md` (Chapter state: one flags bitfield per chapter row, chapters as metadata hub).
+* **Creation**: Documented concept `findings/plugin-probe-param-keys.md` (Plugin probes with wrong param keys write a cache row that shadows the real handler).
+* **Creation**: Documented concept `constraints/plugin-image-url-regex.md` (Plugin page-image regexes must match every image extension a site serves).
+* **Creation**: Documented concept `architecture/4ucomics-plugin.md` (4ucomics plugin: private JSON API v1 behind Cloudflare, thin manga payload).
+* **Creation**: Documented concept `findings/plugin-date-shapes-2026-11-18.md` (Detail page dates: plugins emit both epoch seconds and ISO strings).
+* **Update**: Updated concept `findings/valid-title-pair-charset.md`.
+* **Update**: Updated concept `findings/store-serialized-ops.md`.
 * **Update**: Linked `findings/browser-chrome-backend-2026-11-17.md` to `decisions/comix-turnstile-token-2026-11-17.md` (Chrome swap made turnstile minting moot: real-Chrome engine solves the WAF transparently; decision left deprecated.).
 * **Update**: Linked `findings/browser-chrome-backend-2026-11-17.md` to `findings/browser-host-apply-2026-11-17.md` (Supersedes the lightpanda-era backend; its invariants (D13, single-session) carry over re-shaped.).
 * **Creation**: Documented concept `findings/browser-chrome-backend-2026-11-17.md` (Chrome/CDP browser backend: invariants, wait tool, and the comix tomy2x redeploy breakage).

@@ -1,9 +1,9 @@
 ---
 type: Finding
 title: "database is locked: concurrent store ops on the one shared connection"
-description: "Root cause of the intermittent 'database is locked' browse failures (detail pages, /api/library) under parallel traffic: store methods ran on the single sqlite_orm handle from several threads at once, producing SQLITE_BUSY_SNAPSHOT which bypasses the busy handler. Fixed 2026-11-16 by serializing every store op behind one recursive mutex in store_detail::OpTrace (65f8ff5)."
-tags: [sqlite, lock, store, concurrency, database-is-locked, fixed, trace]
-generated: { by: agent/mcp, at: "2026-11-16T11:42:18Z" }
+description: "One shared sqlite connection: OpTrace serializes calls, but explicit transactions also need TxGuard or one throw wedges every later BEGIN."
+tags: [sqlite, lock, store, concurrency, database-is-locked, fixed, trace, transaction, txguard, busy-snapshot]
+generated: { by: agent/mcp, at: "2026-11-17T21:50:39Z" }
 status: stable
 ---
 
@@ -33,3 +33,19 @@ Serializing means a 130ms op (recompute_dup_groups, envelope sync) now blocks re
 
 # Related Concepts
 - Related to [Store migrated to sqlite_orm (Pimpl)](../architecture/store-orm-migration.md)
+
+
+## 2026-11-18: second failure mode -- a dangling transaction wedges the whole DB
+
+Same one-connection store, different failure. Symptom: every title's `/api/chapters` and `/api/pages` 500 with `cannot start a transaction within a transaction` until the daemon restarts; first bad line in the log was `store: chapters_upsert 1.0 ms [error] on_pool failed: database is locked`.
+
+Chain: `chapters_upsert` opened `begin_transaction()`, then `st.replace` hit `SQLITE_BUSY_SNAPSHOT` (deferred txn read its snapshot, then wrote), the exception escaped the scope without `commit` or `rollback`, and from then on every `BEGIN` on that connection failed -- permanently, for all titles. OpTrace serializes calls but does not close transactions, so the mutex gave no protection here.
+
+Fix (6edebdd) in `src/store/store_ops.hpp` + `store_search.cpp`:
+- `store_detail::TxGuard` RAII: rolls back on scope exit unless `commit()` ran. Applied to `chapters_upsert`, `chapter_pages_replace`, `chapter_flags_apply`.
+- `chapters_upsert` now reads all existing rows in ONE query BEFORE `begin_transaction`, so the deferred txn never upgrades a snapshot (that upgrade was what produced BUSY_SNAPSHOT).
+
+Regression test (68f01e0): seed a row, install a `BEFORE INSERT ON chapters` trigger that RAISEs, `CHECK_THROWS(store.chapters_upsert(...))`, drop the trigger, then assert the connection still works (`chapter_flags_apply` returns 1, a later upsert lands). Removing the guard turns the test red; restoring it back to green -- verified both ways.
+
+Rule for any new explicit transaction: wrap in TxGuard and read before BEGIN.
+- [Chapter state: one flags bitfield per chapter row, chapters as metadata hub](../architecture/chapter-state-flags.md): The chapter-state store methods are what exposed the dangling-transaction wedge; TxGuard now wraps them.

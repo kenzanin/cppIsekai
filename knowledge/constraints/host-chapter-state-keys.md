@@ -3,7 +3,7 @@ type: constraint
 title: "Chapter state keys: one canonical (decoded) key space; rollup owns total_ch"
 description: "Host state routes percent-decode path ids before keying plugin_state, and apply_read_rollup refreshes total_ch on every path - row-served opens never sync, so totals live or die by the rollup."
 tags: [reader, state, encoding, regression, host]
-generated: { by: agent/mcp, at: "2026-11-15T17:11:03Z" }
+generated: { by: agent/mcp, at: "2026-11-17T21:50:51Z" }
 status: stable
 ---
 
@@ -18,3 +18,6 @@ Chapter state lives under `host/{read,skip,total}/<id>`. Ids reach the host in T
 
 ## Housekeeping
 Legacy encoded keys are merged max-wins into raw form; no `%3A` state keys may be created going forward. Tests: test_http_enrich "apply_read_rollup heals total_ch", test_store negative-total keep. Landed 349ab28.
+
+# Related Concepts
+- [Chapter state: one flags bitfield per chapter row, chapters as metadata hub](../architecture/chapter-state-flags.md): Host-side chapter state keys are the identity contract the flags bitfield rides on.
