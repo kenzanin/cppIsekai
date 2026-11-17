@@ -92,7 +92,7 @@
           <img :src="'/plugin/'+encodeURIComponent(plugin)+'/logo'" class="h-5 w-5 object-contain rounded" @error="pluginLogoOk=false" alt="">
         </template>
         <span x-show="pluginName" x-text="pluginName"></span>
-        <span class="px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300" x-show="detail.status && !(detail.status_flags & 60)" x-text="detail.status"></span>
+        <span class="px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300" x-show="detail.status && detail.status !== 'unknown' && !(detail.status_flags & 60)" x-text="detail.status"></span>
         <span class="px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400" x-show="detail.release_at" x-text="fmtDate(detail.release_at)"></span>
         <span class="px-2 py-0.5 rounded-full bg-emerald-900/40 text-emerald-300 border border-emerald-800" x-show="cached">cached</span>
         <span class="px-2 py-0.5 rounded-full bg-red-900/40 text-red-300 border border-red-800" x-show="detail.status_flags & 1">New</span>
@@ -565,7 +565,9 @@ function detailPage() {
     chNum(n) { const [i, f] = String(n).split('.'); return i.padStart(3, '0') + (f ? '.' + f : ''); },
     chLabel(ch) { const n = Number(ch.number); return Number.isFinite(n) ? 'ch ' + this.chNum(n) : (ch.title || 'ch'); },
     chSlug(ch) { const n = Number(ch.number); return Number.isFinite(n) ? 'ch' + this.chNum(n) : 'chx'; },
-    fmtDate(ts) { if (!ts) return ''; const d = new Date(ts * 1000); return isNaN(d) ? '' : d.toISOString().slice(0, 10); },
+    // epoch seconds (mangafire) or an ISO date string (comix/4ucomics/thunderscan) -- both shapes
+    // reach the templates; an ISO date through `ts*1000` was NaN and blanked the date column.
+    fmtDate(ts) { if (!ts) return ''; const n = typeof ts === 'number' ? ts : (/^\d+$/.test(ts) ? Number(ts) : null); const d = n === null ? new Date(ts) : new Date(n * 1000); return isNaN(d) ? '' : d.toISOString().slice(0, 10); },
     scraperRelated: [], // base list from the scraper plugin; chosen.related_add is merged on top
     mergeSavedRelated() {
       const seen = new Set(); const merged = [];

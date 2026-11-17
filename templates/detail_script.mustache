@@ -257,7 +257,9 @@ function detailPage() {
     chNum(n) { const [i, f] = String(n).split('.'); return i.padStart(3, '0') + (f ? '.' + f : ''); },
     chLabel(ch) { const n = Number(ch.number); return Number.isFinite(n) ? 'ch ' + this.chNum(n) : (ch.title || 'ch'); },
     chSlug(ch) { const n = Number(ch.number); return Number.isFinite(n) ? 'ch' + this.chNum(n) : 'chx'; },
-    fmtDate(ts) { if (!ts) return ''; const d = new Date(ts * 1000); return isNaN(d) ? '' : d.toISOString().slice(0, 10); },
+    // epoch seconds (mangafire) or an ISO date string (comix/4ucomics/thunderscan) -- both shapes
+    // reach the templates; an ISO date through `ts*1000` was NaN and blanked the date column.
+    fmtDate(ts) { if (!ts) return ''; const n = typeof ts === 'number' ? ts : (/^\d+$/.test(ts) ? Number(ts) : null); const d = n === null ? new Date(ts) : new Date(n * 1000); return isNaN(d) ? '' : d.toISOString().slice(0, 10); },
     scraperRelated: [], // base list from the scraper plugin; chosen.related_add is merged on top
     mergeSavedRelated() {
       const seen = new Set(); const merged = [];

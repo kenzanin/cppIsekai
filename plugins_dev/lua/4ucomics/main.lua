@@ -88,6 +88,13 @@ methods.detail = function(params)
     return out
   end
   for _, a in ipairs(names_of(m.authors)) do authors[#authors + 1] = a end
+  -- the API carries no series start date; the earliest chapter date is the only
+  -- real one available (and the sort order makes "first" = oldest here anyway).
+  local first = ""
+  for _, c in ipairs(m.chapters or {}) do
+    local ds = tostring(c.date or ""):sub(1, 10)
+    if ds ~= "" and (first == "" or ds < first) then first = ds end
+  end
   return { ok = true, data = {
     id = m.slug or slug,
     name = m.title or "",
@@ -97,7 +104,7 @@ methods.detail = function(params)
     authors = authors,
     artists = {},
     description = m.description or "",
-    release_at = 0,
+    release_at = (first ~= "") and first or 0,
     url = "https://4ucomics.com/manga/" .. (m.slug or slug),
   } }
 end

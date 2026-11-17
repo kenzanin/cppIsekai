@@ -17,7 +17,7 @@
           <img :src="'/plugin/'+encodeURIComponent(plugin)+'/logo'" class="h-5 w-5 object-contain rounded" @error="pluginLogoOk=false" alt="">
         </template>
         <span x-show="pluginName" x-text="pluginName"></span>
-        <span class="px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300" x-show="detail.status && !(detail.status_flags & 60)" x-text="detail.status"></span>
+        <span class="px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300" x-show="detail.status && detail.status !== 'unknown' && !(detail.status_flags & 60)" x-text="detail.status"></span>
         <span class="px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400" x-show="detail.release_at" x-text="fmtDate(detail.release_at)"></span>
         <span class="px-2 py-0.5 rounded-full bg-emerald-900/40 text-emerald-300 border border-emerald-800" x-show="cached">cached</span>
         <span class="px-2 py-0.5 rounded-full bg-red-900/40 text-red-300 border border-red-800" x-show="detail.status_flags & 1">New</span>
