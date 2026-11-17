@@ -1,4 +1,5 @@
 ## 2026-11-17
+* **Update**: Updated concept `architecture/cache-layout-v3.md`.
 * **Update**: Linked `decisions/drop-date-dependency.md` to `findings/plugin-date-shapes-2026-11-18.md` (Host date conversion is stdlib-only; the same epoch-vs-ISO split shows up at the template boundary.).
 * **Update**: Linked `findings/re2-findall-one-indexed.md` to `constraints/plugin-image-url-regex.md` (The extension group is m[2] because host re2 tables are 1-based -- the indexing fact this regex rule depends on.).
 * **Update**: Linked `decisions/renderer-fetch-engines.md` to `architecture/4ucomics-plugin.md` (4ucomics requires the lightpanda fetch profile for every call; plain curl gets the Cloudflare challenge.).
