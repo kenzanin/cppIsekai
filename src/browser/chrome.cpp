@@ -8,6 +8,7 @@
 #include <glaze/glaze.hpp>
 #include <memory>
 #include <string>
+#include <thread>
 
 namespace browser {
 
@@ -64,6 +65,29 @@ bool launch(std::string* err) {
         return false;
     }
     s_page = page.page;
+    // comix's router bounces HeadlessChrome UAs off title pages (2026-11-17 tomy2x build);
+    // present as normal Chrome for every navigation.
+    std::string ua = s_page->evalString("navigator.userAgent");
+    const std::string kHc = "HeadlessChrome";
+    if (auto p = ua.find(kHc); p != std::string::npos) {
+        ua.replace(p, kHc.size(), "Chrome");
+        s_page->client().Emulation.setUserAgentOverride(ua, "", "");
+        spdlog::info("browser: ua override -> {}", ua);
+    }
+    // Permanent console funnel: page exceptions land in our log at debug.
+    page.page->client().Runtime.enable();
+    page.page->client().connection().onEvent("Runtime.exceptionThrown", [](const cdp::CDPEvent& ev) {
+        std::string desc = "?";
+        if (auto* d = ev.params.find("exceptionDetails")) {
+            if (auto* x = d->find("exception")) {
+                if (auto* t = x->find("description")) desc = t->asString();
+            }
+            if (desc == "?") {
+                if (auto* t = d->find("text")) desc = t->asString();
+            }
+        }
+        spdlog::debug("[browser] page exception: {}", desc.substr(0, 300));
+    });
     return true;
 }
 
@@ -165,6 +189,32 @@ std::string call(const std::string& tool, const std::string& args_json, std::str
                     return fail("goto failed");
                 }
                 return "ok";
+            }
+            if (tool == "wait") {
+                const std::string expr = arg_str(args, "expression");
+                if (expr.empty()) {
+                    return fail("wait: no expression");
+                }
+                int tmo = 15000;
+                if (args.is_object()) {
+                    const auto it = args.get_object().find("timeout_ms");
+                    if (it != args.get_object().end() && it->second.is_number()) {
+                        tmo = static_cast<int>(it->second.get_number());
+                    }
+                }
+                // CDP wait_for: poll !!expr until truthy or deadline. Eval errors
+                // (mid-navigation) count as not-yet and keep polling.
+                const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(tmo);
+                for (;;) {
+                    auto v = s_page->eval("!!(" + expr + ")");
+                    if (v.isBool() && v.asBool()) {
+                        return "ok";
+                    }
+                    if (std::chrono::steady_clock::now() >= deadline) {
+                        return fail("wait: condition not met in " + std::to_string(tmo) + "ms");
+                    }
+                    std::this_thread::sleep_for(std::chrono::milliseconds(150));
+                }
             }
             if (tool == "evaluate") {
                 const std::string script = arg_str(args, "script");
