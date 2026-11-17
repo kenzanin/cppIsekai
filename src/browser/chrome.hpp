@@ -29,8 +29,9 @@ void configure(std::string command);
  *  healthy backend is kept. Fatal => false + err (boot aborts the daemon). */
 bool boot(std::string* err);
 
-/** \brief Plugin tool call. Tools: "goto" {url} (waits for load) and
- *  "evaluate" {script} (value-serialized result; objects come back as JSON).
+/** \brief Plugin tool call. Tools: "goto" {url} (waits for load),
+ *  "evaluate" {script} (value-serialized result; objects come back as JSON)
+ *  and "wait" {expression, timeout_ms} (CDP wait_for: polls !!expr server-side).
  *  Empty string + \p err set on failure. Thread-safe. */
 std::string call(const std::string& tool, const std::string& args_json, std::string* err = nullptr);
 
