@@ -1,3 +1,6 @@
+## 2026-11-17
+* **Creation**: Documented concept `findings/browser-session-waf-2026-11-17.md` (comix WAF turnstile unsolvable in lightpanda headless; session ops notes).
+
 ## 2026-11-16
 * **Creation**: Documented concept `findings/browser-host-apply-2026-11-17.md` (browser-host apply findings (reproc reuse EINVAL, lightpanda await)).
 * **Creation**: Documented concept `findings/reader-spill-cached-overcount.md` (Reader prefetch spill wrote next-chapter pages into the current chapter dir (cached>total)).
