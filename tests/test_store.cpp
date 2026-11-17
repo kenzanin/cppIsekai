@@ -811,3 +811,53 @@ TEST_CASE("Store: materialized detail columns (manga-detail-table 1.4/2.1/3.2)")
         CHECK(store.saved_get(plugin, slug)->dup_group == 0);
     }
 }
+
+
+TEST_CASE("Store: chapter flags bitfield (chapter-state 1.3-1.6)") {
+    Store store("test_store.db");
+    const auto run = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+    const std::string plugin = "md", slug = "cs-" + run;
+    const auto seed = [&](const std::string& id, double n) {
+        return ChapterSeed{id, n, "t" + id, ""};
+    };
+
+    SUBCASE("upsert preserves flags; identity key wins") {
+        store.chapters_upsert(plugin, slug, {seed("a1", 1), seed("b2", 2)});
+        store.chapter_flags_apply(plugin, slug, {"a1"}, false, 1, 0);
+        store.chapters_upsert(plugin, slug, {seed("a1", 1), seed("c3", 3)}); // re-parse
+        CHECK(store.chapter_flags_get(plugin, slug, "a1") == 1); // bit survived
+        CHECK(store.chapter_flags_get(plugin, slug, "b2") == 0);
+        CHECK(store.chapter_flags_get(plugin, slug, "c3") == 0);
+        CHECK_FALSE(store.chapter_flags_get(plugin, "nope", "a1").has_value());
+    }
+
+    SUBCASE("RMW set/clear/all via one call; map echoes new values") {
+        store.chapters_upsert(plugin, slug, {seed("a1", 1), seed("b2", 2), seed("c3", 3)});
+        auto m = store.chapter_flags_apply(plugin, slug, {"a1", "b2"}, false, 3, 0); // both bits
+        CHECK(m["a1"] == 3);
+        CHECK(m["b2"] == 3);
+        m = store.chapter_flags_apply(plugin, slug, {"b2"}, false, 0, 1); // clear read
+        CHECK(m["b2"] == 2);
+        m = store.chapter_flags_apply(plugin, slug, {}, true, 0, 3); // all: clear both bits
+        CHECK(m.size() == 3);
+        for (auto& [id, v] : m) CHECK(v == 0);
+    }
+
+    SUBCASE("pages replace: delete+insert, count helper") {
+        store.chapters_upsert(plugin, slug, {seed("a1", 1)});
+        store.chapter_pages_replace(plugin, slug, "a1", {"p1", "p2", "p3"});
+        CHECK(store.chapter_pages_count(plugin, slug, "a1") == 3);
+        store.chapter_pages_replace(plugin, slug, "a1", {"x1"});
+        CHECK(store.chapter_pages_count(plugin, slug, "a1") == 1); // old rows gone
+        CHECK(store.chapter_pages_count(plugin, slug, "zz") == 0);
+    }
+
+    SUBCASE("list returns every row of the manga only") {
+        store.chapters_upsert(plugin, slug, {seed("a1", 1)});
+        store.chapters_upsert("other", slug, {seed("a1", 1)});
+        store.chapter_flags_apply(plugin, slug, {"a1"}, false, 2, 0);
+        const auto all = store.chapter_flags_list(plugin, slug);
+        REQUIRE(all.size() == 1);
+        CHECK(all.at("a1") == 2);
+    }
+}

@@ -31,7 +31,8 @@
 
 ## 5. Verify
 
-- [ ] 5.1 `tests/test_store.cpp`: upsert-preserves-flags, pages replace, RMW set/clear/all, reader helpers
-- [ ] 5.2 `tests/test_http.cpp` (or closest suite): `/chapter/flags` 400/ok paths; `/chapter/state` shape
-- [ ] 5.3 Live: mark 1..N on a real title → checks lit; clear-all → unlit; reader last page auto-lights; skip eye still drives the window
+- [x] 5.1 `tests/test_store.cpp`: upsert-preserves-flags, pages replace, RMW set/clear/all, reader helpers
+- [x] 5.2 `tests/test_http.cpp` (or closest suite): `/chapter/flags` 400/ok paths; `/chapter/state` shape
+- [x] 5.3 Live: mark 1..N on a real title → checks lit; clear-all → unlit; reader last page auto-lights; skip eye still drives the window
+- [x] 5.4 Zero-warning build, full suite green
 - [ ] 5.4 Zero-warning build, full suite green

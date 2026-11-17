@@ -27,7 +27,7 @@ function detailPage() {
     readMax(ch) { return (this.readState[ch.id] && this.readState[ch.id].read) || 0; },
     chStats(ch) { const s = this.readState[ch.id] || {}; return ((typeof s.total === 'number') ? s.total : '-') + '/' + ((typeof s.cached === 'number') ? s.cached : '-') + '/' + this.readMax(ch); },
     totalOf(ch) { const t = this.readState[ch.id] && this.readState[ch.id].total; return (typeof t === 'number' && t > 0) ? t : 0; },
-    isRead(ch) { const t = this.totalOf(ch); return t ? this.readMax(ch) >= t : this.readMax(ch) > 0; },
+    isRead(ch) { return !!(this.readState[ch.id] && this.readState[ch.id].done); }, // chapter-state: bit0 is the single truth
     async loadChapterState() {
       if (!this.chapters.length) return;
       try {
@@ -40,16 +40,30 @@ function detailPage() {
       } catch (e) { /* list renders without state */ }
     },
     async toggleRead(ch) {
-      const to = this.isRead(ch) ? 0 : (this.totalOf(ch) || ch.pages || 1);
-      this.readState[ch.id] = {...(this.readState[ch.id] || {}), read: to || undefined};
-      if (!to) delete this.readState[ch.id].read;
-      try { await fetch(`/chapter/${encodeURIComponent(ch.id)}/read`, {method: 'POST',
-        headers: {'Content-Type': 'application/json'}, body: JSON.stringify({page: to})}); } catch (e) {}
+      const on = !this.isRead(ch);
+      this.readState[ch.id] = {...(this.readState[ch.id] || {}), done: on || undefined};
+      try { await fetch('/chapter/flags', {method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({plugin: this.plugin, slug: this.slug, ids: [ch.id], ...(on ? {set: 1} : {clear: 1})})}); } catch (e) {}
+    },
+    async markAllRead(on) {
+      if (!this.chapters.length) return;
+      if (!confirm(on ? `Mark all ${this.chapters.length} chapters read?` : 'Clear read status on all chapters?')) return;
+      this.chapters.forEach(c => { this.readState[c.id] = {...(this.readState[c.id] || {}), done: on || undefined}; });
+      try { await fetch('/chapter/flags', {method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({plugin: this.plugin, slug: this.slug, all: true, ...(on ? {set: 1} : {clear: 1})})}); } catch (e) {}
+    },
+    async markPrevRead(ch) { // chapter-state 4.2: canonical (number-asc) order, number <= picked
+      const canon = [...this.chapters].sort((a, b) => (a.number || 0) - (b.number || 0));
+      const ids = canon.filter(c => (c.number || 0) <= (ch.number || 0)).map(c => c.id);
+      if (ids.length < 2 || !confirm(`Mark ${ids.length} chapters (up to ${this.chLabel(ch)}) read?`)) return;
+      ids.forEach(id => { this.readState[id] = {...(this.readState[id] || {}), done: true}; });
+      try { await fetch('/chapter/flags', {method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({plugin: this.plugin, slug: this.slug, ids, set: 1})}); } catch (e) {}
     },
     async toggleDone(ch) {
       ch.done = !ch.done;
       try { await fetch(`/chapter/${encodeURIComponent(ch.id)}/skip`, {method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({skipped: ch.done})}); } catch (e) {}
+        body: JSON.stringify({skipped: ch.done, plugin: this.plugin, slug: this.slug})}); } catch (e) {}
     },
     async boot() {
       await this.loadPluginMeta(); // caps gate related fetch inside load()
