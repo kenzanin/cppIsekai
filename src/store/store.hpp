@@ -263,7 +263,8 @@ public:
      *  synopsis/alt_titles are never touched here (design D4). */
     bool saved_detail_put(const std::string& plugin, const std::string& slug, const std::string& name,
                           const std::string& authors_json, const std::string& artists_json,
-                          const std::string& tags_json, const std::string& synopsis_display);
+                          const std::string& tags_json, const std::string& synopsis_display,
+                          const std::string& cover);
     /** \brief manga-detail-table reset (design D6): clear the materialized display fields so
      *  the next open re-resolves them. No-op when the row is absent. */
     void saved_detail_clear(const std::string& plugin, const std::string& slug);

@@ -745,7 +745,7 @@ TEST_CASE("Store: materialized detail columns (manga-detail-table 1.4/2.1/3.2)")
         store.save_manga({plugin, slug, "Raw", "", 0});
         store.saved_signal_update(plugin, slug, "source synopsis", R"(["Alt One"])");
         CHECK(store.saved_detail_put(plugin, slug, "Resolved", R"(["Author A"])", R"(["Artist B"])",
-                                     R"(["Tag 1","Tag 2"])", "display text"));
+                                     R"(["Tag 1","Tag 2"])", "display text", "https://x/c.png"));
         const auto row = store.saved_get(plugin, slug);
         REQUIRE(row.has_value());
         CHECK(row->name == "Resolved");
@@ -760,7 +760,7 @@ TEST_CASE("Store: materialized detail columns (manga-detail-table 1.4/2.1/3.2)")
     SUBCASE("re-save preserves materialized columns; name refresh allowed") {
         const std::string slug = "mat-b-" + run;
         store.save_manga({plugin, slug, "Raw", "", 0});
-        REQUIRE(store.saved_detail_put(plugin, slug, "Resolved", R"(["A"])", "", R"(["t"])", "d"));
+        REQUIRE(store.saved_detail_put(plugin, slug, "Resolved", R"(["A"])", "", R"(["t"])", "d", ""));
         store.save_manga({plugin, slug, "Re-saved", "", 0}); // plain re-save
         const auto row = store.saved_get(plugin, slug);
         REQUIRE(row.has_value());
@@ -772,11 +772,11 @@ TEST_CASE("Store: materialized detail columns (manga-detail-table 1.4/2.1/3.2)")
     SUBCASE("placeholder name never clobbers a stored one (D9 guard at the store seam)") {
         const std::string slug = "mat-c-" + run;
         store.save_manga({plugin, slug, "Real Name", "", 0});
-        CHECK(store.saved_detail_put(plugin, slug, "", R"(["A"])", "", "", "")); // columns land, name kept
+        CHECK(store.saved_detail_put(plugin, slug, "", R"(["A"])", "", "", "", "")); // columns land, name kept
         CHECK(store.saved_get(plugin, slug)->name == "Real Name");
-        CHECK(store.saved_detail_put(plugin, slug, slug, "", "", "", "x")); // slug == name kept
+        CHECK(store.saved_detail_put(plugin, slug, slug, "", "", "", "x", "")); // slug == name kept
         CHECK(store.saved_get(plugin, slug)->name == "Real Name");
-        CHECK(store.saved_detail_put(plugin, slug, "Better", "", "", "", "")); // real name lands
+        CHECK(store.saved_detail_put(plugin, slug, "Better", "", "", "", "", "")); // real name lands
         CHECK(store.saved_get(plugin, slug)->name == "Better");
     }
 
@@ -785,7 +785,7 @@ TEST_CASE("Store: materialized detail columns (manga-detail-table 1.4/2.1/3.2)")
         store.save_manga({plugin, slug, "Raw", "", 0});
         store.saved_signal_update(plugin, slug, "src", R"(["Alt"])");
         store.saved_stats_update(plugin, slug, "ongoing", 9);
-        REQUIRE(store.saved_detail_put(plugin, slug, "R", R"(["A"])", "", R"(["t"])", "d"));
+        REQUIRE(store.saved_detail_put(plugin, slug, "R", R"(["A"])", "", R"(["t"])", "d", ""));
         store.saved_detail_clear(plugin, slug);
         const auto row = store.saved_get(plugin, slug);
         REQUIRE(row.has_value());
@@ -798,14 +798,14 @@ TEST_CASE("Store: materialized detail columns (manga-detail-table 1.4/2.1/3.2)")
         CHECK(row->alt_titles == R"(["Alt"])");
         CHECK(row->total_ch == 9); // stats survive
         store.saved_detail_clear("nope", "x"); // absent row no-op
-        CHECK_FALSE(store.saved_detail_put("nope", "x", "N", "[]", "[]", "[]", "")); // absent row no-op
+        CHECK_FALSE(store.saved_detail_put("nope", "x", "N", "[]", "[]", "[]", "", "")); // absent row no-op
     }
 
     SUBCASE("saved_has_detail gate and recompute coexistence") {
         const std::string slug = "mat-e-" + run;
         store.save_manga({plugin, slug, "Raw", "", 0});
         CHECK_FALSE(saved_has_detail(*store.saved_get(plugin, slug))); // empty everywhere: not materialized
-        REQUIRE(store.saved_detail_put(plugin, slug, "", "", "", "", "only synopsis"));
+        REQUIRE(store.saved_detail_put(plugin, slug, "", "", "", "", "only synopsis", ""));
         CHECK(saved_has_detail(*store.saved_get(plugin, slug)));
         store.recompute_dup_groups(); // clustering runs over rows carrying detail
         CHECK(store.saved_get(plugin, slug)->dup_group == 0);

@@ -107,6 +107,70 @@ bool chapter_cached(const std::string& ns, const std::string& slug, int chapter,
     return false;
 }
 
+// Percent-decode a query value (crow's param() does this internally; the
+// raw_url path below must match or curl receives a literal "%3A%2F" host).
+std::string pct_decode(const std::string& s) {
+    auto nib = [](char c) -> int {
+        if (c >= '0' && c <= '9') return c - '0';
+        if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+        if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+        return -1;
+    };
+    std::string out;
+    out.reserve(s.size());
+    for (size_t i = 0; i < s.size(); ++i) {
+        if (s[i] == '%' && i + 2 < s.size() && nib(s[i + 1]) >= 0 && nib(s[i + 2]) >= 0) {
+            out += static_cast<char>(nib(s[i + 1]) * 16 + nib(s[i + 2]));
+            i += 2;
+        } else {
+            out += s[i];
+        }
+    }
+    return out;
+}
+
+// Duplicate-number releases can fail per-entry upstream (comico's CF origin
+// 502s only some releases' open call). Siblings of the primary id with the
+// same number, id-ascending, primary excluded, capped at three -- the pages
+// route falls back across them when the primary yields no pages.
+std::vector<std::string> sibling_ids(const std::string& chs_env, double chd, const std::string& primary) {
+    std::vector<std::string> out;
+    const auto chs = envelope_data(chs_env);
+    if (!chs) {
+        return out;
+    }
+    for (const auto& item : *chs) {
+        if (!item.is_object()) {
+            continue;
+        }
+        const auto& entry = item.get_object();
+        const auto* const num = entry.find("number");
+        if (num == entry.end()) {
+            continue;
+        }
+        const auto* d = std::get_if<double>(&num->second.data);
+        if (!d || *d != chd) {
+            continue;
+        }
+        const auto* const idf = entry.find("id");
+        if (idf == entry.end()) {
+            continue;
+        }
+        const auto* s = std::get_if<std::string>(&idf->second.data);
+        if (!s || s->empty() || *s == primary) {
+            continue;
+        }
+        const auto at = std::lower_bound(out.begin(), out.end(), *s);
+        if (at == out.end() || *at != *s) {
+            out.insert(at, *s);
+            if (out.size() > 3) {
+                out.pop_back();
+            }
+        }
+    }
+    return out;
+}
+
 } // namespace
 
 namespace http::api {
@@ -151,27 +215,37 @@ void register_content(Ctx& c) {
             if (chapter_id.empty()) {
                 return std::string{};
             }
-            crow::json::wvalue pages_q;
-            pages_q["id"] = chapter_id;
-            const std::string pages_params = pages_q.dump();
-            const std::string pages_env = call_cached(store, plugin, "pages", pages_params,
-                                                      [&] { return plugins.call(plugin, "pages", pages_params); });
-            if (const auto pages = envelope_data(pages_env)) {
-                total_id = chapter_id;
-                total_pages = static_cast<int>(pages->size());
-                // chapter-store 2.2: page-url rows ride every parse (D4
-                // replace-all); the reader-visible list stays the same shape.
-                std::vector<std::string> urls;
-                urls.reserve(pages->size());
-                for (const auto& el : *pages) {
-                    if (const auto* s = std::get_if<std::string>(&el.data)) {
-                        urls.emplace_back(*s);
+            // Walk the primary id then same-number siblings; first release
+            // whose pages parse wins (per-entry upstream flakes, comico 502s).
+            std::vector<std::string> candidates = sibling_ids(chs_env, chd, chapter_id);
+            candidates.insert(candidates.begin(), chapter_id);
+            std::string pages_id = chapter_id;
+            std::string pages_env;
+            for (const auto& cand : candidates) {
+                crow::json::wvalue pages_q;
+                pages_q["id"] = cand;
+                const std::string pages_params = pages_q.dump();
+                pages_env = call_cached(store, plugin, "pages", pages_params,
+                                        [&] { return plugins.call(plugin, "pages", pages_params); });
+                if (const auto pages = envelope_data(pages_env); pages && !pages->empty()) {
+                    pages_id = cand;
+                    total_id = pages_id;
+                    total_pages = static_cast<int>(pages->size());
+                    // chapter-store 2.2: page-url rows ride every parse (D4
+                    // replace-all); the reader-visible list stays the same shape.
+                    std::vector<std::string> urls;
+                    urls.reserve(pages->size());
+                    for (const auto& el : *pages) {
+                        if (const auto* s = std::get_if<std::string>(&el.data)) {
+                            urls.emplace_back(*s);
+                        }
                     }
+                    store.chapter_pages_replace(plugin, slug, pages_id, urls);
+                    break;
                 }
-                store.chapter_pages_replace(plugin, slug, chapter_id, urls);
             }
             return build_pages_response(chs_env, pages_env,
-                                        PagesCtx{.plugin = plugin, .slug = slug, .ch = chd, .ch_id = chapter_id})
+                                        PagesCtx{.plugin = plugin, .slug = slug, .ch = chd, .ch_id = pages_id})
                 .value_or(std::string{});
         });
         if (total_pages > 0 && !total_id.empty()) {
@@ -206,7 +280,7 @@ void register_content(Ctx& c) {
         if (const auto raw = req.raw_url; !raw.empty()) {
             if (const auto q = raw.find("?url="); q != std::string::npos) {
                 auto end = raw.find('&', q + 5);
-                url = raw.substr(q + 5, end == std::string::npos ? std::string::npos : end - (q + 5));
+                url = pct_decode(raw.substr(q + 5, end == std::string::npos ? std::string::npos : end - (q + 5)));
             }
         }
         const bool cover = param(req, "cover") == "1" || param(req, "cover") == "true";

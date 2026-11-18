@@ -36,26 +36,36 @@ end
 
 -- GET + 200 + JSON decode -> table, or nil on any failure (goIsekai http_get).
 local function http_get(url)
-  local res, err = host.http.fetch(url, { headers = HEADERS })
-  if err ~= nil or res.status ~= 200 then return nil end
-  local ok, data = pcall(json.decode, res.body or "")
-  if not ok or type(data) ~= "table" then return nil end
+  local data
+  for _ = 1, 4 do -- CF 502s are intermittent; same retry policy as POST
+    local res, err = host.http.fetch(url, { headers = HEADERS })
+    if err == nil and res.status == 200 then
+      local ok, decoded = pcall(json.decode, res.body or "")
+      if ok and type(decoded) == "table" then data = decoded break end
+    end
+  end
   return data
 end
 
 local function http_post_json(url, body)
-  local res, err = host.http.fetch(url, {
-    method = "POST",
-    body = body,
-    headers = {
-      ["User-Agent"] = UA,
-      ["Accept"] = "application/json",
-      ["Content-Type"] = "application/json",
-      ["Referer"] = SITE .. "/",
-    },
-  })
-  if err ~= nil or res.status ~= 200 then return nil end
-  return res.body
+  -- comico.moe's CF origin 502s intermittently on POSTs; retry a few times
+  local last_err
+  for _ = 1, 4 do
+    local res, err = host.http.fetch(url, {
+      method = "POST",
+      body = body,
+      headers = {
+        ["User-Agent"] = UA,
+        ["Accept"] = "application/json",
+        ["Content-Type"] = "application/json",
+        ["Referer"] = SITE .. "/",
+      },
+    })
+    if err == nil and res.status == 200 then return res.body end
+    last_err = err or res.status
+  end
+  host.log.info("comico post failed: " .. tostring(last_err) .. " " .. url)
+  return nil
 end
 
 local methods = {}

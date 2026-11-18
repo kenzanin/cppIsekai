@@ -45,7 +45,7 @@ namespace http::api {
     const std::string artists = arr_json("artists");
     const std::string tags = arr_json("tags");
     on_pool(db, [&] {
-        store.saved_detail_put(plugin, slug, name, authors, artists, tags, syn);
+        store.saved_detail_put(plugin, slug, name, authors, artists, tags, syn, str_of("cover"));
         return 0;
     });
 }

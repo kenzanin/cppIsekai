@@ -190,7 +190,8 @@ void Store::saved_clear_update(const std::string& plugin, const std::string& slu
 
 bool Store::saved_detail_put(const std::string& plugin, const std::string& slug, const std::string& name,
                              const std::string& authors_json, const std::string& artists_json,
-                             const std::string& tags_json, const std::string& synopsis_display) {
+                             const std::string& tags_json, const std::string& synopsis_display,
+                             const std::string& cover) {
     const store_detail::OpTrace _op{"saved_detail_put"};
     auto rows = impl_->storage.get_all<store_detail::SavedMangaEntity>(where(
         c(&store_detail::SavedMangaEntity::plugin) == plugin && c(&store_detail::SavedMangaEntity::slug) == slug));
@@ -205,7 +206,8 @@ bool Store::saved_detail_put(const std::string& plugin, const std::string& slug,
     }
     const bool name_changed = new_name != e.name;
     const bool changed = name_changed || e.authors != authors_json || e.artists != artists_json ||
-                         e.tags != tags_json || e.synopsis_display != synopsis_display;
+                         e.tags != tags_json || e.synopsis_display != synopsis_display ||
+                         (!cover.empty() && e.cover != cover);
     if (!changed) {
         return false; // plain page open stays read-only (design D2)
     }
@@ -214,6 +216,9 @@ bool Store::saved_detail_put(const std::string& plugin, const std::string& slug,
     e.artists = artists_json;
     e.tags = tags_json;
     e.synopsis_display = synopsis_display;
+    if (!cover.empty()) {
+        e.cover = cover; // refresh keeps the cover current (sites rotate/prune upload urls)
+    }
     impl_->storage.replace(e);
     if (name_changed) {
         // name is an FTS-indexed column (library-dedup 1.4); signals above are untouched (D4)
