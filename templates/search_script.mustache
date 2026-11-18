@@ -4,7 +4,8 @@ function searchPage() {
   return {
     plugins: [], plugin: '', q: '', tags: [], genres: [],
     items: [], total: null, page: 1, loading: false, err: '', notice: '',
-    logoBroken: false,
+    logoBroken: false, open: false,
+    get pluginName() { return this.plugins.find(p => p.key === this.plugin)?.name || 'select a plugin' },
     logoFor(k) { return k && !this.logoBroken },
     async boot() {
       const j = await (await fetch('/api/plugins')).json()

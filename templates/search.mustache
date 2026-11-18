@@ -1,18 +1,31 @@
 {{>top.mustache}}
 <div x-data="searchPage" x-init="boot()">
   <!-- plugin + query row -->
+  <!-- plugin picker: custom dropdown (native select cannot render logos) -->
   <div class="flex items-center gap-3 mb-4">
-    <select x-model="plugin" @change="pick()" class="bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-sm">
-      <option value="" disabled>select a plugin</option>
-      <template x-for="p in plugins" :key="p.key">
-        <option :value="p.key" x-text="p.name"></option>
-      </template>
-    </select>
-    <template x-if="plugin && !logoBroken">
-      <span class="w-6 h-6 rounded bg-zinc-800 flex items-center justify-center text-xs font-bold">
-        <img :src="'/plugin/'+plugin+'/logo'" class="w-6 h-6 rounded object-cover" @error="logoBroken=true" alt="">
-      </span>
-    </template>
+    <div class="relative" @keydown.escape="open=false">
+      <button @click="open=!open" data-testid="plugin-picker"
+
+              class="flex items-center gap-2 bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-sm min-w-[10rem] hover:border-zinc-500 transition">
+        <template x-if="plugin && !logoBroken">
+          <img :src="'/plugin/'+plugin+'/logo'" class="w-6 h-6 rounded object-cover" @error="logoBroken=true" alt="">
+        </template>
+        <span x-text="pluginName" class="truncate"></span>
+        <span class="text-zinc-500 text-xs ml-auto" x-text="open ? '▲' : '▼'"></span>
+      </button>
+      <div x-show="open" @click.outside="open=false" x-cloak
+           class="absolute z-20 mt-1 w-72 max-h-96 overflow-y-auto bg-zinc-900 border border-zinc-700 rounded shadow-xl">
+        <template x-for="p in plugins" :key="p.key">
+          <button @click="plugin=p.key; logoBroken=false; open=false; pick()"
+                  class="w-full flex items-center gap-3 px-3 py-2 text-sm text-left hover:bg-zinc-800 transition"
+                  :class="p.key===plugin ? 'bg-zinc-800' : ''">
+            <img :src="'/plugin/'+p.key+'/logo'" class="w-8 h-8 rounded object-cover bg-zinc-800 shrink-0"
+                 @error="$el.style.visibility='hidden'" alt="">
+            <span class="truncate" x-text="p.name"></span>
+          </button>
+        </template>
+      </div>
+    </div>
     <input x-model="q" @keydown.enter="search()"
            placeholder="Search manga…" class="focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:border-transparent transition flex-1 bg-zinc-900 border border-zinc-700 rounded px-3 py-1.5">
     <button @click="search()" :disabled="!plugin || loading"
