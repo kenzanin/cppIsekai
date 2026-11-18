@@ -46,7 +46,7 @@ a reviewed golden diff.
 - [x] 4.2 Confirm the escape hatch can no longer turn a red suite green silently
 - [x] 4.3 Document the two-step re-lock (update, read `git diff`, re-run without the flag)
       where contributors will see it
-- [ ] 4.4 Confirm a deliberate template edit without a re-lock still fails `xmake test`
+- [x] 4.4 Confirm a deliberate template edit without a re-lock still fails `xmake test`
 
 ## 5. A6 — precompiled header for the daemon target
 
