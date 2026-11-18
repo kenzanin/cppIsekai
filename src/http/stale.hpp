@@ -26,6 +26,16 @@
 /** Constant per-method TTL for the api_cache read model; ponytail: knob later. */
 inline constexpr std::int64_t kApiCacheTtl = 24 * 3600;
 
+/** \brief Per-method TTL: reader page URLs can carry short-lived signed
+ *  session tokens (comico `d=` decays in minutes -> 410 on every image), so
+ *  `pages` rows age out much faster than metadata. */
+inline std::int64_t cache_ttl_for(const std::string& method) {
+    if (method == "pages") {
+        return 30 * 60;
+    }
+    return kApiCacheTtl;
+}
+
 /** \brief Read-only methods allowed to serve from api_cache (exact opt-in
  *  list; all of them, not just search). Library reads are local-first: the
  *  network is only used on a cold miss (nothing cached) or when the caller
@@ -130,7 +140,7 @@ std::string call_cached(Store& store, const std::string& id, const std::string& 
 
     if (envelope_ok(env)) {
         spdlog::debug("[plugin:{}] {} fresh envelope cached", id, method);
-        store.api_cache_put(id, key, params_json, res, now, kApiCacheTtl);
+        store.api_cache_put(id, key, params_json, res, now, cache_ttl_for(method));
         return res;
     }
 

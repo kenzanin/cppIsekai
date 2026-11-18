@@ -26,7 +26,7 @@ std::optional<std::string> Cache::img_store(const std::string& key, const std::s
                                   cover_ctx.w > 0 && cover_ctx.h > 0
                                       ? static_cast<double>(cover_ctx.w) / static_cast<double>(cover_ctx.h)
                                       : 0.0);
-    } else if (page_ctx.plugin.empty() || page_ctx.slug.empty() || page_ctx.chapter < 1 || page_ctx.page < 1) {
+    } else if (page_ctx.plugin.empty() || page_ctx.slug.empty() || page_ctx.chapter < 0 || page_ctx.page < 1) {
         return std::nullopt; // no placement context: nothing to name the file
     } else {
         rel = internal::page_rel(ns(page_ctx.plugin), page_ctx.slug, page_ctx.chapter, page_ctx.page, page_ctx.chapter_id) +
@@ -65,7 +65,7 @@ std::optional<std::string> Cache::img_ensure(const std::string& key, const Cover
 
     // No placement context (neither a cover nor a complete page): there is no
     // path to look up and none to store, so do not fetch either (D5).
-    if (!cover_ctx.cover && (page_ctx.plugin.empty() || page_ctx.slug.empty() || page_ctx.chapter < 1 ||
+    if (!cover_ctx.cover && (page_ctx.plugin.empty() || page_ctx.slug.empty() || page_ctx.chapter < 0 ||
                              page_ctx.page < 1)) {
         spdlog::debug("cache: img no placement context, refusing {}", key);
         return std::nullopt;

@@ -73,7 +73,7 @@ std::string resolve_chapter_id(const std::string& chs_env, const std::string& wa
 // count >= pages. ch-dir matched by chNNN prefix (collision id8 variant counts too).
 // `ns` is the cache namespace from Cache::ns(), not the raw plugin id.
 bool chapter_cached(const std::string& ns, const std::string& slug, int chapter, int pages) {
-    if (chapter <= 0 || pages <= 0) {
+    if (chapter < 0 || pages <= 0) { // ch 0 is a real chapter (comico prologue)
         return false;
     }
     const fs::path base = fs::path("data/cache") / "img" / ns / "manga" / cache::slug_dir(slug);
@@ -295,7 +295,7 @@ void register_content(Ctx& c) {
             cctx.cover = true;
             cctx.plugin = plugin;
             cctx.url = url;
-        } else if (!plugin.empty() && !slug.empty() && ch >= 1 && page >= 1) {
+        } else if (!plugin.empty() && !slug.empty() && ch >= 0 && page >= 1) { // ch 0 = prologue (comico)
             pctx = {.plugin = plugin, .slug = slug, .chapter = ch, .page = page, .chapter_id = ch_id};
         }
         const ImgReply r = serve_cached_image(images, url, cctx, pctx);
