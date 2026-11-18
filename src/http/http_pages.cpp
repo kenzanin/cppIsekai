@@ -244,7 +244,8 @@ void register_pages(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, L
 } // namespace http
 
 namespace {
-void br_asset(const crow::request& req, crow::response& res, const char* path, const char* mime) {
+void br_asset(const crow::request& req, crow::response& res, const char* path, const char* mime,
+              const char* cache = "public, max-age=31536000, immutable") {
     // Serve precompressed brotli body when the client advertises it; else
     // fall back to the plain sibling (must exist). Content-Encoding: br is
     // only set on the .br branch, never on the plain one.
@@ -276,7 +277,7 @@ void br_asset(const crow::request& req, crow::response& res, const char* path, c
     if (served_br) {
         res.set_header("Content-Encoding", "br");
     }
-    res.set_header("Cache-Control", "public, max-age=31536000, immutable");
+    res.set_header("Cache-Control", cache);
     res.end();
 }
 } // namespace
@@ -296,5 +297,12 @@ void http::register_static(crow::SimpleApp& app) {
     });
     CROW_ROUTE(app, "/static/tailwind.min.js")([](const crow::request& req, crow::response& res) {
         br_asset(req, res, "static/tailwind.min.js", "application/javascript");
+    });
+    // App JS: revalidate each load -- these change with releases, unlike vendored libs.
+    CROW_ROUTE(app, "/static/detail.js")([](const crow::request& req, crow::response& res) {
+        br_asset(req, res, "static/detail.js", "application/javascript", "no-cache");
+    });
+    CROW_ROUTE(app, "/static/reader.js")([](const crow::request& req, crow::response& res) {
+        br_asset(req, res, "static/reader.js", "application/javascript", "no-cache");
     });
 }

@@ -29,14 +29,14 @@ a reviewed golden diff.
 
 ## 3. A4 — extract inline template scripts
 
-- [ ] 3.1 Move the Alpine body of `templates/detail_script.mustache` (318 lines) into
+- [x] 3.1 Move the Alpine body of `templates/detail_script.mustache` (318 lines) into
       `static/detail.js` and the body of `templates/reader_script.mustache` (293 lines) into
       `static/reader.js`
-- [ ] 3.2 Serve both through the existing `br_asset()` route, consistent with how
+- [x] 3.2 Serve both through the existing `br_asset()` route, consistent with how
       Tailwind/Alpine/htmx are already delivered; no new serving machinery
-- [ ] 3.3 Leave each partial as a script tag; re-lock goldens once and confirm the diff is
+- [x] 3.3 Leave each partial as a script tag; re-lock goldens once and confirm the diff is
       limited to that script tag
-- [ ] 3.4 Browser smoke: open a reader page and a detail page, exercise the pager and a
+- [x] 3.4 Browser smoke: open a reader page and a detail page, exercise the pager and a
       chapter load, confirm behaviour is unchanged
 
 ## 4. A5 — make golden re-locking deliberate
