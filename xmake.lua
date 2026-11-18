@@ -16,6 +16,7 @@ local STORE_SRC = {"src/store/store_core.cpp", "src/store/store_search.cpp", "sr
                    "src/store/store_enrichment.cpp", "src/store/store_dedup.cpp", "src/store/store_saved.cpp",
                    "src/store/store_chapters.cpp"}
 local CACHE_SRC = {"src/cache/cache.cpp", "src/cache/cache_img.cpp"}
+local ENRICH_SRC = {"src/http/enrich_chosen.cpp", "src/http/enrich_detail.cpp"}
 local PLUGIN_SRC = {"src/plugin/plugin_core.cpp", "src/plugin/plugin_load.cpp", "src/plugin/plugin_call.cpp",
                     "src/plugin/lua/bridge.cpp", "src/plugin/lua/lua_runtime.cpp", "src/plugin/http_client.cpp",
                     "src/plugin/wasm/wasm_rt.cpp", "src/plugin/wasm/wasm_load.cpp", "src/plugin/wasm/wasm_imports.cpp",
@@ -248,7 +249,7 @@ cxx_bin("test_stale", {
 })
 
 cxx_bin("test_http_enrich", {
-    files = {"tests/test_http_enrich.cpp", STORE_SRC},
+    files = {"tests/test_http_enrich.cpp", STORE_SRC, ENRICH_SRC},
     incs = {"src"},
     pkgs = {"vips"},
     reqs = {"crow", "glaze", "sqlite_orm", "thread-pool", "simpleini", "readerwriterqueue", "spdlog", "sqlite3", "utf8proc", "hash-library"},

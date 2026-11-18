@@ -23,9 +23,9 @@ a reviewed golden diff.
 
 ## 2. A2 — split the enrich unit (`enrich_internal.hpp` 20.3K + `http_api_enrich.cpp`)
 
-- [ ] 2.1 Split by request concern, not by extracting the largest function
-- [ ] 2.2 Keep the public entry point unchanged so callers do not move
-- [ ] 2.3 `xmake test test_http_enrich` green, no golden change
+- [x] 2.1 Split by request concern, not by extracting the largest function
+- [x] 2.2 Keep the public entry point unchanged so callers do not move
+- [x] 2.3 `xmake test test_http_enrich` green, no golden change
 
 ## 3. A4 — extract inline template scripts
 
