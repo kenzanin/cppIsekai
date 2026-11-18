@@ -218,19 +218,20 @@ methods.pages = function(params)
     if lerr == nil and listed and listed ~= "" then body = listed end
   end
 
-  -- tag-at-a-time scan (host.re2.find_index has no start-offset argument)
+  -- tag-at-a-time scan (host.re2.find_index has no start-offset argument).
+  -- 2026-11: theme dropped per-img wp-manga-chapter-img classes; page images
+  -- now live in div.reading-content as lazyload imgs (data-src + placeholder src).
+  local block = find1(body, [[(?s)class="[^"]*reading-content[^"]*".*]]) or body
   local pages, scanned, pos = {}, 0, 1
   while true do
-    local s = body:find("<img", pos, true)
+    local s = block:find("<img", pos, true)
     if not s then break end
-    local e = body:find(">", s, true)
+    local e = block:find(">", s, true)
     if not e then break end
-    local tag = body:sub(s, e)
+    local tag = block:sub(s, e)
     scanned = scanned + 1
-    if tag:find("wp-manga-chapter-img", 1, true) then
-      local src = img_src(tag)
-      if src ~= "" then pages[#pages + 1] = src end -- cdn.madaradex.org 403s without Referer; host sends site origin
-    end
+    local src = img_src(tag)
+    if src ~= "" then pages[#pages + 1] = src end -- cdn host 403s without Referer; host sends site origin
     pos = e + 1
   end
 
