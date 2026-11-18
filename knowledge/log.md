@@ -1,3 +1,8 @@
+## 2026-11-18
+* **Update**: Linked `decisions/plugin-website-field.md` to `constraints/plugin-image-url-regex.md`.
+* **Update**: Linked `decisions/plugin-website-field.md` to `findings/js-image-referer-gap.md`.
+* **Update**: Updated concept `decisions/plugin-website-field.md`.
+
 ## 2026-11-17
 * **Update**: Updated concept `architecture/cache-layout-v3.md`.
 * **Update**: Linked `decisions/drop-date-dependency.md` to `findings/plugin-date-shapes-2026-11-18.md` (Host date conversion is stdlib-only; the same epoch-vs-ISO split shows up at the template boundary.).
