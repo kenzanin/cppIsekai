@@ -11,8 +11,10 @@ a reviewed golden diff.
 
 ## 1. A1 — split `src/store/store_search.cpp` (794 lines)
 
-- [ ] 1.1 Group the file's contents by concern: FTS search, `saved_*` stat writers, dim,
-      library listing
+- [ ] 1.1 Group the file's contents by concern: dedup/similarity core (fts, tokenize, dice,
+      `recompute_dup_groups`), `saved_*` writer family (incl. `status_category_mask` /
+      `compose_flags`), chapter flags/pages family, and the residue (plugin registry,
+      search/count, `state_*`, `position_*`)
 - [ ] 1.2 Split into units of roughly <=200 code-loc, header-only where the convention asks
       for it
 - [ ] 1.3 Keep `compose_flags` the single place that composes `status_flags`; if a split
@@ -46,9 +48,20 @@ a reviewed golden diff.
       where contributors will see it
 - [ ] 4.4 Confirm a deliberate template edit without a re-lock still fails `xmake test`
 
-## 5. Final verification
+## 5. A6 — precompiled header for the daemon target
 
-- [ ] 5.1 `xmake -y` clean with `-Wall -Wextra`
-- [ ] 5.2 `xmake test` full suite green
-- [ ] 5.3 No golden diff left over from A1/A2; the only golden commit is A4's, reviewed
-- [ ] 5.4 One commit per item, each self-contained and reviewable on its own
+- [ ] 5.1 Include-census the daemon target's TUs; write `src/std.pch.hpp` with the frozen
+      third-party roots plus std, no project headers (D6)
+- [ ] 5.2 Plumb an opt-in `pch` field through `cxx_bin` and enable it for the daemon target
+      only; if the clang path needs a forced include, add exactly that line per TU
+- [ ] 5.3 Record clean-build and touch-`api_ctx.hpp` incremental times before/after in the
+      commit message; revert the PCH if the clean-build win is not clearly measurable
+- [ ] 5.4 `xmake -y` zero warnings, `xmake test` green, no behaviour change (PCH is
+      additive); third-party targets and test binaries untouched
+
+## 6. Final verification
+
+- [ ] 6.1 `xmake -y` clean with `-Wall -Wextra`
+- [ ] 6.2 `xmake test` full suite green
+- [ ] 6.3 No golden diff left over from A1/A2; the only golden commit is A4's, reviewed
+- [ ] 6.4 One commit per item, each self-contained and reviewable on its own

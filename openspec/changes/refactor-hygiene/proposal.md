@@ -8,11 +8,13 @@ this change carries tasks only and has no spec deltas.
 Four items from `references/rec-architecture-improvements`, each verified before being
 proposed rather than taken on trust:
 
-- **A1.** `src/store/store_search.cpp` is 794 lines (measured). The convention says split
-  units stay near 200 code-loc. The file currently mixes FTS search, the `saved_*` stat
-  writers, `compose_flags`, dim and library listing.
-- **A2.** `src/http/enrich_internal.hpp` is 20.3K with `http_api_enrich.cpp` alongside it —
-  the same scale problem on the HTTP side.
+- **A1.** `src/store/store_search.cpp` is 1060 lines (re-measured 2026-11-18; was 794 at
+  proposal time — chapter-state grew it). The convention says split units stay near 200
+  code-loc. The file now mixes SIX concerns: the dedup/similarity core (fts, tokenize, dice,
+  `recompute_dup_groups`), the plugin registry, search/count, `state_*`/`position_*`
+  accessors, the `saved_*` writer family, and the chapter flags/pages family.
+- **A2.** `src/http/enrich_internal.hpp` is 671 lines / ~20 KB of `inline` logic included by
+  five TUs plus `api_ctx.hpp` — the same scale problem on the HTTP side.
 - **A4.** `templates/detail_script.mustache` is 318 lines and
   `templates/reader_script.mustache` is 293 lines (measured). Alpine logic of that size lives
   in mustache partials, so it cannot be linted or unit-tested and it churns the template
@@ -22,12 +24,19 @@ proposed rather than taken on trust:
   detection itself works. The real gap is that `CPPISEKAI_UPDATE_GOLDEN=1` re-locks the
   fixture in the same command that runs the check, so a stale suite becomes green without
   anyone reading the diff.
+- **A6.** No precompiled header anywhere (`xmake.lua` has none): every TU re-parses the same
+  frozen third-party forest (crow, glaze, spdlog, ...) pulled in via `api_ctx.hpp` /
+  `plugin.hpp`. Clean build measured 26.5 s (2026-11-18). A PCH over the stable external
+  includes is pure compile-time; it changes no behaviour and no diagnostics.
 
 ## What Changes
 
-- **A1** split `store_search.cpp` by concern (search / saved stats / library listing),
-  keeping `compose_flags` as the single flag writer in one file.
+- **A1** split `store_search.cpp` by concern (dedup core / saved writers / chapter family /
+  registry+search+state residue), keeping `compose_flags` as the single flag writer in one
+  file.
 - **A2** split the enrich unit the same way.
+- **A6** add a precompiled header for the daemon target over frozen third-party includes
+  only, with measured before/after build times; revert if the win is not measurable.
 - **A4** extract the inline Alpine bodies from the two template partials into `static/*.js`
   served through the existing precompressed-asset route.
 - **A5** make golden re-locking a deliberate two-step and add a stale check that fails.

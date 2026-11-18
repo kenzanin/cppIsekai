@@ -51,3 +51,32 @@ a committed golden.
 
 Each split is its own commit: suite green, split, suite green again, goldens unchanged. A
 split and a behaviour fix in one commit makes the diff unreviewable and hides the fix.
+
+## D6. PCH caches parses of FROZEN headers, not our evolving ones
+
+A PCH only pays when its contents rarely change: xmake/clang invalidate it on any edit to
+anything it includes, so project headers (`api_ctx.hpp`, `plugin.hpp`, store headers) in the
+PCH would turn every host edit into a full-target rebuild — the opposite of the goal. The
+PCH therefore contains the frozen third-party forest only (the crow / glaze / spdlog class
+of include every TU already pulls transitively), plus the standard library. Final contents
+are set by include census, not by guess: a header qualifies if the large majority of the
+target's TUs already reach it.
+
+- Scope: the daemon binary target only, via a `pch` field on the `cxx_bin` helper. Third-
+  party targets (`wasm3`, `tiny-aes256`, `cdp-cpp`) and test binaries are out of scope; a
+  test binary adopts it only on a separately measured win.
+- The PCH is additive: existing `#include` lines stay verbatim. If xmake's clang path needs
+  a forced first include instead of auto-injection, that one line per TU is the only
+  permitted source change.
+- Kill criterion: record clean-build and touch-`api_ctx.hpp` incremental times before/after;
+  if the clean-build win is not clearly measurable, revert — a PCH that buys nothing is
+  pure config debt.
+
+## D7. The dedup core is one documented >200-loc unit
+
+`store_search.cpp`'s front matter (fts index maintenance, tokenization, Jaccard/dice
+scoring, `recompute_dup_groups`) is a single algorithm wearing four hats; slicing it to hit
+200 code-loc would split a cohesive pass into files that need each other's statics. It
+moves as one ~360-loc `store_dedup.cpp` unit under the same documented exception the plugin
+core already has. The remainder splits cleanly under the 200 guideline
+(saved-writers ~300 is the largest and is one CRUD family).
