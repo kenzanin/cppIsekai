@@ -1,4 +1,5 @@
 #include "main.hpp"
+#include "tray.hpp"
 
 int main(int argc, char** argv) {
     // Default logger wrapped so spdlog::info call ends up in queue sink,
@@ -128,6 +129,7 @@ int main(int argc, char** argv) {
     scheduler.start();
 
     spdlog::info("cppIsekai listening on :{} (config: {})", cfg.port, ini_path);
+    tray::start(cfg.port); // detached UI thread; no-op headless
     serve(store, db_pool, plugin_pool, plugins, logs, images, cfg.port, ini_path, overrides, cfg.templates_dir);
     scheduler.stop();
     browser::shutdown(); // app-owned child only; adopted externals survive (D12)

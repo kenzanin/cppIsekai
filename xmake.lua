@@ -89,11 +89,37 @@ local function cxx_bin(name, cfg)
                 t:add("ldflags", "-fuse-ld=mold", {force = true})
         t:add("ldflags", "-rdynamic", {force = true}) -- dynsym utk backward dladdr; jalur def-time add_ldflags menghilangkannya
             end
+            -- pkg-config injection for vendored sources needing system GUI libs
+            -- (traypp): xmake's pkgconfig:: package cache proved flaky here, the
+            -- raw tool is not.
+            if cfg.pkgconfig then
+                local pc = find_program("pkg-config")
+                if pc then
+                    local names = table.concat(cfg.pkgconfig, " ")
+                    local cf = os.iorun(pc .. " --cflags " .. names)
+                    local lf = os.iorun(pc .. " --libs " .. names)
+                    if cf and #cf > 0 then
+                        local flags = {} -- split shlex-ish on spaces
+                        for f in cf:gmatch("%S+") do flags[#flags + 1] = f end
+                        t:add("cflags", flags, {force = true})
+                        t:add("cxxflags", flags, {force = true})
+                    end
+                    if lf and #lf > 0 then
+                        local libs = {}
+                        for f in lf:gmatch("%S+") do libs[#libs + 1] = f end
+                        t:add("ldflags", libs, {force = true})
+                    end
+                end
+            end
         end)
     target_end()
 end
 
 -- --- vendored static libs (C) ---
+-- traypp (vendored Soundux/traypp) compiles straight into the daemon target
+-- below: a separate static target does not propagate its pkg-config cflags to
+-- its own sources reliably, and the daemon needs the gtk link flags anyway.
+
 target("wasm3")
     set_kind("static")
     set_languages("c23")
@@ -138,10 +164,11 @@ target("cdp-cpp")
 
 -- --- daemon ---
 cxx_bin("cppIsekai", {
-    files = {"src/**.cpp"},
-    incs = {"src"},
+    files = {"src/**.cpp", TP .. "/traypp/tray/src/core/*.cpp", TP .. "/traypp/tray/src/core/linux/*.cpp", TP .. "/traypp/tray/src/components/*.cpp"},
+    incs = {"src", TP .. "/traypp/tray/include"},
     deps = {"wasm3", "tiny-aes256", "cdp-cpp"},
     pkgs = {"vips"},
+    pkgconfig = {"appindicator3-0.1", "gtk+-3.0"}, -- traypp gtk/appindicator (raw pkg-config; see on_load)
     reqs = {"lua", "crow", "cli11", "asio", "glaze", "sol2", "thread-pool", "readerwriterqueue", "lexbor", "libzippp", "quickjs-ng", "simpleini", "sqlite_orm", "spdlog", "zlib", "sqlite3", "utf8proc", "re2", "hash-library", "pugixml", "backward-cpp"},
     ldflags = {CURL_SO},
     rpath = {CURL_LIB},
