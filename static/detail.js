@@ -239,7 +239,7 @@ function detailPage() {
         this.enrichment = (d.enrichment) || null;
         this.enrichLastFetched = Math.max(this.enrichLastFetched || 0, (this.enrichment && this.enrichment.fetched_at) || 0);
         this.hiddenTags = (this.enrichment && this.enrichment.chosen && this.enrichment.chosen.tags_hidden) || [];
-        this.chapters = (c.data || []).slice().sort((a, b) => (b.number ?? 0) - (a.number ?? 0));
+        this.chapters = (Array.isArray(c.data) ? c.data : []).slice().sort((a, b) => (b.number ?? 0) - (a.number ?? 0)); // lua empty table marshals {} not []
         this.mergeSavedRelated(); // re-merge chosen.related_add now that /api/detail is in
         await this.loadChapterState(); // chapters are fresh objects -- re-apply done/read flags + cbz gating
       } catch (e) { this.err = String(e); }

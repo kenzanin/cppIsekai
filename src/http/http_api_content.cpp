@@ -198,7 +198,17 @@ void register_content(Ctx& c) {
     // ratio is ignored — host sidecar is the source of truth (D3).
     CROW_ROUTE(app, "/cache/img")
     ([&](const crow::request& req) {
-        const auto url = param(req, "url");
+        // crow's query parser truncates a value at a nested '?' (proxy urls
+        // like .../img?url=<enc> lose their tail), so take url verbatim from
+        // raw_url: everything after "url=" up to the next '&' (D-none: hosts
+        // with nested-query proxies, 4ucomics api/v1/img).
+        std::string url{param(req, "url")};
+        if (const auto raw = req.raw_url; !raw.empty()) {
+            if (const auto q = raw.find("?url="); q != std::string::npos) {
+                auto end = raw.find('&', q + 5);
+                url = raw.substr(q + 5, end == std::string::npos ? std::string::npos : end - (q + 5));
+            }
+        }
         const bool cover = param(req, "cover") == "1" || param(req, "cover") == "true";
         const auto plugin = param(req, "plugin");
         const auto slug = param(req, "slug");
