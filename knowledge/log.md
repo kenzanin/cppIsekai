@@ -1,4 +1,6 @@
 ## 2026-11-18
+* **Update**: Updated concept `decisions/search-read-model-cache.md`.
+* **Update**: Updated concept `decisions/chapter-zero-falsy-regression.md`.
 * **Update**: Linked `decisions/plugin-website-field.md` to `constraints/plugin-image-url-regex.md`.
 * **Update**: Linked `decisions/plugin-website-field.md` to `findings/js-image-referer-gap.md`.
 * **Update**: Updated concept `decisions/plugin-website-field.md`.
