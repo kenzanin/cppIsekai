@@ -5,21 +5,21 @@ a reviewed golden diff.
 
 ## 0. Baseline
 
-- [ ] 0.1 `xmake -y` clean and `xmake test` green before touching anything; record the
+- [x] 0.1 `xmake -y` clean and `xmake test` green before touching anything; record the
       baseline so a later failure cannot be blamed on the refactor
-- [ ] 0.2 `git diff tests/fixtures/golden/` empty at baseline
+- [x] 0.2 `git diff tests/fixtures/golden/` empty at baseline
 
 ## 1. A1 — split `src/store/store_search.cpp` (794 lines)
 
-- [ ] 1.1 Group the file's contents by concern: dedup/similarity core (fts, tokenize, dice,
+- [x] 1.1 Group the file's contents by concern: dedup/similarity core (fts, tokenize, dice,
       `recompute_dup_groups`), `saved_*` writer family (incl. `status_category_mask` /
       `compose_flags`), chapter flags/pages family, and the residue (plugin registry,
       search/count, `state_*`, `position_*`)
-- [ ] 1.2 Split into units of roughly <=200 code-loc, header-only where the convention asks
+- [x] 1.2 Split into units of roughly <=200 code-loc, header-only where the convention asks
       for it
-- [ ] 1.3 Keep `compose_flags` the single place that composes `status_flags`; if a split
+- [x] 1.3 Keep `compose_flags` the single place that composes `status_flags`; if a split
       would duplicate it, that boundary is wrong — choose another
-- [ ] 1.4 `xmake test test_store` green, no golden change
+- [x] 1.4 `xmake test test_store` green, no golden change
 
 ## 2. A2 — split the enrich unit (`enrich_internal.hpp` 20.3K + `http_api_enrich.cpp`)
 

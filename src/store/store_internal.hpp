@@ -199,3 +199,11 @@ struct StoreImpl {
     bool fts5_ok = false; // library-dedup 1.3: false when the amalgamation lacks FTS5 (dedup disabled)
     explicit StoreImpl(const std::string& p) : path(p), storage(store_detail::create_storage(p)) {}
 };
+
+// library-dedup FTS maintenance (defined in store_dedup.cc): the saved writers
+// call these whenever an indexed column (name/alt_titles/synopsis) changes.
+namespace store_detail {
+void fts_sync(StoreImpl& impl, const std::string& plugin, const std::string& slug, const std::string& name,
+              const std::string& alt_titles, const std::string& synopsis);
+void fts_delete(StoreImpl& impl, const std::string& plugin, const std::string& slug);
+} // namespace store_detail

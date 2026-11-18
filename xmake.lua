@@ -13,7 +13,8 @@ local CURL_LIB = "$(projectdir)/" .. TP .. "/curl-impersonate/lib"
 
 -- shared source groups
 local STORE_SRC = {"src/store/store_core.cpp", "src/store/store_search.cpp", "src/store/store_api.cpp",
-                   "src/store/store_enrichment.cpp"}
+                   "src/store/store_enrichment.cpp", "src/store/store_dedup.cpp", "src/store/store_saved.cpp",
+                   "src/store/store_chapters.cpp"}
 local CACHE_SRC = {"src/cache/cache.cpp", "src/cache/cache_img.cpp"}
 local PLUGIN_SRC = {"src/plugin/plugin_core.cpp", "src/plugin/plugin_load.cpp", "src/plugin/plugin_call.cpp",
                     "src/plugin/lua/bridge.cpp", "src/plugin/lua/lua_runtime.cpp", "src/plugin/http_client.cpp",
