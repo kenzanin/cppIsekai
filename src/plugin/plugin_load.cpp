@@ -161,6 +161,9 @@ void scan_dir(const Config& conf, LiveProfile& live_profile, Store& store, const
         rt.info.website = m.website.value_or(m.site_url.value_or(""));
         rt.info.image_referer = m.image_referer.value_or("");
         rt.info.image_engine = m.image_engine.value_or("");
+        if (m.cache_ttl) {
+            rt.info.cache_ttl = *m.cache_ttl;
+        }
         const char* default_ext = "lua";
         if (m.runtime == "wasm") {
             default_ext = "wasm";

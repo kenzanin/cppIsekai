@@ -271,7 +271,7 @@ cxx_bin("test_stale", {
     files = {"tests/test_stale.cpp", STORE_SRC},
     incs = {"src"},
     pkgs = {"vips"},
-    reqs = {"glaze", "sqlite_orm", "spdlog", "sqlite3", "utf8proc", "hash-library"},
+    reqs = {"glaze", "sqlite_orm", "spdlog", "sqlite3", "utf8proc", "hash-library", "thread-pool"},
     test = true,
 })
 
@@ -286,7 +286,7 @@ cxx_bin("test_http_enrich", {
 cxx_bin("test_pages", {
     files = {"tests/test_pages.cpp", "src/http/pages_api.cpp"},
     incs = {"src"},
-    reqs = {"crow", "glaze", "spdlog", "hash-library"},
+    reqs = {"crow", "glaze", "spdlog", "hash-library", "thread-pool"},
     test = true,
 })
 

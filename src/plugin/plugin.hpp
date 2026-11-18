@@ -13,6 +13,7 @@
 #include <BS_thread_pool.hpp>
 
 #include <atomic>
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -52,6 +53,7 @@ struct Config {
 struct PluginInfo {
     std::string id, name, version, runtime, entry, website, image_referer, image_engine;
     std::vector<std::string> capabilities;
+    std::map<std::string, std::int64_t> cache_ttl; // per-method api_cache TTL override (seconds; absent = host default)
     int api{};
     std::string dir;
 };
@@ -126,6 +128,11 @@ public:
      *  = legacy plain curl (stock TLS). CF-fronted image CDNs opt in
      *  (image-engine-profile). */
     [[nodiscard]] std::string image_engine(const std::string& id) const;
+
+    /** \brief Manifest `cache_ttl` override for one api_cache method, in
+     *  seconds; 0 when absent (host per-method default applies). For sites
+     *  whose responses carry short-lived signed tokens (comico `d=`). */
+    [[nodiscard]] std::int64_t cache_ttl_seconds(const std::string& id, const std::string& method) const;
 
     /** \brief Last-call outcome for id; ok-when-unknown when never called. */
     [[nodiscard]] CallHealth health(const std::string& id) const;

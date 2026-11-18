@@ -19,7 +19,7 @@ std::vector<reader::WindowPart> reader_window(Store& store, BS::thread_pool<>& d
 
     const std::string envelope = on_pool(plugin_pool, [&] {
         return call_cached(store, plugin_id, "chapters", chapters_query,
-                           [&] { return plugins.call(plugin_id, "chapters", chapters_query); });
+                           [&] { return plugins.call(plugin_id, "chapters", chapters_query); }, &plugins);
     });
 
     std::vector<reader::Chapter> chapters;
@@ -64,7 +64,7 @@ std::vector<reader::WindowPart> reader_window(Store& store, BS::thread_pool<>& d
         const std::string pages_query = q.dump();
         const std::string env = on_pool(plugin_pool, [&] {
             return call_cached(store, plugin_id, "pages", pages_query,
-                               [&] { return plugins.call(plugin_id, "pages", pages_query); });
+                               [&] { return plugins.call(plugin_id, "pages", pages_query); }, &plugins);
         });
         std::vector<std::string> urls;
         if (const auto data = envelope_data(env)) {

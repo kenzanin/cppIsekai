@@ -165,7 +165,7 @@ void register_admin(Ctx& c) {
         const std::string params = p.dump();
         // Stale-serve wrap (design D3): the one call site, opt-in methods only.
         crow::response r{on_pool(plugin_pool, [&] {
-            return call_cached(store, id, action, params, [&] { return plugins.call(id, action, params); });
+            return call_cached(store, id, action, params, [&] { return plugins.call(id, action, params); }, &plugins);
         })};
         // Search covers also land in the cover pool (cache-first): the browser
         // grid asks /cache/img?cover=1, and the worker stores in the same v3

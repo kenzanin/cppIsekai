@@ -4,6 +4,7 @@
   "site_url": "https://comico.moe",
   "logo": "logo.png",
   "paginates": false,
+  "cache_ttl": {"pages": 1800},
   "contract_version": 1,
   "runtime": "lua",
   "version": "1.0.0",

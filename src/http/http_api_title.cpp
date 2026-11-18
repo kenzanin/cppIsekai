@@ -28,7 +28,7 @@ crow::response title_data_response(plugin::Host& plugins, BS::thread_pool<>& db,
     const bool row_served = !body.empty();
     if (!row_served) {
         body = on_pool(plugin_pool, [&] {
-            return call_cached(store, plugin, method, params, [&] { return plugins.call(plugin, method, params); });
+            return call_cached(store, plugin, method, params, [&] { return plugins.call(plugin, method, params); }, &plugins);
         });
     }
     if (method == "detail") { // chosen rides BOTH paths: newer picker edits must win over the row

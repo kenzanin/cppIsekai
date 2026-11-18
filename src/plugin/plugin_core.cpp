@@ -63,6 +63,17 @@ std::string Host::image_engine(const std::string& id) const {
     return it != impl_->plugins.end() ? it->second->info.image_engine : std::string{};
 }
 
+std::int64_t Host::cache_ttl_seconds(const std::string& id, const std::string& method) const {
+    const std::scoped_lock lock(impl_->mu);
+    const auto it = impl_->plugins.find(id);
+    if (it == impl_->plugins.end()) {
+        return 0;
+    }
+    const auto& table = it->second->info.cache_ttl;
+    const auto t = table.find(method);
+    return t != table.end() ? t->second : 0;
+}
+
 std::string Host::logo_path(const std::string& id) const {
     std::shared_ptr<Runtime> rt;
     {

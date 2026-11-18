@@ -12,6 +12,7 @@
  *  it hermetically. */
 
 #include "cache/sha1.hpp"
+#include "plugin/plugin.hpp"
 #include "store/store.hpp"
 
 #include <glaze/glaze.hpp>
@@ -26,14 +27,25 @@
 /** Constant per-method TTL for the api_cache read model; ponytail: knob later. */
 inline constexpr std::int64_t kApiCacheTtl = 24 * 3600;
 
-/** \brief Per-method TTL: reader page URLs can carry short-lived signed
- *  session tokens (comico `d=` decays in minutes -> 410 on every image), so
- *  `pages` rows age out much faster than metadata. */
+/** \brief Per-method host defaults; manifest `cache_ttl` (plugin-side) wins
+ *  per plugin+method. Reader page URLs can carry short-lived signed session
+ *  tokens (comico `d=` decays in minutes -> 410 on every image), so `pages`
+ *  rows age out much faster than metadata. */
 inline std::int64_t cache_ttl_for(const std::string& method) {
     if (method == "pages") {
         return 30 * 60;
     }
     return kApiCacheTtl;
+}
+
+/** \brief Host default, then the plugin's manifest override when non-zero. */
+inline std::int64_t effective_ttl(const plugin::Host* plugins, const std::string& id, const std::string& method) {
+    const std::int64_t def = cache_ttl_for(method);
+    if (plugins == nullptr) {
+        return def;
+    }
+    const std::int64_t o = plugins->cache_ttl_seconds(id, method);
+    return o > 0 ? o : def;
 }
 
 /** \brief Read-only methods allowed to serve from api_cache (exact opt-in
@@ -94,7 +106,7 @@ inline std::string stale_key(const std::string& plugin, const std::string& metho
  *  in both directions. */
 template <class Call> // std::string() -- the ABI call seam
 std::string call_cached(Store& store, const std::string& id, const std::string& method, const std::string& params_json,
-                        Call&& call) {
+                        Call&& call, const plugin::Host* plugins = nullptr) {
     // plugin-lifecycle 1.x: a disabled plugin is read-only -- cached envelopes
     // still serve; no cache at all answers with this and the net stays quiet.
     static constexpr const char* kDisabledEnv = R"({"ok":false,"error":"plugin disabled"})";
@@ -140,7 +152,7 @@ std::string call_cached(Store& store, const std::string& id, const std::string& 
 
     if (envelope_ok(env)) {
         spdlog::debug("[plugin:{}] {} fresh envelope cached", id, method);
-        store.api_cache_put(id, key, params_json, res, now, cache_ttl_for(method));
+        store.api_cache_put(id, key, params_json, res, now, effective_ttl(plugins, id, method));
         return res;
     }
 

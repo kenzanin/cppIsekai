@@ -206,7 +206,7 @@ void register_content(Ctx& c) {
         int total_pages = 0;
         const std::string body = on_pool(plugin_pool, [&] {
             const std::string chs_env = call_cached(store, plugin, "chapters", chs_params,
-                                                    [&] { return plugins.call(plugin, "chapters", chs_params); });
+                                                    [&] { return plugins.call(plugin, "chapters", chs_params); }, &plugins);
             // Pre-resolve the chapter id from the list so the pages call
             // targets the right one even when the plugin's list is stale.
             // A `ch_id` query param wins when it matches an entry; otherwise
@@ -226,7 +226,7 @@ void register_content(Ctx& c) {
                 pages_q["id"] = cand;
                 const std::string pages_params = pages_q.dump();
                 pages_env = call_cached(store, plugin, "pages", pages_params,
-                                        [&] { return plugins.call(plugin, "pages", pages_params); });
+                                        [&] { return plugins.call(plugin, "pages", pages_params); }, &plugins);
                 if (const auto pages = envelope_data(pages_env); pages && !pages->empty()) {
                     pages_id = cand;
                     total_id = pages_id;
