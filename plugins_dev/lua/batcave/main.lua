@@ -73,6 +73,11 @@ end
 
 local methods = {}
 
+-- Fwd: genre catalogue parsed once by genres() below; search resolves chip
+-- names to DLE ids through it.
+local genre_ids = {}
+local load_genres
+
 -- ── search ─────────────────────────────────────────────────────────────────
 -- Text search: GET /search/<query>/page/<N>. Category/genre browse:
 -- GET /ComicList/g=<id>/page/<N> (the id is BatCave's numeric DLE genre).
@@ -88,8 +93,11 @@ methods.search = function(params)
     local body
     if type(genres) == "table" and #genres > 0 then
         -- Genre/category browse uses ComicList with g=<id>. First genre wins;
-        -- the numeric id may arrive as the raw slug or a display name.
-        local id = tonumber(tostring(genres[1]):match("(%d+)"))
+        -- the chip sends the display name, resolved via the genre map built by
+        -- genres() (numeric passthrough kept for old cached URLs).
+        load_genres()
+        local id = tonumber(genre_ids[tostring(genres[1])]
+            or tostring(genres[1]):match("(%d+)"))
         if not id then return { ok = true, data = { items = {}, total = 0 } } end
         local url = "/ComicList/g=" .. id .. "/"
         if page > 1 then url = url .. "page/" .. page .. "/" end
@@ -239,20 +247,32 @@ end
 -- ── genres ─────────────────────────────────────────────────────────────────
 -- GET /comix/ once to grab __XFILTER__'s "g" list (genre id -> name).
 
-methods.genres = function()
+-- Genre catalogue shared by the genres action and search's name->id lookup;
+-- parsed once, cached for the daemon lifetime.
+local genre_list = nil
+load_genres = function()
+    if genre_list then return genre_list end
+    genre_list = {}
     local body = site_get("/comix/")
-    if not body or body == "" then return { ok = false, error = "batcave: genres fetch failed" } end
-    local f = dle.json_data(body, "__XFILTER__ = ")
-    if not f or not f.filter_items then return { ok = true, data = {} } end
-    local items = f.filter_items.g
-    if not items or not items.values then return { ok = true, data = {} } end
-    local out = {}
-    for _, v in ipairs(items.values) do
-        -- The slug is the DLE genre id, which is what search feeds into
-        -- /ComicList/g=<id>/.
-        out[#out + 1] = { name = v.value, slug = tostring(v.id) }
+    local f = body and body ~= "" and dle.json_data(body, "__XFILTER__ = ") or nil
+    local values = f and f.filter_items and f.filter_items.g and f.filter_items.g.values or nil
+    if type(values) == "table" then
+        for _, v in ipairs(values) do
+            -- The DLE genre id is what search feeds into /ComicList/g=<id>/;
+            -- the chip carries the display name.
+            if type(v.value) == "string" and v.id ~= nil then
+                genre_list[#genre_list + 1] = v.value
+                genre_ids[v.value] = tostring(v.id)
+            end
+        end
     end
-    return { ok = true, data = out }
+    return genre_list
+end
+
+methods.genres = function()
+    local list = load_genres()
+    if #list == 0 then return { ok = true, data = {} } end
+    return { ok = true, data = list }
 end
 
 function handle(req)

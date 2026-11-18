@@ -511,11 +511,7 @@ static void genres_reply() {
     emit(R"({"ok":true,"data":[)");
     for (size_t i = 0; i < names.size(); ++i) {
         if (i) emit(",");
-        emit(R"({"name":)");
-        jemit(names[i]);
-        emit(R"(,"slug":)");
-        jemit(names[i]);
-        emit("}");
+        jemit(names[i]); // plain strings: the chip renderer prints them raw
     }
     emit("]}");
 }
@@ -542,6 +538,9 @@ extern "C" unsigned handle(unsigned, unsigned) {
         if (q.empty()) q = env_field("title");
         std::string g = env_field("genre");
         if (g.empty()) g = env_field("genres");
+        if (g.empty()) g = env_field("tags"); // UI sends comma-joined chip names
+        size_t comma = g.find(',');
+        if (comma != std::string::npos) g.resize(comma); // one genre per listing
         search_reply(q, g);
     } else if (method == "detail") {
         detail_reply(env_field("id"));

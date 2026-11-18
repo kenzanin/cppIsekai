@@ -341,7 +341,8 @@ methods.genres = function()
   for _, g in ipairs(found) do
     if not seen[g.slug] then
       seen[g.slug] = true
-      genres[#genres + 1] = g
+      -- Chip payload is the plain name; the UI renders strings only.
+      genres[#genres + 1] = g.name
     end
   end
   host.log.info("comix: found " .. tostring(#genres) .. " genres")

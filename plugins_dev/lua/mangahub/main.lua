@@ -19,6 +19,9 @@ local cachedKey = nil
 -- Last refusal message, so callers surface it instead of a silent empty list.
 local gqlError = nil
 
+-- Genre cache: chip names plus the name->slug map search filters with.
+local genre_cache, genre_slugs = nil, {}
+
 -- ── helpers ────────────────────────────────────────────────────────────────
 
 -- first capture group; nil when the pattern does not match.
@@ -229,7 +232,17 @@ methods.search = function(params)
     local one = type(genres) == "string" and genres or ""
     genres = one ~= "" and { one } or {}
   end
-  local genre = #genres > 0 and table.concat(genres, ",") or "all"
+  local genre = "all"
+  if #genres > 0 then
+    -- Chips carry display names; map back to the API slugs (fallback slugify
+    -- keeps old cached URLs working when the map is cold).
+    local slugs = {}
+    for i, name in ipairs(genres) do
+      slugs[i] = (genre_slugs and genre_slugs[name])
+        or name:lower():gsub("%s+", "-")
+    end
+    genre = table.concat(slugs, ",")
+  end
   local offset = (page - 1) * 30
   host.log.info("mangahub search: q=" .. query .. " genre=" .. genre .. " page=" .. tostring(page))
 
@@ -427,7 +440,7 @@ end
 local genres_cache = nil
 
 methods.genres = function()
-  if genres_cache then return { ok = true, data = genres_cache } end
+  if genre_cache then return { ok = true, data = genre_cache } end
 
   local res, err = host.http.fetch(SITE_URL .. "/search")
   local html = (err == nil and res and res.body) or ""
@@ -436,16 +449,21 @@ methods.genres = function()
     return { ok = true, data = {} }
   end
 
+  -- Slugs are the API truth (/search genre=<comma slugs>); names are derived
+  -- for the chips and mapped back in search. The anchor-label regex lost the
+  -- capture index once already -- deriving from the slug sidesteps it.
+  genre_slugs = {}
   local seen, out = {}, {}
-  for g in host.re2.gmatch([[(<a [^>]*genre-label[^>]*)>([^<]+)</a>]], html) do
-    local tag, name = g[1] or "", g[2] or ""
-    local slug = find1(tag, [[/genre/([a-z0-9-]+)]])
-    if slug and slug ~= "" and not seen[slug] then
+  for g in host.re2.gmatch([[/genre/([a-z0-9-]+)]], html) do
+    local slug = g[2] or "" -- m[1] is the full match; group 1 sits at m[2]
+    if slug ~= "" and not seen[slug] then
       seen[slug] = true
-      out[#out + 1] = { name = host.text.trim(name), slug = slug }
+      local name = slug:gsub("(%a)([%a']*)", function(a, b) return a:upper() .. b:lower() end):gsub("%-", " ")
+      genre_slugs[name] = slug
+      out[#out + 1] = name
     end
   end
-  table.sort(out, function(a, b) return a.name < b.name end)
+  table.sort(out)
 
   if #out == 0 then
     host.log.error("mangahub: /search listed no genre labels, genre browsing unavailable")
@@ -453,7 +471,7 @@ methods.genres = function()
   end
 
   host.log.info("mangahub: " .. tostring(#out) .. " genres")
-  genres_cache = out
+  genre_cache = out
   return { ok = true, data = out }
 end
 
