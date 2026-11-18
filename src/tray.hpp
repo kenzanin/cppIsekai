@@ -15,9 +15,10 @@
 
 #include <spdlog/spdlog.h>
 
+#include <atomic>
 #include <csignal>
 #include <thread>
-#include <unistd.h> // fork/exec/raise
+#include <unistd.h> // fork/exec/raise/getcwd
 
 #if defined(__linux__) && !defined(CPP_ISEKAI_NO_TRAY)
 #define CPP_ISEKAI_TRAY 1
@@ -29,6 +30,27 @@
 #endif
 
 namespace tray {
+
+inline std::atomic<bool> restart_requested{false}; // set by the tray, consumed in main
+
+namespace detail {
+
+// Detach a shell line from the gtk callback thread: double-fork so the
+// daemon exit cannot take the spawned process with it.
+inline void spawn(const std::string& cmd) {
+    if (pid_t pid = fork(); pid == 0) {
+        setsid();
+        if (pid_t pid2 = fork(); pid2 == 0) {
+            for (int fd = 3; fd < 64; ++fd) close(fd); // drop inherited listen fd etc,
+            // else run-cppIsekai's kill-holders sees this sh as an :8090 holder
+            execlp("/bin/sh", "sh", "-c", cmd.c_str(), static_cast<char*>(nullptr));
+            _exit(127);
+        }
+        _exit(0);
+    }
+}
+
+} // namespace detail
 
 inline void start(unsigned port) {
 #if defined(CPP_ISEKAI_TRAY)
@@ -45,7 +67,13 @@ inline void start(unsigned port) {
                     _exit(127); // exec failed
                 }
             }));
-            t.addEntry(Tray::Button("Quit", [] { raise(SIGTERM); }));
+            t.addEntry(Tray::Button("Restart server", [] {
+                // flag + graceful TERM; main spawns the respawn after teardown
+                // (fork from the gtk thread raced the exit and flaked)
+                restart_requested.store(true);
+                raise(SIGTERM);
+            }));
+            t.addEntry(Tray::Button("Stop server", [] { raise(SIGTERM); }));
             t.run(); // blocking gtk loop; ends when the appindicator dies
             spdlog::info("tray: closed");
         } catch (const std::exception& e) {

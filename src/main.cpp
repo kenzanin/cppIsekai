@@ -133,5 +133,7 @@ int main(int argc, char** argv) {
     serve(store, db_pool, plugin_pool, plugins, logs, images, cfg.port, ini_path, overrides, cfg.templates_dir);
     scheduler.stop();
     browser::shutdown(); // app-owned child only; adopted externals survive (D12)
+    if (tray::restart_requested) // tray-initiated: respawn once teardown is done
+        tray::detail::spawn("exec ./run-cppIsekai.sh restart >>/tmp/cppisekai-restart.log 2>&1");
     running.store(false);
 }
