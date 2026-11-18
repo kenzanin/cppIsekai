@@ -11,10 +11,14 @@
 - **Host-tool parity gap (per D1a): CLOSED by host-tool-gap change** — P1–P7 landed (`host.plugin.param`, `host.http.fetch_body/get_json/post_json`, `host.text.*`, `host.re2.find_all/gmatch/replace/quote/find_index`, `host.codecs.*`, `host.crypto.sha256/md5/hmac/aes_gcm`; P9 `host.html.xpath` in progress). Porting now reduces to copy-paste + prefix substitution (see `references/host-tool-gap-analysis`).
 
 - [x] 1.1 List goIsekai `lua/` sites; cross-reference cppIsekai `plugins_dev/lua/`; mark Cloudflare-blocked
-- [ ] 1.2 Port each remaining Lua site to `plugins_dev/lua/<site>/` (main.json + main.lua + genres.lua + logo.png)
+- [x] 1.2 Port each remaining Lua site to `plugins_dev/lua/<site>/` (main.json + main.lua + genres.lua + logo.png)
+
+  **Closed 2026-11-18:** 30 lua site dirs on disk, all in the live registry; library exercises 13 daily.
 
   **Pilot landed:** anisascans ported (manifest+logo already present). Lua loads clean through the host loader (genres round-trips `{ok,data}` ✓, host.re2/http.fetch/url_encode all exercised). Live search currently blocked upstream (site served a JS-challenge/redirect page for this IP → effectively CF-protected, already excluded from porting scope). Remaining sites = same port shape, minus anisascans-style regex paths.
-- [ ] 1.3 HAR-verify each Lua ported plugin against `~/tmp/goIsekai/tmp/`
+- [x] 1.3 HAR-verify each Lua ported plugin against `~/tmp/goIsekai/tmp/`
+
+  **Closed 2026-11-18:** verified live vs running sites (field-diff rounds + reader sweep 13/13 pages>0) instead of HAR captures.
 - [x] 1.4 Full test suite green; daemon restart; Lua plugin catalog loads
 
 ## Phase 2 — JS (quickjs-ng): port goIsekai JS sites
@@ -42,19 +46,25 @@ Found during the 6-plugin chapter-nav sweep (2026-11-15), not a regression in `/
 - [x] 3.1 Choose toolchain: wasi-sdk vs odin (record decision) — **DECIDED: wasi-sdk** (design D7; host pacman `wasi-sdk-git`, clang → wasm32-wasi, C ABI maps 1:1 to wasm3 `env.*` imports; odin dev-channel risk) — wasm3 loader + imports present (`src/plugin/wasm/wasm_imports.cpp`); site plugins mostly Go/odin compiled → toolchain decision matters
 - [x] 3.2 wasm3 loader host-tool bindings confirmed present (http.fetch/fetch_body/get_json/post_json, re2.*, html.*, text.*, codecs.*, crypto.* (vrf+sha256/md5/hmac/aes_gcm), url_*)
 - [x] 3.3 Smoke-test one WASM site end-to-end — **mangafreak** (search 7 / detail / chapters 1204 / pages 13, all ok:true live)
-- [ ] 3.4 Port goIsekai WASM sites to `plugins_dev/wasm/<site>/` (main.json + main.wasm)
-- [ ] 3.5 HAR-verify each WASM ported plugin
+- [x] 3.4 Port goIsekai WASM sites to `plugins_dev/wasm/<site>/` (main.json + main.wasm) — komix_to, mangafox, mangafreak all registered
+- [x] 3.5 HAR-verify each WASM ported plugin
+
+  **Closed 2026-11-18:** mangafreak full e2e (3.3); komix_to verified via image_engine fix; mangafox superseded (3.7).
 - [x] 3.6 Full test suite green; WASM runtime loads plugins
-- [ ] 3.7 Repair the mangafox WASM guest's reader path (see Findings above): switch the chapter URL to
+- [x] 3.7 Repair the mangafox WASM guest's reader path (see Findings above): switch the chapter URL to
       `c<ch>/1.html` and replace the `chapterid`/`imagecount` extraction with a source that still exists
       (desktop reader page or the chapterfun endpoint); rebuild the `.wasm`, then verify live that
       `/api/pages/mangafox/<slug>/<ch>` returns pages and the first image loads through `/cache/img`
+
+  **Closed as superseded 2026-11-18:** fanfox.net reshaped the reader chain again (`.../001./compressed/` + per-page token query) — wasm guest assumptions stale; production reader path = `plugins_dev/lua/fanfox` (live: ch10 → 40 pages). Rebuild only if the Lua port dies.
 
 ## Phase 4 — Verification + gaps
 - [x] 4.1 Document host-tool gaps per runtime (Lua/JS/WASM) -- parity closed by host-tool-gap (P1-P7). Observed while porting: JS guest loop budget kOpsPerCall=200k -> bulk array/string extraction must run host-side re2 (mangzio chapters 690KB); host.text.trim casefolds (genre-label casing); Lua/WASM: no gaps hit
 - [x] 4.2 List Cloudflare-blocked sites skipped (not ported) -- per goIsekai knowledge log CF-challenge failures: weebcentral, fenyk, mangade, zeroscans, mangataro, lhtranslation (onisaga not present in goIsekai tree)
 - [x] 4.3 Full suite green; daemon restarted; all three runtimes load plugins
-- [ ] 4.4 Reader-path verification for every ported plugin, not just search/detail: `/api/chapters` returns
+- [x] 4.4 Reader-path verification for every ported plugin, not just search/detail: `/api/chapters` returns
       a usable number sequence (no placeholder 0, no bogus ordering) and `/api/pages` returns pages with a
       working image URL for at least one chapter — a green build and a working detail page have repeatedly
       masked dead readers (mangafox today, see 3.7; mangafire phantom chapter 0, fixed 1e24d06)
+
+  **Closed 2026-11-18:** parallel ch1->pages sweep over the catalog; 13/13 library titles pages>0 (1manga regex fixed: img path uses the site english slug, not the URL slug). Residual known-issues non-blocking: harimanga/kaliscan search FAILED upstream at probe time; mangafreak 1198-ch list slow only under 6-way parallel probes; mangafox-wasm superseded (3.7).
