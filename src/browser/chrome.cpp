@@ -7,6 +7,7 @@
 #include <chrono>
 #include <glaze/glaze.hpp>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <thread>
 
@@ -15,6 +16,8 @@ namespace browser {
 namespace {
 
 std::string s_command;                     // configure(); empty = auto-discover
+std::string s_args;                        // space-split -> additionalFlags
+bool s_headless = true;                    // [chrome] headless, "0" = headed (xvfb)
 std::unique_ptr<cdp::quick::QuickBrowser> s_browser;
 // The one working page; owned by s_browser, recreated on relaunch.
 cdp::quick::QuickPage* s_page = nullptr;
@@ -40,11 +43,17 @@ void teardown() {
 /** \brief (Re)spawn Chrome and open the working page. Caller holds mutex. */
 bool launch(std::string* err) {
     cdp::ChromeLaunchOptions opts;
-    opts.headless = true;
+    opts.headless = s_headless;
     opts.disableGpu = true;
     opts.tempProfilePrefix = "cppisekai_chrome_";
     if (!s_command.empty()) {
         opts.customChromePath = s_command;
+        opts.preferredChannel = cdp::ChromeChannel::Custom; // custom path honored only under Custom
+    }
+    // [chrome] args: space-split; chromium flags carry no embedded spaces.
+    std::istringstream iss(s_args);
+    for (std::string flag; iss >> flag;) {
+        opts.additionalFlags.push_back(flag);
     }
     // 60 s evaluate cap lives in the vendored QuickPage::eval (awaitPromise);
     // ponytail: raise there if a harvest ever outgrows it.
@@ -131,9 +140,11 @@ std::mutex& mutex() {
     return m;
 }
 
-void configure(std::string command) {
+void configure(std::string command, std::string args, std::string headless) {
     std::lock_guard lock(mutex());
     s_command = std::move(command);
+    s_args = std::move(args);
+    s_headless = headless != "0"; // empty/1 => headless, "0" => headed (xvfb)
     s_dead = false;
 }
 
@@ -155,8 +166,7 @@ bool boot_locked(std::string* err) {
         s_dead = true;
         return false;
     }
-    spdlog::info("browser: headless chrome ready ({})",
-                 s_command.empty() ? "auto-discovered" : s_command);
+        spdlog::info("browser: ready ({})", s_command.empty() ? "auto-discovered" : s_command);
     return true;
 }
 

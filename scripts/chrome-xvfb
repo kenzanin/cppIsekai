@@ -1,0 +1,11 @@
+#!/bin/sh
+# Headed chromium under Xvfb: a real display for bot blockers that measure the
+# window/screen. The chrome binary is discovered here; every flag comes from
+# the caller ($@ = cdp launcher argv, plus [chrome] args from cppisekai.ini).
+for b in google-chrome google-chrome-stable chromium chromium-browser; do
+    if command -v "$b" >/dev/null 2>&1; then
+        exec xvfb-run -a --server-args="-screen 0 1280x1024x24" "$b" "$@"
+    fi
+done
+echo "chrome-xvfb: no chrome/chromium binary on PATH" >&2
+exit 127

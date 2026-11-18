@@ -26,7 +26,7 @@ struct Entry {
 };
 
 // Order is the projection order consumed by config.hpp -- do not reorder.
-inline constexpr std::array<Entry, 19> kEntries{
+inline constexpr std::array<Entry, 21> kEntries{
     {
         // section      key                   flag                 alias          env def doc
         // type
@@ -219,7 +219,27 @@ inline constexpr std::array<Entry, 19> kEntries{
             .alias = "",
             .env = "CPPISEKAI_CHROME_COMMAND",
             .def = "",
-            .doc = "Browser binary for the CDP backend; empty = auto-discover (google-chrome-stable first). Absolute path on minimal-PATH units",
+            .doc = "Browser binary or wrapper for the CDP backend; empty = auto-discover (google-chrome-stable first). Absolute path on minimal-PATH units",
+            .type = Type::Str,
+        },
+        {
+            .section = "chrome",
+            .key = "args",
+            .flag = "",
+            .alias = "",
+            .env = "CPPISEKAI_CHROME_ARGS",
+            .def = "",
+            .doc = "Extra chromium flags appended at launch, space-split (e.g. --no-sandbox --disable-dev-shm-usage)",
+            .type = Type::Str,
+        },
+        {
+            .section = "chrome",
+            .key = "headless",
+            .flag = "",
+            .alias = "",
+            .env = "CPPISEKAI_CHROME_HEADLESS",
+            .def = "1",
+            .doc = "1 = --headless (default); 0 = headed window -- for xvfb-run set [chrome] command to a wrapper and this to 0",
             .type = Type::Str,
         },
     },

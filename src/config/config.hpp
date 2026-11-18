@@ -42,7 +42,9 @@ struct Config {
     int update_interval_days{};    // [update] interval_days: days between auto-update runs
     int update_per_plugin_limit{}; // [update] per_plugin_limit: max chapter-list refreshes per plugin per run
     int update_request_delay_ms{}; // [update] request_delay_ms: pause between auto-update requests
-    std::string chrome_command; // [chrome] command: browser binary; empty = auto-discover (ini-only)
+    std::string chrome_command; // [chrome] command: browser binary/wrapper; empty = auto-discover (ini-only)
+    std::string chrome_args;    // [chrome] args: extra flags, space-split (ini-only)
+    std::string chrome_headless; // [chrome] headless: "1"/"0", default headed-off (ini-only)
 };
 
 // Per-knob CLI state. Explicit = opt->count() > 0 (D7), never value comparison;
@@ -114,6 +116,8 @@ inline Config to_config(const std::array<std::string, kEntryCount>& v) {
         c.update_request_delay_ms = num_or<int>(kEntries[17].def, kEntries[17].def); // min 0
     }
     c.chrome_command = v[18];
+    c.chrome_args = v[19];
+    c.chrome_headless = v[20];
     if (c.port <= 0) {
         c.port = num_or<int>(kEntries[0].def, kEntries[0].def); // design ceiling: port > 0
     }

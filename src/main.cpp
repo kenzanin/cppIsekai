@@ -65,7 +65,7 @@ int main(int argc, char** argv) {
     }
 
     std::filesystem::create_directories(cfg.data_dir); // [paths] data_dir, boot-created (D6)
-    browser::configure(cfg.chrome_command);
+    browser::configure(cfg.chrome_command, cfg.chrome_args, cfg.chrome_headless);
     std::string browser_err;
     if (!browser::boot(&browser_err)) {
         spdlog::error("browser backend: {}", browser_err); // no browser => comix pages dead; abort loud

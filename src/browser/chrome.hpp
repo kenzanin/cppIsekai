@@ -22,8 +22,9 @@ namespace browser {
 std::mutex& mutex();
 
 /** \brief Boot configuration. Empty \p command = auto-discover the Chrome
- *  binary (stable channel). Call before boot(). */
-void configure(std::string command);
+ *  binary (stable channel). \p args: extra chromium flags, space-split.
+ *  \p headless "0" runs a headed window (xvfb). Call before boot(). */
+void configure(std::string command, std::string args = "", std::string headless = "1");
 
 /** \brief Spawn headless Chrome + open the working page. Idempotent: a
  *  healthy backend is kept. Fatal => false + err (boot aborts the daemon). */
