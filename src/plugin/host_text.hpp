@@ -71,7 +71,7 @@ inline std::string normalize_status(std::string_view raw) {
  *         "Ch. 12.5" → 12.5, "Vol. 3" → 0 (volume-only → no chapter),
  *         "One Piece 1085" → 1085.0. Returns 0.0f when the string is
  *         volume-only; std::nullopt when no number is present. */
-inline std::optional<float> chapter_num(std::string_view s) {
+inline std::optional<double> chapter_num(std::string_view s) {
     // Fixed patterns, compiled once (function-local static, thread-safe).
     re2::RE2::Options io;
     io.set_case_sensitive(false);
@@ -80,16 +80,16 @@ inline std::optional<float> chapter_num(std::string_view s) {
     static const re2::RE2 kVolumeOnly(R"(\b(?:volumes?|vols?|books?)\b)", io);
     static const re2::RE2 kFirstNumber(R"(\d+(?:[.,]\d+)?)");
 
-    const auto parse_decimal = [](std::string_view sv) -> float {
+    const auto parse_decimal = [](std::string_view sv) -> double {
         if (sv.empty()) {
-            return 0.0f;
+            return 0.0;
         }
         std::string tmp(sv);
         std::replace(tmp.begin(), tmp.end(), ',', '.');
         try {
-            return std::stof(tmp);
+            return std::stod(tmp);
         } catch (...) {
-            return 0.0f;
+            return 0.0;
         }
     };
 
