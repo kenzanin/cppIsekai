@@ -125,6 +125,10 @@ crow::json::wvalue home_context(Store& store, BS::thread_pool<>& db, const crow:
         row["added_at"] = static_cast<double>(m.added_at);
         row["dup"] = m.dup_group; // library-dedup 3.1: grid duplicate filter/sort marker
         row["updated_at"] = static_cast<double>(m.updated_at);
+        // library-search 1.1: client-side match corpus — display synopsis (D4
+        // fallback, same rule as detail) + source alt titles verbatim JSON.
+        row["syn"] = !m.synopsis_display.empty() ? m.synopsis_display : m.synopsis;
+        row["alt"] = m.alt_titles;
         saved_rows.push_back(std::move(row));
     }
     ctx["saved_list"] = std::move(saved_rows);
