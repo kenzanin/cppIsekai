@@ -38,8 +38,8 @@ int first_diff_line(const std::string& got, const std::string& want) {
 
 // Render one top-level page with a representative context and diff it against
 // tests/fixtures/golden/<name>.html -- locks the partial include graph and the
-// context keys each page reads. CPPISEKAI_UPDATE_GOLDEN=1 rewrites the goldens
-// after an intentional markup change.
+// context keys each page reads. Re-lock is two-step: CPPISEKAI_UPDATE_GOLDEN=1
+// rewrites + reports and FAILS until CPPISEKAI_UPDATE_GOLDEN_ACK=1 is also set.
 void check_golden(const std::string& name, const crow::json::wvalue& ctx) {
     crow::mustache::set_base(CPPISEKAI_TEMPLATES_DIR);
     const std::string got = crow::mustache::load(name).render(ctx).dump();
@@ -47,6 +47,8 @@ void check_golden(const std::string& name, const crow::json::wvalue& ctx) {
 
     if (std::getenv("CPPISEKAI_UPDATE_GOLDEN") != nullptr) {
         spit(golden, got);
+        MESSAGE(name, ": golden rewritten -- read `git diff tests/fixtures/golden`, then re-lock with a plain run; add CPPISEKAI_UPDATE_GOLDEN_ACK=1 to accept in the same run");
+        CHECK(std::getenv("CPPISEKAI_UPDATE_GOLDEN_ACK") != nullptr); // two-step re-lock: a rewrite run stays red until acknowledged, so the escape hatch cannot flip red to green silently
         return;
     }
     const std::string want = slurp(golden);

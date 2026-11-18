@@ -41,10 +41,10 @@ a reviewed golden diff.
 
 ## 4. A5 — make golden re-locking deliberate
 
-- [ ] 4.1 Make a run with `CPPISEKAI_UPDATE_GOLDEN` report which fixtures it rewrote and
+- [x] 4.1 Make a run with `CPPISEKAI_UPDATE_GOLDEN` report which fixtures it rewrote and
       fail unless an explicit second acknowledgement is present
-- [ ] 4.2 Confirm the escape hatch can no longer turn a red suite green silently
-- [ ] 4.3 Document the two-step re-lock (update, read `git diff`, re-run without the flag)
+- [x] 4.2 Confirm the escape hatch can no longer turn a red suite green silently
+- [x] 4.3 Document the two-step re-lock (update, read `git diff`, re-run without the flag)
       where contributors will see it
 - [ ] 4.4 Confirm a deliberate template edit without a re-lock still fails `xmake test`
 
