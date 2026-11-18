@@ -96,7 +96,8 @@
   <p class="text-xs text-yellow-500 mb-3" x-show="notice" x-text="notice" x-cloak></p>
 
   <!-- genre chips -->
-  <div class="flex flex-wrap gap-1.5 mb-3" x-show="genres.length" x-cloak>
+  <!-- genre chips: capped at ~8 rows, the rest scrolls (comico emits dozens) -->
+  <div class="flex flex-wrap gap-1.5 mb-3 max-h-56 overflow-y-auto" x-show="genres.length" x-cloak>
     <template x-for="g in genres" :key="g">
       <button @click="toggleTag(g)"
               class="text-xs px-2 py-0.5 rounded-full border"
