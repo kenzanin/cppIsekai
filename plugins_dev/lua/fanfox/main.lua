@@ -93,7 +93,13 @@ end
 -- Static list; objects, not bare names — the numeric slug is the payload
 -- search?genres= consumes (batcave precedent).
 methods.genres = function()
-  return { ok = true, data = genres.list }
+  -- UI contract: plain name strings (rendered as chips, sent back via
+  -- ?genres=name,...; search maps name -> numeric id internally).
+  local names = {}
+  for _, g in ipairs(genres.list) do
+    names[#names + 1] = g.name
+  end
+  return { ok = true, data = names }
 end
 
 function handle(req)

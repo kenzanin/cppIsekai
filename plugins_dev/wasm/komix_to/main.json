@@ -3,6 +3,7 @@
   "id": "komix_to",
   "version": "1.0.0",
   "website": "https://komix.to",
+  "image_engine": "chrome116",
   "runtime": "wasm",
   "capabilities": ["search", "detail", "chapters", "pages", "genres"],
   "api": 1
