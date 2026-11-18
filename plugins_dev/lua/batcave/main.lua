@@ -132,6 +132,7 @@ methods.detail = function(params)
     -- so the direct child is not always the <img>.
     local cover = host.re2.find([[<div class="page__poster[^"]*"[^>]*>\s*<img[^>]*src="([^"]+)"]], body)[2]
         or host.re2.find([[<div class="page__poster[^"]*"[^>]*>\s*<a[^>]*>\s*<img[^>]*src="([^"]+)"]], body)[2]
+        or host.re2.find("\"thumbnailUrl\":\"([^\"]+)\"", body)[2]
     cover = abs_url(cover)
 
     local desc = host.re2.find([[<div class="page__text full-text clearfix">(.*?)</div><div class="page__tags]], body)[2] or ""

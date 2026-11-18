@@ -1,16 +1,15 @@
--- scratch: in-daemon probe lane. raw = impersonated GET, prints status+len+head.
-local methods = {}
-
-methods.raw = function(params)
-  local url = params.url or ""
-  local res, err = host.http.fetch(url)
-  if err ~= nil then return { ok = false, error = "fetch: " .. err } end
-  local body = res.body or ""
-  return { ok = true, data = { status = res.status, len = #body, head = body:sub(1, 300) } }
+-- throwaway probe: batcave poster region (method detail)
+local function probe(params)
+    local body, err = host.http.fetch_body("https://batcave.cc/8413-arthur-sex.html")
+    host.log.info("PROBE fetch=" .. tostring(body and #body or "nil") .. " err=" .. tostring(err))
+    if body then
+        local i = body:find("page__poster") or 0
+        host.log.info("PROBE at=" .. i)
+        if i > 0 then host.log.info("PROBE region: " .. body:sub(math.max(1, i - 150), i + 300):gsub("[\n\r]", " ")) end
+    end
+    return { ok = true, data = { len = body and #body or 0 } }
 end
-
 function handle(req)
-  local fn = methods[req.method]
-  if fn == nil then return { ok = false, error = "unknown method " .. tostring(req.method) } end
-  return fn(req.params or {})
+    if req.method == "detail" then return probe(req.params or {}) end
+    return { ok = false, error = "unknown method " .. tostring(req.method) }
 end
