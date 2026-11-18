@@ -229,6 +229,12 @@ public:
      *  Returns the row count removed (-1 on sqlite failure). */
     int api_cache_clear(const std::string& plugin_id);
 
+    /** \brief Maintenance ([backup] knobs): VACUUM the live db, then write a
+     *  consistent snapshot <backup_dir>/library-<ts>.db via VACUUM INTO and
+     *  prune the oldest library-*.db beyond \p keep. Returns the snapshot
+     *  path; empty on failure (busy db / io) — caller just retries next tick. */
+    std::string maintenance_vacuum_backup(const std::string& backup_dir, int keep);
+
     /** \brief Envelope-derived stat update (status, total_ch, status_flags, updated_at). Empty
      * status leaves the stored status (and its category bits) alone; a negative total_ch keeps
      * the stored count (envelope absent). Only changed fields bump updated_at. */

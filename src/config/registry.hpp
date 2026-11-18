@@ -26,7 +26,7 @@ struct Entry {
 };
 
 // Order is the projection order consumed by config.hpp -- do not reorder.
-inline constexpr std::array<Entry, 21> kEntries{
+inline constexpr std::array<Entry, 23> kEntries{
     {
         // section      key                   flag                 alias          env def doc
         // type
@@ -241,6 +241,28 @@ inline constexpr std::array<Entry, 21> kEntries{
             .def = "1",
             .doc = "1 = --headless (default); 0 = headed window -- for xvfb-run set [chrome] command to a wrapper and this to 0",
             .type = Type::Str,
+        },
+        {
+            .section = "backup",
+            .key = "interval_h",
+            .flag = "backup-interval-h",
+            .alias = "",
+            .env = "CPPISEKAI_BACKUP_INTERVAL_H",
+            .def = "24",
+            .doc = "Hours between automatic DB VACUUM + snapshot backup; 0 disables",
+            .type = Type::Int,
+            .min_value = 0,
+        },
+        {
+            .section = "backup",
+            .key = "keep",
+            .flag = "backup-keep",
+            .alias = "",
+            .env = "CPPISEKAI_BACKUP_KEEP",
+            .def = "5",
+            .doc = "Snapshot files kept under <db dir>/backups, newest wins",
+            .type = Type::Int,
+            .min_value = 1,
         },
     },
 };

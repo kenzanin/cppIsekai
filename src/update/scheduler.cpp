@@ -8,11 +8,13 @@
 #include <chrono>
 #include <cstdlib>
 #include <ctime>
+#include <filesystem>
 #include <random>
 #include <spdlog/spdlog.h>
 
 namespace {
 constexpr const char* kLastRunKey = "update/last_run";
+constexpr const char* kBackupLastKey = "backup/last_run";
 } // namespace
 
 namespace update {
@@ -53,6 +55,29 @@ void Scheduler::run_once() {
     // knobs re-read per tick: /settings edits take effect without a restart
     const config::Config cfg = config::resolve(overrides_, ini_path_);
     const auto now = static_cast<std::int64_t>(std::time(nullptr));
+
+    // [backup] VACUUM + snapshot, own watermark; failure retries next tick.
+    if (cfg.backup_interval_h > 0) {
+        const std::int64_t interval_s = static_cast<std::int64_t>(cfg.backup_interval_h) * 3600;
+        const auto last_b = http::on_pool(db_, [&] { return store_.state_get(kStateHost, kBackupLastKey); });
+        std::int64_t last_backup = 0;
+        if (last_b && !last_b->empty()) {
+            last_backup = std::strtoll(last_b->c_str(), nullptr, 10);
+        }
+        if (last_backup == 0 || now - last_backup >= interval_s) {
+            const std::string dir =
+                (std::filesystem::path(cfg.db).parent_path() / "backups").generic_string();
+            const std::string path =
+                http::on_pool(db_, [&] { return store_.maintenance_vacuum_backup(dir, cfg.backup_keep); });
+            if (!path.empty()) {
+                spdlog::info("[backup] vacuum+snapshot {}", path);
+                http::on_pool(db_, [&] {
+                    store_.state_set(kStateHost, kBackupLastKey, std::to_string(now));
+                    return 0;
+                });
+            }
+        }
+    }
 
     const std::int64_t interval_s = static_cast<std::int64_t>(cfg.update_interval_days) * 86400;
     const std::optional<std::string> last =

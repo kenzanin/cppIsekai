@@ -45,6 +45,8 @@ struct Config {
     std::string chrome_command; // [chrome] command: browser binary/wrapper; empty = auto-discover (ini-only)
     std::string chrome_args;    // [chrome] args: extra flags, space-split (ini-only)
     std::string chrome_headless; // [chrome] headless: "1"/"0", default headed-off (ini-only)
+    int backup_interval_h{}; // [backup] interval_h: hours between VACUUM+snapshot runs, 0 = off
+    int backup_keep{};       // [backup] keep: snapshot files kept under <db dir>/backups
 };
 
 // Per-knob CLI state. Explicit = opt->count() > 0 (D7), never value comparison;
@@ -118,6 +120,14 @@ inline Config to_config(const std::array<std::string, kEntryCount>& v) {
     c.chrome_command = v[18];
     c.chrome_args = v[19];
     c.chrome_headless = v[20];
+    c.backup_interval_h = num_or<int>(v[21], kEntries[21].def);
+    if (c.backup_interval_h < 0) {
+        c.backup_interval_h = 0;
+    }
+    c.backup_keep = num_or<int>(v[22], kEntries[22].def);
+    if (c.backup_keep < 1) {
+        c.backup_keep = num_or<int>(kEntries[22].def, kEntries[22].def); // min 1
+    }
     if (c.port <= 0) {
         c.port = num_or<int>(kEntries[0].def, kEntries[0].def); // design ceiling: port > 0
     }

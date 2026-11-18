@@ -96,7 +96,7 @@
               <span class="flex-1"></span>
               <!-- input -->
               <template x-if="enumOf(k)">
-                <select class="bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-sm"
+                <select class="bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-sm text-zinc-100"
                         :value="k.value" :disabled="readOnly(k)"
                         @change="dirty[k.fullKey] = $event.target.value">
                   <template x-for="opt in enumOf(k)" :key="opt">
@@ -105,19 +105,19 @@
                 </select>
               </template>
               <template x-if="!enumOf(k) && k.type !== 'str'">
-                <input type="number" min="1" step="256" class="bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-sm w-48"
+                <input type="number" min="1" step="256" class="bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-sm text-zinc-100 w-48"
                        :value="k.value" :disabled="readOnly(k)"
                        @input="dirty[k.fullKey] = $event.target.value">
               </template>
               <template x-if="!enumOf(k) && k.type === 'str'">
                 <span class="flex items-center gap-2">
                   <template x-if="k.fullKey === 'server.proxy' && !reveal[k.fullKey]">
-                    <input type="password" class="bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-sm w-80"
+                    <input type="password" class="bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-sm text-zinc-100 w-80"
                            :value="k.value" :disabled="readOnly(k)"
                            @input="dirty[k.fullKey] = $event.target.value">
                   </template>
                   <template x-if="!(k.fullKey === 'server.proxy' && !reveal[k.fullKey])">
-                    <input type="text" class="bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-sm w-80"
+                    <input type="text" class="bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-sm text-zinc-100 w-80"
                            :value="k.value" :disabled="readOnly(k)"
                            @input="dirty[k.fullKey] = $event.target.value">
                   </template>
@@ -149,7 +149,8 @@
 function settingsPage() {
   const RESTART = new Set(['server.port', 'paths.library', 'paths.log_file', 'paths.data_dir', 'paths.templates_dir',
                            'cache.cache_max_mb', 'cache.image_format', 'cache.cover_max_px', 'log.level']);
-  const LIVE = new Set(['plugin.fetch_profile', 'update.interval_days', 'update.per_plugin_limit', 'update.request_delay_ms']);
+  const LIVE = new Set(['plugin.fetch_profile', 'update.interval_days', 'update.per_plugin_limit', 'update.request_delay_ms',
+                         'backup.interval_h', 'backup.keep']);
   // fetch_profile options come from the ini ([plugin] fetch_profiles), surfaced as
   // j.fetch_profiles; fall back to ENUMS if the server didn't send any.
   const ENUMS = { 'cache.image_format': ['webp', 'avif', 'jxl', 'none'],

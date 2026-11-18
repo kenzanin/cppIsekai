@@ -3,6 +3,8 @@
 #include <sqlite3.h>
 
 #include <chrono>
+#include <filesystem>
+#include <fstream>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -883,4 +885,46 @@ TEST_CASE("Store: chapter flags bitfield (chapter-state 1.3-1.6)") {
         store.chapters_upsert(plugin, slug, {seed("keep1", 1), seed("boom2", 2)});
         CHECK(store.chapter_flags_get(plugin, slug, "boom2") == 0);
     }
+}
+
+TEST_CASE("Store: maintenance snapshot + prune (backup knobs)") {
+    TestStoreDb fixture;
+    Store store(fixture.path);
+
+    // isolated backup dir seeded with two stale snapshots: pruning keeps the
+    // newest N across runs, older files go first (name == timestamp order).
+    const std::string dir = "test_backup_dir";
+    std::filesystem::remove_all(dir);
+    std::filesystem::create_directories(dir);
+    for (const char* name : {"library-20260101-000000.db", "library-20260102-000000.db"}) {
+        std::ofstream(dir + "/" + name).put('x');
+    }
+
+    const auto snap1 = store.maintenance_vacuum_backup(dir, /*keep=*/2);
+    REQUIRE(!snap1.empty());
+    CHECK(std::filesystem::exists(snap1));
+    CHECK(snap1.find("library-") != std::string::npos);
+
+    // second run, keep=2: the two seeded old ones lose to the two newest
+    const auto snap2 = store.maintenance_vacuum_backup(dir, 2);
+    REQUIRE(!snap2.empty());
+    int remaining = 0;
+    for (const auto& it : std::filesystem::directory_iterator(dir)) {
+        if (it.path().filename().string().rfind("library-", 0) == 0) {
+            ++remaining;
+        }
+    }
+    CHECK(remaining == 2);
+
+    // snapshot is a valid sqlite db carrying the schema
+    sqlite3* raw = nullptr;
+    REQUIRE(sqlite3_open(snap2.c_str(), &raw) == SQLITE_OK);
+    sqlite3_stmt* st = nullptr;
+    REQUIRE(sqlite3_prepare_v2(raw, "SELECT COUNT(*) FROM sqlite_master WHERE type='table'", -1, &st, nullptr) == SQLITE_OK);
+    REQUIRE(sqlite3_step(st) == SQLITE_ROW);
+    CHECK(sqlite3_column_int(st, 0) > 0);
+    sqlite3_finalize(st);
+    sqlite3_close(raw);
+
+    std::filesystem::remove_all(dir);
 }
