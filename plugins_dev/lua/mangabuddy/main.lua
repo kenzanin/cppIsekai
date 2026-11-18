@@ -113,14 +113,27 @@ methods.detail = function(params)
   title = title:gsub("^Read%s+", "")
   title = title:gsub("%s*|%s*MangaBuddy%s*$", "")
   title = title:gsub("%s+Online$", "")
-  title = host.text.unescape(host.text.unescape(title)) -- ponytail: mangabuddy double-encodes metas (&amp;#039;); pass 2 is a no-op on single-encoded text
+  -- ponytail: mangabuddy metas are multi-encoded ("&amp;amp;039;" seen, # eaten by their CMS);
+  -- unescape to fixpoint, then a lenient numeric-ref sweep for the #-less leftovers
+  local function deep_unescape(s)
+    for _ = 1, 4 do
+      local t = host.text.unescape(s)
+      if t == s then break end
+      s = t
+    end
+    return (s:gsub("&#?0*(%d%d%d);", function(n)
+      local c = tonumber(n)
+      return c and c < 256 and string.char(c) or nil
+    end))
+  end
+  title = deep_unescape(title)
 
   local cover = find1(html, [[<meta property="og:image" content="([^"]*)"]]) or ""
 
   local desc = find1(html, [[<meta name="description" content="([^"]*)"]]) or ""
   desc = desc:gsub("^Read%s+[^%.]+%.%s*", "")
   desc = desc:gsub("%s*Read the latest chapters online for free at MangaBuddy%.?%s*$", "")
-  desc = host.text.unescape(host.text.unescape(desc))
+  desc = deep_unescape(desc)
 
   local status = label_value(html, "Status", "/series?status=")
   local author = label_value(html, "Author", "/author/")
