@@ -125,8 +125,10 @@
         function gridPage() {
           let prefs = {};
           try { prefs = JSON.parse(localStorage.getItem('grid_prefs') || '{}'); } catch (_) { prefs = {}; }
+          const V2 = prefs.v === 2; // v2: default sort is recent-read; older prefs fall back to defaults once
           return {
-            q: prefs.q || '', plugin: prefs.plugin || '', sort: prefs.sort || 'added', sortDir: prefs.sortDir || {}, dup: !!prefs.dup,
+            q: prefs.q || '', plugin: V2 ? (prefs.plugin || '') : '', sort: V2 ? (prefs.sort || 'read') : 'read',
+            sortDir: V2 ? (prefs.sortDir || {}) : { read: 'desc' }, dup: V2 && !!prefs.dup,
             filterState: Object.assign({ new: 'off', done: 'off', ongoing: 'off', hiatus: 'off', canceled: 'off', completed: 'off' }, prefs.filterState || {}),
             page: 1, perPage: 30,
             pages: 1, count: 0, total: 0, hasDup: false, hasStats: false,
@@ -164,7 +166,7 @@
               this.hasDup = this.cards.some(c => (+c.dataset.dup || 0) > 0);
               this.hasStats = this.cards.some(c => (+c.dataset.total || 0) > 0);
             },
-            save() { try { localStorage.setItem('grid_prefs', JSON.stringify({ q: this.q, plugin: this.plugin, sort: this.sort, sortDir: this.sortDir, dup: this.dup, filterState: this.filterState })); } catch (_) {} },
+            save() { try { localStorage.setItem('grid_prefs', JSON.stringify({ v: 2, q: this.q, plugin: this.plugin, sort: this.sort, sortDir: this.sortDir, dup: this.dup, filterState: this.filterState })); } catch (_) {} },
             toggleBadge(kind) { // 3-state per badge: off -> show -> hide -> off
               const st = this.filterState;
               const cur = st[kind] || 'off';
@@ -173,13 +175,18 @@
             },
             toggleDup() { this.dup = !this.dup; this.page = 1; this.apply(); },
             setPlugin(p) { this.plugin = (this.plugin === p ? '' : p); this.page = 1; this.apply(); },
-            setSort(s) {
-              if (this.sort !== s) { this.sort = s; this.sortDir[s] = 'asc'; }
-              else { this.sortDir[s] = this.sortDir[s] === 'asc' ? 'desc' : 'asc'; }
+            setSort(s) { // 3-state per key: off -> asc -> desc -> off(default recent-read); the default key only toggles asc/desc
+              const cur = this.sort === s ? (this.sortDir[s] || 'asc') : null;
+              if (cur === null) { this.sort = s; this.sortDir[s] = 'asc'; }
+              else if (cur === 'asc') { this.sortDir[s] = 'desc'; }
+              else if (s === 'read') { this.sortDir.read = 'asc'; }
+              else { this.sort = 'read'; this.sortDir.read = 'desc'; }
               this.page = 1; this.apply();
             },
+            scls(k) { return this.sort === k ? 'text-zinc-50 bg-zinc-800 rounded' : 'text-zinc-500 hover:text-zinc-200'; },
+            sarrow(k) { return this.sort === k ? ((this.sortDir[k] || 'asc') === 'desc' ? ' \u2193' : ' \u2191') : ''; },
             reset() { this.q = ''; const i = document.getElementById('lib-q'); if (i) i.value = '';
-              this.plugin = ''; this.sort = 'added'; this.sortDir = {}; this.dup = false;
+              this.plugin = ''; this.sort = 'read'; this.sortDir = { read: 'desc' }; this.dup = false;
               this.filterState = { new: 'off', done: 'off', ongoing: 'off', hiatus: 'off', canceled: 'off', completed: 'off' }; this.page = 1; this.apply(); },
             ratio(c) { const t = +c.dataset.total || 0; return t > 0 ? (+c.dataset.read || 0) / t : -1; },
             badge(c) { // New/Done from stored status_flags bits (bit0=is_new, bit1=is_done); Done priority kept by caller
@@ -253,13 +260,12 @@
           <button @click="toggleBadge('completed')" aria-label="Filter completed" class="px-2.5 py-1 text-xs rounded-full border" :class="filterState.completed === 'show' ? 'border-violet-500 bg-violet-900/40 text-violet-300' : filterState.completed === 'hide' ? 'border-violet-700 bg-violet-500/10 text-violet-400/70' : 'border-zinc-700 text-zinc-400 hover:bg-zinc-800'" :title="filterState.completed === 'show' ? 'show completed' : filterState.completed === 'hide' ? 'hide completed' : 'completed off'">Completed</button>
          <div class="flex items-center gap-1 text-xs border border-zinc-700 rounded px-1 py-0.5">
            <span class="text-zinc-500 px-1">Sort:</span>
-           <button @click="setSort('added')" class="px-1 py-0.5 text-zinc-400 hover:text-white" :title="sort==='added' ? ('added ' + (sortDir.added || 'asc')) : 'sort added'">added</button>
-           <button @click="setSort('title')" class="px-1 py-0.5 text-zinc-400 hover:text-white" :title="sort==='title' ? ('title ' + (sortDir.title || 'asc')) : 'sort title'">title</button>
-           <button @click="setSort('progress')" class="px-1 py-0.5 text-zinc-400 hover:text-white" :title="sort==='progress' ? ('progress ' + (sortDir.progress || 'asc')) : 'sort progress'">progress</button>
-           <button @click="setSort('read')" class="px-1 py-0.5 text-zinc-400 hover:text-white" :title="sort==='read' ? ('read ' + (sortDir.read || 'asc')) : 'sort read'">recent read</button>
-           <button @click="setSort('update')" class="px-1 py-0.5 text-zinc-400 hover:text-white" :title="sort==='update' ? ('update ' + (sortDir.update || 'asc')) : 'sort update'">recent update</button>
-           <button x-show="hasDup" @click="setSort('dup')" class="px-1 py-0.5 text-zinc-400 hover:text-white" :title="sort==='dup' ? ('dup ' + (sortDir.dup || 'asc')) : 'sort dup'">dup</button>
-           <span v-if="sortDir[sort]" x-show="sortDir[sort]" class="text-zinc-300 px-1"></span>
+           <button @click="setSort('added')" :class="scls('added')" class="px-1 py-0.5" :title="sort==='added' ? ('added ' + (sortDir.added || 'asc')) : 'sort added'">added<span x-text="sarrow('added')"></span></button>
+           <button @click="setSort('title')" :class="scls('title')" class="px-1 py-0.5" :title="sort==='title' ? ('title ' + (sortDir.title || 'asc')) : 'sort title'">title<span x-text="sarrow('title')"></span></button>
+           <button @click="setSort('progress')" :class="scls('progress')" class="px-1 py-0.5" :title="sort==='progress' ? ('progress ' + (sortDir.progress || 'asc')) : 'sort progress'">progress<span x-text="sarrow('progress')"></span></button>
+           <button @click="setSort('read')" :class="scls('read')" class="px-1 py-0.5" :title="sort==='read' ? ('recent read ' + (sortDir.read || 'desc')) : 'sort recent read'">recent read<span x-text="sarrow('read')"></span></button>
+           <button @click="setSort('update')" :class="scls('update')" class="px-1 py-0.5" :title="sort==='update' ? ('update ' + (sortDir.update || 'asc')) : 'sort update'">recent update<span x-text="sarrow('update')"></span></button>
+           <button x-show="hasDup" @click="setSort('dup')" :class="scls('dup')" class="px-1 py-0.5" :title="sort==='dup' ? ('dup ' + (sortDir.dup || 'asc')) : 'sort dup'">dup<span x-text="sarrow('dup')"></span></button>
          </div>
           <button @click="reset()" class="px-2.5 py-1 text-xs rounded-full border border-zinc-700 text-zinc-400 hover:bg-zinc-800">Reset</button>
           <span class="text-xs text-zinc-500" x-text="count + ' / ' + total + ' shown'"></span>
