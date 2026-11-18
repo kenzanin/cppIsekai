@@ -50,18 +50,18 @@ a reviewed golden diff.
 
 ## 5. A6 — precompiled header for the daemon target
 
-- [ ] 5.1 Include-census the daemon target's TUs; write `src/std.pch.hpp` with the frozen
+- [x] 5.1 Include-census the daemon target's TUs; write `src/std.pch.hpp` with the frozen
       third-party roots plus std, no project headers (D6)
-- [ ] 5.2 Plumb an opt-in `pch` field through `cxx_bin` and enable it for the daemon target
+- [x] 5.2 Plumb an opt-in `pch` field through `cxx_bin` and enable it for the daemon target
       only; if the clang path needs a forced include, add exactly that line per TU
-- [ ] 5.3 Record clean-build and touch-`api_ctx.hpp` incremental times before/after in the
+- [x] 5.3 Record clean-build and touch-`api_ctx.hpp` incremental times before/after in the
       commit message; revert the PCH if the clean-build win is not clearly measurable
-- [ ] 5.4 `xmake -y` zero warnings, `xmake test` green, no behaviour change (PCH is
+- [x] 5.4 `xmake -y` zero warnings, `xmake test` green, no behaviour change (PCH is
       additive); third-party targets and test binaries untouched
 
 ## 6. Final verification
 
-- [ ] 6.1 `xmake -y` clean with `-Wall -Wextra`
-- [ ] 6.2 `xmake test` full suite green
-- [ ] 6.3 No golden diff left over from A1/A2; the only golden commit is A4's, reviewed
-- [ ] 6.4 One commit per item, each self-contained and reviewable on its own
+- [x] 6.1 `xmake -y` clean with `-Wall -Wextra`
+- [x] 6.2 `xmake test` full suite green
+- [x] 6.3 No golden diff left over from A1/A2; the only golden commit is A4's, reviewed
+- [x] 6.4 One commit per item, each self-contained and reviewable on its own

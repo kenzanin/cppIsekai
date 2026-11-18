@@ -71,6 +71,12 @@ target's TUs already reach it.
 - Kill criterion: record clean-build and touch-`api_ctx.hpp` incremental times before/after;
   if the clean-build win is not clearly measurable, revert — a PCH that buys nothing is
   pure config debt.
+- OUTCOME (2026-11-18, kill criterion exercised): xmake 3.1.2 `set_pcxxheader` with
+  std+spdlog+glaze+crow contents. Full-target rebuild 4.9 s → 22.3 s (PCH gen + per-TU
+  pch load dominate), touch-`api_ctx` incremental 2.76 s → 3.65 s. No win on either
+  metric at this TU count (~20 cpp, incremental already 2.76 s) → **reverted**; the
+  1-line `cxx_bin` pch hook, `src/std.hpp` and the target wiring are all back out of the
+  tree (reproducible from this commit history if TU count grows ~10×).
 
 ## D7. The dedup core is one documented >200-loc unit
 
