@@ -13,7 +13,9 @@ return function(ctx)
     if not body then return { ok = false, error = err } end
 
     local chnum = string.match(chid, "chapter%-(.+)$")
-    local pat = [[https://imgx\.mghcdn\.com/]] .. slug .. "/" .. chnum .. [[/([0-9]+)\.[a-z]+]]
+    -- img path slug is the site's english title slug, not the URL slug
+    -- (asobinin... serves /did-you-know-.../58/1.jpg) -- match any single seg.
+    local pat = [[https://imgx\.mghcdn\.com/[^/"]+/]] .. chnum .. [[/([0-9]+)\.[a-z]+]]
     local by_index, order = {}, {}
     for _, m in ipairs(host.re2.find_all(pat, body)) do
       local idx = tonumber(m[2])
