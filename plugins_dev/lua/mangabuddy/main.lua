@@ -85,8 +85,10 @@ methods.search = function(params)
       end
     end
   else
-    -- Text search: /api/search?search=Q -> {comics:[{slug_hash,title,image,status}]}
-    local raw = helpers.http_get(BASE .. "/api/search?search=" .. host.url_encode(q), { json = true })
+    -- Text search: /api/search?search=Q&page=N -> {comics:[...]} (API paginates)
+    local url = BASE .. "/api/search?search=" .. host.url_encode(q)
+    if page > 1 then url = url .. "&page=" .. tostring(page) end
+    local raw = helpers.http_get(url, { json = true })
     if not raw then return { ok = false, error = "mangabuddy: search failed" } end
     local ok, data = pcall(json.decode, raw)
     if ok and type(data) == "table" and type(data.comics) == "table" then
