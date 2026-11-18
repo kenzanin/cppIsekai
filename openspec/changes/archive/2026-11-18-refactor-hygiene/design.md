@@ -76,7 +76,10 @@ target's TUs already reach it.
   pch load dominate), touch-`api_ctx` incremental 2.76 s → 3.65 s. No win on either
   metric at this TU count (~20 cpp, incremental already 2.76 s) → **reverted**; the
   1-line `cxx_bin` pch hook, `src/std.hpp` and the target wiring are all back out of the
-  tree (reproducible from this commit history if TU count grows ~10×).
+  tree (reproducible from this commit history if TU count grows ~10×). Fair-test follow-up:
+  the textbook std-only PCH (no crow/glaze, minimal load tax) also loses — rebuild
+  4.9 s → 8.82 s, touch 2.76 s → 3.82 s — so the verdict is variant-independent at this
+  scale: 32-way parallel parse + ~20 TUs starve PCH of amortization.
 
 ## D7. The dedup core is one documented >200-loc unit
 
