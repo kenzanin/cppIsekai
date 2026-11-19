@@ -308,11 +308,14 @@ void Store::recompute_dup_groups() {
                 const double sd = dice(syms[i], syms[j]);
                 // name-only dice: alt_titles dilute one side's multiset (64 vs 9
                 // tokens => 0.247 for identical names); the bare name is the
-                // strongest single signal. Fires only near-identical (0.75):
-                // generic short names ('middle aged man isekai ...') collide at 0.6.
+                // strongest single signal. Standalone paths fire only near
+                // identical (0.75): generic overlaps ('... middle aged man ...
+                // isekai ...') reach 0.6+ on shared phrases alone (observed
+                // 0.667 for two different series); below that the synopsis must
+                // corroborate via the mixed term.
                 const double nd = dice(names[i], names[j]);
                 // synopsis Dice counts double-ish as corroboration (design D3)
-                const double sim = std::max({td, (0.5 * td) + (0.5 * sd), nd >= 0.75 ? nd : 0.0});
+                const double sim = std::max({td >= 0.75 ? td : 0.0, (0.5 * td) + (0.5 * sd), nd >= 0.75 ? nd : 0.0});
                 if (sim >= 0.6) {
                     unite(static_cast<int>(i), static_cast<int>(j));
                 }
