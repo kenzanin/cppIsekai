@@ -88,7 +88,7 @@ void register_title(Ctx& c) {
     // /plugin/<id>/<method>; keyed by our own slug, which is the title key the
     // cache layout and plugins mint. The page's Alpine layer consumes these.
     CROW_ROUTE(app, "/api/detail/<string>/<string>")
-    ([&](const crow::request& /*req*/, std::string plugin, const std::string& slug) {
+    ([&](const crow::request& /*req*/, const std::string& plugin, const std::string& slug) {
         // sync/flags/materialize/read-first live in title_data_response (shared
         // body above); the route is the thin mapper it always was.
         return title_data_response(plugins, db, plugin_pool, store, plugin, slug, "detail");
