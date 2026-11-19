@@ -3,6 +3,7 @@
 #include <sqlite3.h>
 
 #include <atomic>
+#include <mutex>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -993,26 +994,43 @@ TEST_CASE("Store: raw-handle ops progress beside ORM ops (store-contention 2.2)"
     Store store("test_store.db");
     const auto run = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
     std::atomic<int> cache_ok{0}, state_ok{0};
+    std::string cache_err, state_err; // probe: which op throws, and its message
+    std::mutex err_mu;
     std::thread cache_t([&] {
         for (int i = 0; i < 50; ++i) {
             const std::string k = "k" + std::to_string(i);
-            store.api_cache_put("rawA_" + run, k, "{}", R"({"i":1})", i, 60);
-            if (store.api_cache_get("rawA_" + run, k).has_value()) {
-                ++cache_ok;
+            try {
+                store.api_cache_put("rawA_" + run, k, "{}", R"({"i":1})", i, 60);
+                if (store.api_cache_get("rawA_" + run, k).has_value()) {
+                    ++cache_ok;
+                }
+            } catch (const std::exception& e) {
+                const std::lock_guard lk(err_mu);
+                cache_err = std::string("i") + std::to_string(i) + ": " + e.what();
+                return;
             }
         }
     });
     std::thread orm_t([&] {
         for (int i = 0; i < 50; ++i) {
             const std::string k = "s" + std::to_string(i);
-            store.state_set("rawB_" + run, k, "v");
-            if (store.state_get("rawB_" + run, k) == std::optional<std::string>{"v"}) {
-                ++state_ok;
+            try {
+                store.state_set("rawB_" + run, k, "v");
+                if (store.state_get("rawB_" + run, k) == std::optional<std::string>{"v"}) {
+                    ++state_ok;
+                }
+            } catch (const std::exception& e) {
+                const std::lock_guard lk(err_mu);
+                state_err = std::string("i") + std::to_string(i) + ": " + e.what();
+                return;
             }
         }
     });
     cache_t.join();
     orm_t.join();
+    INFO("cache_err=" << cache_err << " state_err=" << state_err);
+    CHECK(cache_err.empty());
+    CHECK(state_err.empty());
     CHECK(cache_ok == 50);
     CHECK(state_ok == 50);
 }

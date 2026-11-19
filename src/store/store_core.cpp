@@ -93,6 +93,12 @@ Store::Store(const std::string& path) : impl_(std::make_unique<StoreImpl>(path))
     // wait on writers instead of failing instantly: raw api_cache opens and this
     // ORM connection are concurrent writers (db-lock regression).
     impl_->storage.busy_handler([](int count) { return store_detail::busy_wait(count); });
+    // Hold the ORM connection open for the storage lifetime. sqlite_orm's lazy
+    // open/close per use is a documented data race with concurrent raw-handle
+    // writers: the reopen's on_open pragmas run before the busy handler is
+    // attached and surface SQLITE_BUSY as a thrown std::system_error
+    // (test_store 2.2 abort, state_set i0). Also skips per-op open/close churn.
+    impl_->storage.open_forever();
     // FK: pragma_t has no foreign_keys setter in v1.9.1; make_storage enables it
     // automatically because the schema declares a foreign_key.
     //
