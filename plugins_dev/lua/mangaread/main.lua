@@ -47,6 +47,7 @@ methods.search = function(params)
   else
     -- Madara GET search: admin-ajax.php answers 0 bytes, use server-rendered GET.
     url = BASE .. "/?s=" .. host.url_encode(q) .. "&post_type=wp-manga"
+    if page > 1 then url = BASE .. "/page/" .. tostring(page) .. "/?s=" .. host.url_encode(q) .. "&post_type=wp-manga" end
   end
 
   local body, err = http_req(url)
