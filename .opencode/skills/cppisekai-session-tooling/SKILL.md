@@ -61,6 +61,7 @@ xmake test test_store                 # single target
   xmake f -m release --sanitize=none -y && xmake -y                          # back to the daemon build
   ```
   In `release` the option is warn-and-skip on purpose: `build/linux/x86_64/release/cppIsekai` is the running daemon, and swapping it for an ASan binary is never what you want. ASan reports are exit-code failures, so `xmake test` reds on leaks — read `Direct leak` blocks first (our frames), and blame `Indirect leak` only after the direct rows are clean. Two real leaks came out of the first run (lexbor selector list ~20 KB per `html.select`, quickjs `JS_ToCStringLen`), so run this pass after touching any C-library boundary (lexbor/quickjs/lua/wasm3).
+- `xmake scan` is the whole sweep in one command (ASan+UBSan suite, then TSan suite, then it restores the release build whether or not the sweep passed). Two full rebuilds, ~minutes — release-gate only, not per-commit.
 
 ## 5. Daemon: restart and prove it
 
@@ -86,6 +87,8 @@ Verification ladder — climb it before saying "fixed":
 3. DB: `sqlite3 data/library.db` for the row you claim changed.
 4. Browser: CDP probe or `blueprint-mcp` for anything the user described visually (cover blank, image identical, layout shifted). Server-side green does not refute a visual report.
 5. Cache poisoning: if the user reports a symptom twice, hash the served bytes for two different URLs. Identical hashes mean the *input* is identical (bad referer, bad param truncation), not that the cache is broken.
+- **Never judge a plugin by curling `/search?...`** — that route returns a JS shell; the result list arrives from `/plugin/<id>/search?...` in the browser. A `curl localhost:8090/search?plugin=X&q=Y` body containing "No results" proves nothing (it is the empty-state template). Probe `/plugin/<id>/search?q=...` and count `"id":` instead, then confirm visually in the browser if the user reported it.
+- **Local DNS is ISP-poisoned on this machine** (Indonesian ISP `ioh.co.id`): a long list of domains resolve to a wildcard `*.ioh.co.id` cert, so libcurl reports `SSL peer certificate ... not OK` and Python says `Hostname mismatch` — for sites that are perfectly alive. Do not conclude "site down" from a local TLS/DNS failure. Check global truth with DoH (`https://dns.google/resolve?name=HOST&type=A`, `Status:3` = NXDOMAIN = really gone) and then confirm with a direct-IP TLS+GET using SNI. Only NXDOMAIN/SERVFAIL on a public resolver means the site is gone.
 
 ## 6. Store/SQLite specifics
 

@@ -421,3 +421,37 @@ task("gate")
         os.exec("xmake")
         os.exec("xmake test")
     end)
+
+-- Full sanitizer sweep, meant for the release gate (slow: two full rebuilds).
+-- Leak/UB first, races second -- the two cannot share one binary -- then the
+-- daemon build is restored no matter how the sweep ends.
+task("scan")
+    set_menu {usage = "xmake scan", description = "release gate: ASan+UBSan suite, TSan suite, restore release"}
+    on_run(function()
+        local function run(cmd)
+            print("[scan] " .. cmd)
+            local ok, out = pcall(os.iorun, cmd)
+            if not ok then
+                print("[scan] FAILED: " .. cmd)
+                print(out)
+            end
+            return ok
+        end
+        local ok = true
+        -- address+undefined: leaks, lifetime, integer UB, out-of-bounds. ASan
+        -- reports are exit-code failures, so a red suite here IS a finding.
+        ok = run("xmake f -m debug --sanitize=address,undefined -y") and ok
+        ok = run("xmake -y") and ok
+        ok = run("xmake test") and ok
+        -- thread: data races in the store/plugin worker pools. Keep going even
+        -- when the leak pass failed -- one sweep should surface both.
+        ok = run("xmake f -m debug --sanitize=thread -y") and ok
+        ok = run("xmake -y") and ok
+        ok = run("TSAN_OPTIONS='halt_on_error=0 second_deadlock_stack=1 history_size=7' xmake test") and ok
+        run("xmake f -m release --sanitize=none -y")
+        run("xmake -y")
+        if not ok then
+            raise("[scan] sanitizer findings above (release build restored)")
+        end
+        print("[scan] clean: address+undefined and thread suites green; release restored")
+    end)
