@@ -17,6 +17,8 @@
 
 #include <atomic>
 #include <csignal>
+#include <filesystem>
+#include <system_error>
 #include <thread>
 #include <unistd.h> // fork/exec/raise/getcwd
 
@@ -54,9 +56,17 @@ inline void spawn(const std::string& cmd) {
 
 inline void start(unsigned port) {
 #if defined(CPP_ISEKAI_TRAY)
-    std::thread([port] {
+    // XFCE's systray host resolves IconName through the icon theme, so a relative
+    // path ("assets/tray.png") looks like a missing theme name and the item comes
+    // up blank; an absolute path is loaded straight from file. Wayland hosts took
+    // the relative form, hence "works on Wayland, invisible on X11".
+    std::string icon = "assets/tray.png";
+    std::error_code ec;
+    const auto abs = std::filesystem::absolute(icon, ec);
+    if (!ec && std::filesystem::exists(abs)) icon = abs.string();
+    std::thread([port, icon] {
         try {
-            Tray::Tray t{"cppIsekai", "assets/tray.png"};
+            Tray::Tray t{"cppIsekai", icon};
             t.addEntry(Tray::Label("cppIsekai :" + std::to_string(port) + " - running"));
             t.addEntry(Tray::Separator());
             t.addEntry(Tray::Button("Open Reader", [port] {
