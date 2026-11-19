@@ -64,6 +64,7 @@ curl -s -o /dev/null -w '%{http_code}' localhost:8090/
 
 Facts that bite:
 
+- `./run-cppIsekai.sh restart` ends in the server running **in the foreground**, so running it non-detached blocks until your tool timeout kills the process group — and the daemon dies with it. Use `./run-cppIsekai.sh stop; setsid ./run-cppIsekai.sh >/tmp/boot.log 2>&1 < /dev/null &`, then poll `curl` for 200 (cold boot ≈ 7 s, first boot with Chrome ≈ 50 s).
 - A stale `./build/cppIsekai` (old CMake leftover) can be the process you are talking to. Check the path every time.
 - Orphaned Chrome/Xvfb children inherit the listen fd, keep :8090 bound after the daemon dies, and make every rebind fail (crow logs it as the cosmetic `0.0.0.0:0`). `run-cppIsekai.sh` sweeps fd-holders; do not remove that sweep.
 - `data/plugins/<id>` is a hardlink to `plugins_dev/lua/<site>` — edits at either location propagate, so "wrong plugin dir" is a dead hypothesis.
