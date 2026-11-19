@@ -79,10 +79,37 @@ local genre_ids = {}
 local load_genres
 
 -- ── search ─────────────────────────────────────────────────────────────────
--- Text search: GET /search/<query>/page/<N>. Category/genre browse:
--- GET /ComicList/g=<id>/page/<N> (the id is BatCave's numeric DLE genre).
--- The page is server-rendered with cards; the embedded __COMICS__ blob is
--- malformed, so cards are regex-parsed.
+-- Text search: GET /search/<query>; genre browse: GET /ComicList/g=<id>;
+-- both paginate as <base>/page/<N>/. The site serves 10 cards per page, which
+-- does not divide the host's 12-item page, so the envelope reports the site's
+-- own page count (data.pages) plus the real result total. The total needs the
+-- last page's item count; it is memoised per query so only the first host page
+-- request of a query pays the extra fetch. The pager is windowed (link numbers
+-- plus the current page as a bare <span>), so the page count is the max over
+-- both inside the pagination block -- never the requested page, which may be
+-- past the end and still serve the last page's cards. Memo is process-lifetime,
+-- bounded to 128 keys; the host's api_cache TTL makes items as stale as this.
+local total_memo = {}
+
+local function pager_pages(body)
+    local block = body:match('(<div class="pagination.-</div></div>)') or body
+    local maxp = 1
+    for n in block:gmatch("/page/(%d+)/") do
+        n = tonumber(n)
+        if n > maxp then maxp = n end
+    end
+    for n in block:gmatch("<span>(%d+)</span>") do
+        n = tonumber(n)
+        if n > maxp then maxp = n end
+    end
+    return maxp
+end
+
+local function remember(key, value)
+    if #total_memo > 128 then total_memo = {} end
+    total_memo[key] = value
+    return value
+end
 
 methods.search = function(params)
     local query = params.title or params.query or params.q or ""
@@ -90,7 +117,7 @@ methods.search = function(params)
     local genres = params.tags or params.genres or {}
     if type(genres) == "string" then genres = { genres } end
 
-    local body
+    local base, key
     if type(genres) == "table" and #genres > 0 then
         -- Genre/category browse uses ComicList with g=<id>. First genre wins;
         -- the chip sends the display name, resolved via the genre map built by
@@ -98,23 +125,42 @@ methods.search = function(params)
         load_genres()
         local id = tonumber(genre_ids[tostring(genres[1])]
             or tostring(genres[1]):match("(%d+)"))
-        if not id then return { ok = true, data = { items = {}, total = 0 } } end
-        local url = "/ComicList/g=" .. id .. "/"
-        if page > 1 then url = url .. "page/" .. page .. "/" end
-        body = site_get(url)
+        if not id then return { ok = true, data = { items = {}, total = 0, pages = 0 } } end
+        base = "/ComicList/g=" .. id .. "/"
+        key = "g:" .. id
     elseif query ~= "" then
-        local url = "/search/" .. host.url_encode(query)
-        if page > 1 then url = url .. "/page/" .. page end
-        body = site_get(url)
+        base = "/search/" .. host.url_encode(query)
+        key = "q:" .. query
     else
-        return { ok = true, data = { items = {}, total = 0 } }
+        return { ok = true, data = { items = {}, total = 0, pages = 0 } }
     end
 
+    local function page_url(p)
+        if p <= 1 then return base end
+        local b = base
+        if b:sub(-1) ~= "/" then b = b .. "/" end
+        return b .. "page/" .. p .. "/"
+    end
+
+    local body = site_get(page_url(page))
     if not body or body == "" then
         return { ok = false, error = "batcave: search fetch failed" }
     end
     local items = parse_readed_cards(body)
-    return { ok = true, data = { items = items, total = #items } }
+    local maxp = pager_pages(body)
+
+    local total = total_memo[key]
+    if total == nil then
+        if maxp <= 1 then
+            total = #items
+        else
+            local per = page < maxp and #items or #parse_readed_cards(site_get(page_url(1)))
+            local last = page == maxp and #items or #parse_readed_cards(site_get(page_url(maxp)))
+            total = per > 0 and (maxp - 1) * per + last or #items
+        end
+        total = remember(key, total)
+    end
+    return { ok = true, data = { items = items, total = total, pages = maxp } }
 end
 
 -- ── detail ─────────────────────────────────────────────────────────────────

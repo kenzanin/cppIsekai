@@ -3,7 +3,7 @@ function searchPage() {
   const PAGE = 12
   return {
     plugins: [], plugin: '', q: '', tags: [], genres: [],
-    items: [], total: null, page: 1, loading: false, err: '', notice: '',
+    items: [], total: null, pageCount: null, page: 1, loading: false, err: '', notice: '',
     logoBroken: false, open: false,
     get pluginName() { return this.plugins.find(p => p.key === this.plugin)?.name || 'select a plugin' },
     logoFor(k) { return k && !this.logoBroken },
@@ -18,7 +18,7 @@ function searchPage() {
       if (this.plugin) { await this.loadGenres(); await this.run(false) }
       else if (!this.plugins.length) this.notice = 'No enabled plugin — aktifkan satu di halaman Plugins.'
     },
-    async pick() { this.tags = []; this.items = []; this.total = null; this.page = 1; this.sync()
+    async pick() { this.tags = []; this.items = []; this.total = null; this.pageCount = null; this.page = 1; this.sync()
       await this.loadGenres() },
     async loadGenres() {
       this.genres = []
@@ -35,7 +35,12 @@ function searchPage() {
     },
     search() { this.page = 1; this.run() },
     go(p) { if (p >= 1 && p <= this.pages()) { this.page = p; this.run() } },
-    pages() { return this.total === null ? 1 : Math.max(1, Math.ceil(this.total / PAGE)) },
+    // A plugin may report its own page count (data.pages) when its site's page
+    // size differs from PAGE; otherwise page count derives from total/PAGE.
+    pages() {
+      if (this.pageCount) return Math.max(1, this.pageCount)
+      return this.total === null ? 1 : Math.max(1, Math.ceil(this.total / PAGE))
+    },
     // [1 2 3 ... max-2 max-1 max] window; 0 marks gap
     window() {
       const p = this.page, max = this.pages(), out = [1]
@@ -54,7 +59,7 @@ function searchPage() {
       try {
         const j = await (await fetch(u)).json()
         if (!j.ok) { this.err = j.error || 'search failed' }
-        else { this.items = Array.isArray(j.data.items) ? j.data.items : []; this.total = j.data.total }
+        else { this.items = Array.isArray(j.data.items) ? j.data.items : []; this.total = j.data.total; this.pageCount = j.data.pages ?? null }
       } catch (e) { this.err = String(e) }
       this.loading = false
       if (push) this.sync()
