@@ -1,4 +1,6 @@
 ## 2026-11-19
+* **Update**: Linked `decisions/sanitizer-build.md` to `decisions/xmake-build-system.md`.
+* **Creation**: Documented concept `decisions/sanitizer-build.md` (Sanitizers are an opt-in debug build (--sanitize), never the release daemon).
 * **Update**: Linked `constraints/dle-json-float-ids.md` to `constraints/plugin-image-url-regex.md`.
 * **Update**: Linked `constraints/dle-json-float-ids.md` to `findings/js-image-referer-gap.md`.
 * **Creation**: Documented concept `constraints/dle-json-float-ids.md` (DLE sites: JSON numeric ids must be formatted integrally, and image CDNs need the trailing-slash Referer).

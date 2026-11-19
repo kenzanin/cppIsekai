@@ -54,6 +54,13 @@ xmake test test_store                 # single target
 - Template changes require regenerating goldens (`tests/test_templates.cpp`): run the regen, **review the diff**, then re-run the suite. A golden diff that is more than the intended lines means the template change leaked.
 - Plugin changes require a daemon restart (Lua chunks compile per boot, no hot reload) *and* a cache purge of that plugin's `api_cache` rows — `call_cached` is local-first, so pre-fix rows shadow the fix indefinitely.
 - Test DBs: give each new case a unique file name (`"test_store_x_" + run + ".db"`). A fixed name carries rows and schema across runs and produces phantom passes.
+- **Sanitizers are opt-in and debug-only** (`--sanitize` in `xmake.lua`):
+  ```bash
+  xmake f -m debug --sanitize=address,undefined -y && xmake -y && xmake test   # leak+UB run
+  xmake f -m debug --sanitize=thread -y && xmake -y                          # races (store/threads)
+  xmake f -m release --sanitize=none -y && xmake -y                          # back to the daemon build
+  ```
+  In `release` the option is warn-and-skip on purpose: `build/linux/x86_64/release/cppIsekai` is the running daemon, and swapping it for an ASan binary is never what you want. ASan reports are exit-code failures, so `xmake test` reds on leaks — read `Direct leak` blocks first (our frames), and blame `Indirect leak` only after the direct rows are clean. Two real leaks came out of the first run (lexbor selector list ~20 KB per `html.select`, quickjs `JS_ToCStringLen`), so run this pass after touching any C-library boundary (lexbor/quickjs/lua/wasm3).
 
 ## 5. Daemon: restart and prove it
 
