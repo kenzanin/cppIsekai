@@ -47,7 +47,7 @@
 ## Gate
 
 - [x] 7.1 `xmake -y` clean (`-Wall -Wextra`, no new warnings), full suite green
-- [ ] 7.2 live sweep for every plugin touched in T3/T4/T5: search → detail → chapters → one `/cache/img` page; record the pass table (memory #5362)
-- [ ] 7.3 DLE pair specifically: batcave behind its PoW guard + mangabay `__DATA__` pages, both through the shared lib
+- [x] 7.2 live sweep for every plugin touched in T3/T4/T5: search → detail → chapters → one `/cache/img` page; record the pass table (memory #5362)
+- [x] 7.3 DLE pair specifically: batcave behind its PoW guard + mangabay `__DATA__` pages, both through the shared lib
 - [x] 7.4 plugin-tree LoC delta recorded (~-490 plugin LoC / ~+130 host LoC) in `proposal.md` after landing
-- [ ] 7.5 `openspec validate --changes` ✓; no capability removed (spec delta is additive)
+- [x] 7.5 `openspec validate --changes` ✓; no capability removed (spec delta is additive)
