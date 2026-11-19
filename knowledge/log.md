@@ -1,3 +1,6 @@
+## 2026-11-19
+* **Update**: Updated concept `decisions/xmake-build-system.md`.
+
 ## 2026-11-18
 * **Update**: Updated concept `decisions/search-read-model-cache.md`.
 * **Update**: Updated concept `decisions/chapter-zero-falsy-regression.md`.

@@ -1,9 +1,9 @@
 ---
 type: Decision
 title: xmake build system alongside cmake + prod-code gate tasks
-description: "xmake is the primary build path (cmake kept, ./build rebuilt by xmake). Daily: xmake -j → xmake test; gate = format/fix/build/test with tidy/fix diff-scoped vs HEAD since 2026-11-12 (5a41afc) — vendor-template TUs skip the crawl; always build+test after fix, its reflow has eaten separators. Original decisions d019d91/3a8a466/12b7202."
+description: "xmake is the primary build path (cmake kept, ./build rebuilt by xmake). Daily: xmake -j → xmake test; gate = format/fix/build/test with tidy/fix diff-scoped vs HEAD since 2026-11-12 (5a41afc) — vendor-template TUs skip the crawl; always build+test after fix, its reflow has eaten separators. Original decisions d019d91/3a8a466/12b7202. 2026-11-19: C++23 modules probe P0 killed -- 18-28x slower on every metric (scan-deps per TU per build); headers stay, revisit ~10x TU."
 tags: [build, xmake, cmake, clang-tidy, clang-format, gate, workflow, diff-scope]
-generated: { by: agent/mcp, at: "2026-11-14T10:31:34Z" }
+generated: { by: agent/mcp, at: "2026-11-19T03:38:52Z" }
 status: stable
 ---
 
@@ -35,6 +35,13 @@ Target parity: vendored static C `git check-ignore -v` after editing.
 - Gotcha 10: xrepo libzippp nests its header `libzippp/libzippp.h` (export_cbz.cpp include adapted). quickjs-ng 0.15.1 `JS_SetInterruptHandler` takes the runtime, not ctx (js_rt.cpp adapted).
 - Targetdir: default xmake layout; run-cppIsekai.sh path unchanged. A transient `outdir=build` override was reverted to keep the launcher script + AGENTS run-line canonical.
 - Zero-warning sweep: NSDMI added — PageCtx::chapter_id / CoverCtx::plugin (cache.hpp), WindowCtx::chapter_id (worker.hpp), SavedManga synopsis/alt_titles (store.hpp); vestigial params commented in htmltext_html ddoc + http_pages layout().
+
+## 2026-11-19 update: C++23 modules probe P0 — killed, 18-28x slower
+
+- Probe: `build.c++.modules` policy on every `cxx_bin` target + one named module `cache.slug` (`src/cache/slug.mpp`), 10 includers flipped to `import cache.slug;` (incl. 2 plain headers). clang 23.1.5, libstdc++ 16, 44 TUs.
+- Result vs header-include baseline: full rebuild 13.24 s -> 373.6 s (28x), daemon `-r` 152 s, touch `api_ctx` 3.58 -> 98.1 s (27x), touch slug 2.65 -> 47.9 s (18x). Suite 19/19 after revert; tree restored to HEAD.
+- Cause: xmake runs the clang-scan-deps module-discovery pass over every TU on every build (heavy crow/sol2/glaze include closure), and the policy must be on EVERY consuming target (daemon + 19 test bins) -- the scan cost is structural, not per-target tunable. Same family as the PCH verdict (refactor-hygiene design D6): fixed instrument cost > work saved at this scale.
+- Ruling: header-#include stays. Revisit only at ~10x TU count (~400) or when xmake caches the module-deps scan across builds. Retry gotchas: the `.mpp` must be listed in `files` of every target that imports it (else `missing cache.slug dependency`); `import` inside plain headers works; the edit tool's syntax validator rejects import-line edits -- use sed.
 
 # Related Concepts
 - [Build system: CMake + C++23, exe-only](build-toolchain-cpp23.md): C++23 toolchain choice for the build.
