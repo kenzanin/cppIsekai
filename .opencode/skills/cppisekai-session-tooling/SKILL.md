@@ -30,6 +30,8 @@ The goal is never "run a command". It is to get a trustworthy answer with the fe
 - **Keep output tiny.** Pipe through `grep -E "error:|passed|failed|build ok"`. Do not dump full build logs or full test logs into context; they drown the answer and invite misreads.
 - **One test failure = run the binary yourself, not the suite.** `./build/linux/x86_64/release/test_store` prints the failing `FILE:LINE` with the exact `CHECK(...)` expression; the suite summary only names the target.
 - **Quoting inside scripts.** `pkill -f <pattern>` inside a script self-matches the invoking `sh -c` and kills your own shell. Target pids parsed from `ss`, or exclude your own pid.
+- **Tool names are exact.** `aft_search`, not `bash_search`/`grep_search`; if unsure, the §1 table is the canonical list. An invented name stalls the turn.
+- **Identical call twice = you already have the answer.** If a tool result is byte-identical to the previous one, stop and act on it; repeated polling is the #1 turn-waster in this project's history.
 
 ## 3. Editing discipline
 
