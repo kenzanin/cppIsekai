@@ -1,6 +1,7 @@
 {
   "name": "MangaBay",
   "site_url": "https://manga-bay.biz",
+  "image_referer": "https://manga-bay.biz/",
   "logo": "logo.png",
   "thumb_ratio": 0.75,
   "contract_version": 1,

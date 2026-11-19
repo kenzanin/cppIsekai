@@ -16,6 +16,15 @@ local function find1(s, pattern)
   return nil
 end
 
+-- JSON numbers decode to Lua floats, so tostring renders ids as "991476.0".
+-- The site's reader paths are integral (/reader/15840/991476); the float form
+-- 404s, which the host surfaces as an empty page list ("unknown chapter").
+local function num_str(v)
+  if type(v) ~= "number" then return tostring(v or "") end
+  if v == math.floor(v) then return string.format("%d", v) end
+  return tostring(v)
+end
+
 -- site_get fetches path via dle.get (guard solved over HTTP). dle.get
 -- concatenates site .. path, so absolute URLs reduce to their path part.
 local function site_get(path)
@@ -190,7 +199,7 @@ methods.chapters = function(params)
       if not c.broken then
         out[#out + 1] = {
           -- the id IS the reader path; pages receives it back verbatim
-          id = "/reader/" .. tostring(data.news_id) .. "/" .. tostring(c.id),
+          id = "/reader/" .. num_str(data.news_id) .. "/" .. num_str(c.id),
           number = tonumber(c.posi) or host.text.chapter_num(c.title or "") or 0,
           title = c.title or ("Issue #" .. tostring(c.id)),
           release_at = dle.dle_date(c.date),
@@ -211,6 +220,9 @@ end
 methods.pages = function(params)
   local reader = tostring(params.id or "")
   if reader == "" then return { ok = true, data = {} } end
+  -- chapters rows cached before the num_str fix carry the float ids
+  -- (/reader/15840.0/991476.0); normalize so those sessions still resolve.
+  reader = reader:gsub("%.0$", ""):gsub("%.0/", "/")
   local body = site_get(path_of(reader))
   local data = dle.json_blob(body, "window.__DATA__ = ")
   local images = data and type(data.images) == "table" and data.images or {}

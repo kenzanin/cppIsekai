@@ -1,4 +1,7 @@
 ## 2026-11-19
+* **Update**: Linked `constraints/dle-json-float-ids.md` to `constraints/plugin-image-url-regex.md`.
+* **Update**: Linked `constraints/dle-json-float-ids.md` to `findings/js-image-referer-gap.md`.
+* **Creation**: Documented concept `constraints/dle-json-float-ids.md` (DLE sites: JSON numeric ids must be formatted integrally, and image CDNs need the trailing-slash Referer).
 * **Creation**: Documented concept `decisions/tray-sni-icon-resolution.md` (Tray icon: SNI IconName must be an absolute path for xfce4-panel's status tray).
 * **Update**: Linked `decisions/search-read-model-cache.md` to `decisions/search-envelope-page-count.md`.
 * **Creation**: Documented concept `decisions/search-envelope-page-count.md` (Search envelope: plugin reports real total + optional data.pages; host pager prefers it).
