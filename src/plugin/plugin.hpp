@@ -71,7 +71,7 @@ class Host; // fwd: Impl defined in plugin.cpp as plugin::Host::Impl
  *  call from pool threads. */
 class Host {
 public:
-    explicit Host(const Config& conf);
+    explicit Host(Config conf);
     ~Host();
     Host(const Host&) = delete;
     Host& operator=(const Host&) = delete;
@@ -139,7 +139,7 @@ public:
 
     /** \brief Swap the live default profile (task 1.2); the config route
      *  calls this after a successful save. */
-    void set_default_profile(const std::string& profile);
+    void set_default_profile(std::string profile);
 
     /** \brief Current live default profile (plugin.fetch_profile). */
     [[nodiscard]] std::string default_profile() const;
