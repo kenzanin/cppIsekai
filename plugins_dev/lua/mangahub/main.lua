@@ -7,9 +7,10 @@
 -- the site's base64url blob parts are converted plugin-side (host.codecs has
 -- standard-alphabet base64 only). The manifest here pins api/img_cdn/
 -- thumb_cdn but no site_url -> defaulted below.
-local GRAPHQL_URL = host.plugin.param("api") or "https://api.mghcdn.com/graphql"
+local GRAPHQL_URL = host.plugin.param("api") or "https://mangahub.io/graphql"
 local SITE_URL = host.plugin.param("site_url") or "https://mangahub.io"
 local SOURCE_ID = "m01"
+local PAGE_SIZE = 30 -- the API's search page size; the pager divides by this
 local IMG_CDN = host.plugin.param("img_cdn") or "https://imgx.mghcdn.com/"
 local THUMB_CDN = host.plugin.param("thumb_cdn") or "https://thumb.mghcdn.com/"
 
@@ -182,6 +183,9 @@ local function graphql_query(query)
         ["Content-Type"] = "application/json",
         ["Origin"] = SITE_URL,
         ["Referer"] = SITE_URL .. "/",
+        -- The endpoint authenticates on the mhub_access cookie (the browser
+        -- sends nothing else); the header is kept as a harmless extra.
+        ["Cookie"] = "mhub_access=" .. key .. "; showNSFW=1",
         ["x-mhub-access"] = key,
       },
     })
@@ -240,17 +244,21 @@ methods.search = function(params)
     end
     genre = table.concat(slugs, ",")
   end
-  local offset = (page - 1) * 30
+  local offset = (page - 1) * PAGE_SIZE
   host.log.info("mangahub search: q=" .. query .. " genre=" .. genre .. " page=" .. tostring(page))
 
+  -- hideNSFW:false is the site's "show NSFW content" setting, which the browser
+  -- carries as the showNSFW cookie; count:true makes the pager real instead of
+  -- showing one page. Both verified against the 2026-11 HAR.
   local gql = '{search(x: ' .. SOURCE_ID .. ', q: "' .. escape_gql(query)
-    .. '", genre: "' .. escape_gql(genre) .. '", mod: POPULAR, offset: ' .. tostring(offset)
-    .. ') {rows {title, slug, image}}}'
+    .. '", genre: "' .. escape_gql(genre) .. '", mod: POPULAR, hideNSFW: false, count: true, offset: '
+    .. tostring(offset) .. ') {rows {title, slug, image}, count}}'
 
   local data = graphql_query(gql)
-  local rows = {}
+  local rows, total = {}, 0
   if data and data.data and data.data.search then
     rows = data.data.search.rows or {}
+    total = tonumber(data.data.search.count) or 0
   end
 
   local items = {}
@@ -266,8 +274,10 @@ methods.search = function(params)
     }
   end
 
-  host.log.info("mangahub search: found " .. tostring(#items) .. " results for q=" .. query)
-  return { ok = true, data = { items = items, total = #items } }
+  host.log.info("mangahub search: found " .. tostring(#items) .. " results for q=" .. query
+    .. " (total " .. tostring(total) .. ")")
+  if total < #items then total = #items end
+  return { ok = true, data = { items = items, total = total, pages = math.max(1, math.ceil(total / PAGE_SIZE)) } }
 end
 
 -- ── detail ─────────────────────────────────────────────────────────────────
@@ -341,13 +351,22 @@ methods.chapters = function(params)
 
   local out = {}
   for _, ch in ipairs(raw) do
+    -- JSON decode hands numbers back as floats, so tostring(1) is "1.0" and
+    -- every chapter id / store row would carry that shape (see the mangabay
+    -- float-id incident). Integral values are formatted back to integers.
+    local number = ch.number
+    if type(number) == "number" and number % 1 == 0 then
+      number = string.format("%d", number)
+    else
+      number = tostring(number)
+    end
+
     -- An absent title arrives as an empty string, not nil, so it has to be
     -- tested for emptiness: "" is truthy in Lua.
     local title = ch.title
-    if not title or title == "" then title = "Chapter " .. tostring(ch.number) end
-
+    if not title or title == "" then title = "Chapter " .. tostring(number) end
     local item = {
-      id = slug .. ":chapter-" .. tostring(ch.number),
+      id = slug .. ":chapter-" .. number,
       number = tonumber(ch.number) or 0,
       title = title,
       release_at = 0,
@@ -377,6 +396,9 @@ methods.pages = function(params)
   local m = host.re2.find("^([^:]+):chapter-(.+)$", chapterID)
   if #m < 3 then return { ok = true, data = {} } end
   local slug, number = m[2], m[3]
+  -- Chapter ids minted before the float fix look like "1.0"; the GraphQL
+  -- number argument wants the integer form.
+  if number:sub(-2) == ".0" then number = number:sub(1, -3) end
   host.log.info("mangahub pages: slug=" .. slug .. " ch=" .. number)
 
   local gql = '{chapter(x: ' .. SOURCE_ID .. ', slug: "' .. escape_gql(slug)
@@ -439,36 +461,29 @@ local genres_cache = nil
 methods.genres = function()
   if genre_cache then return { ok = true, data = genre_cache } end
 
-  local res, err = host.http.fetch(SITE_URL .. "/search")
-  local html = (err == nil and res and res.body) or ""
-  if html == "" then
-    host.log.error("mangahub: /search carried no body, genre browsing unavailable")
-    return { ok = true, data = {} }
-  end
+  -- The GraphQL schema exposes the slugs directly; scraping the /search page
+  -- for /genre/ links broke silently every time the frontend markup moved.
+  local data = graphql_query("{genres{id,slug,title}}")
+  local rows = (data and data.data and data.data.genres) or {}
 
-  -- Slugs are the API truth (/search genre=<comma slugs>); names are derived
-  -- for the chips and mapped back in search. The anchor-label regex lost the
-  -- capture index once already -- deriving from the slug sidesteps it.
-  genre_slugs = {}
-  local seen, out = {}, {}
-  for g in host.re2.gmatch([[/genre/([a-z0-9-]+)]], html) do
-    local slug = g[2] or "" -- m[1] is the full match; group 1 sits at m[2]
-    if slug ~= "" and not seen[slug] then
-      seen[slug] = true
-      local name = slug:gsub("(%a)([%a']*)", function(a, b) return a:upper() .. b:lower() end):gsub("%-", " ")
-      genre_slugs[name] = slug
+  local slugs, out = {}, {}
+  for _, g in ipairs(rows) do
+    local name, slug = g.title or "", g.slug or ""
+    if name ~= "" and slug ~= "" then
+      slugs[name] = slug
       out[#out + 1] = name
     end
   end
-  table.sort(out)
 
   if #out == 0 then
-    host.log.error("mangahub: /search listed no genre labels, genre browsing unavailable")
+    host.log.error("mangahub: GraphQL listed no genres")
     return { ok = true, data = {} }
   end
 
-  host.log.info("mangahub: " .. tostring(#out) .. " genres")
+  table.sort(out)
+  genre_slugs = slugs
   genre_cache = out
+  host.log.info("mangahub: " .. tostring(#out) .. " genres")
   return { ok = true, data = out }
 end
 

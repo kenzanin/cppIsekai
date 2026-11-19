@@ -7,7 +7,7 @@
   "contract_version": 1,
   "paginates": true,
   "params": {
-    "api": "https://api.mghcdn.com/graphql",
+    "api": "https://mangahub.io/graphql",
     "img_cdn": "https://imgx.mghcdn.com/",
     "thumb_cdn": "https://thumb.mghcdn.com/"
   },
