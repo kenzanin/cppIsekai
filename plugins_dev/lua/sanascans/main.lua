@@ -39,29 +39,31 @@ local methods = {}
 
 -- ── search ─────────────────────────────────────────────────────────────────
 
+-- The site has NO server-side search: /comics?search= ignores the param (the
+-- SSR ships the same 188-anchor catalog for every value) and /search 404s.
+-- The only search surface is the navbar live-dropdown JSON API (har:
+-- api.sanascans.com/api/query?searchTerm=&perPage=4), which also paginates.
+local API = "https://api.sanascans.com"
+
 methods.search = function(params)
   local q = params.title or params.query or params.q or ""
   if q == "" then return { ok = true, data = { items = {}, total = 0 } } end
-  local body, err = http_req(BASE .. "/comics?search=" .. host.url_encode(q))
-  if err ~= nil then return { ok = false, error = err } end
-
-  -- Cards: <a href="/series/<slug>" ...><img ... alt="Cover of <title>" src=
-  -- "<cover>"> (attribute order is alt BEFORE src; the site prefixes many card
-  -- alts with "Cover of " — strip it so titles stay clean).
-  local items, seen = {}, {}
-  for _, m in ipairs(host.re2.find_all(
-    [[(?s)<a href="/series/([^"]+)"[^>]*>.*?<img[^>]*alt="([^"]*)"[^>]*src="([^"]+)"]], body)) do
-    -- The slug is URL-encoded AND HTML-escaped inside the href (the site's
-    -- React-style link, e.g. "violetta&#x27;s-...%3A..."): unescape, then
-    -- url_decode; detail/chapter re-encode once.
-    local slug = host.url_decode(host.text.unescape(m[2]))
-    local title = string.gsub(m[3], "^Cover [Oo]f%s+", "")
-    if not seen[slug] then
-      seen[slug] = true
-      items[#items + 1] = { id = slug, name = host.text.unescape(host.text.trim(title)), cover = m[4] }
-    end
+  local page = math.max(1, tonumber(params.page) or 1)
+  local j = host.http.get_json(
+    API .. "/api/query?searchTerm=" .. host.url_encode(q) .. "&perPage=100&page=" .. page,
+    { headers = { accept = "application/json" } })
+  if type(j) ~= "table" or type(j.posts) ~= "table" then
+    return { ok = false, error = "search api failed" }
   end
-  return { ok = true, data = { items = items, total = #items } }
+  local items = {}
+  for _, p in ipairs(j.posts) do
+    items[#items + 1] = {
+      id = p.slug or "",
+      name = p.postTitle or "",
+      cover = p.featuredImage or "",
+    }
+  end
+  return { ok = true, data = { items = items, total = tonumber(j.totalCount) or #items } }
 end
 
 -- ── detail ─────────────────────────────────────────────────────────────────
