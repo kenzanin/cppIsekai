@@ -1,4 +1,5 @@
 ## 2026-11-19
+* **Creation**: Documented concept `findings/mangahub-graphql-move.md` (mangahub.io GraphQL moved to the site host, cookie auth, NSFW flag).
 * **Update**: Linked `findings/plugin-liveness-2026-11-19.md` to `decisions/deps-and-plugins.md`.
 * **Creation**: Documented concept `findings/plugin-liveness-2026-11-19.md` (Plugin liveness scan: only kaliscan.me and anisascans.in are globally dead; most peers fail locally on ISP DNS interception).
 * **Update**: Linked `decisions/sanitizer-build.md` to `decisions/xmake-build-system.md`.
