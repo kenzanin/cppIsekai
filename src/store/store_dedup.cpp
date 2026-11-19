@@ -235,9 +235,11 @@ void Store::recompute_dup_groups() {
     }
     const std::size_t n = rows.size();
     std::vector<TokenMultiset> titles(n);
+    std::vector<TokenMultiset> names(n);
     std::vector<TokenMultiset> syms(n);
     for (std::size_t i = 0; i < n; ++i) {
         titles[i] = tokenize(rows[i].name + " " + rows[i].alt_titles);
+        names[i] = tokenize(rows[i].name);
         syms[i] = tokenize(rows[i].synopsis);
     }
     // union-find over indices
@@ -304,8 +306,13 @@ void Store::recompute_dup_groups() {
                 }
                 const double td = dice(titles[i], titles[j]);
                 const double sd = dice(syms[i], syms[j]);
+                // name-only dice: alt_titles dilute one side's multiset (64 vs 9
+                // tokens => 0.247 for identical names); the bare name is the
+                // strongest single signal. Fires only near-identical (0.75):
+                // generic short names ('middle aged man isekai ...') collide at 0.6.
+                const double nd = dice(names[i], names[j]);
                 // synopsis Dice counts double-ish as corroboration (design D3)
-                const double sim = std::max(td, (0.5 * td) + (0.5 * sd));
+                const double sim = std::max({td, (0.5 * td) + (0.5 * sd), nd >= 0.75 ? nd : 0.0});
                 if (sim >= 0.6) {
                     unite(static_cast<int>(i), static_cast<int>(j));
                 }
