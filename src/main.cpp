@@ -129,7 +129,7 @@ int main(int argc, char** argv) {
     scheduler.start();
 
     spdlog::info("cppIsekai listening on :{} (config: {})", cfg.port, ini_path);
-    tray::start(cfg.port); // detached UI thread; no-op headless
+    tray::start(cfg); // detached UI thread; no-op headless or [tray] enabled=0
     serve(store, db_pool, plugin_pool, plugins, logs, images, cfg.port, ini_path, overrides, cfg.templates_dir);
     scheduler.stop();
     browser::shutdown(); // app-owned child only; adopted externals survive (D12)

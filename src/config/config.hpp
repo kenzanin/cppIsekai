@@ -47,6 +47,13 @@ struct Config {
     std::string chrome_headless; // [chrome] headless: "1"/"0", default headed-off (ini-only)
     int backup_interval_h{}; // [backup] interval_h: hours between VACUUM+snapshot runs, 0 = off
     int backup_keep{};       // [backup] keep: snapshot files kept under <db dir>/backups
+    std::string tray_enabled;      // [tray] enabled: "1" shows the tray, "0" leaves it off
+    std::string tray_icon;         // [tray] icon: icon file path
+    std::string tray_title;        // [tray] title: StatusNotifier app name
+    std::string tray_label;        // [tray] label: status row, {port} = listen port
+    std::string tray_open_label;    // [tray] open_label: open-reader entry
+    std::string tray_restart_label; // [tray] restart_label: restart entry
+    std::string tray_stop_label;    // [tray] stop_label: stop entry
 };
 
 // Per-knob CLI state. Explicit = opt->count() > 0 (D7), never value comparison;
@@ -128,6 +135,13 @@ inline Config to_config(const std::array<std::string, kEntryCount>& v) {
     if (c.backup_keep < 1) {
         c.backup_keep = num_or<int>(kEntries[22].def, kEntries[22].def); // min 1
     }
+    c.tray_enabled = v[23];
+    c.tray_icon = v[24];
+    c.tray_title = v[25];
+    c.tray_label = v[26];
+    c.tray_open_label = v[27];
+    c.tray_restart_label = v[28];
+    c.tray_stop_label = v[29];
     if (c.port <= 0) {
         c.port = num_or<int>(kEntries[0].def, kEntries[0].def); // design ceiling: port > 0
     }

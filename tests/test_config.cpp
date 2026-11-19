@@ -143,6 +143,21 @@ TEST_CASE("config: layered resolve default < ini < env < flag") {
         CHECK(c.image_format == "none"); // explicit flag beats env and ini
         CHECK(c.cover_max_px == 600);
     }
+
+    SUBCASE("tray knobs resolve from ini and env") {
+        auto ini = tmp_ini("[tray]\nenabled = 0\nicon = assets/crimson.png\nlabel = lib :{port}\n");
+        Config a = resolve(none, ini, fake_env({}));
+        CHECK(a.tray_enabled == "0");
+        CHECK(a.tray_icon == "assets/crimson.png");
+        CHECK(a.tray_label == "lib :{port}");
+        CHECK(a.tray_title == "cppIsekai");      // registry default
+        CHECK(a.tray_open_label == "Open Reader"); // registry default
+
+        Config b = resolve(none, "no-such-cfg.ini",
+                           fake_env({{"CPPISEKAI_TRAY_ENABLED", "1"}, {"CPPISEKAI_TRAY_STOP_LABEL", "Halt"}}));
+        CHECK(b.tray_enabled == "1");
+        CHECK(b.tray_stop_label == "Halt");
+    }
 }
 
 TEST_CASE("config: dump projects registry as commented ini template (D4)") {
@@ -175,7 +190,7 @@ TEST_CASE("config: dump projects registry as commented ini template (D4)") {
         CHECK(row[key][1] == "; " + std::string(e.doc));
         CHECK(row[key][2] == key + " = " + std::string(e.def));
     }
-    CHECK(headers == 8); // one header per group: server plugin cache paths log update chrome backup
+    CHECK(headers == 9); // one header per group: server plugin cache paths log update chrome backup tray
 
     // And the template is honest ini: SimpleIni reads every default back.
     CSimpleIniA ini;

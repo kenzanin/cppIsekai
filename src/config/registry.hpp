@@ -26,7 +26,7 @@ struct Entry {
 };
 
 // Order is the projection order consumed by config.hpp -- do not reorder.
-inline constexpr std::array<Entry, 23> kEntries{
+inline constexpr std::array<Entry, 30> kEntries{
     {
         // section      key                   flag                 alias          env def doc
         // type
@@ -263,6 +263,78 @@ inline constexpr std::array<Entry, 23> kEntries{
             .doc = "Snapshot files kept under <db dir>/backups, newest wins",
             .type = Type::Int,
             .min_value = 1,
+        },
+        // [tray]: every system-tray string and toggle, ini-only (a UI preference
+        // on a headless daemon has no business on the CLI).
+        {
+            .section = "tray",
+            .key = "enabled",
+            .flag = "",
+            .alias = "",
+            .env = "CPPISEKAI_TRAY_ENABLED",
+            .def = "1",
+            .doc = "1 = system tray icon, 0 = no tray",
+            .type = Type::Str,
+        },
+        {
+            .section = "tray",
+            .key = "icon",
+            .flag = "",
+            .alias = "",
+            .env = "CPPISEKAI_TRAY_ICON",
+            .def = "assets/tray.png",
+            .doc = "Tray icon file (resolved to an absolute path before export)",
+            .type = Type::Str,
+        },
+        {
+            .section = "tray",
+            .key = "title",
+            .flag = "",
+            .alias = "",
+            .env = "CPPISEKAI_TRAY_TITLE",
+            .def = "cppIsekai",
+            .doc = "Tray application name (StatusNotifier item identity)",
+            .type = Type::Str,
+        },
+        {
+            .section = "tray",
+            .key = "label",
+            .flag = "",
+            .alias = "",
+            .env = "CPPISEKAI_TRAY_LABEL",
+            .def = "cppIsekai :{port} - running",
+            .doc = "Menu status row; {port} is replaced with the listen port",
+            .type = Type::Str,
+        },
+        {
+            .section = "tray",
+            .key = "open_label",
+            .flag = "",
+            .alias = "",
+            .env = "CPPISEKAI_TRAY_OPEN_LABEL",
+            .def = "Open Reader",
+            .doc = "Menu entry that opens the reader in a browser",
+            .type = Type::Str,
+        },
+        {
+            .section = "tray",
+            .key = "restart_label",
+            .flag = "",
+            .alias = "",
+            .env = "CPPISEKAI_TRAY_RESTART_LABEL",
+            .def = "Restart server",
+            .doc = "Menu entry that restarts the daemon",
+            .type = Type::Str,
+        },
+        {
+            .section = "tray",
+            .key = "stop_label",
+            .flag = "",
+            .alias = "",
+            .env = "CPPISEKAI_TRAY_STOP_LABEL",
+            .def = "Stop server",
+            .doc = "Menu entry that stops the daemon",
+            .type = Type::Str,
         },
     },
 };
