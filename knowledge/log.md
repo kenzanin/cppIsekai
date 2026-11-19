@@ -1,4 +1,5 @@
 ## 2026-11-19
+* **Creation**: Documented concept `decisions/tray-sni-icon-resolution.md` (Tray icon: SNI IconName must be an absolute path for xfce4-panel's status tray).
 * **Update**: Linked `decisions/search-read-model-cache.md` to `decisions/search-envelope-page-count.md`.
 * **Creation**: Documented concept `decisions/search-envelope-page-count.md` (Search envelope: plugin reports real total + optional data.pages; host pager prefers it).
 * **Update**: Updated concept `decisions/xmake-build-system.md`.
