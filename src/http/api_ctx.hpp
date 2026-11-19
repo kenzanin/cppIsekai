@@ -280,11 +280,9 @@ inline void sync_saved_stats(Store& store, BS::thread_pool<>& db, const std::str
             store.saved_signal_update(plugin, slug, syn, alts);
             return 0;
         });
-        // library-dedup 2.3: re-cluster after the signals changed
-        http::on_pool(db, [&] {
-            store.recompute_dup_groups();
-            return 0;
-        });
+        // library-dedup 2.3: re-cluster after the signals changed --
+        // store-contention C1: coalesced, the scheduler tick pays once
+        store.mark_dup_dirty();
     } else if (chs) {
         // chapters-only (design D4): same stat write with an empty status so
         // the source status + category bits stay untouched; an absent saved

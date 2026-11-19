@@ -87,6 +87,9 @@ void migrate_saved_manga(const std::string& path) {
 
 Store::Store(const std::string& path) : impl_(std::make_unique<StoreImpl>(path)) {
     impl_->storage.pragma.journal_mode(journal_mode::WAL);
+    // store-contention C4 (user-approved): WAL's standard pairing. App-crash safe;
+    // power-loss may drop the last txn(s) -- bounded by the hourly [backup] snapshot.
+    impl_->storage.pragma.synchronous(1); // 1 = NORMAL
     // wait on writers instead of failing instantly: raw api_cache opens and this
     // ORM connection are concurrent writers (db-lock regression).
     impl_->storage.busy_handler([](int count) { return store_detail::busy_wait(count); });
@@ -157,3 +160,11 @@ Store::Store(const std::string& path) : impl_(std::make_unique<StoreImpl>(path))
 }
 
 Store::~Store() = default;
+
+void Store::mark_dup_dirty() {
+    impl_->dup_dirty.store(true, std::memory_order_relaxed);
+}
+
+bool Store::take_dup_dirty() {
+    return impl_->dup_dirty.exchange(false, std::memory_order_relaxed);
+}

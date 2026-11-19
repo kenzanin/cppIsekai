@@ -154,10 +154,8 @@ namespace http::api {
                             store.saved_signal_update(plugin, slug, {}, alts_json);
                             return 0;
                         });
-                        on_pool(db, [&] {
-                            store.recompute_dup_groups();
-                            return 0;
-                        });
+                        // store-contention C1: coalesced recluster via scheduler tick
+                        store.mark_dup_dirty();
                     }
                 }
             }

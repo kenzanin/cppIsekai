@@ -2,6 +2,7 @@
 #include <doctest/doctest.h>
 #include <sqlite3.h>
 
+#include <atomic>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -978,4 +979,64 @@ TEST_CASE("Store: maintenance snapshot + prune (backup knobs)") {
     sqlite3_close(raw);
 
     std::filesystem::remove_all(dir);
+}
+
+TEST_CASE("Store: dup-dirty flag coalescing (store-contention 1.4)") {
+    Store store("test_store.db");
+    CHECK(store.take_dup_dirty()); // ctor default true: first tick reclusters
+    store.mark_dup_dirty();
+    CHECK(store.take_dup_dirty());
+    CHECK_FALSE(store.take_dup_dirty()); // exactly-once per mark
+}
+
+TEST_CASE("Store: raw-handle ops progress beside ORM ops (store-contention 2.2)") {
+    Store store("test_store.db");
+    const auto run = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+    std::atomic<int> cache_ok{0}, state_ok{0};
+    std::thread cache_t([&] {
+        for (int i = 0; i < 50; ++i) {
+            const std::string k = "k" + std::to_string(i);
+            store.api_cache_put("rawA_" + run, k, "{}", R"({"i":1})", i, 60);
+            if (store.api_cache_get("rawA_" + run, k).has_value()) {
+                ++cache_ok;
+            }
+        }
+    });
+    std::thread orm_t([&] {
+        for (int i = 0; i < 50; ++i) {
+            const std::string k = "s" + std::to_string(i);
+            store.state_set("rawB_" + run, k, "v");
+            if (store.state_get("rawB_" + run, k) == std::optional<std::string>{"v"}) {
+                ++state_ok;
+            }
+        }
+    });
+    cache_t.join();
+    orm_t.join();
+    CHECK(cache_ok == 50);
+    CHECK(state_ok == 50);
+}
+
+TEST_CASE("Store: chapters_upsert fingerprint skip (store-contention 3.3)") {
+    Store store("test_store.db");
+    const auto run = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+    const std::string plugin = "fp", slug = "s-" + run;
+    const auto seed = [](const std::string& id, double n) {
+        return ChapterSeed{id, n, "t" + id, "u" + id};
+    };
+
+    CHECK(store.chapters_upsert(plugin, slug, {seed("a1", 1), seed("b2", 2)}) == 2);
+    CHECK(store.chapters_upsert(plugin, slug, {seed("a1", 1), seed("b2", 2)}) == 0); // identical: skipped
+
+    // flag-only changes ride through the skip (flags are not fingerprinted)
+    store.chapter_flags_apply(plugin, slug, {"a1"}, false, 1, 0);
+    CHECK(store.chapters_upsert(plugin, slug, {seed("a1", 1), seed("b2", 2)}) == 0);
+    CHECK(store.chapter_flags_get(plugin, slug, "a1") == 1);
+
+    // any seed delta rewrites
+    CHECK(store.chapters_upsert(plugin, slug, {seed("a1", 1), seed("b2", 2), seed("c3", 3)}) == 3);
+
+    // fingerprint persists in plugin_state: a reopened store skips too
+    Store reopened("test_store.db");
+    CHECK(reopened.chapters_upsert(plugin, slug, {seed("a1", 1), seed("b2", 2), seed("c3", 3)}) == 0);
 }

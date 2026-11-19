@@ -4,6 +4,7 @@
  */
 #include "store_ops.hpp"
 
+#include <atomic>
 #include <memory>
 #include <sqlite3.h>
 #include <string>
@@ -197,6 +198,7 @@ struct StoreImpl {
     std::string path; // kept for the raw api_cache JSONB connection
     store_detail::StorageType storage;
     bool fts5_ok = false; // library-dedup 1.3: false when the amalgamation lacks FTS5 (dedup disabled)
+    std::atomic<bool> dup_dirty{true}; // store-contention C1: first tick reclusters
     explicit StoreImpl(const std::string& p) : path(p), storage(store_detail::create_storage(p)) {}
 };
 

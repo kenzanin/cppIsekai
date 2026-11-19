@@ -2,6 +2,7 @@
 #include "store_busy.hpp"
 #include "store_internal.hpp"
 
+#include <cstdint>
 #include <cstdlib>
 #include <ctime>
 #include <map>
@@ -14,14 +15,49 @@ using namespace sqlite_orm;
 
 // --- chapter-store (chapter-state): identity rows + per-chapter flag bitfield ---
 
-void Store::chapters_upsert(const std::string& plugin, const std::string& slug,
+namespace {
+
+// store-contention C3: stable-across-rebuilds seed fingerprint (FNV-1a, NOT
+// std::hash) so the plugin_state value compares after restarts. Covers id,
+// number, title, url -- the fields the upsert would rewrite.
+std::string chapters_fingerprint(const std::vector<ChapterSeed>& rows) {
+    std::uint64_t h = 1469598103934665603ull;
+    auto mix = [&h](unsigned char c) { h ^= c; h *= 1099511628211ull; };
+    const auto mix_str = [&mix](const std::string& s, unsigned char sep) {
+        for (char c : s) {
+            mix(static_cast<unsigned char>(c));
+        }
+        mix(sep);
+    };
+    for (const auto& r : rows) {
+        mix_str(r.chapter_id, 0x1f);
+        mix_str(std::to_string(r.number), 0x1f);
+        mix_str(r.title, 0x1e);
+        mix_str(r.url, 0x1d);
+    }
+    return std::to_string(rows.size()) + ":" + std::to_string(h);
+}
+
+} // namespace
+
+int Store::chapters_upsert(const std::string& plugin, const std::string& slug,
                             const std::vector<ChapterSeed>& rows) {
     const store_detail::OpTrace _op{"chapters_upsert"};
     if (plugin.empty() || slug.empty()) {
-        return;
+        return 0;
     }
     auto& st = impl_->storage;
     const std::int64_t now = std::time(nullptr);
+    // store-contention C3: materialize feeds every seen chapters envelope here;
+    // an unchanged seed set would rewrite identical state (~100 ms mutexed).
+    // Fingerprint lives in plugin_state, written inside the txn below; a lost
+    // one only costs one redundant pass. Flags never appear here, so skipping
+    // preserves them by construction.
+    const std::string fp = chapters_fingerprint(rows);
+    const std::string fp_key = std::string(kChaptersFpPrefix) + plugin + "/" + slug;
+    if (const auto stored = state_get(kStateHost, fp_key); stored && *stored == fp) {
+        return 0;
+    }
     // Reads happen BEFORE the write transaction: a deferred transaction that
     // reads and then writes upgrades its snapshot, and the upgrade surfaces as
     // an instant "database is locked" (SQLITE_BUSY_SNAPSHOT) whenever another
@@ -76,7 +112,7 @@ void Store::chapters_upsert(const std::string& plugin, const std::string& slug,
         writes.push_back(std::move(e));
     }
     if (writes.empty()) {
-        return;
+        return 0;
     }
     store_detail::TxGuard tx{st};
     st.begin_transaction();
@@ -84,10 +120,12 @@ void Store::chapters_upsert(const std::string& plugin, const std::string& slug,
         // composite-PK upsert for new rows; insert() misbinds NOT NULL cols here
         known.contains(e.chapter_id) ? st.update(e) : st.replace(e);
     }
+    st.replace(store_detail::StateEntity{.plugin_id = kStateHost, .key = fp_key, .value = fp});
     tx.commit();
     if (inherited > 0) {
         spdlog::debug("chapter-store: {} legacy flag(s) inherited for {}/{}", inherited, plugin, slug);
     }
+    return static_cast<int>(writes.size());
 }
 
 void Store::chapter_pages_replace(const std::string& plugin, const std::string& slug, const std::string& chapter_id,

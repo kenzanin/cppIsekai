@@ -56,6 +56,12 @@ void Scheduler::run_once() {
     const config::Config cfg = config::resolve(overrides_, ini_path_);
     const auto now = static_cast<std::int64_t>(std::time(nullptr));
 
+    // store-contention C1: browse marks the dedup cache dirty; the tick pays
+    // for ONE recluster instead of every detail open paying ~200 ms each.
+    if (store_.take_dup_dirty()) {
+        http::on_pool(db_, [&] { store_.recompute_dup_groups(); return 0; });
+    }
+
     // [backup] VACUUM + snapshot, own watermark; failure retries next tick.
     if (cfg.backup_interval_h > 0) {
         const std::int64_t interval_s = static_cast<std::int64_t>(cfg.backup_interval_h) * 3600;

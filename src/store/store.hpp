@@ -70,6 +70,7 @@ inline constexpr const char* kStateHost = "host";
 inline constexpr const char* kSkipPrefix = "host/skip/";
 inline constexpr const char* kReadPrefix = "host/read/";
 inline constexpr const char* kTotalPrefix = "host/total/";
+inline constexpr const char* kChaptersFpPrefix = "host/chapters_fp/"; // store-contention C3 seed fingerprint
 
 /** One parsed chapter identity for chapters_upsert (chapter-store): the
  *  plugin-emitted view of a chapter, flags-free (the store preserves them). */
@@ -191,8 +192,9 @@ public:
      *  chapter_id); flags/updated history preserved on re-parse, updated_at
      *  restamped. First sight of an id inherits the legacy host/skip //
      *  host/read>=host/total state (D2: the parse that claims the id is the
-     *  attribution; keys carry no manga identity). One transaction. */
-    void chapters_upsert(const std::string& plugin, const std::string& slug, const std::vector<ChapterSeed>& rows);
+     *  attribution; keys carry no manga identity). One transaction. Unchanged seed set (C3
+     *  fingerprint in plugin_state) short-circuits to 0 writes. */
+    int chapters_upsert(const std::string& plugin, const std::string& slug, const std::vector<ChapterSeed>& rows);
     /** \brief Replace the page-url rows of one chapter (chapter-store D4):
      *  delete+insert in parse order, one transaction. */
     void chapter_pages_replace(const std::string& plugin, const std::string& slug, const std::string& chapter_id,
@@ -247,6 +249,11 @@ public:
     /** \brief Library-dedup 2.2: FTS5 candidate + Dice similarity clustering; writes dup_group for ALL saved rows in
      * one txn. No-op (all 0) when FTS5 unavailable or library tiny. */
     void recompute_dup_groups();
+    /** \brief store-contention C1: mark the dedup cache stale; the scheduler tick
+     *  coalesces the recluster so browse bursts pay once per tick, not per open. */
+    void mark_dup_dirty();
+    /** \brief Atomic take of the dirty flag; true => caller must run recompute_dup_groups. */
+    bool take_dup_dirty();
     /** \brief Envelope-derived dedup signals (library-dedup 1.2): synopsis (or 'description' fallback) + alt_titles
      * JSON array, verbatim. Empty args = leave untouched. */
     void saved_signal_update(const std::string& plugin, const std::string& slug, const std::string& synopsis,

@@ -71,10 +71,15 @@ inline std::string tid_str() {
 /// RAII scope over one Store operation: serializes it, names it, times it.
 class OpTrace {
 public:
-    explicit OpTrace(const char* op) : op_(op), t0_(std::chrono::steady_clock::now()), lock_(db_mutex()) {
-        // api_cache_* helpers open their own sqlite handle; every other op rides
-        // the one shared sqlite_orm connection.
-        const bool raw = std::strncmp(op, "api_cache_", 10) == 0;
+    explicit OpTrace(const char* op) : op_(op), t0_(std::chrono::steady_clock::now()), lock_() {
+        // api_cache_*/maintenance open their own sqlite handle (raw): they never
+        // touch the shared ORM connection, so serializing them behind db_mutex
+        // only added queue wait (store-contention C2). One mutex per handle
+        // family; the overlap ledger below still tracks both.
+        const bool raw = std::strncmp(op_, "api_cache_", 10) == 0 ||
+                         std::strcmp(op_, "maintenance_vacuum_backup") == 0 ||
+                         std::strcmp(op_, "cache_prune_expired") == 0;
+        lock_ = std::unique_lock<std::recursive_mutex>(raw ? raw_db_mutex() : db_mutex());
         std::lock_guard<std::mutex> lock(mutex());
         for (const auto& [tid, name, other_raw] : active()) {
             if (tid != std::this_thread::get_id()) {
@@ -116,6 +121,11 @@ private:
     /// One recursive mutex for the whole process: the connection is not
     /// shareable across threads, and Store methods may nest.
     static std::recursive_mutex& db_mutex() {
+        static std::recursive_mutex m;
+        return m;
+    }
+    /// Mutex for the raw-handle ops (own sqlite3_open connection, C2).
+    static std::recursive_mutex& raw_db_mutex() {
         static std::recursive_mutex m;
         return m;
     }
