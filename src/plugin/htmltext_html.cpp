@@ -101,6 +101,14 @@ template <typename Fn> void select_each(const std::string& html, const std::stri
     if (list == nullptr) {
         return; // malformed selector: zero matches (lenient)
     }
+    struct ListGuard {
+        lxb_css_selector_list_t* p = nullptr;
+        ~ListGuard() {
+            if (p != nullptr) {
+                lxb_css_selector_list_destroy_memory(p);
+            }
+        }
+    } list_guard{list}; // parsed selectors own memory outside the parser's
 
     std::vector<lxb_dom_node_t*> nodes;
     const auto cb = [](lxb_dom_node_t* node, lxb_css_selector_specificity_t /*spec*/, void* ctx) -> lxb_status_t {
