@@ -7,6 +7,7 @@ function readerPage() {
     slug: decodeURIComponent(parts.slice(2).join('/')) || '',
     ch: 1, chId: '', pages: [], prev_ch: 0, next_ch: 0, prev_ch_id: '', next_ch_id: '',
     page: 1, mode: 'paged', dir: 'ltr', zoom: 'fit-w', zoomPct: 100, wheelAt: 0,
+    pairFrom: 1, _prevMode: '',
     navShown: false, done: false,
     seen: [], err: '', io: null, chaptersList: [],
     _prefetch: new Map(), _reqToken: 0, _chaptersReady: null, t: null,
@@ -33,6 +34,8 @@ function readerPage() {
       if (q.get('dir')) this.dir = q.get('dir');
       if (q.get('page')) this.page = Number(q.get('page')) || 1;
       if (q.get('zoom')) this.applyZoomSeed(q.get('zoom'));
+      // entering spread keeps the reader's page as its pair's first page
+      this._prevMode = this.mode;
       // chapter list is needed once for position-write id resolution; pages load per chapter
       this._chaptersReady = fetch(`/api/chapters/${encodeURIComponent(this.plugin)}/${encodeURIComponent(this.slug)}`)
         .then(r => r.json())
@@ -64,6 +67,7 @@ function readerPage() {
       if (!p || !Array.isArray(p.pages)) { this.err = (p && p.error) || 'load failed'; return; }
       this.ch = n;
       this.page = Math.max(1, Math.min(page || 1, p.pages.length));
+      this.pairFrom = this.pairing ? Math.max(1, this.page) : 1; // the landing page opens its own pair
       this.pages = p.pages;
       this.prev_ch = p.prev_ch || 0;
       this.next_ch = p.next_ch || 0;
@@ -110,23 +114,39 @@ function readerPage() {
       }
     },
     // --- layout: one screen = one view; page is the view's first page number.
-    // Spread pairs (1,2) (3,4)...: odd page leads, even page joins the pair before it,
-    // so the pair holding the open page is (p, p+1) for odd p, (p-1, p) for even p.
-    // Tail alone when odd. Pure function of pages -- no anchor state to re-run.
+    // Pairing is anchored at pairFrom: the page open when spread mode was entered leads
+    // its own pair, so [3,4] [5,6] ... (paged page 3 -> spread stays on 3,4). Pages before
+    // the anchor keep plain (1,2) (3,4) pairing so nothing is lost or stacked into one
+    // giant view; fresh chapters and non-spread modes anchor at 1.
     get pairing() { return this.mode === 'spread-h' || this.mode === 'spread-v'; },
+    get nLead() { // parity views covering pages 1 .. pairFrom-1
+      const end = Math.max(0, Math.min(this.pairFrom, this.pages.length + 1) - 1);
+      return this.pairing ? Math.ceil(end / 2) : 0;
+    },
     get views() {
       if (!this.pairing) return this.pages.map(u => [u]);
-      const v = [];
-      for (let i = 0; i < this.pages.length; i += 2) v.push(this.pages.slice(i, i + 2));
+      const v = [], end = Math.max(0, Math.min(this.pairFrom, this.pages.length + 1) - 1);
+      let i = 0;
+      while (i + 2 <= end) { v.push(this.pages.slice(i, i + 2)); i += 2; }
+      if (i < end) { v.push(this.pages.slice(i, end)); i = end; }
+      for (; i < this.pages.length; i += 2) v.push(this.pages.slice(i, i + 2));
       return v;
     },
-    firstOf(i) { return this.pairing ? 2 * i + 1 : i + 1; },
-    viewOf(p) { return this.pairing ? Math.floor((p - 1) / 2) : p - 1; },
+    firstOf(i) { // page number that opens view i
+      if (!this.pairing) return i + 1;
+      const n = this.nLead;
+      return i < n ? 2 * i + 1 : this.pairFrom + 2 * (i - n);
+    },
+    viewOf(p) { // view holding page p (rounds back to that view's first page)
+      if (!this.pairing) return p - 1;
+      return p < this.pairFrom ? Math.floor((p - 1) / 2) : this.nLead + Math.floor((p - this.pairFrom) / 2);
+    },
     cur() { return Math.max(0, Math.min(this.viewOf(this.page), this.views.length - 1)); },
     label() {
       if (!this.pages.length) return '';
       const f = this.firstOf(this.cur());
-      return (this.views[this.cur()].length > 1 ? `p ${f}\u2013${f + 1}` : `p ${f}`) + ` / ${this.pages.length}p`;
+      const last = f + this.views[this.cur()].length - 1;
+      return (last > f ? `p ${f}\u2013${last}` : `p ${f}`) + ` / ${this.pages.length}p`;
     },
       applyZoomSeed(z) { // 'fit-h' | 'fit-w' | '1:1' | 'custom:NN' | 'custom'
         if (typeof z === 'string' && z.indexOf('custom:') === 0) {
@@ -253,6 +273,12 @@ function readerPage() {
       this.persist();
     },
     modeChanged() { // re-paired views: keep page, reseed observers, realign scroll
+      const wasPairing = this._prevMode === 'spread-h' || this._prevMode === 'spread-v';
+      // paged/webtoon -> spread: the open page leads its pair (page 3 gives [3,4] [5,6] ...).
+      // spread h <-> v keeps the pairing that is already on screen.
+      if (this.pairing && !wasPairing) this.pairFrom = Math.max(1, this.page);
+      if (!this.pairing) this.pairFrom = 1;
+      this._prevMode = this.mode;
       this.persist();
       this.$nextTick(() => {
         this.observe();
