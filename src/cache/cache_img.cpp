@@ -100,7 +100,7 @@ std::optional<std::string> Cache::img_ensure(const std::string& key, const Cover
             it->second.tick = ++tick_; // recency bump
         }
         spdlog::debug("cache: img hit {} ({})", *hit, key);
-        return std::move(hit);
+        return hit;
     }
     if (cover_ctx.cover) {
         auto hit = cover_serve(cover_ctx.plugin, cover_ctx.url.empty() ? key : cover_ctx.url);

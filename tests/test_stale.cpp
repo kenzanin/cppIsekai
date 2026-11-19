@@ -134,3 +134,9 @@ TEST_CASE("stale: failure with no last-good returns the error envelope") {
     CHECK(has(res, R"("ok":false)")); // honest failure, no fake cached flag
     CHECK(!has(res, "cached"));
 }
+
+// Link stub: call_cached's ttl hook (stale.hpp effective_ttl) references
+// Host::cache_ttl_seconds, but this target links STORE_SRC only -- the plugin
+// Host TU would drag sol2/lua/quickjs into a pure store test. Every case here
+// passes plugins == nullptr, so the hook never runs.
+std::int64_t plugin::Host::cache_ttl_seconds(const std::string&, const std::string&) const { return 0; }

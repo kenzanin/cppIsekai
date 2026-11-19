@@ -19,15 +19,6 @@ namespace fs = std::filesystem;
 namespace cbz {
 namespace {
 
-// Empty-but-valid ZIP = 22-byte EOCD only (no central directory, no entries).
-// Matches spec scenario: "empty slug -> empty-but-valid zip".
-constexpr char kEmptyZip[] = "\x50\x4b\x05\x06" // End-of-central-dir sig
-                             "\x00\x00\x00\x00" // disk #
-                             "\x00\x00\x00\x00" // entries on disk
-                             "\x00\x00\x00\x00" // total entries
-                             "\x00\x00\x00\x00" // central dir size
-                             "\x00\x00\x00\x00" // central dir offset
-                             "\x00\x00";        // comment length
 
 std::optional<std::string> zip_of(const fs::path& tmp, const std::vector<std::pair<std::string, fs::path>>& entries) {
     std::optional<std::string> out;

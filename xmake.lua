@@ -7,6 +7,30 @@ add_rules("mode.debug", "mode.release", "mode.releasedbg")
 set_config("mode", "release") -- daemon runs from this build
 set_policy("package.requires_lock", true) -- lock resolved versions (xmake-requires.lock); bump via the pins below
 
+-- Opt-in sanitizers (never on by default). Debug modes only: the release binary
+-- is the daemon, so instrumenting it in place would swap the running build for
+-- an ASan one -- release is warn-and-skip.
+--   xmake f -m debug --sanitize=address,undefined -y && xmake -y && xmake test
+option("sanitize")
+    set_default("none")
+    set_values("none", "address", "address,undefined", "undefined", "thread")
+    set_description("Instrument every target with -fsanitize=<value> (debug modes only)")
+option_end()
+
+local SAN = get_config("sanitize") or "none"
+if SAN ~= "none" then
+    if is_mode("release") then
+        print("[sanitize] IGNORED in release mode (that binary is the daemon) -- use `xmake f -m debug --sanitize=%s`",
+              SAN)
+    else
+        add_cxflags("-fsanitize=" .. SAN, "-fno-omit-frame-pointer", {force = true})
+        add_cflags("-fsanitize=" .. SAN, "-fno-omit-frame-pointer", {force = true})
+        add_ldflags("-fsanitize=" .. SAN, {force = true})
+        add_defines("CPPISEKAI_SANITIZE=" .. SAN)
+        print("[sanitize] %s (mode %s)", SAN, get_config("mode"))
+    end
+end
+
 local TP = "third_party"
 local CURL_SO = "$(projectdir)/" .. TP .. "/curl-impersonate/lib/libcurl-impersonate-chrome.so.4.8.0"
 local CURL_LIB = "$(projectdir)/" .. TP .. "/curl-impersonate/lib"
