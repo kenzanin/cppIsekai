@@ -4,7 +4,7 @@ namespace fs = std::filesystem;
 
 namespace plugin {
 
-Host::Host(Config conf) : conf_(conf), impl_(std::make_unique<Host::Impl>()) {
+Host::Host(const Config& conf) : conf_(conf), impl_(std::make_unique<Host::Impl>()) {
     impl_->conf = std::move(conf);
     impl_->live_profile = std::make_shared<const std::string>(conf_.fetch_profile);
 }
@@ -15,7 +15,7 @@ void Host::use_db(BS::thread_pool<>* db) {
     impl_->db = db;
 }
 
-void Host::set_default_profile(std::string profile) {
+void Host::set_default_profile(const std::string& profile) {
     impl_->live_profile = std::make_shared<const std::string>(std::move(profile));
 }
 

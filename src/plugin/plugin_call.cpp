@@ -1,6 +1,7 @@
 #include "plugin_internal.hpp"
 
 #include <algorithm>
+#include <utility>
 
 namespace plugin {
 namespace {
@@ -100,7 +101,7 @@ std::string Host::call(const std::string& id, const std::string& method, const s
     }
 
     // Health bookkeeping: one entry per finished call (design: in-memory).
-    const auto record = [&](bool ok, std::string err) {
+    const auto record = [&](bool ok, const std::string& err) {
         const std::scoped_lock lock(impl_->mu);
         auto& h = impl_->health[id];
         h.ok = ok;
@@ -108,7 +109,7 @@ std::string Host::call(const std::string& id, const std::string& method, const s
         h.at = std::time(nullptr);
     };
     const auto fail = [&](std::string msg) {
-        record(false, msg);
+        record(false, std::move(msg));
         return err_json(std::move(msg));
     };
 

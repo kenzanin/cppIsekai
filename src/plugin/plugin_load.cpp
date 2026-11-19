@@ -9,7 +9,7 @@ namespace fs = std::filesystem;
 
 namespace plugin {
 
-std::string err_json(std::string msg) {
+std::string err_json(const std::string& msg) {
     glz::generic ok;
     glz::generic err;
     glz::generic root;

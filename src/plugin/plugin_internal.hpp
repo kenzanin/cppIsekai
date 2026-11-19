@@ -74,7 +74,7 @@ struct Host::Impl {
     std::map<std::string, CallHealth> health; // last call outcome per plugin id
 };
 
-std::string err_json(std::string msg);
+std::string err_json(const std::string& msg);
 // The wasm env.http_fetch service: the same option names the lua front takes,
 // JSON-encoded; the lua-shaped result ({status, body, headers}) as JSON back.
 // nullopt = fetch failure (the import reports -1). Needs conf.proxy; the
