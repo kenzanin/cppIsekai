@@ -737,6 +737,53 @@ TEST_CASE("Store: plugin_prune_absent cascade (plugin-lifecycle 2.1)") {
     CHECK(store.plugin_prune_absent({"Asura", "Flame"}).empty());
 }
 
+TEST_CASE("Store: title_meta_get_many batched overlay read (hot-path-perf 1.3)") {
+    seed_fixture("test_store_meta_many.db");
+    Store store("test_store_meta_many.db");
+    const auto run = std::chrono::steady_clock::now().time_since_epoch().count();
+    const std::string plugin = "Asura";
+    const std::string s1 = "many-a-" + std::to_string(run);
+    const std::string s2 = "many-b-" + std::to_string(run);
+
+    store.title_meta_put_fetched(plugin, s1, R"([{"source":"m","fetched_at":1,"data":{}}])", 1);
+    store.title_meta_put_chosen(plugin, s1, R"({"title":"T1","cover":"https://x/1.jpg"})");
+    store.title_meta_put_fetched(plugin, s2, "[]", 2);
+    store.title_meta_put_chosen(plugin, s2, R"({"title":"T2"})");
+
+    const auto rows = store.title_meta_get_many({{plugin, s1}, {plugin, s2}, {"nope", "missing"}, {plugin, "absent"}});
+    REQUIRE(rows.size() == 2); // absent pairs skipped
+    REQUIRE(rows.count({plugin, s1}) == 1);
+    CHECK(rows.at({plugin, s1}).fetched == R"([{"source":"m","fetched_at":1,"data":{}}])");
+    CHECK(rows.at({plugin, s1}).chosen == R"({"title":"T1","cover":"https://x/1.jpg"})");
+    CHECK(rows.at({plugin, s2}).chosen == R"({"title":"T2"})");
+    // parity with the single-row getter
+    const auto single = store.title_meta_get(plugin, s1);
+    REQUIRE(single.has_value());
+    CHECK(rows.at({plugin, s1}).fetched_at == single->fetched_at);
+    CHECK(rows.at({plugin, s1}).chosen == single->chosen);
+    CHECK(rows.at({plugin, s1}).fetched == single->fetched);
+    CHECK(store.title_meta_get_many({}).empty());
+}
+
+TEST_CASE("Store: cache_prune_expired age-based reaper (hot-path-perf 3.3)") {
+    const auto run = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+    Store store("test_store_cache_prune_" + run + ".db");
+    const auto now = static_cast<std::int64_t>(std::time(nullptr));
+    // payload must be valid JSON: api_cache_put writes through jsonb(?), which
+    // rejects anything else and silently skips the row.
+    // expired beyond the 7d grace / fresh / long-ttl inside the grace window
+    store.api_cache_put("prune-plugin", "expired", "{}", "{}", now - 100 * 86400, 3600);
+    store.api_cache_put("prune-plugin", "fresh", "{}", "{}", now, 3600);
+    store.api_cache_put("prune-plugin", "longttl", "{}", "{}", now - 20 * 86400, 30 * 86400);
+    REQUIRE(store.api_cache_get("prune-plugin", "expired").has_value());
+
+    const auto n = store.cache_prune_expired();
+    CHECK(n == 1); // only the expired row
+    CHECK_FALSE(store.api_cache_get("prune-plugin", "expired").has_value());
+    CHECK(store.api_cache_get("prune-plugin", "fresh").has_value());
+    CHECK(store.api_cache_get("prune-plugin", "longttl").has_value());
+}
+
 TEST_CASE("Store: materialized detail columns (manga-detail-table 1.4/2.1/3.2)") {
     Store store("test_store.db");
     const auto run = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
@@ -746,8 +793,9 @@ TEST_CASE("Store: materialized detail columns (manga-detail-table 1.4/2.1/3.2)")
         const std::string slug = "mat-a-" + run;
         store.save_manga({plugin, slug, "Raw", "", 0});
         store.saved_signal_update(plugin, slug, "source synopsis", R"(["Alt One"])");
-        CHECK(store.saved_detail_put(plugin, slug, "Resolved", R"(["Author A"])", R"(["Artist B"])",
-                                     R"(["Tag 1","Tag 2"])", "display text", "https://x/c.png"));
+        CHECK(store.saved_detail_put({.plugin = plugin, .slug = slug, .name = "Resolved", .authors = R"(["Author A"])",
+                                     .artists = R"(["Artist B"])", .tags = R"(["Tag 1","Tag 2"])",
+                                     .synopsis_display = "display text", .cover = "https://x/c.png"}));
         const auto row = store.saved_get(plugin, slug);
         REQUIRE(row.has_value());
         CHECK(row->name == "Resolved");
@@ -762,7 +810,8 @@ TEST_CASE("Store: materialized detail columns (manga-detail-table 1.4/2.1/3.2)")
     SUBCASE("re-save preserves materialized columns; name refresh allowed") {
         const std::string slug = "mat-b-" + run;
         store.save_manga({plugin, slug, "Raw", "", 0});
-        REQUIRE(store.saved_detail_put(plugin, slug, "Resolved", R"(["A"])", "", R"(["t"])", "d", ""));
+        REQUIRE(store.saved_detail_put({.plugin = plugin, .slug = slug, .name = "Resolved", .authors = R"(["A"])",
+                                        .tags = R"(["t"])", .synopsis_display = "d"}));
         store.save_manga({plugin, slug, "Re-saved", "", 0}); // plain re-save
         const auto row = store.saved_get(plugin, slug);
         REQUIRE(row.has_value());
@@ -774,11 +823,11 @@ TEST_CASE("Store: materialized detail columns (manga-detail-table 1.4/2.1/3.2)")
     SUBCASE("placeholder name never clobbers a stored one (D9 guard at the store seam)") {
         const std::string slug = "mat-c-" + run;
         store.save_manga({plugin, slug, "Real Name", "", 0});
-        CHECK(store.saved_detail_put(plugin, slug, "", R"(["A"])", "", "", "", "")); // columns land, name kept
+        CHECK(store.saved_detail_put({.plugin = plugin, .slug = slug, .authors = R"(["A"])"})); // columns land, name kept
         CHECK(store.saved_get(plugin, slug)->name == "Real Name");
-        CHECK(store.saved_detail_put(plugin, slug, slug, "", "", "", "x", "")); // slug == name kept
+        CHECK(store.saved_detail_put({.plugin = plugin, .slug = slug, .name = slug, .synopsis_display = "x"})); // slug == name kept
         CHECK(store.saved_get(plugin, slug)->name == "Real Name");
-        CHECK(store.saved_detail_put(plugin, slug, "Better", "", "", "", "", "")); // real name lands
+        CHECK(store.saved_detail_put({.plugin = plugin, .slug = slug, .name = "Better"})); // real name lands
         CHECK(store.saved_get(plugin, slug)->name == "Better");
     }
 
@@ -787,7 +836,8 @@ TEST_CASE("Store: materialized detail columns (manga-detail-table 1.4/2.1/3.2)")
         store.save_manga({plugin, slug, "Raw", "", 0});
         store.saved_signal_update(plugin, slug, "src", R"(["Alt"])");
         store.saved_stats_update(plugin, slug, "ongoing", 9);
-        REQUIRE(store.saved_detail_put(plugin, slug, "R", R"(["A"])", "", R"(["t"])", "d", ""));
+        REQUIRE(store.saved_detail_put({.plugin = plugin, .slug = slug, .name = "R", .authors = R"(["A"])",
+                                        .tags = R"(["t"])", .synopsis_display = "d"}));
         store.saved_detail_clear(plugin, slug);
         const auto row = store.saved_get(plugin, slug);
         REQUIRE(row.has_value());
@@ -800,14 +850,15 @@ TEST_CASE("Store: materialized detail columns (manga-detail-table 1.4/2.1/3.2)")
         CHECK(row->alt_titles == R"(["Alt"])");
         CHECK(row->total_ch == 9); // stats survive
         store.saved_detail_clear("nope", "x"); // absent row no-op
-        CHECK_FALSE(store.saved_detail_put("nope", "x", "N", "[]", "[]", "[]", "", "")); // absent row no-op
+        CHECK_FALSE(store.saved_detail_put({.plugin = "nope", .slug = "x", .name = "N", .authors = "[]", .artists = "[]",
+                                            .tags = "[]"})); // absent row no-op
     }
 
     SUBCASE("saved_has_detail gate and recompute coexistence") {
         const std::string slug = "mat-e-" + run;
         store.save_manga({plugin, slug, "Raw", "", 0});
         CHECK_FALSE(saved_has_detail(*store.saved_get(plugin, slug))); // empty everywhere: not materialized
-        REQUIRE(store.saved_detail_put(plugin, slug, "", "", "", "", "only synopsis", ""));
+        REQUIRE(store.saved_detail_put({.plugin = plugin, .slug = slug, .synopsis_display = "only synopsis"}));
         CHECK(saved_has_detail(*store.saved_get(plugin, slug)));
         store.recompute_dup_groups(); // clustering runs over rows carrying detail
         CHECK(store.saved_get(plugin, slug)->dup_group == 0);

@@ -188,11 +188,10 @@ void Store::saved_clear_update(const std::string& plugin, const std::string& slu
     impl_->storage.replace(e);
 }
 
-bool Store::saved_detail_put(const std::string& plugin, const std::string& slug, const std::string& name,
-                             const std::string& authors_json, const std::string& artists_json,
-                             const std::string& tags_json, const std::string& synopsis_display,
-                             const std::string& cover) {
+bool Store::saved_detail_put(const SavedDetailPut& in) {
     const store_detail::OpTrace _op{"saved_detail_put"};
+    const auto& plugin = in.plugin;
+    const auto& slug = in.slug;
     auto rows = impl_->storage.get_all<store_detail::SavedMangaEntity>(where(
         c(&store_detail::SavedMangaEntity::plugin) == plugin && c(&store_detail::SavedMangaEntity::slug) == slug));
     if (rows.empty()) {
@@ -201,23 +200,23 @@ bool Store::saved_detail_put(const std::string& plugin, const std::string& slug,
     auto& e = rows[0];
     // name guard mirrors D9: never land a placeholder over a real name
     std::string new_name = e.name;
-    if (!name.empty() && name != slug) {
-        new_name = name;
+    if (!in.name.empty() && in.name != slug) {
+        new_name = in.name;
     }
     const bool name_changed = new_name != e.name;
-    const bool changed = name_changed || e.authors != authors_json || e.artists != artists_json ||
-                         e.tags != tags_json || e.synopsis_display != synopsis_display ||
-                         (!cover.empty() && e.cover != cover);
+    const bool changed = name_changed || e.authors != in.authors || e.artists != in.artists ||
+                         e.tags != in.tags || e.synopsis_display != in.synopsis_display ||
+                         (!in.cover.empty() && e.cover != in.cover);
     if (!changed) {
         return false; // plain page open stays read-only (design D2)
     }
     e.name = new_name;
-    e.authors = authors_json;
-    e.artists = artists_json;
-    e.tags = tags_json;
-    e.synopsis_display = synopsis_display;
-    if (!cover.empty()) {
-        e.cover = cover; // refresh keeps the cover current (sites rotate/prune upload urls)
+    e.authors = in.authors;
+    e.artists = in.artists;
+    e.tags = in.tags;
+    e.synopsis_display = in.synopsis_display;
+    if (!in.cover.empty()) {
+        e.cover = in.cover; // refresh keeps the cover current (sites rotate/prune upload urls)
     }
     impl_->storage.replace(e);
     if (name_changed) {

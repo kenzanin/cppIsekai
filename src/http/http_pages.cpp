@@ -1,6 +1,10 @@
 #include "enrich_internal.hpp"
 #include "http_routes.hpp"
 
+#include <glaze/glaze.hpp>
+#include <optional>
+#include <utility>
+
 #include <fstream>
 #include <sstream>
 
@@ -86,13 +90,42 @@ crow::json::wvalue home_context(Store& store, BS::thread_pool<>& db, const crow:
     const int dup_total = static_cast<int>(std::count_if(saved.begin(), saved.end(), [](const SavedManga& m) { return m.dup_group > 0; }));
     // Cover prefetch: hand the saved covers to the cover worker; cache-first,
     // so entries already on disk are not re-fetched.
-    // overlay chosen enrichment covers so the grid matches the detail page
-    std::vector<std::optional<std::string>> ovl;
-    ovl.reserve(saved.size());
-    std::vector<std::optional<std::string>> ovl_title;
+    // overlay chosen enrichment covers/titles so the grid matches the detail
+    // page: ONE batched title_meta read + a single parse pass (hot-path-perf P1)
+    // instead of 2N mutexed per-title queries.
+    std::vector<std::pair<std::string, std::string>> tm_keys;
+    tm_keys.reserve(saved.size());
     for (const auto& m : saved) {
-        ovl.push_back(http::api::chosen_cover(store, db, m.plugin, m.slug));
-        ovl_title.push_back(http::api::chosen_title(store, db, m.plugin, m.slug));
+        tm_keys.emplace_back(m.plugin, m.slug);
+    }
+    const auto tm = on_pool(db, [&] { return store.title_meta_get_many(tm_keys); });
+    const auto chosen_field = [](const glz::generic& chosen, const char* key) -> std::optional<std::string> {
+        if (!chosen.is_object()) {
+            return std::nullopt;
+        }
+        const auto& cd = chosen.get_object();
+        const auto it = cd.find(key);
+        if (it == cd.end()) {
+            return std::nullopt;
+        }
+        if (const auto* s = std::get_if<std::string>(&it->second.data); s != nullptr && !s->empty()) {
+            return *s;
+        }
+        return std::nullopt;
+    };
+    std::vector<std::optional<std::string>> ovl(saved.size());
+    std::vector<std::optional<std::string>> ovl_title(saved.size());
+    for (std::size_t i = 0; i < saved.size(); ++i) {
+        const auto it = tm.find({saved[i].plugin, saved[i].slug});
+        if (it == tm.end()) {
+            continue;
+        }
+        glz::generic chosen;
+        if (glz::read_json(chosen, it->second.chosen) != glz::error_code::none) {
+            continue;
+        }
+        ovl[i] = chosen_field(chosen, "cover");
+        ovl_title[i] = chosen_field(chosen, "title");
     }
     std::vector<reader::CoverJob> jobs;
     for (std::size_t i = 0; i < saved.size(); ++i) {

@@ -234,6 +234,10 @@ public:
      *  prune the oldest library-*.db beyond \p keep. Returns the snapshot
      *  path; empty on failure (busy db / io) — caller just retries next tick. */
     std::string maintenance_vacuum_backup(const std::string& backup_dir, int keep);
+    /** \brief hot-path-perf P3: age-based api_cache reaper -- deletes rows expired
+     *  beyond the 7d stale-serve grace (fetched_at + ttl_s < now-7d); returns the
+     *  deleted count so the tick can log it. */
+    std::size_t cache_prune_expired();
 
     /** \brief Envelope-derived stat update (status, total_ch, status_flags, updated_at). Empty
      * status leaves the stored status (and its category bits) alone; a negative total_ch keeps
@@ -266,11 +270,20 @@ public:
     /** \brief manga-detail-table: persist the resolved display detail on the saved row
      *  (authors/artists/tags JSON arrays + display synopsis; name refreshed too). No-op
      *  (returns false) when the row is absent or nothing changed; the dedup signals
-     *  synopsis/alt_titles are never touched here (design D4). */
-    bool saved_detail_put(const std::string& plugin, const std::string& slug, const std::string& name,
-                          const std::string& authors_json, const std::string& artists_json,
-                          const std::string& tags_json, const std::string& synopsis_display,
-                          const std::string& cover);
+     *  synopsis/alt_titles are never touched here (design D4).
+     *  hot-path-perf P4/D4: payload struct with designated init instead of the former
+     *  8-positional-string signature (whose 7->8 growth already cost one mass sweep). */
+    struct SavedDetailPut {
+        std::string plugin;
+        std::string slug;
+        std::string name;
+        std::string authors;          // JSON array
+        std::string artists;          // JSON array
+        std::string tags;             // JSON array
+        std::string synopsis_display;
+        std::string cover;            // empty = keep the saved cover
+    };
+    bool saved_detail_put(const SavedDetailPut& in);
     /** \brief manga-detail-table reset (design D6): clear the materialized display fields so
      *  the next open re-resolves them. No-op when the row is absent. */
     void saved_detail_clear(const std::string& plugin, const std::string& slug);
@@ -286,6 +299,11 @@ public:
 
     /** \brief nullopt when the manga never fetched; corrupt JSON reads as nullopt too (2.3). */
     std::optional<TitleMetaRow> title_meta_get(const std::string& plugin, const std::string& slug);
+    /** \brief hot-path-perf P1/D1: batched overlay read for the library grid -- rows for
+     *  the (plugin, slug) keys that exist, absent/corrupt ones skipped; parity with
+     *  title_meta_get in a single OpTrace scope instead of 2N mutexed queries. */
+    std::map<std::pair<std::string, std::string>, TitleMetaRow> title_meta_get_many(
+        const std::vector<std::pair<std::string, std::string>>& keys);
     void title_meta_put_fetched(const std::string& plugin, const std::string& slug, const std::string& fetched_json,
                                 std::int64_t fetched_at);
     void title_meta_put_chosen(const std::string& plugin, const std::string& slug, const std::string& chosen_json);

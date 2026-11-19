@@ -65,6 +65,12 @@ void Scheduler::run_once() {
             last_backup = std::strtoll(last_b->c_str(), nullptr, 10);
         }
         if (last_backup == 0 || now - last_backup >= interval_s) {
+            // hot-path-perf P3: age-based api_cache prune rides the backup tick,
+            // immediately before the snapshot; silent when nothing expired.
+            const auto pruned = http::on_pool(db_, [&] { return store_.cache_prune_expired(); });
+            if (pruned > 0) {
+                spdlog::info("[backup] pruned {} cache rows", pruned);
+            }
             const std::string dir =
                 (std::filesystem::path(cfg.db).parent_path() / "backups").generic_string();
             const std::string path =

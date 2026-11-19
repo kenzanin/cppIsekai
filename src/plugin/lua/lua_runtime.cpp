@@ -42,6 +42,64 @@ void open_sandbox(lua_State* L) {
     lua_pop(L, 1);
 }
 
+namespace {
+
+// Shared request-opts surface for host.http.fetch/fetch_body (hot-path-perf P2):
+// one parser, two consumers -- the option set can no longer drift between them.
+struct HttpOpts {
+    long ms{};                // effective timeout; conf default when unset
+    std::string live_default; // live-profile snapshot at call time
+    std::string profile;      // == live_default until opts/profile overrides
+    std::string method = "GET";
+    std::string body;
+    std::string accept;
+    std::string user_agent;
+    bool cookie = false; // per-plugin cookie jar
+    std::vector<std::pair<std::string, std::string>> headers;
+};
+
+HttpOpts parse_http_opts(const sol::optional<sol::table>& opts, long timeout_ms, const plugin::LiveProfile& live) {
+    HttpOpts o;
+    o.ms = timeout_ms;
+    if (auto p = live.load()) {
+        o.live_default = *p;
+    }
+    o.profile = o.live_default;
+    if (opts) {
+        if (sol::object v = (*opts)["timeout_ms"]; v.get_type() == sol::type::number) {
+            o.ms = static_cast<long>(v.as<double>());
+        }
+        if (sol::object v = (*opts)["profile"]; v.get_type() == sol::type::string) {
+            o.profile = v.as<std::string>();
+        }
+        if (sol::object v = (*opts)["method"]; v.get_type() == sol::type::string) {
+            o.method = v.as<std::string>();
+        }
+        if (sol::object v = (*opts)["body"]; v.get_type() == sol::type::string) {
+            o.body = v.as<std::string>();
+        }
+        if (sol::object v = (*opts)["accept"]; v.get_type() == sol::type::string) {
+            o.accept = v.as<std::string>();
+        }
+        if (sol::object v = (*opts)["user_agent"]; v.get_type() == sol::type::string) {
+            o.user_agent = v.as<std::string>();
+        }
+        if (sol::object v = (*opts)["cookie"]; v.get_type() == sol::type::boolean) {
+            o.cookie = v.as<bool>();
+        }
+        if (sol::object v = (*opts)["headers"]; v.get_type() == sol::type::table) {
+            v.as<sol::table>().for_each([&](sol::object k, sol::object val) {
+                if (k.get_type() == sol::type::string && val.get_type() == sol::type::string) {
+                    o.headers.emplace_back(k.as<std::string>(), val.as<std::string>());
+                }
+            });
+        }
+    }
+    return o;
+}
+
+} // namespace
+
 // Host tools for the Lua runtime. Build with clang only (xmake set_toolchains):
 // GCC folds every same-signature lambda to ONE type name, and sol2 3.5.0 keys its
 // functor metatables on that name (upstream #1743) -- at lua_close it then runs the
@@ -188,54 +246,13 @@ end
             return std::make_pair(sol::make_object(ts, sol::lua_nil), std::optional(std::move(why)));
         };
 
-        long ms = timeout_ms;
-        std::string live_default;
-        if (auto p = live->load()) {
-            live_default = *p;
-        }
-        std::string profile_name = live_default;
-        std::string method = "GET";
-        std::string body;
-        std::string accept_header; // optional per-call Accept override
-        std::string ua_header;     // optional per-call User-Agent override
-        bool use_cookies = false;  // 2.2: opts.cookie => per-plugin jar (cookie_jar_path)
-        std::vector<std::pair<std::string, std::string>> extra_headers;
-        if (opts) {
-            if (sol::object v = (*opts)["timeout_ms"]; v.get_type() == sol::type::number) {
-                ms = static_cast<long>(v.as<double>());
-            }
-            if (sol::object v = (*opts)["profile"]; v.get_type() == sol::type::string) {
-                profile_name = v.as<std::string>();
-            }
-            if (sol::object v = (*opts)["method"]; v.get_type() == sol::type::string) {
-                method = v.as<std::string>();
-            }
-            if (sol::object v = (*opts)["body"]; v.get_type() == sol::type::string) {
-                body = v.as<std::string>();
-            }
-            if (sol::object v = (*opts)["accept"]; v.get_type() == sol::type::string) {
-                accept_header = v.as<std::string>();
-            }
-            if (sol::object v = (*opts)["user_agent"]; v.get_type() == sol::type::string) {
-                ua_header = v.as<std::string>();
-            }
-            if (sol::object v = (*opts)["cookie"]; v.get_type() == sol::type::boolean) {
-                use_cookies = v.as<bool>();
-            }
-            if (sol::object v = (*opts)["headers"]; v.get_type() == sol::type::table) {
-                v.as<sol::table>().for_each([&](sol::object k, sol::object val) {
-                    if (k.get_type() == sol::type::string && val.get_type() == sol::type::string) {
-                        extra_headers.emplace_back(k.as<std::string>(), val.as<std::string>());
-                    }
-                });
-            }
-        }
+        const HttpOpts o = parse_http_opts(opts, timeout_ms, *live);
 
-        profile_name = checked_profile(std::move(profile_name), live_default);
-        const std::string cookie_jar = use_cookies ? cookie_jar_path(id) : std::string{};
+        const std::string profile = checked_profile(std::move(o.profile), o.live_default);
+        const std::string cookie_jar = o.cookie ? cookie_jar_path(id) : std::string{};
         // The shared sync path (http_client): one option block, retry, impersonation.
         const FetchResult fr =
-            fetch_sync(url, ms, profile_name, method, body, accept_header, ua_header, extra_headers, proxy, cookie_jar);
+            fetch_sync(url, o.ms, profile, o.method, o.body, o.accept, o.user_agent, o.headers, proxy, cookie_jar);
         if (!fr.error.empty()) {
             return fail(fr.error);
         }
@@ -255,53 +272,12 @@ end
     // host.http.fetch_body: returns body string when status == 200, else nil.
     http["fetch_body"] = [id, timeout_ms = conf.fetch_timeout_ms, live = &live_profile,
                           proxy = conf.proxy](const std::string& url, const sol::optional<sol::table>& opts) -> std::optional<std::string> {
-        long ms = timeout_ms;
-        std::string live_default;
-        if (auto p = live->load()) {
-            live_default = *p;
-        }
-        std::string profile_name = live_default;
-        std::string method = "GET";
-        std::string body;
-        std::string accept_header;
-        std::string ua_header;
-        bool use_cookies = false;
-        std::vector<std::pair<std::string, std::string>> extra_headers;
-        if (opts) {
-            if (sol::object v = (*opts)["timeout_ms"]; v.get_type() == sol::type::number) {
-                ms = static_cast<long>(v.as<double>());
-            }
-            if (sol::object v = (*opts)["profile"]; v.get_type() == sol::type::string) {
-                profile_name = v.as<std::string>();
-            }
-            if (sol::object v = (*opts)["method"]; v.get_type() == sol::type::string) {
-                method = v.as<std::string>();
-            }
-            if (sol::object v = (*opts)["body"]; v.get_type() == sol::type::string) {
-                body = v.as<std::string>();
-            }
-            if (sol::object v = (*opts)["accept"]; v.get_type() == sol::type::string) {
-                accept_header = v.as<std::string>();
-            }
-            if (sol::object v = (*opts)["user_agent"]; v.get_type() == sol::type::string) {
-                ua_header = v.as<std::string>();
-            }
-            if (sol::object v = (*opts)["cookie"]; v.get_type() == sol::type::boolean) {
-                use_cookies = v.as<bool>();
-            }
-            if (sol::object v = (*opts)["headers"]; v.get_type() == sol::type::table) {
-                v.as<sol::table>().for_each([&](sol::object k, sol::object val) {
-                    if (k.get_type() == sol::type::string && val.get_type() == sol::type::string) {
-                        extra_headers.emplace_back(k.as<std::string>(), val.as<std::string>());
-                    }
-                });
-            }
-        }
+        const HttpOpts o = parse_http_opts(opts, timeout_ms, *live);
 
-        profile_name = checked_profile(std::move(profile_name), live_default);
-        const std::string cookie_jar = use_cookies ? cookie_jar_path(id) : std::string{};
+        const std::string profile = checked_profile(std::move(o.profile), o.live_default);
+        const std::string cookie_jar = o.cookie ? cookie_jar_path(id) : std::string{};
         const FetchResult fr =
-            fetch_sync(url, ms, profile_name, method, body, accept_header, ua_header, extra_headers, proxy, cookie_jar);
+            fetch_sync(url, o.ms, profile, o.method, o.body, o.accept, o.user_agent, o.headers, proxy, cookie_jar);
         if (!fr.error.empty()) {
             spdlog::warn("[plugin:{}] fetch_body {} failed: {}", id, url, fr.error);
             return std::nullopt;

@@ -89,3 +89,34 @@ std::string Store::maintenance_vacuum_backup(const std::string& backup_dir, int 
     }
     return target;
 }
+
+// hot-path-perf P3/D3: api_cache had no age-based reaper (rows left only on
+// unlink/purge), so expired rows plus dead-plugin rows accumulated forever.
+// Horizon = expiry + 7d keeps the stale-serve grace and per-plugin manifest
+// cache_ttl intact; a busy/failing sweep just retries next tick.
+std::size_t Store::cache_prune_expired() {
+    const store_detail::OpTrace _op{"cache_prune_expired"};
+    const std::int64_t horizon = static_cast<std::int64_t>(std::time(nullptr)) - 7 * 86400;
+    sqlite3* db = nullptr;
+    if (sqlite3_open(impl_->path.c_str(), &db) != SQLITE_OK) {
+        if (db) {
+            sqlite3_close(db);
+        }
+        return 0;
+    }
+    store_detail::attach_busy(db);
+    sqlite3_stmt* stmt = nullptr;
+    bool ok = sqlite3_prepare_v2(db, "DELETE FROM api_cache WHERE fetched_at + ttl_s < ?", -1, &stmt, nullptr) == SQLITE_OK;
+    std::size_t n = 0;
+    if (ok) {
+        ok = sqlite3_bind_int64(stmt, 1, horizon) == SQLITE_OK && sqlite3_step(stmt) == SQLITE_DONE;
+        n = ok ? static_cast<std::size_t>(sqlite3_changes(db)) : 0;
+    }
+    const std::string msg = ok ? "" : sqlite3_errmsg(db);
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+    if (!ok) {
+        spdlog::warn("[backup] cache prune failed: {}", msg);
+    }
+    return n;
+}

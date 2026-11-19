@@ -32,6 +32,34 @@ std::optional<Store::TitleMetaRow> Store::title_meta_get(const std::string& plug
         .plugin = r.plugin, .slug = r.slug, .fetched = r.fetched, .chosen = r.chosen, .fetched_at = r.fetched_at};
 }
 
+std::map<std::pair<std::string, std::string>, Store::TitleMetaRow> Store::title_meta_get_many(
+    const std::vector<std::pair<std::string, std::string>>& keys) {
+    const store_detail::OpTrace _op{"title_meta_get_many"};
+    std::map<std::pair<std::string, std::string>, Store::TitleMetaRow> out;
+    // group by plugin: one indexed query per plugin with the slug set as IN --
+    // a raw pair-IN statement is not worth it at library scale.
+    std::map<std::string, std::vector<std::string>> by_plugin;
+    for (const auto& key : keys) {
+        by_plugin[key.first].push_back(key.second);
+    }
+    for (const auto& [plugin, slugs] : by_plugin) {
+        auto rows = impl_->storage.get_all<store_detail::TitleMetaEntity>(
+            where(c(&store_detail::TitleMetaEntity::plugin) == plugin &&
+                  in(&store_detail::TitleMetaEntity::slug, slugs)));
+        for (const auto& r : rows) {
+            if (title_meta_row_bad(r.fetched) || title_meta_row_bad(r.chosen)) {
+                continue; // corrupt reads as absent (parity with title_meta_get)
+            }
+            out.try_emplace({r.plugin, r.slug}, TitleMetaRow{.plugin = r.plugin,
+                                                             .slug = r.slug,
+                                                             .fetched = r.fetched,
+                                                             .chosen = r.chosen,
+                                                             .fetched_at = r.fetched_at});
+        }
+    }
+    return out;
+}
+
 void Store::title_meta_put_fetched(const std::string& plugin, const std::string& slug, const std::string& fetched_json,
                                    std::int64_t fetched_at) {
     const store_detail::OpTrace _op{"title_meta_put_fetched"};
