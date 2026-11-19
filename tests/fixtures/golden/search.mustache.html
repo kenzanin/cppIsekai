@@ -243,7 +243,7 @@ function searchPage() {
       try {
         const j = await (await fetch(u)).json()
         if (!j.ok) { this.err = j.error || 'search failed' }
-        else { this.items = j.data.items; this.total = j.data.total }
+        else { this.items = Array.isArray(j.data.items) ? j.data.items : []; this.total = j.data.total }
       } catch (e) { this.err = String(e) }
       this.loading = false
       if (push) this.sync()

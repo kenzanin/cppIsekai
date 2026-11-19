@@ -10,5 +10,6 @@
   },
   "runtime": "lua",
   "version": "1.0.0",
-  "api": 1
+  "api": 1,
+  "image_referer": "https://www.mangaread.org/"
 }
