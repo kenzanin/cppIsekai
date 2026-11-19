@@ -1,6 +1,8 @@
 #include "enrich_internal.hpp"
 #include "http_routes.hpp"
 
+#include "plugin/url_codec.hpp"
+
 #include <glaze/glaze.hpp>
 #include <optional>
 #include <utility>
@@ -147,6 +149,12 @@ crow::json::wvalue home_context(Store& store, BS::thread_pool<>& db, const crow:
         row["slug"] = m.slug;
         row["plugin"] = m.plugin;
         row["cover"] = ovl[i].value_or(m.cover);
+        // grid cover src is built SERVER-side (/cache/img?url={{cover_q}}), so the url
+        // must arrive fully percent-encoded: its own `?token=..&ttl=..` would otherwise
+        // be cut at the first `&` by the route's raw_url parse and the truncated fetch
+        // returns an HTML error page that gets stored as the "cover". The detail page
+        // has always encoded client-side (encodeURIComponent) — this is the same shape.
+        row["cover_q"] = plugin::url_encode(ovl[i].value_or(m.cover));
         row["url"] = std::string("/view/manga/") + m.plugin + "/" + m.slug;
         // library-grid-stats 3.1: stat fields for grid badges/filters
         // (library-grid-controls 1.1 renders them; keys mirror /api/library).

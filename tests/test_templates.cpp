@@ -11,6 +11,8 @@
 #include <crow/json.h>
 #include <crow/mustache.h>
 
+#include "plugin/url_codec.hpp"
+
 namespace {
 
 std::string slurp(const std::string& path) {
@@ -97,6 +99,7 @@ crow::json::wvalue home_ctx() {
         row["slug"] = "one-piece";
         row["plugin"] = "mangadex";
         row["cover"] = "http://example/cover.jpg";
+        row["cover_q"] = plugin::url_encode("http://example/cover.jpg"); // grid src is server-built -> fully encoded
         row["url"] = "/view/manga/mangadex/one-piece";
         row["dup"] = 3; // library-dedup 3.1: data-dup attrs exercised in golden
         saved.push_back(std::move(row));
