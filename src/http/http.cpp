@@ -22,7 +22,9 @@ cache::Fetcher makeCurlFetcher(const std::string& proxy, const plugin::Host& plu
         // Manifest `image_engine` opt-in: CF-fronted image CDNs need the
         // chrome impersonation fingerprint; stock curl eats a 403 challenge.
         if (const std::string engine = plugins.image_engine(plugin); !engine.empty()) {
-            fetch::Request rq{.url = url, .timeout_ms = 30000, .profile = engine};
+            fetch::Request rq;
+            rq.url = url;
+            rq.profile = engine; // timeout_ms defaults to 30 s
             if (const std::string referer = plugins.image_referer(plugin);
                 !referer.empty() && referer != "none") { // "none": sentinel, no header (D-sentinel)
                 rq.headers = {{"Referer", referer}};

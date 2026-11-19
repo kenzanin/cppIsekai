@@ -1,3 +1,4 @@
+#include "parse_num.hpp"
 #include "store.hpp"
 #include "store_busy.hpp"
 #include "store_internal.hpp"
@@ -102,7 +103,7 @@ int Store::chapters_upsert(const std::string& plugin, const std::string& slug,
             total && !total->empty() && *total != "0") {
             if (const auto rd = state_get(kStateHost, std::string(kReadPrefix) + r.chapter_id);
                 rd && !rd->empty()) {
-                if (const int p = std::atoi(rd->c_str()), t = std::atoi(total->c_str()); p >= t && p > 0) {
+                if (const int p = parse::to_int(*rd), t = parse::to_int(*total); p >= t && p > 0) {
                     legacy |= std::to_underlying(ChapterFlag::kRead);
                 }
             }

@@ -25,8 +25,10 @@ std::string Store::maintenance_vacuum_backup(const std::string& backup_dir, int 
     {
         const std::time_t now = std::time(nullptr);
         std::tm tm{};
-        localtime_r(&now, &tm);
-        std::strftime(ts, sizeof(ts), "%Y%m%d-%H%M%S", &tm);
+        if (localtime_r(&now, &tm) == nullptr || std::strftime(ts, sizeof(ts), "%Y%m%d-%H%M%S", &tm) == 0) {
+            spdlog::warn("[backup] timestamp build failed");
+            return {};
+        }
     }
     const std::string target = backup_dir + "/library-" + ts + ".db";
     // same-second rerun (tests, manual + scheduler race): VACUUM INTO fails on

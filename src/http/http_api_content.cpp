@@ -286,8 +286,8 @@ void register_content(Ctx& c) {
         const bool cover = param(req, "cover") == "1" || param(req, "cover") == "true";
         const auto plugin = param(req, "plugin");
         const auto slug = param(req, "slug");
-        const int ch = std::atoi(param(req, "ch").c_str());
-        const int page = std::atoi(param(req, "page").c_str());
+        const int ch = parse::to_int(param(req, "ch"));
+        const int page = parse::to_int(param(req, "page"));
         const std::string ch_id = param(req, "ch_id");
         cache::Cache::CoverCtx cctx;
         cache::Cache::PageCtx pctx;
@@ -316,8 +316,8 @@ void register_content(Ctx& c) {
     ([&](const crow::request& req) {
         const auto plugin = param(req, "plugin");
         const auto slug = param(req, "slug");
-        const int ch = std::atoi(param(req, "ch").c_str());
-        const int pages = std::atoi(param(req, "pages").c_str());
+        const int ch = parse::to_int(param(req, "ch"));
+        const int pages = parse::to_int(param(req, "pages"));
         const bool full = valid_title_pair(plugin, slug) && chapter_cached(images.ns(plugin), slug, ch, pages);
         crow::json::wvalue out;
         out["ok"] = true;

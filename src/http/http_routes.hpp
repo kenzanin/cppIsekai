@@ -9,8 +9,9 @@
  * translation units.
  */
 
-#include <crow.h>
+#include "parse_num.hpp"
 
+#include <crow.h>
 #include <BS_thread_pool.hpp>
 
 #include <spdlog/spdlog.h>
@@ -62,7 +63,7 @@ inline std::string param(const crow::request& req, const char* key) {
 
 /** \brief 1-based page number from a query value. */
 inline int page_of(const std::string& text) {
-    const int page = text.empty() ? 1 : std::atoi(text.c_str());
+    const int page = parse::to_int(text, 1);
     return page < 1 ? 1 : page;
 }
 

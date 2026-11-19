@@ -288,13 +288,13 @@ void register_admin(Ctx& c) {
         std::map<std::string, std::string> updates;
         std::string parse_err;
         if (!config::parse_updates(req.body, updates, parse_err)) {
-            return fail(400, std::move(parse_err));
+            return fail(400, parse_err);
         }
 
         std::string err;
         const int written = config::save(updates, ini_path, &err);
         if (written < 0) {
-            return fail(written == -2 ? 500 : 400, std::move(err));
+            return fail(written == -2 ? 500 : 400, err);
         }
 
         // Live default (task 1.2): the running Host picks up the new

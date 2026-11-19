@@ -319,11 +319,11 @@ void register_state(Ctx& c) {
                 }
                 if (const auto r = store.state_get(kStateHost, std::string(kReadPrefix) + id);
                     r && !r->empty() && *r != "0") {
-                    out[id]["read"] = std::atoi(r->c_str());
+                    out[id]["read"] = parse::to_int(*r);
                 }
                 if (const auto t = store.state_get(kStateHost, std::string(kTotalPrefix) + id);
                     t && !t->empty() && *t != "0") {
-                    out[id]["total"] = std::atoi(t->c_str());
+                    out[id]["total"] = parse::to_int(*t);
                 }
                 if (const auto c2 = cached_for(id); c2 && *c2 > 0) {
                     out[id]["cached"] = *c2;

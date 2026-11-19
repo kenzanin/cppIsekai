@@ -255,7 +255,7 @@ void register_pages(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, L
    CROW_ROUTE(app, "/about")([&] { return html("about.mustache", layout(store, db, "about")); });
    // Single source for the About page: repo-root README.md, read per
    // request (it changes with every push) and cached never.
-   CROW_ROUTE(app, "/about/readme")([](const crow::request& req, crow::response& res) {
+   CROW_ROUTE(app, "/about/readme")([](const crow::request& /*req*/, crow::response& res) {
        std::ifstream f("README.md", std::ios::binary);
        if (!f) { res.code = 404; res.end(); return; }
        std::stringstream ss;

@@ -184,7 +184,7 @@ void register_reader(Ctx& c) {
                     int prev = 0;
                     if (const auto s = store.state_get(kStateHost, std::string(kReadPrefix) + chapter);
                         s && !s->empty()) {
-                        prev = std::atoi(s->c_str()); // state_get returns the stored "N"
+                        prev = parse::to_int(*s); // state_get returns the stored "N"
                     }
                     const int p = pos.page > 1 ? pos.page : 1;
                     const int now = std::max(prev, p);
