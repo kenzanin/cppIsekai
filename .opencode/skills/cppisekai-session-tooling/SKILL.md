@@ -107,3 +107,7 @@ Verification ladder — climb it before saying "fixed":
 ## 8. Reporting
 
 Report in Indonesian, casual, and lead with what is verified vs not. A green build is not a green feature. State the exact commands, exit statuses, and the field/row/pixel you observed; if a step is unverified, say so plainly instead of implying it passed.
+
+## static/*.js is brotli-served — regenerate the .br
+
+`/static/reader.js` and `/static/detail.js` go through `br_asset` (`src/http/http_pages.cpp:292`), which serves `static/<name>.js.br` whenever it exists (and it does, tracked in git). Editing only the `.js` is invisible in the browser — the old brotli body keeps shipping and Alpine data shows no new fields. After any edit: `brotli -q 11 -f -o static/reader.js.br static/reader.js`, then navigate (not just reload) and check the new state key exists.
