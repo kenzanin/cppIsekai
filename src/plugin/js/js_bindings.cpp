@@ -27,6 +27,7 @@ std::string arg_str(JSContext* ctx, JSValueConst v) {
     size_t n = 0;
     if (const char* p = JS_ToCStringLen(ctx, &n, v)) {
         out.assign(p, n);
+        JS_FreeCString(ctx, p); // quickjs hands back an owned copy
     }
     return out;
 }
@@ -520,7 +521,7 @@ JSValue js_re2_match(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueCon
         }
         return arr;
     } catch (const std::invalid_argument& e) {
-        return JS_ThrowTypeError(ctx, e.what());
+        return JS_ThrowTypeError(ctx, "%s", e.what());
     }
 }
 
@@ -536,7 +537,7 @@ JSValue js_re2_find(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueCons
         }
         return arr;
     } catch (const std::invalid_argument& e) {
-        return JS_ThrowTypeError(ctx, e.what());
+        return JS_ThrowTypeError(ctx, "%s", e.what());
     }
 }
 
@@ -558,7 +559,7 @@ JSValue js_re2_find_all(JSContext* ctx, JSValueConst /*this*/, int argc, JSValue
         }
         return arr;
     } catch (const std::invalid_argument& e) {
-        return JS_ThrowTypeError(ctx, e.what());
+        return JS_ThrowTypeError(ctx, "%s", e.what());
     }
 }
 
@@ -570,7 +571,7 @@ JSValue js_re2_replace(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueC
         const std::string out = re2_replace(arg_str(ctx, argv[0]), arg_str(ctx, argv[1]), arg_str(ctx, argv[2]));
         return JS_NewStringLen(ctx, out.data(), out.size());
     } catch (const std::invalid_argument& e) {
-        return JS_ThrowTypeError(ctx, e.what());
+        return JS_ThrowTypeError(ctx, "%s", e.what());
     }
 }
 
@@ -590,7 +591,7 @@ JSValue js_re2_find_index(JSContext* ctx, JSValueConst /*this*/, int argc, JSVal
         const size_t idx = re2_find_index(arg_str(ctx, argv[0]), arg_str(ctx, argv[1]));
         return JS_NewInt64(ctx, static_cast<int64_t>(idx)); // 0 = not found
     } catch (const std::invalid_argument& e) {
-        return JS_ThrowTypeError(ctx, e.what());
+        return JS_ThrowTypeError(ctx, "%s", e.what());
     }
 }
 
@@ -606,7 +607,7 @@ JSValue js_re2_capture(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueC
         }
         return JS_NewStringLen(ctx, v->data(), v->size());
     } catch (const std::invalid_argument& e) {
-        return JS_ThrowTypeError(ctx, e.what());
+        return JS_ThrowTypeError(ctx, "%s", e.what());
     }
 }
 
