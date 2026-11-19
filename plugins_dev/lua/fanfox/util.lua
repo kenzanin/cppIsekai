@@ -5,10 +5,8 @@
 -- get_body parameter of get_page_urls).
 local util = {}
 
--- host.text.trim casefolds (utf8proc CASEFOLD) — mangles titles; local trim.
-local function trim(s)
-  return (tostring(s or ""):gsub("^%s+", ""):gsub("%s+$", ""))
-end
+-- host.text.trim: utf8-aware, case-preserving (plugin-host-promotion).
+local trim = host.text.trim
 
 -- re2.find row capture, nil-safe for `or` chains ({} on no-match).
 local function cap(pat, s, n)
@@ -17,11 +15,12 @@ end
 
 -- GET + 200 -> body, else nil. opts pass straight to host.http.fetch
 -- (headers = {...} for the chapterfun Referer).
+-- GET + 200 -> body, else nil (empty body included). opts pass straight to
+-- host.http.fetch (headers = {...} for the chapterfun Referer).
 function util.http_body(url, opts)
-  local res, err = host.http.fetch(url, opts)
-  if err ~= nil or res.status ~= 200 then return nil end
-  if res.body == nil or res.body == "" then return nil end
-  return res.body
+  local b = host.http.fetch_body(url, opts)
+  if b == nil or b == "" then return nil end
+  return b
 end
 
 -- ─── Search result parsing ─────────────────────────────────────────────────

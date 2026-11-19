@@ -19,12 +19,9 @@ local function render(url)
   return res.body, nil
 end
 
--- first capture group; nil when the pattern does not match.
+-- first capture group of the first match; nil when no match (host re2.capture).
 local function find1(s, pattern)
-  local m = host.re2.find(pattern, tostring(s or ""))
-  if #m >= 2 then return m[2] end
-  if #m == 1 then return m[1] end
-  return nil
+  return host.re2.capture(pattern, tostring(s or ""))
 end
 
 -- cover_abs absolutizes bare /images/covers/... paths (both the SSR detail

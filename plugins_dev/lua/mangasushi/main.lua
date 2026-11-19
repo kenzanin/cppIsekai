@@ -9,19 +9,11 @@ local GENRE_PATH = "/manga-genre/" -- stock Madara archive path (mangaread uses 
 -- ── helpers ────────────────────────────────────────────────────────────────
 
 -- http request -> (body, err). cppIsekai host.http.fetch replaces goIsekai get_body.
-local function http_req(url, opts)
-  local res, err = host.http.fetch(url, opts or {})
-  if err ~= nil then return nil, err end
-  if res.status ~= 200 then return nil, "mangasushi: upstream status " .. tostring(res.status) end
-  return res.body, nil
-end
+local http_req = host.http.fetch_body -- (body, err); nil unless 200 (plugin-host-promotion).
 
--- first capture group of the first match; nil when the pattern does not match.
+-- first capture group of the first match; nil when no match (host re2.capture).
 local function find1(s, pattern)
-  local m = host.re2.find(pattern, tostring(s or ""))
-  if #m >= 2 then return m[2] end
-  if #m == 1 then return m[1] end
-  return nil
+  return host.re2.capture(pattern, tostring(s or ""))
 end
 
 local methods = {}

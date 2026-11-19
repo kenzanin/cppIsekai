@@ -5,21 +5,15 @@
 -- mangadex precedent) instead of goIsekai's RFC3339 string requirement.
 local BASE = "https://comik.to"
 
--- host.text.trim casefolds (utf8proc CASEFOLD) — mangles titles; local trim.
-local function trim(s)
-  return (tostring(s or ""):gsub("^%s+", ""):gsub("%s+$", ""))
-end
+-- host.text.trim: utf8-aware, case-preserving (plugin-host-promotion).
+local trim = host.text.trim
 
-local function http_req(url)
-  local res, err = host.http.fetch(url)
-  if err ~= nil then return nil, err end
-  if res.status ~= 200 then return nil, "comik: upstream status " .. tostring(res.status) end
-  return res.body, nil
-end
+-- http request -> (body, err): the host two-value fetch_body form.
+local http_req = host.http.fetch_body
 
--- re2 find_all; nil on bad pattern (pcall) so callers can skip.
+-- re2 find_all (pattern, body); nil on bad pattern (pcall) so callers can skip.
 local function find_all(body, pattern)
-  local ok, res = pcall(host.re2.find_all, pattern, body)
+  local ok, res = pcall(host.re2.find_all, pattern, tostring(body or ""))
   if not ok then return nil end
   return res
 end

@@ -15,14 +15,9 @@ local function id_of(params)
   return tostring(v or "")
 end
 
--- request -> body, or nil on transport failure / non-200. opts (with
--- opts.headers) pass straight through to host.http.fetch.
-local function http_body(url, opts)
-  local res, err = host.http.fetch(url, opts or {})
-  if err ~= nil then return nil end
-  if res.status ~= 200 then return nil end
-  return res.body
-end
+-- request -> (body, err): the host two-value fetch_body form; opts (with
+-- opts.headers) pass straight through.
+local http_body = host.http.fetch_body
 
 local methods = {}
 

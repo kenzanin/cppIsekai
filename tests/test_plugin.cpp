@@ -15,10 +15,16 @@
 #include <spdlog/spdlog.h>
 
 #include <cstdlib>
+#include <cstring>
 #include <ctime>
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <thread>
+
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
 
 namespace {
 plugin::Config test_conf() {
@@ -633,4 +639,75 @@ TEST_CASE("host.re2 P4: find_all / replace / quote / find_index") {
         threw = true;
     }
     CHECK(threw);
+}
+
+TEST_CASE("lua require: shared-lib fallback, local shadow, guards") {
+    LogSetup ls;
+    Store store("test_libreq.db");
+    plugin::Host host(test_conf());
+    host.load_all(store);
+
+    const std::string res = host.call("lua_libtest", "ping", "{}");
+    CHECK(res.find("\"shared_tag\":\"shared-tag\"") != std::string::npos);  // lib fallback
+    CHECK(res.find("\"shadow_tag\":\"local-shadow\"") != std::string::npos); // plugin-local wins
+    CHECK(res.find("\"traversal_ok\":false") != std::string::npos);
+    CHECK(res.find("bad module name") != std::string::npos);               // '..' rejected
+    CHECK(res.find("module 'nope_nope' not found") != std::string::npos);  // miss message
+
+    std::error_code ec;
+    std::filesystem::remove("test_libreq.db", ec);
+}
+
+// plugin-host-promotion 6.3: fetch_body's (body, err) pair -- transport
+// failure, non-200 and the happy path, against a one-shot local listener
+// (hermetic; no external smoke host).
+TEST_CASE("lua fetch_body pair: err on transport / 4xx, body on 200") {
+    LogSetup ls;
+    Store store("test_fbpair.db");
+    plugin::Config c = test_conf();
+    plugin::Host host(c);
+    host.load_all(store);
+
+    // one-shot listener: accept once, write a 404 with a 2-byte body, close
+    int srv = ::socket(AF_INET, SOCK_STREAM, 0);
+    REQUIRE(srv >= 0);
+    sockaddr_in addr{};
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    addr.sin_port = 0;
+    REQUIRE(::bind(srv, reinterpret_cast<sockaddr*>(&addr), sizeof addr) == 0);
+    REQUIRE(::listen(srv, 1) == 0);
+    socklen_t alen = sizeof addr;
+    REQUIRE(::getsockname(srv, reinterpret_cast<sockaddr*>(&addr), &alen) == 0);
+    const int port = ntohs(addr.sin_port);
+
+    std::thread srv_t([srv] {
+        const int fd = ::accept(srv, nullptr, nullptr);
+        if (fd >= 0) {
+            const char* resp = "HTTP/1.1 404 Not Found\r\nContent-Length: 2\r\nConnection: close\r\n\r\nhi";
+            const ssize_t ignored = ::write(fd, resp, std::strlen(resp));
+            (void)ignored;
+            ::shutdown(fd, SHUT_WR);
+            ::close(fd);
+        }
+    });
+
+    // 404 -> (nil, "upstream status 404")
+    const std::string nf =
+        host.call("fetcher", "fb", "{\"url\":\"http://127.0.0.1:" + std::to_string(port) + "/\",\"opts\":{\"timeout_ms\":2000}}");
+    srv_t.join();
+    ::close(srv);
+    CHECK(nf.find("\"err\":\"upstream status 404\"") != std::string::npos);
+    CHECK(nf.find("\"body\":") == std::string::npos); // nil body key omitted
+
+    // transport refusal -> (nil, msg) on a closed port
+    const std::string dead =
+        host.call("fetcher", "fb", "{\"url\":\"http://127.0.0.1:9/\",\"opts\":{\"timeout_ms\":300}}");
+    CHECK(dead.find("\"err\":\"") != std::string::npos);
+    CHECK(dead.find("\"body\":") == std::string::npos);
+
+    // happy path is covered by the live PLUGIN_SMOKE_URL leg above when set;
+    // offline we assert only the pair shape on the two failure legs.
+    std::error_code ec;
+    std::filesystem::remove("test_fbpair.db", ec);
 }

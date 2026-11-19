@@ -7,6 +7,8 @@
 #include <doctest/doctest.h>
 
 #include "plugin/htmltext.hpp"
+#include "plugin/host_text.hpp"
+#include "plugin/url_codec.hpp"
 #include "plugin/plugin.hpp"
 #include "store/store.hpp"
 
@@ -105,4 +107,69 @@ TEST_CASE("host: wasm parity fixture (host.* via env.* imports)") {
     const std::string res = host.call("wasmfix", "ping", "{}");
     CHECK(res.find("\"ok\":true") != std::string::npos);
     CHECK(res.find("\"wasm\":\"pong\"") != std::string::npos);
+}
+
+// ---------------------------------------------------------------------------
+// plugin-host-promotion 6.1: new host core helpers
+// ---------------------------------------------------------------------------
+
+TEST_CASE("host_text: normalize_status keys collapse + synonyms + passthrough") {
+    using plugin::host_text::normalize_status;
+    CHECK(normalize_status("On-Going") == "Ongoing");
+    CHECK(normalize_status("on_going") == "Ongoing");
+    CHECK(normalize_status("  Releasing ") == "Ongoing");
+    CHECK(normalize_status("publish") == "Ongoing");
+    CHECK(normalize_status("Published") == "Ongoing");
+    CHECK(normalize_status("completed") == "Completed");
+    CHECK(normalize_status("finished") == "Completed");
+    CHECK(normalize_status("On-Hiatus") == "Hiatus");
+    CHECK(normalize_status("onhold") == "Hiatus");
+    CHECK(normalize_status("Cancelled") == "Dropped");
+    CHECK(normalize_status("Upcoming") == "Upcoming");
+    CHECK(normalize_status("NotYetReleased") == "Upcoming");
+    CHECK(normalize_status("") == "unknown");
+    CHECK(normalize_status("###") == "unknown");
+    CHECK(normalize_status("Season Break") == "Season Break"); // unrecognized passes through
+}
+
+TEST_CASE("host_text: date_epoch layouts + garbage") {
+    using plugin::host_text::date_epoch;
+    // Fixed instances: 2024-01-02T03:04:05Z == 1704164645
+    CHECK(date_epoch("2024-01-02T03:04:05Z").value_or(-1) == 1704164645);
+    CHECK(date_epoch("2024-01-02 03:04:05").value_or(-1) == 1704164645);
+    CHECK(date_epoch("2024-01-02").value_or(-1) == 1704153600); // midnight UTC
+    CHECK(date_epoch("Jan 2, 2024").value_or(-1) == 1704153600);
+    CHECK_FALSE(date_epoch("not a date").has_value());
+    CHECK_FALSE(date_epoch("").has_value());
+}
+
+TEST_CASE("host_text: json_blob balanced scan") {
+    using plugin::host_text::json_blob;
+    const std::string doc = R"(prefix var X = {"a":1,"b":{"c":[2,3]},"s":"}"} suffix)";
+    CHECK(json_blob(doc, "var X =").value_or("") == R"({"a":1,"b":{"c":[2,3]},"s":"}"})");
+    CHECK(json_blob("no marker here {\"k\":1}", "").value_or("") == "{\"k\":1}");
+    CHECK(json_blob("arr [1,[2,{\"x\":\"]\"}]] t", "").value_or("") == R"([1,[2,{"x":"]"}]])");
+    CHECK_FALSE(json_blob("unclosed {\"a\":1", "").has_value());
+    CHECK_FALSE(json_blob("no braces", "zzz").has_value());
+    CHECK_FALSE(json_blob("{\"a':1}", "").has_value()); // string-brace imbalance guard
+}
+
+TEST_CASE("host_text: url_abs four branches (madaradex canonical)") {
+    using plugin::url_abs;
+    const std::string base = "https://madaradex.org/manga/foo/ch-1";
+    CHECK(url_abs(base, "https://cdn.ex/a.png") == "https://cdn.ex/a.png");
+    CHECK(url_abs(base, "//cdn.ex/a.png") == "https://cdn.ex/a.png");
+    CHECK(url_abs(base, "/covers/a.webp") == "https://madaradex.org/covers/a.webp");
+    CHECK(url_abs(base, "x/y.jpg") == "https://madaradex.org/manga/foo/x/y.jpg");
+    CHECK(url_abs(base, "") == "");
+    CHECK(url_abs("no-scheme", "/p") == "/p");
+}
+
+TEST_CASE("htmltext: re2_capture group / no-group / no-match") {
+    auto cap = plugin::re2_capture(R"rx(src="([^"]+)")rx", "<img src=\"a.png\">");
+    CHECK(cap.value_or("") == "a.png");
+    cap = plugin::re2_capture("ch(\\d+)x(\\d+)", "ch12x3");
+    CHECK(cap.value_or("") == "12");
+    CHECK(plugin::re2_capture("(zzz)x", "abc").has_value() == false);
+    CHECK(plugin::re2_capture("ch\\d+", "ch9").value_or("") == "ch9");
 }

@@ -20,18 +20,12 @@ local function http_req(url, extra)
   if extra then
     for k, v in pairs(extra) do opts.headers[k] = v end
   end
-  local res, err = host.http.fetch(url, opts)
-  if err ~= nil then return nil, err end
-  if res.status ~= 200 then return nil, "topmanhua: upstream status " .. tostring(res.status) end
-  return res.body, nil
+  return host.http.fetch_body(url, opts)
 end
 
--- first capture group of the first match; nil when the pattern does not match.
+-- first capture group of the first match; nil when no match (host re2.capture).
 local function find1(s, pattern)
-  local m = host.re2.find(pattern, tostring(s or ""))
-  if #m >= 2 then return m[2] end
-  if #m == 1 then return m[1] end
-  return nil
+  return host.re2.capture(pattern, tostring(s or ""))
 end
 
 local function search_json(query)

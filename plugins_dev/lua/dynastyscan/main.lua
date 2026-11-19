@@ -4,17 +4,11 @@
 -- + status check; host.re2.* pattern-first). Pages are plain URL strings.
 local BASE = "https://dynasty-scans.com" -- single-domain; main.json param kept verbatim, unused
 
--- host.text.trim casefolds (utf8proc CASEFOLD) — mangles titles; local trim.
-local function trim(s)
-  return (tostring(s or ""):gsub("^%s+", ""):gsub("%s+$", ""))
-end
+-- host.text.trim: utf8-aware, case-preserving (plugin-host-promotion).
+local trim = host.text.trim
 
 local function get_json(url)
-  local res, err = host.http.fetch(url, { headers = { accept = "application/json" } })
-  if err ~= nil or res.status ~= 200 then return nil end
-  local ok, decoded = pcall(json.decode, res.body or "")
-  if not ok or type(decoded) ~= "table" then return nil end
-  return decoded
+  return (host.http.get_json(url, { headers = { accept = "application/json" } }))
 end
 
 local function absolute(path)

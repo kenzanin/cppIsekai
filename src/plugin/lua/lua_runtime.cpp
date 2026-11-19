@@ -13,6 +13,7 @@
 
 #include <map>
 #include <vector>
+#include <filesystem>
 
 #include <spdlog/spdlog.h>
 
@@ -113,6 +114,13 @@ void install_host_tools(lua_State* L, const std::string& id, const Config& conf,
     sol::table fs_tab = sv.create_named_table("host");
     sol::table fs = sv.create_table();
     fs["read"] = [dir](const std::string& rel) -> std::optional<std::string> { return fs_read(dir, rel); };
+    // Shared read-only lib root: <data>/plugins_lib -> plugins_dev/lib (two
+    // levels above the per-plugin dir). require()'s fallback, never written by
+    // plugins. plugin-host-promotion D8.
+    fs["read_lib"] = [dir](const std::string& rel) -> std::optional<std::string> {
+        const std::filesystem::path root = std::filesystem::path(dir).parent_path().parent_path() / "plugins_lib";
+        return fs_read(root, rel);
+    };
     fs_tab["fs"] = fs;
 
     // Confined require() as a pure-Lua helper on top of host.fs.read:
@@ -121,6 +129,7 @@ void install_host_tools(lua_State* L, const std::string& id, const Config& conf,
     // hidden global; path segments are checked for traversal in Lua.
     sv.script(R"lua(
 local fs_read = host.fs.read
+local fs_read_lib = host.fs.read_lib
 local cache = {}
 local function fail(msg) error("require: " .. msg, 0) end
 function require(name)
@@ -135,6 +144,12 @@ function require(name)
   local src, chunkname = fs_read(rel .. ".lua"), "@" .. rel .. ".lua"
   if src == nil then
     src, chunkname = fs_read(rel .. "/init.lua"), "@" .. rel .. "/init.lua"
+  end
+  if src == nil and fs_read_lib then -- shared lib fallback (read-only)
+    src, chunkname = fs_read_lib(rel .. ".lua"), "@lib/" .. rel .. ".lua"
+    if src == nil then
+      src, chunkname = fs_read_lib(rel .. "/init.lua"), "@lib/" .. rel .. "/init.lua"
+    end
   end
   if src == nil then fail("module '" .. name .. "' not found") end
   local chunk, err = load(src, chunkname)
@@ -159,6 +174,8 @@ end
     // decode leaves '+' verbatim (queryEncode semantics, goIsekai parity).
     fs_tab["url_encode"] = [](const std::string& s) { return plugin::url_encode(s); };
     fs_tab["url_decode"] = [](const std::string& s) { return plugin::url_decode(s); };
+    // url_abs: madaradex semantics, canonical since plugin-host-promotion D6.
+    fs_tab["url_abs"] = [](const std::string& base, const std::string& ref) { return plugin::url_abs(base, ref); };
 
     // ponytail: io shim is read-only via istream; widen only when a plugin
     // needs incremental reads (io.lines multi-arg / formats).
@@ -269,9 +286,12 @@ end
         return {sol::make_object(ts, out), std::nullopt};
     };
 
-    // host.http.fetch_body: returns body string when status == 200, else nil.
+    // host.http.fetch_body: (body, err); body nil unless status == 200
+    // (plugin-host-promotion D4 -- the (body,err) pair every http_req shim
+    // hand-rolled). Second value is nil on success.
     http["fetch_body"] = [id, timeout_ms = conf.fetch_timeout_ms, live = &live_profile,
-                          proxy = conf.proxy](const std::string& url, const sol::optional<sol::table>& opts) -> std::optional<std::string> {
+                          proxy = conf.proxy](const std::string& url, const sol::optional<sol::table>& opts,
+                                              sol::this_state ts) -> std::pair<sol::object, std::optional<std::string>> {
         const HttpOpts o = parse_http_opts(opts, timeout_ms, *live);
 
         const std::string profile = checked_profile(std::move(o.profile), o.live_default);
@@ -280,50 +300,90 @@ end
             fetch_sync(url, o.ms, profile, o.method, o.body, o.accept, o.user_agent, o.headers, proxy, cookie_jar);
         if (!fr.error.empty()) {
             spdlog::warn("[plugin:{}] fetch_body {} failed: {}", id, url, fr.error);
-            return std::nullopt;
+            return {sol::make_object(ts, sol::lua_nil), std::optional(fr.error)};
         }
         if (fr.status != 200) {
-            return std::nullopt;
+            return {sol::make_object(ts, sol::lua_nil), std::optional("upstream status " + std::to_string(fr.status))};
         }
-        return fr.body;
+        return {sol::make_object(ts, fr.body), std::nullopt};
     };
 
-    // P5: get_json/post_json -- fetch + decode in one call; nil on any
-    // failure (transport, non-200, malformed JSON). headers is an optional
-    // string->string table; post_json sends body with method POST.
-    const auto json_call = [id, timeout_ms = conf.fetch_timeout_ms, live = &live_profile,
-                            proxy = conf.proxy](const std::string& url, const std::string& method,
-                                                const std::string& body,
-                                                const sol::optional<sol::table>& headers,
-                                                sol::this_state ts) -> sol::object {
-        std::string live_default;
-        if (auto p = live->load()) {
-            live_default = *p;
+    // P5 → plugin-host-promotion D3: get_json takes the full fetch opts
+    // envelope (timeout_ms/profile/headers/cookie/...); a table with none of
+    // the known keys is the legacy flat headers map, so old call sites keep
+    // working. Returns (value, err). post_json keeps its (url, body, headers)
+    // contract and single return.
+    const auto json_fetch = [id, proxy = conf.proxy](const std::string& url, HttpOpts o,
+                                                 sol::this_state ts)
+        -> std::pair<sol::object, std::optional<std::string>> {
+        const std::string profile = checked_profile(std::move(o.profile), o.live_default);
+        const std::string cookie_jar = o.cookie ? cookie_jar_path(id) : std::string{};
+        const FetchResult fr =
+            fetch_sync(url, o.ms, profile, o.method, o.body, o.accept, o.user_agent, o.headers, proxy, cookie_jar);
+        if (!fr.error.empty()) {
+            spdlog::warn("[plugin:{}] json_fetch {} failed: {}", id, url, fr.error);
+            return {sol::make_object(ts, sol::lua_nil), std::optional(fr.error)};
         }
-        std::vector<std::pair<std::string, std::string>> extra_headers;
-        if (headers) {
-            headers->for_each([&](sol::object k, sol::object val) {
-                if (k.get_type() == sol::type::string && val.get_type() == sol::type::string) {
-                    extra_headers.emplace_back(k.as<std::string>(), val.as<std::string>());
+        if (fr.status != 200) {
+            return {sol::make_object(ts, sol::lua_nil), std::optional("upstream status " + std::to_string(fr.status))};
+        }
+        glz::generic g;
+        if (auto ec = glz::read_json(g, fr.body)) {
+            return {sol::make_object(ts, sol::lua_nil), std::optional(std::string("invalid JSON body"))};
+        }
+        return {json_to_sol(ts, g), std::nullopt};
+    };
+    http["get_json"] = [json_fetch, timeout_ms = conf.fetch_timeout_ms, live = &live_profile](
+                           const std::string& url, const sol::optional<sol::table>& opts,
+                           sol::this_state ts) -> std::pair<sol::object, std::optional<std::string>> {
+        HttpOpts o;
+        o.ms = timeout_ms;
+        if (auto p = live->load()) {
+            o.live_default = *p;
+        }
+        o.profile = o.live_default;
+        bool has_known = false;
+        if (opts) {
+            opts->for_each([&](sol::object k, sol::object) {
+                if (k.get_type() == sol::type::string) {
+                    const std::string key = k.as<std::string>();
+                    if (key == "timeout_ms" || key == "profile" || key == "method" || key == "body" ||
+                        key == "accept" || key == "user_agent" || key == "cookie" || key == "headers") {
+                        has_known = true;
+                    }
                 }
             });
         }
-        const FetchResult fr = fetch_sync(url, timeout_ms, checked_profile(live_default, live_default), method, body, {},
-                                          {}, extra_headers, proxy);
-        if (fr.error.empty() && fr.status == 200) {
-            glz::generic g;
-            if (auto ec = glz::read_json(g, fr.body); !ec) {
-                return json_to_sol(ts, g);
-            }
+        if (opts && has_known) {
+            o = parse_http_opts(opts, timeout_ms, *live);
+        } else if (opts) { // legacy: flat string->string map == headers
+            opts->for_each([&](sol::object k, sol::object v) {
+                if (k.get_type() == sol::type::string && v.get_type() == sol::type::string) {
+                    o.headers.emplace_back(k.as<std::string>(), v.as<std::string>());
+                }
+            });
         }
-        return sol::make_object(ts, sol::lua_nil);
+        return json_fetch(url, std::move(o), ts);
     };
-    http["get_json"] = [json_call](const std::string& url, const sol::optional<sol::table>& headers, sol::this_state ts) {
-        return json_call(url, "GET", "", headers, ts);
-    };
-    http["post_json"] = [json_call](const std::string& url, const std::string& body,
-                                    const sol::optional<sol::table>& headers, sol::this_state ts) {
-        return json_call(url, "POST", body, headers, ts);
+    http["post_json"] = [json_fetch, timeout_ms = conf.fetch_timeout_ms, live = &live_profile](
+                            const std::string& url, const std::string& body,
+                            const sol::optional<sol::table>& headers, sol::this_state ts) -> sol::object {
+        HttpOpts o;
+        o.ms = timeout_ms;
+        o.method = "POST";
+        o.body = body;
+        if (auto p = live->load()) {
+            o.live_default = *p;
+        }
+        o.profile = o.live_default;
+        if (headers) {
+            headers->for_each([&](sol::object k, sol::object v) {
+                if (k.get_type() == sol::type::string && v.get_type() == sol::type::string) {
+                    o.headers.emplace_back(k.as<std::string>(), v.as<std::string>());
+                }
+            });
+        }
+        return json_fetch(url, std::move(o), ts).first;
     };
     fs_tab["http"] = http;
 
@@ -337,6 +397,13 @@ end
     };
     text_tbl["date_to_iso"] = [](const std::string& s) -> std::optional<std::string> {
         return plugin::host_text::date_to_iso(s);
+    };
+    text_tbl["date_epoch"] = [](const std::string& s) -> std::optional<long long> {
+        return plugin::host_text::date_epoch(s);
+    };
+    text_tbl["json_blob"] = [](const std::string& s, const std::string& marker, sol::this_state ts) -> sol::object {
+        const auto v = plugin::host_text::json_blob(s, marker);
+        return v ? sol::make_object(ts, *v) : sol::make_object(ts, sol::lua_nil);
     };
     text_tbl["trim"] = [](const std::string& s) { return plugin::host_text::trim(s); };
     text_tbl["unescape"] = [](const std::string& s) { return plugin::host_text::unescape(s); };
@@ -442,6 +509,15 @@ end
     re2["find_index"] = [](const std::string& p, const std::string& t) {
         try {
             return static_cast<long long>(re2_find_index(p, t)); // 0 = not found
+        } catch (const std::invalid_argument& e) {
+            throw std::runtime_error(e.what());
+        }
+    };
+    // capture: group 1 (or whole match for group-less patterns), nil on no
+    // match -- the find1 shim, host-owned (plugin-host-promotion D2).
+    re2["capture"] = [](const std::string& p, const std::string& t) -> std::optional<std::string> {
+        try {
+            return re2_capture(p, t);
         } catch (const std::invalid_argument& e) {
             throw std::runtime_error(e.what());
         }

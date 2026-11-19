@@ -33,28 +33,17 @@ local function http_req(url, opts)
   local o = {}
   if opts then for k, v in pairs(opts) do o[k] = v end end
   o.cookie = true
-  local res, err = host.http.fetch(url, o)
-  if err ~= nil then return nil, err end
-  if res.status ~= 200 then return nil, "madaradex: upstream status " .. tostring(res.status) end
-  return res.body, nil
+  return host.http.fetch_body(url, o)
 end
 
--- first capture group of the first match; nil when the pattern does not match.
+-- first capture group of the first match; nil when no match (host re2.capture).
 local function find1(s, pattern)
-  local m = host.re2.find(pattern, tostring(s or ""))
-  if #m >= 2 then return m[2] end
-  if #m == 1 then return m[1] end
-  return nil
+  return host.re2.capture(pattern, tostring(s or ""))
 end
 
--- href can be absolute or site-relative; the reader needs absolute.
-local function abs_url(raw)
-  raw = tostring(raw or "")
-  if raw == "" then return "" end
-  if raw:match("^https?://") then return raw end
-  if raw:match("^//") then return "https:" .. raw end
-  return BASE .. "/" .. raw:gsub("^/+", "")
-end
+-- abs_url: host.url_abs anchored at BASE (D6, this plugin's variant is the
+-- canonical semantics).
+local abs_url = function(raw) return host.url_abs(BASE, raw) end
 
 local function manga_url(slug)
   return BASE .. MANGA_PATH .. host.url_encode(slug) .. "/"

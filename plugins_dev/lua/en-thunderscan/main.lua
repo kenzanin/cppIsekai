@@ -4,10 +4,8 @@
 -- plain URL strings; genres are static site data (genres.lua).
 local BASE = "https://en-thunderscans.com" -- single-domain; main.json param kept verbatim, unused
 
--- host.text.trim casefolds (utf8proc CASEFOLD) — mangles titles; local trim.
-local function trim(s)
-  return (tostring(s or ""):gsub("^%s+", ""):gsub("%s+$", ""))
-end
+-- host.text.trim: utf8-aware, case-preserving (plugin-host-promotion).
+local trim = host.text.trim
 
 -- re2.find returns {} (truthy) on no-match; take the capture so `or` chains
 -- and nil-check behave like goIsekai's find.
@@ -16,10 +14,9 @@ local function cap(pat, s, n)
 end
 
 local function http_body(url)
-  local res, err = host.http.fetch(url)
-  if err ~= nil or res.status ~= 200 then return nil end
-  if res.body == nil or res.body == "" then return nil end
-  return res.body
+  local b = host.http.fetch_body(url)
+  if b == nil or b == "" then return nil end
+  return b
 end
 
 local methods = {}

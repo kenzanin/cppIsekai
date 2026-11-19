@@ -14,18 +14,12 @@ local opts = { -- static theme wants a browser-ish UA on every request
 -- ── helpers ────────────────────────────────────────────────────────────────
 
 local function http_req(url)
-  local res, err = host.http.fetch(url, opts)
-  if err ~= nil then return nil, err end
-  if res.status ~= 200 then return nil, "mangakatana: upstream status " .. tostring(res.status) end
-  return res.body, nil
+  return host.http.fetch_body(url, opts) -- (body, err); UA kept: static theme wants a browser-ish UA (plugin-host-promotion).
 end
 
--- first capture group of the first match; nil when the pattern does not match.
+-- first capture group of the first match; nil when no match (host re2.capture).
 local function find1(s, pattern)
-  local m = host.re2.find(pattern, tostring(s or ""))
-  if #m >= 2 then return m[2] end
-  if #m == 1 then return m[1] end
-  return nil
+  return host.re2.capture(pattern, tostring(s or ""))
 end
 
 -- "https://mangakatana.com/manga/naruto.1205" and "/manga/naruto.1205" both
@@ -56,7 +50,7 @@ local function page_urls(html)
     local best = {}
     for _, m in ipairs(host.re2.find_all([=[(?s)\[(.*?)\]]=], html)) do
         local urls = {}
-        for _, u in ipairs(host.re2.find_all([=['](https?://[^']+)']=], m[2])) do
+        for _, u in ipairs(host.re2.find_all("'(https?://[^']+)'", m[2])) do
             urls[#urls + 1] = u[2]
         end
         if #urls > #best then best = urls end

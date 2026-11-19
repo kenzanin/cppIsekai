@@ -30,15 +30,10 @@ local function status_of(list)
 end
 
 local function get_json(path)
-  local res, err = host.http.fetch(API .. path, { profile = "lightpanda", timeout_ms = 60000 })
-  if err ~= nil then return nil, err end
-  if res.status ~= 200 then
-    return nil, "4ucomics status " .. tostring(res.status) .. ": " .. tostring(res.body):sub(1, 80)
-  end
-  local ok, data
-  local body = res.body
+  local body, ferr = host.http.fetch_body(API .. path, { profile = "lightpanda", timeout_ms = 60000 })
+  if body == nil then return nil, ferr end
   if body:sub(1, 1) == "<" then body = body:match("<pre>(.*)</pre>") or body end -- renderer wraps json in <pre>
-  ok, data = pcall(json.decode, body)
+  local ok, data = pcall(json.decode, body)
   if not ok or type(data) ~= "table" then return nil, "4ucomics: invalid JSON" end
   return data, nil
 end

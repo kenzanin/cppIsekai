@@ -7,12 +7,7 @@ local BASE = "https://sanascans.com"
 
 -- ── helpers ────────────────────────────────────────────────────────────────
 
-local function http_req(url)
-  local res, err = host.http.fetch(url)
-  if err ~= nil then return nil, err end
-  if res.status ~= 200 then return nil, "sanascans: upstream status " .. tostring(res.status) end
-  return res.body, nil
-end
+local http_req = host.http.fetch_body -- (body, err); nil unless 200 (plugin-host-promotion).
 
 -- Extract a slug from a series path like /series/<slug> or <slug>.
 local function slug_of(path)
@@ -159,7 +154,7 @@ methods.pages = function(params)
   -- double slash after the host, so scan with plain substring finds (a re2
   -- anchor stops at the host) and rebuild the URL without the duplicate.
   local out = {}
-  local anchor = 'src="https://storage.sanascans.com/'
+  local anchor = 'src="https://media.sanascans.com/' -- site renamed storage.->media. (2026-11, checked live)
   local pos = string.find(body, anchor, 1, true)
   while pos do
     local ustart = pos + #anchor
@@ -167,7 +162,7 @@ methods.pages = function(params)
     if not close then break end
     local path = string.sub(body, ustart, close - 1)
     if string.find(path, "upload/series/", 1, true) then
-      local u = string.gsub("https://storage.sanascans.com/" .. path, "(https://[^/]+)/+", "%1/")
+      local u = string.gsub("https://media.sanascans.com/" .. path, "(https://[^/]+)/+", "%1/")
       out[#out + 1] = u
     end
     pos = string.find(body, anchor, close, true)

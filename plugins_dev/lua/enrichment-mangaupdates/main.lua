@@ -26,14 +26,7 @@ local function post_json(url, body_tbl)
 end
 
 local function get_json(url)
-  local res, err = host.http.fetch(url, {
-    ["Accept"] = "application/json",
-  })
-  if err ~= nil then return nil end
-  if not res or res.status ~= 200 then return nil end
-  local ok, body = pcall(json.decode, res.body)
-  if not ok or type(body) ~= "table" then return nil end
-  return body
+  return (host.http.get_json(url, { headers = { ["Accept"] = "application/json" } }))
 end
 
 local function normalize(s)

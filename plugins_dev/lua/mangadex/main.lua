@@ -2,16 +2,7 @@
 -- host.http.fetch + json + base/string/table libs. Canonical output fields:
 -- {id, name, cover, status, tags, release_at, chapters = {id, number, title, release_at}}
 -- canonical status; unknown passes through, empty -> "unknown"
-local function normalize_status(s)
-  s = tostring(s or ""):lower():gsub("[^a-z0-9]", "")
-  if s == "" then return "unknown" end
-  if s == "ongoing" or s == "ongoin" or s == "releasing" or s == "publishing" then return "Ongoing" end
-  if s == "completed" or s == "finished" then return "Completed" end
-  if s == "hiatus" or s == "onhaiatus" then return "Hiatus" end
-  if s == "dropped" or s == "cancelled" or s == "canceled" then return "Dropped" end
-  if s == "upcoming" or s == "notyetreleased" then return "Upcoming" end
-  return s
-end
+local normalize_status = host.text.normalize_status
 
 local API = "https://api.mangadex.org"
 local AUTH = "https://auth.mangadex.org/realms/mangadex/protocol/openid-connect/token"
@@ -28,6 +19,12 @@ end
 
 local function have_creds()
   return cid ~= nil and csecret ~= nil and cuser ~= nil and cpass ~= nil
+end
+
+-- RFC3339 timestamps -> unix seconds via host.text.date_epoch (D7); 0 when
+-- absent/unparseable, the house zero-time contract.
+local function epoch(s)
+  return host.text.date_epoch(tostring(s or "")) or 0
 end
 
 -- POST the token endpoint (form-encoded). Returns token table or nil, err.
@@ -117,22 +114,6 @@ local function get(path, query)
   local body = json.decode(res.body)
   if body.result ~= "ok" then return nil, "upstream result " .. tostring(body.result) end
   return body
-end
-
--- ISO-8601 (MangaDex timestamps) -> integer unix seconds (pure arithmetic; no os in sandbox).
-local function epoch(s)
-  if not s then return 0 end
-  local y, mo, d, h, mi, sec = s:match("(%d+)-(%d+)-(%d+)T(%d+):(%d+):(%d+)")
-  if not y then return 0 end
-  y, mo, d, h, mi, sec = tonumber(y), tonumber(mo), tonumber(d), tonumber(h), tonumber(mi), tonumber(sec)
-  -- days since civil epoch (Howard Hinnant's algorithm)
-  local yy = y - (mo <= 2 and 1 or 0)
-  local era = math.floor(yy / 400)
-  local yoe = yy - era * 400
-  local doy = math.floor((153 * (mo + (mo > 2 and -3 or 9)) + 2) / 5) + d - 1
-  local doe = yoe * 365 + math.floor(yoe / 4) - math.floor(yoe / 100) + doy
-  local days = era * 146097 + doe - 719468
-  return days * 86400 + h * 3600 + mi * 60 + sec
 end
 
 local function canonical_manga(m)

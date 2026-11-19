@@ -8,9 +8,12 @@ local API = SITE .. "/api"
 local UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 local HEADERS = { ["User-Agent"] = UA, ["Accept"] = "application/json" }
 
--- host.text.trim casefolds (utf8proc CASEFOLD) — mangles titles; local trim.
-local function trim(s)
-  return (tostring(s or ""):gsub("^%s+", ""):gsub("%s+$", ""))
+-- host.text.trim: utf8-aware, case-preserving (plugin-host-promotion).
+local trim = host.text.trim
+
+local function abs_url(u)
+  if type(u) ~= "string" or u == "" then return "" end
+  return host.url_abs(SITE, u)
 end
 
 local function abs_url(u)

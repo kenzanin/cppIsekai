@@ -7,12 +7,9 @@ local util = {}
 
 local BASE = "https://www.mangahere.cc"
 
--- first capture group of the first match; nil when the pattern does not match.
+-- first capture group of the first match; nil when no match (host re2.capture).
 local function find1(s, pattern)
-  local m = host.re2.find(pattern, tostring(s or ""))
-  if #m >= 2 then return m[2] end
-  if #m == 1 then return m[1] end
-  return nil
+  return host.re2.capture(pattern, tostring(s or ""))
 end
 
 -- ─── Search result parsing ─────────────────────────────────────────────────
@@ -83,19 +80,10 @@ end
 -- every date stays pinned to its row; the number is rebuilt from the path
 -- (padded/decimal safe).
 
-local MONTHS = { Jan = 1, Feb = 2, Mar = 3, Apr = 4, May = 5, Jun = 6, Jul = 7, Aug = 8, Sep = 9, Oct = 10, Nov = 11, Dec = 12 }
-
--- "Nov 18,2016" -> unix midnight UTC; unparseable dates -> 0 (no os in sandbox)
+-- "Nov 18,2016" etc -> unix seconds via host.text.date_epoch (D7, strptime
+-- space-in-format matches the missing padding); 0 when unparseable.
 local function date_epoch(s)
-  local mon, d, y = tostring(s or ""):match("^([A-Za-z]+)%s+(%d+)%s*,%s*(%d+)$")
-  local mo = mon and MONTHS[mon]
-  if not mo then return 0 end
-  local yy = tonumber(y) - ((tonumber(mo) or 1) <= 2 and 1 or 0)
-  local era = math.floor(yy / 400)
-  local yoe = yy - era * 400
-  local doy = math.floor((153 * (tonumber(mo) + (tonumber(mo) > 2 and -3 or 9)) + 2) / 5) + tonumber(d) - 1
-  local doe = yoe * 365 + math.floor(yoe / 4) - math.floor(yoe / 100) + doy
-  return (era * 146097 + doe - 719468) * 86400
+  return host.text.date_epoch(tostring(s or "")) or 0
 end
 
 function util.parse_chapter_list(html, manga_id)

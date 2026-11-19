@@ -67,26 +67,14 @@ local function http_get(url)
 end
 
 local function sanitize_title(s)
-  s = tostring(s or ""):gsub("<[^>]*>", " ")
-  s = s:gsub("&amp;", "&"):gsub("&lt;", "<"):gsub("&gt;", ">"):gsub("&quot;", '"'):gsub("&#39;", "'"):gsub("&nbsp;", " ")
-  return (s:gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", ""))
+  return (host.text.strip_html(tostring(s or "")):gsub("%s+", " "))
 end
 
 local function strip_html(s)
   return sanitize_title(s)
 end
 
--- canonical status; unknown passes through, empty -> "unknown"
-local function normalize_status(s)
-  s = tostring(s or ""):lower():gsub("[^a-z0-9]", "")
-  if s == "" then return "unknown" end
-  if s == "ongoing" or s == "ongoin" or s == "releasing" or s == "publishing" then return "Ongoing" end
-  if s == "completed" or s == "finished" then return "Completed" end
-  if s == "hiatus" or s == "onhaiatus" then return "Hiatus" end
-  if s == "dropped" or s == "cancelled" or s == "canceled" then return "Dropped" end
-  if s == "upcoming" or s == "notyetreleased" then return "Upcoming" end
-  return s
-end
+local normalize_status = host.text.normalize_status
 
 
 local GENRE_IDS = require("genres").map

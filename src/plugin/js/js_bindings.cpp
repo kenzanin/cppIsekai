@@ -171,7 +171,26 @@ JSValue js_http_json_call(JSContext* ctx, JSValueConst* argv, int argc, bool pos
             opts += ",\"headers\":" + json_stringify(ctx, argv[2]) + "}";
         }
     } else if (argc > 1 && JS_IsObject(argv[1])) {
-        opts = "{\"headers\":" + json_stringify(ctx, argv[1]) + "}";
+        // plugin-host-promotion: a table carrying known opt keys is the full
+        // fetch envelope (parity with lua get_json); anything else is the
+        // legacy flat headers map.
+        static const char* kKnown[] = {"timeout_ms", "profile", "method", "body",
+                                       "accept",     "user_agent", "cookie", "headers"};
+        bool has_known = false;
+        for (const char* k : kKnown) {
+            JSValue v = JS_GetPropertyStr(ctx, argv[1], k);
+            const bool present = !JS_IsUndefined(v);
+            JS_FreeValue(ctx, v);
+            if (present) {
+                has_known = true;
+                break;
+            }
+        }
+        if (has_known) {
+            opts = json_stringify(ctx, argv[1]);
+        } else {
+            opts = "{\"headers\":" + json_stringify(ctx, argv[1]) + "}";
+        }
     }
     const auto res = inst.services.http_fetch(url, opts);
     if (!res) {
@@ -279,6 +298,29 @@ JSValue js_text_strip_html(JSContext* ctx, JSValueConst /*this*/, int argc, JSVa
     }
     const std::string out = plugin::host_text::strip_html(arg_str(ctx, argv[0]));
     return JS_NewStringLen(ctx, out.data(), out.size());
+}
+
+// plugin-host-promotion D5/D7 parity.
+JSValue js_text_date_epoch(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
+    if (argc != 1 || !JS_IsString(argv[0])) {
+        return JS_ThrowTypeError(ctx, "text.date_epoch(string)");
+    }
+    const auto v = plugin::host_text::date_epoch(arg_str(ctx, argv[0]));
+    if (!v) {
+        return JS_NULL; // parity: lua nil on unparseable
+    }
+    return JS_NewInt64(ctx, *v);
+}
+
+JSValue js_text_json_blob(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
+    if (argc != 2 || !JS_IsString(argv[0]) || !JS_IsString(argv[1])) {
+        return JS_ThrowTypeError(ctx, "text.json_blob(text, marker)");
+    }
+    const auto v = plugin::host_text::json_blob(arg_str(ctx, argv[0]), arg_str(ctx, argv[1]));
+    if (!v) {
+        return JS_NULL;
+    }
+    return JS_NewStringLen(ctx, v->data(), v->size());
 }
 
 // host.codecs (P6): string-in/string-out, decode null on invalid.
@@ -552,6 +594,22 @@ JSValue js_re2_find_index(JSContext* ctx, JSValueConst /*this*/, int argc, JSVal
     }
 }
 
+// plugin-host-promotion D2: single-value capture; null on no match.
+JSValue js_re2_capture(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
+    if (argc < 2) {
+        return JS_ThrowTypeError(ctx, "re2.capture(pattern, text)");
+    }
+    try {
+        const auto v = re2_capture(arg_str(ctx, argv[0]), arg_str(ctx, argv[1]));
+        if (!v) {
+            return JS_NULL;
+        }
+        return JS_NewStringLen(ctx, v->data(), v->size());
+    } catch (const std::invalid_argument& e) {
+        return JS_ThrowTypeError(ctx, e.what());
+    }
+}
+
 JSValue js_html_select(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
     if (argc < 2) {
         return JS_ThrowTypeError(ctx, "html.select(html, css)");
@@ -593,6 +651,15 @@ JSValue js_url_decode(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueCo
         return JS_ThrowTypeError(ctx, "url_decode(string)");
     }
     const std::string out = plugin::url_decode(arg_str(ctx, argv[0]));
+    return JS_NewStringLen(ctx, out.data(), out.size());
+}
+
+// plugin-host-promotion D6: madaradex semantics, shared core url_codec.hpp.
+JSValue js_url_abs(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
+    if (argc != 2 || !JS_IsString(argv[0]) || !JS_IsString(argv[1])) {
+        return JS_ThrowTypeError(ctx, "url_abs(base, ref)");
+    }
+    const std::string out = plugin::url_abs(arg_str(ctx, argv[0]), arg_str(ctx, argv[1]));
     return JS_NewStringLen(ctx, out.data(), out.size());
 }
 
@@ -824,6 +891,7 @@ void bind_host_globals(JSContext* c) {
     bind(re2, "replace", JS_NewCFunction(c, js_re2_replace, "replace", 3));
     bind(re2, "quote", JS_NewCFunction(c, js_re2_quote, "quote", 1));
     bind(re2, "find_index", JS_NewCFunction(c, js_re2_find_index, "find_index", 2));
+    bind(re2, "capture", JS_NewCFunction(c, js_re2_capture, "capture", 2));
     bind(host, "re2", re2);
 
     JSValue html = JS_NewObject(c);
@@ -835,6 +903,7 @@ void bind_host_globals(JSContext* c) {
     // Query-component codec, same core lua's host.url_* delegate to.
     bind(host, "url_encode", JS_NewCFunction(c, js_url_encode, "url_encode", 1));
     bind(host, "url_decode", JS_NewCFunction(c, js_url_decode, "url_decode", 1));
+    bind(host, "url_abs", JS_NewCFunction(c, js_url_abs, "url_abs", 2));
 
     // Plugin-local config (design D2) and host-side crypto (D3), lua parity.
     JSValue config = JS_NewObject(c);
@@ -866,6 +935,8 @@ void bind_host_globals(JSContext* c) {
     bind(text_tbl, "trim", JS_NewCFunction(c, js_text_trim, "trim", 1));
     bind(text_tbl, "unescape", JS_NewCFunction(c, js_text_unescape, "unescape", 1));
     bind(text_tbl, "strip_html", JS_NewCFunction(c, js_text_strip_html, "strip_html", 1));
+    bind(text_tbl, "date_epoch", JS_NewCFunction(c, js_text_date_epoch, "date_epoch", 1));
+    bind(text_tbl, "json_blob", JS_NewCFunction(c, js_text_json_blob, "json_blob", 2));
     bind(host, "text", text_tbl);
 
     JSValue codec_tbl = JS_NewObject(c);

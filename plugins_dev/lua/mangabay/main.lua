@@ -8,12 +8,9 @@ local BASE = "https://manga-bay.biz" -- manifest site_url/params, pinned like th
 
 local dle = require("dle")
 
--- first capture group of the first match; nil when the pattern does not match.
+-- first capture group of the first match; nil when no match (host re2.capture).
 local function find1(s, pattern)
-  local m = host.re2.find(pattern, tostring(s or ""))
-  if #m >= 2 then return m[2] end
-  if #m == 1 then return m[1] end
-  return nil
+  return host.re2.capture(pattern, tostring(s or ""))
 end
 
 -- JSON numbers decode to Lua floats, so tostring renders ids as "991476.0".
@@ -31,12 +28,8 @@ local function site_get(path)
   if path:match("^https?://") then path = path:match("^https?://[^/]+(/.*)$") or "/" end
   return dle.get(BASE, path)
 end
-
-local function abs_url(path)
-  if not path then return "" end
-  if path:match("^https?://") then return path end
-  return BASE .. path
-end
+-- abs_url: host.url_abs anchored at BASE (D6).
+local abs_url = function(path) return host.url_abs(BASE, path) end
 
 -- path_of turns a manga id into a site path; the id is the slash-free DLE
 -- slug ("11222-dungeon-meshi.html"), full permalinks accepted too.
@@ -71,16 +64,9 @@ local function parse_cd_cards(body)
   return items
 end
 
--- the site's "Release type" wording -> host vocabulary
-local function normalize_status(raw)
-  local s = host.text.trim(raw or ""):lower()
-  if s == "completed" or s == "finished" or s == "finish" then return "Completed" end
-  if s == "ongoing" or s == "publish" or s == "releasing" or s == "published" then return "Ongoing" end
-  if s == "hiatus" or s == "onhold" or s == "on hold" then return "Hiatus" end
-  if s == "dropped" or s == "cancelled" or s == "canceled" then return "Dropped" end
-  if s == "upcoming" or s == "not yet published" then return "Upcoming" end
-  return host.text.trim(raw or "")
-end
+-- the site's "Release type" wording -> host vocabulary (host.text.normalize_status
+-- covers every key here, incl. on-hold/not-yet-published; empty -> "unknown").
+local normalize_status = host.text.normalize_status
 
 -- name -> DLE genre id, filled by methods.genres; search resolves UI names.
 local genre_map = nil
@@ -191,7 +177,7 @@ end
 methods.chapters = function(params)
   local id = tostring(params.id or "")
   local body = site_get(path_of(id))
-  local data = dle.json_blob(body, "window.__DATA__ = ")
+  local data = dle.json_data(body, "window.__DATA__ = ")
   local rows = data and type(data.chapters) == "table" and data.chapters or nil
   local out = {}
   if rows then
@@ -202,7 +188,7 @@ methods.chapters = function(params)
           id = "/reader/" .. num_str(data.news_id) .. "/" .. num_str(c.id),
           number = tonumber(c.posi) or host.text.chapter_num(c.title or "") or 0,
           title = c.title or ("Issue #" .. tostring(c.id)),
-          release_at = dle.dle_date(c.date),
+          release_at = dle.dle_epoch(c.date),
           pages = tonumber(c.pages) or 0,
         }
       end
@@ -224,7 +210,7 @@ methods.pages = function(params)
   -- (/reader/15840.0/991476.0); normalize so those sessions still resolve.
   reader = reader:gsub("%.0$", ""):gsub("%.0/", "/")
   local body = site_get(path_of(reader))
-  local data = dle.json_blob(body, "window.__DATA__ = ")
+  local data = dle.json_data(body, "window.__DATA__ = ")
   local images = data and type(data.images) == "table" and data.images or {}
   local count = tonumber(data and data.pages) or #images
   if count > #images then count = #images end
@@ -241,7 +227,7 @@ end
 
 methods.genres = function()
   local body = site_get("/comix/")
-  local f = dle.json_blob(body, "__XFILTER__ = ")
+  local f = dle.json_data(body, "__XFILTER__ = ")
   local values = f and f.filter_items and f.filter_items.g and f.filter_items.g.values or nil
   local names, map = {}, {}
   if type(values) == "table" then

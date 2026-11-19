@@ -8,11 +8,7 @@ local WEB = "https://comizy.io"
 
 -- GET + 200 + JSON decode -> table, or nil (goIsekai get_json semantics).
 local function get_json(url)
-  local res, err = host.http.fetch(url, { headers = { accept = "application/json" } })
-  if err ~= nil or res.status ~= 200 then return nil end
-  local ok, decoded = pcall(json.decode, res.body or "")
-  if not ok or type(decoded) ~= "table" then return nil end
-  return decoded
+  return (host.http.get_json(url, { headers = { accept = "application/json" } }))
 end
 
 -- buildId rotates per deploy; cache per VM lifetime. genres cache + slug map

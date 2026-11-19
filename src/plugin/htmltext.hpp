@@ -13,6 +13,7 @@
  */
 #pragma once
 
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -62,5 +63,12 @@ std::string re2_quote(const std::string& s);
  *         (0 when no match).
  *  \throws std::invalid_argument when the pattern fails RE2 compilation. */
 size_t re2_find_index(const std::string& pattern, const std::string& text);
+
+/** \brief Single-value capture (plugin-host-promotion D2): capture group 1 of
+ *         the first match, or the whole match for group-less patterns;
+ *         nullopt on no match. A non-participating group yields "" -- parity
+ *         with the Lua find1 shim it replaces (m[2] always present).
+ *  \throws std::invalid_argument when the pattern fails RE2 compilation. */
+std::optional<std::string> re2_capture(const std::string& pattern, const std::string& text);
 
 } // namespace plugin

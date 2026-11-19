@@ -7,12 +7,7 @@ local BASE = "https://violetmanga.com"
 
 -- ── helpers ────────────────────────────────────────────────────────────────
 
-local function http_req(url)
-  local res, err = host.http.fetch(url)
-  if err ~= nil then return nil, err end
-  if res.status ~= 200 then return nil, "violetmanga: upstream status " .. tostring(res.status) end
-  return res.body, nil
-end
+local http_req = host.http.fetch_body -- (body, err); nil unless 200 (plugin-host-promotion).
 
 -- first text node of a selector; "" when absent
 local function sel1(html, css)

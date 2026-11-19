@@ -5,35 +5,12 @@
 -- Envelope { ok, data | error }; canonical manga fields per the mangadex plugin.
 local BASE = "https://anisascans.com" -- .in died (NXDOMAIN); .com is live
 
--- ── helpers ────────────────────────────────────────────────────────────────
+-- ── helpers (host delegation, plugin-host-promotion) ────────────────────
 
-local function trim(s)
-  return (tostring(s or ""):gsub("^%s+", ""):gsub("%s+$", ""))
-end
-
-local function unescape(s)
-  s = tostring(s or "")
-  s = s:gsub("&amp;", "&"):gsub("&lt;", "<"):gsub("&gt;", ">"):gsub("&quot;", '"'):gsub("&#39;", "'"):gsub("&nbsp;", " ")
-  s = s:gsub("&#(%d+);", function(n) return string.char(tonumber(n)) end)
-  s = s:gsub("&#x(%x+);", function(h) return string.char(tonumber(h, 16)) end)
-  return s
-end
-
-local function strip_html(s)
-  return trim(unescape(tostring(s or ""):gsub("<[^>]*>", " ")))
-end
-
--- canonical status; unknown passes through, empty -> "unknown"
-local function normalize_status(s)
-  s = tostring(s or ""):lower():gsub("[^a-z0-9]", "")
-  if s == "" then return "unknown" end
-  if s == "ongoing" or s == "ongoin" or s == "releasing" or s == "publishing" then return "Ongoing" end
-  if s == "completed" or s == "finished" then return "Completed" end
-  if s == "hiatus" or s == "onhaiatus" then return "Hiatus" end
-  if s == "dropped" or s == "cancelled" or s == "canceled" then return "Dropped" end
-  if s == "upcoming" or s == "notyetreleased" then return "Upcoming" end
-  return s
-end
+local trim = host.text.trim
+local unescape = host.text.unescape
+local strip_html = host.text.strip_html
+local normalize_status = host.text.normalize_status
 
 -- Madara labels ("Chapter 12", "Ch. 12") -> number; 0 when none.
 local function chapter_num(s)
@@ -45,33 +22,17 @@ local function chapter_num(s)
   return 0
 end
 
--- http request -> (body, err). cppIsekai host.http.fetch replaces goIsekai get_body.
-local function http_req(url, opts)
-  local res, err = host.http.fetch(url, opts or {})
-  if err ~= nil then return nil, err end
-  if res.status ~= 200 then return nil, "anisascans: upstream status " .. tostring(res.status) end
-  return res.body, nil
-end
+-- http request -> (body, err): the host two-value fetch_body form.
+local http_req = host.http.fetch_body
 
 -- every match of `pattern` in `s`, each as a re2 group array (goIsekai regex.gmatch).
 local function find_all(s, pattern)
-  local out, pos = {}, 1
-  s = tostring(s or "")
-  while pos <= #s do
-    local m = host.re2.find(pattern, s:sub(pos))
-    if #m == 0 or m[1] == "" then break end
-    out[#out + 1] = m
-    pos = pos + #m[1]
-  end
-  return out
+  return host.re2.find_all(pattern, tostring(s or ""))
 end
 
 -- first capture group of the first match; nil when the pattern does not match.
 local function find1(s, pattern)
-  local m = host.re2.find(pattern, tostring(s or ""))
-  if #m >= 2 then return m[2] end
-  if #m == 1 then return m[1] end
-  return nil
+  return host.re2.capture(pattern, tostring(s or ""))
 end
 
 local methods = {}

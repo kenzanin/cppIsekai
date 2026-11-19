@@ -74,4 +74,8 @@ moves is only what is site-agnostic.
 - Per-plugin live sweep for every plugin touched: search → detail → chapters → one
   `/cache/img` page (memory #5362 — green build is not evidence). DLE pair (batcave, mangabay)
   verified through the shared lib specifically, including their PoW guard and `__DATA__` pages.
-- Plugin tree LoC delta recorded before/after (~-490 plugin LoC, ~+130 host LoC).
+- Plugin tree LoC delta recorded after landing (measured): plugins_dev −573 net
+  (+117/−690, incl. both `dle.lua` fork deletions), host `src/plugin` +283 net
+  (+354/−71), shared lib `plugins_dev/lib/dle.lua` +149. Prediction was ~−490/~+130;
+  host delta is larger because it carries the `require` lib path, the date-parse block
+  and `re2_capture` core, all amortized across every runtime.

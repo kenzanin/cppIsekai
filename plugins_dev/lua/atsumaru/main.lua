@@ -22,13 +22,9 @@ local function image_url(path)
   return CDN .. "/static/" .. path
 end
 
+-- (value, err) JSON fetch with the site's accept header (host envelope).
 local function get_json(url)
-  local res, err = host.http.fetch(url, { accept = "application/json" })
-  if err ~= nil then return nil, err end
-  if res.status ~= 200 then return nil, "upstream status " .. tostring(res.status) end
-  local ok, data = pcall(json.decode, res.body)
-  if not ok or type(data) ~= "table" then return nil, "atsumaru: invalid JSON" end
-  return data
+  return host.http.get_json(url, { accept = "application/json" })
 end
 
 -- allChapters createdAt is epoch milliseconds (int64) -> unix seconds.
@@ -37,20 +33,10 @@ local function epoch_ms(v)
 end
 
 local function strip_html(s)
-  return (tostring(s or ""):gsub("<[^>]*>", " "):gsub("%s+", " "))
+  return (host.text.strip_html(tostring(s or "")):gsub("%s+", " "))
 end
 
--- canonical status; unknown passes through, empty -> "unknown"
-local function normalize_status(s)
-  s = tostring(s or ""):lower():gsub("[^a-z0-9]", "")
-  if s == "" then return "unknown" end
-  if s == "ongoing" or s == "ongoin" or s == "releasing" or s == "publishing" then return "Ongoing" end
-  if s == "completed" or s == "finished" then return "Completed" end
-  if s == "hiatus" or s == "onhaiatus" then return "Hiatus" end
-  if s == "dropped" or s == "cancelled" or s == "canceled" then return "Dropped" end
-  if s == "upcoming" or s == "notyetreleased" then return "Upcoming" end
-  return s
-end
+local normalize_status = host.text.normalize_status
 
 local methods = {}
 

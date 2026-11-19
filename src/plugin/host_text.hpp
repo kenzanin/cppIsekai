@@ -32,30 +32,45 @@ namespace plugin::host_text {
 // ---------------------------------------------------------------------------
 
 /** \brief Normalize a site-specific status word to the canonical host
- *         vocabulary. Unknown / empty input maps to "unknown". */
+ *         vocabulary. The lookup key is lowercased with every non-alnum
+ *        character stripped ("On-Going", "on_going", "On Going" and
+ *        "onhold" all collapse), so callers pass raw site values verbatim.
+ *        Unknown / empty input maps to "unknown"; recognized-but-unmapped
+ *        vocabulary passes through unchanged. */
 inline std::string normalize_status(std::string_view raw) {
-    auto lower = [](std::string_view s) {
-        std::string out(s);
-        std::transform(out.begin(), out.end(), out.begin(), [](unsigned char c) { return std::tolower(c); });
-        return out;
-    };
-    const std::string k = lower(raw);
+    std::string k;
+    k.reserve(raw.size());
+    for (const char c : raw) {
+        const auto uc = static_cast<unsigned char>(c);
+        if (std::isalnum(uc) != 0) {
+            k += static_cast<char>(std::tolower(uc));
+        }
+    }
     if (k.empty()) {
         return "unknown";
     }
+    // Union of every plugin copy's synonym set (plugin-host-promotion D0:
+    // ongoin/onhaiatus typos are real upstream data, publish*/finish/
+    // onhold/notyetpublished come from the mangabay variant).
     static const std::map<std::string, std::string> kMap{
         {"ongoing", "Ongoing"},
+        {"ongoin", "Ongoing"},
         {"releasing", "Ongoing"},
         {"publishing", "Ongoing"},
+        {"publish", "Ongoing"},
+        {"published", "Ongoing"},
         {"completed", "Completed"},
         {"finished", "Completed"},
+        {"finish", "Completed"},
         {"hiatus", "Hiatus"},
-        {"on hiatus", "Hiatus"},
+        {"onhiatus", "Hiatus"},
+        {"onhold", "Hiatus"},
         {"dropped", "Dropped"},
         {"cancelled", "Dropped"},
         {"canceled", "Dropped"},
         {"upcoming", "Upcoming"},
-        {"not yet released", "Upcoming"},
+        {"notyetreleased", "Upcoming"},
+        {"notyetpublished", "Upcoming"},
     };
     if (auto it = kMap.find(k); it != kMap.end()) {
         return it->second;
@@ -140,10 +155,10 @@ inline std::string format_date(std::chrono::system_clock::time_point tp) {
 
 } // namespace detail
 
-/** \brief Parse a human-readable date (unix timestamp, relative phrase, or a
- *         common layout) to an ISO 8601 date string "YYYY-MM-DD".
- *         Returns std::nullopt when nothing parses. */
-inline std::optional<std::string> date_to_iso(std::string_view raw) {
+/** \brief Parse a human-readable date (unix seconds/millis, relative phrase,
+ *         or a common layout) to a UTC time_point. Returns std::nullopt when
+ *         nothing parses; date_to_iso / date_epoch format the result. */
+inline std::optional<std::chrono::system_clock::time_point> parse_date(std::string_view raw) {
     const auto trim = [](std::string_view s) {
         while (!s.empty() && (s.front() == ' ' || s.front() == '\t' || s.front() == '\n' || s.front() == '\r')) {
             s.remove_prefix(1);
@@ -168,10 +183,8 @@ inline std::optional<std::string> date_to_iso(std::string_view raw) {
         if ((len >= 9 && len <= 11) || (len >= 12 && len <= 14)) {
             try {
                 const int64_t n = std::stoll(s);
-                const auto tp = (len >= 12)
-                                    ? std::chrono::system_clock::time_point(std::chrono::milliseconds(n))
-                                    : std::chrono::system_clock::time_point(std::chrono::seconds(n));
-                return detail::format_date(tp);
+                return (len >= 12) ? std::chrono::system_clock::time_point(std::chrono::milliseconds(n))
+                                   : std::chrono::system_clock::time_point(std::chrono::seconds(n));
             } catch (...) {
                 return std::nullopt;
             }
@@ -184,10 +197,10 @@ inline std::optional<std::string> date_to_iso(std::string_view raw) {
         std::string lower(s);
         std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return std::tolower(c); });
         if (lower == "just now" || lower == "today" || lower == "moments ago") {
-            return detail::format_date(now);
+            return now;
         }
         if (lower == "yesterday") {
-            return detail::format_date(now - std::chrono::hours(24));
+            return now - std::chrono::hours(24);
         }
         re2::RE2::Options rel_opts;
         rel_opts.set_case_sensitive(false);
@@ -213,7 +226,7 @@ inline std::optional<std::string> date_to_iso(std::string_view raw) {
                     {"year", std::chrono::minutes(60 * 24 * 365)},
                 };
                 if (const auto it = kUnits.find(unit); it != kUnits.end()) {
-                    return detail::format_date(now - it->second * n);
+                    return now - it->second * n;
                 }
             } catch (...) {
                 return std::nullopt;
@@ -224,28 +237,47 @@ inline std::optional<std::string> date_to_iso(std::string_view raw) {
     // --- fixed layouts via strptime -------------------------------------------
     // The layouts the host knows; Go dateLayouts port.
     static const char* kLayouts[] = {
-        "%Y-%m-%dT%H:%M:%S",        // RFC3339 (no tz) / ISO 8601
-        "%Y-%m-%d %H:%M:%S",        // space separator
-        "%Y-%m-%d %H:%M",           // no seconds
-        "%Y-%m-%d",                 // date only
-        "%d %b %Y",                 // 02 Jan 2006
-        "%e %b %Y",                 // 2 Jan 2006
-        "%b %e, %Y",              // Jan 2, 2006
-        "%b %d, %Y",              // Jan 02, 2006
-        "%b %d %Y",               // Jan 02 2006
-        "%B %e, %Y",              // January 2, 2006
-        "%B %d, %Y",              // January 02, 2006
-        "%a, %d %b %Y %H:%M:%S",  // RFC1123: Wed, 02 Jan 2006 15:04:05
-        "%a %d %b %y %H:%M",      // RFC822-ish: Wed 02 Jan 06 15:04
+        "%Y-%m-%dT%H:%M:%S",       // RFC3339 (no tz) / ISO 8601
+        "%Y-%m-%d %H:%M:%S",       // space separator
+        "%Y-%m-%d %H:%M",          // no seconds
+        "%Y-%m-%d",                // date only
+        "%d %b %Y",                // 02 Jan 2006
+        "%e %b %Y",                // 2 Jan 2006
+        "%b %e, %Y",               // Jan 2, 2006
+        "%b %d, %Y",               // Jan 02, 2006
+        "%b %d %Y",                // Jan 02 2006
+        "%B %e, %Y",               // January 2, 2006
+        "%B %d, %Y",               // January 02, 2006
+        "%a, %d %b %Y %H:%M:%S",   // RFC1123: Wed, 02 Jan 2006 15:04:05
+        "%a %d %b %y %H:%M",       // RFC822-ish: Wed 02 Jan 06 15:04
     };
     for (const char* fmt : kLayouts) {
         std::tm tm{};
         if (strptime(s.c_str(), fmt, &tm) != nullptr) {
-            char out[16];
-            return std::string(out, std::strftime(out, sizeof out, "%Y-%m-%d", &tm));
+            return std::chrono::system_clock::from_time_t(timegm(&tm));
         }
     }
     return std::nullopt;
+}
+
+/** \brief Parse a human-readable date to "YYYY-MM-DD"; nullopt when nothing
+ *         parses. */
+inline std::optional<std::string> date_to_iso(std::string_view raw) {
+    const auto tp = parse_date(raw);
+    if (!tp) {
+        return std::nullopt;
+    }
+    return detail::format_date(*tp);
+}
+
+/** \brief Parse a human-readable date to unix seconds (UTC); nullopt when
+ *         nothing parses. Same parser as date_to_iso. */
+inline std::optional<long long> date_epoch(std::string_view raw) {
+    const auto tp = parse_date(raw);
+    if (!tp) {
+        return std::nullopt;
+    }
+    return std::chrono::duration_cast<std::chrono::seconds>(tp->time_since_epoch()).count();
 }
 
 // ---------------------------------------------------------------------------
@@ -359,6 +391,55 @@ inline std::string strip_html(std::string_view html) {
     const std::string out = detail::doc_text(doc, ddoc);
     lxb_html_document_destroy(doc);
     return trim(out);
+}
+
+// ---------------------------------------------------------------------------
+// json_blob (plugin-host-promotion D5, goIsekai pluginutil.JSONBlob)
+// ---------------------------------------------------------------------------
+
+/** \brief Return the first balanced JSON object/array embedded in `text`,
+ *         starting at the first occurrence of `marker` (empty marker searches
+ *         from the start). Quotes and escapes are tracked, so a brace inside a
+ *         string never closes the blob early. nullopt when no balanced blob
+ *         follows the marker. */
+inline std::optional<std::string> json_blob(std::string_view text, std::string_view marker) {
+    if (!marker.empty()) {
+        const size_t at = text.find(marker);
+        if (at == std::string_view::npos) {
+            return std::nullopt;
+        }
+        text.remove_prefix(at + marker.size());
+    }
+    const size_t start = text.find_first_of("{[");
+    if (start == std::string_view::npos) {
+        return std::nullopt;
+    }
+    const char open = text[start];
+    const char closer = open == '[' ? ']' : '}';
+    bool in_string = false;
+    bool escaped = false;
+    int depth = 0;
+    for (size_t i = start; i < text.size(); ++i) {
+        const char c = text[i];
+        if (in_string) {
+            if (escaped) {
+                escaped = false;
+            } else if (c == '\\') {
+                escaped = true;
+            } else if (c == '"') {
+                in_string = false;
+            }
+        } else if (c == '"') {
+            in_string = true;
+        } else if (c == open) {
+            ++depth;
+        } else if (c == closer) {
+            if (--depth == 0) {
+                return std::string(text.substr(start, i - start + 1));
+            }
+        }
+    }
+    return std::nullopt;
 }
 
 } // namespace plugin::host_text

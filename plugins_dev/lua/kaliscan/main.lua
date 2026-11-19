@@ -14,12 +14,7 @@ local util = require("util")
 local MAX_RESULT_PAGES = 5
 
 -- http request -> (body, err). 200-or-nothing, the anisascans http_req shape.
-local function http_req(url, opts)
-  local res, err = host.http.fetch(url, opts or {})
-  if err ~= nil then return nil, err end
-  if res.status ~= 200 then return nil, "kaliscan: upstream status " .. tostring(res.status) end
-  return res.body, nil
-end
+local http_req = host.http.fetch_body -- (body, err); nil unless 200 (plugin-host-promotion).
 
 local methods = {}
 

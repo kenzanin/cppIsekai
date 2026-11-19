@@ -7,6 +7,7 @@
 #include <cstring>
 #include <memory>
 #include <stdexcept>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -181,6 +182,23 @@ size_t re2_find_index(const std::string& pattern, const std::string& text) {
     }
     const auto start = static_cast<const char*>(m[0].data()) - text.data();
     return static_cast<size_t>(start) + 1;
+}
+
+std::optional<std::string> re2_capture(const std::string& pattern, const std::string& text) {
+    const re2::RE2 re(pattern);
+    if (!re.ok()) {
+        throw std::invalid_argument("re2: " + re.error());
+    }
+    const int groups = re.NumberOfCapturingGroups();
+    std::vector<re2::StringPiece> m(static_cast<size_t>(groups) + 1);
+    if (!re.Match(text, 0, text.size(), re2::RE2::UNANCHORED, m.data(), groups + 1)) {
+        return std::nullopt;
+    }
+    const auto& sp = m[groups >= 1 ? 1 : 0];
+    if (sp.data() == nullptr) {
+        return std::string{}; // non-participating group: "" (find1 parity)
+    }
+    return std::string(sp.data(), sp.size());
 }
 
 } // namespace plugin

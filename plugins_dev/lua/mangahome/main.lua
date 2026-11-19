@@ -13,29 +13,16 @@ local BROWSER_UA =
 
 -- request -> body or nil (200-only); the UA is load-bearing, not cosmetic
 local function http_body(url)
-  local res, err = host.http.fetch(url, { headers = { ["User-Agent"] = BROWSER_UA } })
-  if err ~= nil then return nil end
-  if res.status ~= 200 then return nil end
-  return res.body
+  return (host.http.fetch_body(url, { headers = { ["User-Agent"] = BROWSER_UA } }))
 end
 
--- "Apr 05,2024" -> unix midnight UTC; unparseable -> 0 (no os in sandbox)
-local MONTHS = { Jan = 1, Feb = 2, Mar = 3, Apr = 4, May = 5, Jun = 6, Jul = 7, Aug = 8, Sep = 9, Oct = 10, Nov = 11, Dec = 12 }
-
+-- "Apr 05,2024" etc -> unix seconds via host.text.date_epoch (D7); 0 when
+-- unparseable, the house zero-time contract.
 local function date_epoch(s)
-  local mon, d, y = tostring(s or ""):match("(%a%a%a)%s+(%d+)%s*,%s*(%d%d%d%d)")
-  local mo = mon and MONTHS[mon]
-  if not mo then return 0 end
-  local yy = tonumber(y) - (mo <= 2 and 1 or 0)
-  local era = math.floor(yy / 400)
-  local yoe = yy - era * 400
-  local doy = math.floor((153 * (mo + (mo > 2 and -3 or 9)) + 2) / 5) + tonumber(d) - 1
-  local doe = yoe * 365 + math.floor(yoe / 4) - math.floor(yoe / 100) + doy
-  return (era * 146097 + doe - 719468) * 86400
+  return host.text.date_epoch(tostring(s or "")) or 0
 end
 
 local methods = {}
-
 -- ── search ─────────────────────────────────────────────────────────────────
 
 methods.search = function(params)

@@ -8,12 +8,9 @@ local BASE = "https://mangabuddy1.co.uk" -- manifest site_url; .com is a status/
 local helpers = require("helpers")
 local genres = require("genres")
 
--- first capture group of the first match; nil when the pattern does not match.
+-- first capture group of the first match; nil when no match (host re2.capture).
 local function find1(s, pattern)
-  local m = host.re2.find(pattern, tostring(s or ""))
-  if #m >= 2 then return m[2] end
-  if #m == 1 then return m[1] end
-  return nil
+  return host.re2.capture(pattern, tostring(s or ""))
 end
 
 -- full manga id is "{slug}.{zid}"; several endpoints want the bare slug
@@ -36,20 +33,10 @@ local function label_value(html, label, href_prefix)
   return seg:match('([^"]+)', at + 6 + #href_prefix) or ""
 end
 
--- ISO timestamps -> epoch (Hinnant civil-days, as mangadex); relative phrases
--- and missing dates collapse to 0 rather than dropping the chapter.
+-- RFC3339 timestamps -> unix seconds via host.text.date_epoch (D7); 0 when
+-- absent/unparseable, the house zero-time contract.
 local function epoch(s)
-  if not s then return 0 end
-  local y, mo, d, h, mi, sec = tostring(s):match("(%d+)-(%d+)-(%d+)T(%d+):(%d+):(%d+)")
-  if not y then return 0 end
-  y, mo, d, h, mi, sec = tonumber(y), tonumber(mo), tonumber(d), tonumber(h), tonumber(mi), tonumber(sec)
-  local yy = y - (mo <= 2 and 1 or 0)
-  local era = math.floor(yy / 400)
-  local yoe = yy - era * 400
-  local doy = math.floor((153 * (mo + (mo > 2 and -3 or 9)) + 2) / 5) + d - 1
-  local doe = yoe * 365 + math.floor(yoe / 4) - math.floor(yoe / 100) + doy
-  local days = era * 146097 + doe - 719468
-  return days * 86400 + h * 3600 + mi * 60 + sec
+  return host.text.date_epoch(tostring(s or "")) or 0
 end
 
 local methods = {}

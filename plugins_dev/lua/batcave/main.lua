@@ -24,12 +24,9 @@ local function json_data(html)
     return dle.json_data(html, "window.__DATA__ = ")
 end
 
--- abs_url turns "/path" into a full URL anchored at BASE, leaving absolutes alone.
-local function abs_url(path)
-    if not path or path == "" then return "" end
-    if path:match("^https?://") then return path end
-    return BASE .. path
-end
+-- abs_url: host.url_abs anchored at BASE (D6; madaradex semantics: //scheme,
+-- leading-slash strip, empty passthrough).
+local abs_url = function(path) return host.url_abs(BASE, path) end
 
 -- path_of turns a manga id into a site path. The id is the DLE slug
 -- ("29706-thor-1966-2011.html"); a full permalink is accepted too.
