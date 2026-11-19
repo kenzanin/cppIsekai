@@ -3,7 +3,7 @@ type: decision
 title: "Search results read-model: JSONB cache via call_cached"
 description: "User approved 2026-11-08: plugin results as a JSONB read model via opt-in call_cached; TTL policy extended 2026-11-18 (d423b11): per-method host default + per-plugin manifest cache_ttl override."
 tags: [cache, sqlite, jsonb, search, performance, read-model]
-generated: { by: agent/mcp, at: "2026-11-18T13:58:35Z" }
+generated: { by: agent/mcp, at: "2026-11-19T06:50:04Z" }
 status: stable
 ---
 
@@ -50,3 +50,4 @@ blank reader). Uniform 24h TTL served dead tokens, so:
 - [Normalisation contract: MangaDex canonical + chapter release_at](../architecture/normalization-contract.md): Source of the jsonb/hybrid decision.
 - [Plugin system: folder packaging, manifest, multi-runtime data-contract ABI](../architecture/plugin-system.md): jsonb DB-side only, never the wire.
 - [Source layer map and rules (src/<scope>/, .mustache templates)](../references/code-layers.md): Store is the only SQL; cache via the store layer.
+- Related to [Search envelope: plugin reports real total + optional data.pages; host pager prefers it](search-envelope-page-count.md)

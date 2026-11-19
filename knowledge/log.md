@@ -1,4 +1,6 @@
 ## 2026-11-19
+* **Update**: Linked `decisions/search-read-model-cache.md` to `decisions/search-envelope-page-count.md`.
+* **Creation**: Documented concept `decisions/search-envelope-page-count.md` (Search envelope: plugin reports real total + optional data.pages; host pager prefers it).
 * **Update**: Updated concept `decisions/xmake-build-system.md`.
 
 ## 2026-11-18
