@@ -5,8 +5,10 @@
 #include <SimpleIni.h>
 
 #include <fstream>
+#include <filesystem>
 #include <map>
 #include <sstream>
+#include <system_error>
 #include <vector>
 
 #include <cerrno>
@@ -307,6 +309,53 @@ void register_admin(Ctx& c) {
         out["ok"] = true;
         out["written"] = written;
         crow::response r{std::move(out)};
+        r.set_header("Content-Type", "application/json");
+        return r;
+    });
+
+    // api-first: the [backup] feature is otherwise config-only (auto tick).
+    // GET lists snapshots; POST triggers the same VACUUM -> VACUUM INTO -> prune
+    // unit the scheduler uses, so the whole feature is curl-accessible.
+    // Restore stays a deliberate filesystem operation (stop daemon, copy
+    // snapshot over data/library.db, start) -- exposing it over HTTP would
+    // overwrite a live DB.
+    // NOTE: capture ini_path/overrides_ref (references to long-lived objects),
+    // NOT the local Ctx c -- it dies when register_api returns.
+    CROW_ROUTE(app, "/api/backup")([&] {
+        const config::Config cfg = config::resolve(overrides_ref, ini_path);
+        const std::string dir = (std::filesystem::path(cfg.db).parent_path() / "backups").generic_string();
+        crow::json::wvalue files(crow::json::type::List);
+        int i = 0;
+        std::error_code ec;
+        if (std::filesystem::exists(dir, ec)) {
+            for (const auto& entry : std::filesystem::directory_iterator(dir, ec)) {
+                if (!entry.is_regular_file(ec)) continue;
+                const auto name = entry.path().filename().string();
+                if (name.rfind("library-", 0) != 0 || entry.path().extension() != ".db") continue;
+                crow::json::wvalue f;
+                f["name"] = name;
+                f["size"] = static_cast<std::int64_t>(entry.file_size(ec));
+                files[i++] = std::move(f);
+            }
+        }
+        crow::json::wvalue out;
+        out["ok"] = true;
+        out["dir"] = dir;
+        out["keep"] = cfg.backup_keep;
+        out["files"] = std::move(files);
+        crow::response r{out};
+        r.set_header("Content-Type", "application/json");
+        return r;
+    });
+    CROW_ROUTE(app, "/api/backup").methods(crow::HTTPMethod::POST)([&] {
+        const config::Config cfg = config::resolve(overrides_ref, ini_path);
+        const std::string dir = (std::filesystem::path(cfg.db).parent_path() / "backups").generic_string();
+        const std::string path =
+            on_pool(db, [&] { return store.maintenance_vacuum_backup(dir, cfg.backup_keep); });
+        crow::json::wvalue out;
+        out["ok"] = !path.empty();
+        out["path"] = path;
+        crow::response r{out};
         r.set_header("Content-Type", "application/json");
         return r;
     });

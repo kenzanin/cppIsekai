@@ -331,6 +331,22 @@ void register_pages(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, L
         return html("logs.mustache", ctx);
     });
 
+    // api-first: the log ring is also exposed as JSON so every feature the
+    // /logs page shows is readable with curl (the page itself is HTML; the
+    // websocket is the live tail).
+    CROW_ROUTE(app, "/api/logs")
+    ([&] {
+        crow::json::wvalue lines(crow::json::type::List);
+        int i = 0;
+        for (const auto& line : logs.snapshot()) lines[i++] = line;
+        crow::json::wvalue out;
+        out["ok"] = true;
+        out["lines"] = std::move(lines);
+        crow::response r{out};
+        r.set_header("Content-Type", "application/json");
+        return r;
+    });
+
     CROW_WEBSOCKET_ROUTE(app, "/ws/log").onopen([&](crow::websocket::connection& conn) {
         for (const auto& line : logs.snapshot()) {
             conn.send_text(line);
