@@ -1,0 +1,9 @@
+{
+  "name": "V Example",
+  "id": "vexample",
+  "version": "1.0.0",
+  "website": "https://vlang.io",
+  "runtime": "wasm",
+  "capabilities": ["search", "detail"],
+  "api": 1
+}
