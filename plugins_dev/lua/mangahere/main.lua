@@ -21,6 +21,29 @@ local http_body = host.http.fetch_body
 
 local methods = {}
 
+-- ── pager ─────────────────────────────────────────────────────────────────
+-- The site's pager (div.pager-list) window-links /search?..page=N..; the real
+-- result count is nowhere in the HTML, so the total is derived batcave-style:
+-- (maxpage-1)*per_page + last_page_count, memoised per query so only the
+-- first host page of a query pays the extra probe fetches.
+local total_memo = {}
+
+local function pager_pages(body)
+  local block = body:match('(<div class="pager%-list.-</div></div>)') or body
+  local maxp = 1
+  for n in block:gmatch("page=(%d+)") do
+    local v = tonumber(n)
+    if v and v > maxp then maxp = v end
+  end
+  return maxp
+end
+
+local function remember(key, value)
+  if #total_memo > 128 then total_memo = {} end
+  total_memo[key] = value
+  return value
+end
+
 -- ── search ─────────────────────────────────────────────────────────────────
 -- /search?title=Q&page=N; genre browse adds &genres=<numeric id> — the empty
 -- title is valid and returns genre-only cards (HAR-confirmed upstream).
@@ -35,22 +58,44 @@ methods.search = function(params)
     tags = list
   end
 
-  local url
+  local url, key
   if type(tags) == "table" and #tags > 0 then
     local gid = tostring(tags[1] or "")
     gid = genres.map[gid] or gid
     url = BASE .. "/search?title=" .. host.url_encode(q) .. "&genres=" .. host.url_encode(gid) .. "&nogenres=&sort=name"
-    if page > 1 then url = url .. "&page=" .. tostring(page) end
+    key = "g:" .. gid
   elseif q ~= "" then
-    url = BASE .. "/search?title=" .. host.url_encode(q) .. "&page=" .. tostring(page)
+    url = BASE .. "/search?title=" .. host.url_encode(q)
+    key = "q:" .. q
   else
     return { ok = true, data = { items = {}, total = 0 } }
   end
+  if page > 1 then url = url .. "&page=" .. tostring(page) end
 
   local html = http_body(url)
   if not html or html == "" then return { ok = false, error = "mangahere: search failed" } end
   local items = util.parse_search(html)
-  return { ok = true, data = { items = items, total = #items } }
+  local maxp = pager_pages(html)
+  -- the windowed pager marks the current (last) page as a bare span, so a
+  -- request for the true last page reports maxp-1; restore it from page
+  if #items > 0 and page == maxp + 1 then maxp = page end
+
+  local total = total_memo[key]
+  if total == nil then
+    if maxp <= 1 then
+      total = #items
+    else
+      local function count_page(p)
+        local body = http_body(url:gsub("&page=%d+", "") .. (p > 1 and "&page=" .. p or ""))
+        return body and #util.parse_search(body) or 0
+      end
+      local per = page < maxp and #items or count_page(1)
+      local last = page == maxp and #items or count_page(maxp)
+      total = per > 0 and (maxp - 1) * per + last or #items
+    end
+    total = remember(key, total)
+  end
+  return { ok = true, data = { items = items, total = total, pages = maxp } }
 end
 
 -- ── detail / chapters ──────────────────────────────────────────────────────
