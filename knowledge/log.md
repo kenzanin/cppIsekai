@@ -1,3 +1,6 @@
+## 2026-11-20
+* **Creation**: Documented concept `decisions/clang-doc-generation.md` (clang-doc generation: one process, src-only, md needs vendored templates).
+
 ## 2026-11-19
 * **Creation**: Documented concept `findings/mangahub-graphql-move.md` (mangahub.io GraphQL moved to the site host, cookie auth, NSFW flag).
 * **Update**: Linked `findings/plugin-liveness-2026-11-19.md` to `decisions/deps-and-plugins.md`.
