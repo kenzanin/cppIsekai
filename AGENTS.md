@@ -49,6 +49,7 @@ cppIsekai — local-first C++23 manga viewer daemon (Linux, Arch). Crow master +
 xmake -y                            # configure + build (xrepo packages auto-install; zero-warning gate -Wall -Wextra)
 xmake test                          # full suite (doctest)
 xmake test <target>                 # single target, e.g. xmake test test_store
+xmake doc                           # clang-doc docs for src/ -> docs/api/{html,md} (gitignored; XMAKE_DOC_FORMAT=md for markdown)
 ./run-cppIsekai.sh                   # run (bare boot refuses with usage; --help exit 0)
 ```
 

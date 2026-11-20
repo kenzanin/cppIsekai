@@ -455,3 +455,119 @@ task("scan")
         end
         print("[scan] clean: address+undefined and thread suites green; release restored")
     end)
+
+-- --- docs: clang-doc HTML for src/ only --------------------------------------
+-- Two quirks make this usable instead of a 15-minute, ~20k-page dump:
+--   1. clang-doc cannot merge its own JSON intermediates here (LLVM 23 answers
+--      `Reducing 0 infos` when handed a .json input), so the whole doc set must
+--      come out of ONE process that parses every TU -- per-TU parallel runs
+--      cannot be stitched back together afterwards.
+--   2. xmake passes package includes as -I, so clang-doc treats sqlite_orm,
+--      crow, asio, boost, std, sol... as project code (1816 pages for a single
+--      TU). Rewriting every out-of-project include to -isystem drops them (26
+--      pages for the same TU) because clang-doc skips system headers.
+task("doc")
+    set_menu {usage = "XMAKE_DOC_FORMAT=md xmake doc", description = "clang-doc docs for src/ into docs/api (html default, md opt-in)"}
+    on_run(function ()
+        import("core.base.json")
+        local root = os.projectdir()
+        os.exec("xmake project -k compile_commands")
+        local db = json.loadfile(path.join(root, "compile_commands.json"))
+        local function external(p)
+            -- out-of-project include dirs, plus third_party/: vendored cdp-cpp,
+            -- traypp and wasm3 have their own targets and would otherwise land
+            -- in the docs as project namespaces (cdp alone is 1.3 MB of
+            -- generated markdown next to ~500 KB of our own).
+            return (p:startswith("/") and not p:startswith(root))
+                or p:find("third_party/", 1, true) ~= nil
+        end
+        -- one entry per TU (release/debug duplicates), src/ only
+        local seen = {}
+        local entries = {}
+        for _, e in ipairs(db) do
+            if e.file:startswith("src/") and not seen[e.file] then
+                seen[e.file] = true
+                table.insert(entries, e)
+            end
+        end
+        if #entries == 0 then
+            raise("[doc] no src/ entries in compile_commands.json")
+        end
+        local files = {}
+        for _, e in ipairs(entries) do
+            local args = {}
+            local i = 1
+            while i <= #e.arguments do
+                local t = e.arguments[i]
+                if t == "-I" and e.arguments[i + 1] then
+                    local p = e.arguments[i + 1]
+                    table.insert(args, external(p) and "-isystem" or "-I")
+                    table.insert(args, p)
+                    i = i + 2
+                elseif t:startswith("-I") and #t > 2 then
+                    local p = t:sub(3)
+                    table.insert(args, external(p) and "-isystem" or "-I")
+                    table.insert(args, p)
+                    i = i + 1
+                else
+                    table.insert(args, t)
+                    i = i + 1
+                end
+            end
+            e.arguments = args
+            table.insert(files, e.file)
+        end
+        local cc = path.join(root, "build", "clangdoc")
+        os.tryrm(cc)
+        os.mkdir(cc)
+        io.writefile(path.join(cc, "compile_commands.json"), json.encode(entries))
+        local fmt = os.getenv("XMAKE_DOC_FORMAT") or "html"
+        -- the distro llvm package installs only the html templates under
+        -- share/clang-doc, so --format=md dies on "cannot open .../md/class-template.mustache".
+        -- Provision a private clang-doc prefix with the md set vendored in
+        -- scripts/clang-doc/md instead of requiring root to fix /usr/share.
+        local exe = "clang-doc"
+        local extra = nil
+        if fmt == "md" then
+            local tool = path.join(cc, "tool")
+            local bin = path.join(tool, "bin", "clang-doc")
+            local share = path.join(tool, "share", "clang-doc")
+            if not os.isfile(bin) then
+                os.mkdir(path.join(tool, "bin"))
+                os.mkdir(share)
+                os.mkdir(path.join(share, "md"))
+                os.cp(os.iorunv("sh", {"-c", "command -v clang-doc"}):trim(), bin)
+                for _, f in ipairs(os.files("/usr/share/clang-doc/*")) do
+                    os.cp(f, share, {force = true})
+                end
+                for _, f in ipairs(os.files(path.join(root, "scripts", "clang-doc", "md", "*.mustache"))) do
+                    os.cp(f, path.join(share, "md"), {force = true})
+                end
+            end
+            exe = bin
+            -- a copied binary loses its builtin include dir (it resolves
+            -- ../lib/clang/<ver> relative to argv[0]), so point it back.
+            local rd = try { function () return os.iorunv("clang", {"-print-resource-dir"}):trim() end }
+            if rd and #rd > 0 then
+                extra = "-resource-dir=" .. rd
+            end
+        end
+        local outdir = path.join(root, "docs", "api")
+        os.tryrm(outdir)
+        os.mkdir(outdir)
+        local argv = {"-p", cc, "--format=" .. fmt, "--public",
+                      "--project-name=cppIsekai", "--output=" .. outdir}
+        if extra then
+            table.insert(argv, "--extra-arg=" .. extra)
+        end
+        for _, f in ipairs(files) do
+            table.insert(argv, f)
+        end
+        print("[doc] clang-doc (%s): %d TU(s) -> %s", fmt, #files, outdir)
+        os.execv(exe, argv)
+        local n = 0
+        for _, _ in ipairs(os.files(path.join(outdir, "**", "*.*"))) do
+            n = n + 1
+        end
+        print("[doc] done: %d page(s)", n)
+    end)
