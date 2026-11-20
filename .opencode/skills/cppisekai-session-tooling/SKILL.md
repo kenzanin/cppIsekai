@@ -1,6 +1,6 @@
 ---
 name: cppisekai-session-tooling
-description: How to drive tools correctly in the cppIsekai repo — which tool to reach for (AFT search/zoom/inspect, codebase-memory graph, okf, shell, CDP probes, blueprint-mcp), how to run and read xmake builds and tests, how to restart the daemon and verify it live, and the editing/JSON/SQL traps that have already burned this project. Use at the start of any session in cppIsekai, and whenever a build fails, a test is red, the daemon needs a restart, or you are about to grep/cat through shell.
+description: How to drive tools correctly in the cppIsekai repo — which tool to reach for (AFT search/zoom/inspect, codebase-memory graph, okf, shell, the browse browser extension, CDP probes), how to run and read xmake builds and tests, how to restart the daemon and verify it live, and the editing/JSON/SQL traps that have already burned this project. Use at the start of any session in cppIsekai, and whenever a build fails, a test is red, the daemon needs a restart, or you are about to grep/cat through shell.
 ---
 
 # cppIsekai: correct tool usage
@@ -18,7 +18,7 @@ The goal is never "run a command". It is to get a trustworthy answer with the fe
 | Project decisions, constraints, domain facts | `okf_search` first, `okf_show` only if needed | re-deriving them from code |
 | Literal string, error message, config key | `aft_search(pattern=...)` or `grep` | semantic search |
 | Git state, process state, file metadata, timings | `shell` | — |
-| Is this page actually rendering? | CDP probe (vendored libcdp) or `blueprint-mcp` against the real browser | trusting curl/API output |
+| Is this page actually rendering? | `browse` (drives the user's real Chrome: snapshot/click/key/eval/screenshot) or a vendored-libcdp probe | trusting curl/API output |
 | Did a DB write land? | `sqlite3 <db> "select ..."` | trusting the app's own log |
 
 `aft_inspect` is a *hint*, not the compiler. Its `E`/`W` counters and clangd snippets can be stale or belong to a background refresh. A red panel text block is not proof of a build failure — the proof is `xmake`'s own exit status and its `error:` lines.
@@ -85,7 +85,7 @@ Verification ladder — climb it before saying "fixed":
 1. Envelope/API: `curl` the plugin action or the `/api/...` route, read the exact field.
 2. Route/image: `/cache/img` with full context (`cover=1`, or slug+chapter+page) — a missing param makes it 404 for unrelated reasons.
 3. DB: `sqlite3 data/library.db` for the row you claim changed.
-4. Browser: CDP probe or `blueprint-mcp` for anything the user described visually (cover blank, image identical, layout shifted). Server-side green does not refute a visual report.
+4. Browser: `browse` (§9) for anything the user described visually (cover blank, image identical, layout shifted). Server-side green does not refute a visual report.
 5. Cache poisoning: if the user reports a symptom twice, hash the served bytes for two different URLs. Identical hashes mean the *input* is identical (bad referer, bad param truncation), not that the cache is broken.
 - **Never judge a plugin by curling `/search?...`** — that route returns a JS shell; the result list arrives from `/plugin/<id>/search?...` in the browser. A `curl localhost:8090/search?plugin=X&q=Y` body containing "No results" proves nothing (it is the empty-state template). Probe `/plugin/<id>/search?q=...` and count `"id":` instead, then confirm visually in the browser if the user reported it.
 - **Local DNS is ISP-poisoned on this machine** (Indonesian ISP `ioh.co.id`): a long list of domains resolve to a wildcard `*.ioh.co.id` cert, so libcurl reports `SSL peer certificate ... not OK` and Python says `Hostname mismatch` — for sites that are perfectly alive. Do not conclude "site down" from a local TLS/DNS failure. Check global truth with DoH (`https://dns.google/resolve?name=HOST&type=A`, `Status:3` = NXDOMAIN = really gone) and then confirm with a direct-IP TLS+GET using SNI. Only NXDOMAIN/SERVFAIL on a public resolver means the site is gone.
@@ -108,6 +108,12 @@ Verification ladder — climb it before saying "fixed":
 
 Report in Indonesian, casual, and lead with what is verified vs not. A green build is not a green feature. State the exact commands, exit statuses, and the field/row/pixel you observed; if a step is unverified, say so plainly instead of implying it passed.
 
-## static/*.js is brotli-served — regenerate the .br
+## 9. Browser verification: `browse`
 
+`browse` drives the user's own Chrome (real profile, logins, extensions). It replaces `blueprint-mcp`/`chrome-devtools-mcp`, which were removed from `opencode.json`. Use it for any symptom the user described visually, and for behaviour that only exists at runtime (keyboard handlers, spread pairing, scroll containers).
+
+- **`navigate` returns the tab id — hold on to it.** Every later call needs `tab`; a closed tab answers `Tab <id> is gone`, and the fix is `navigate({url})` without `tab` to open a fresh one and take the new id.
+- **Code Mode has no timers.** `setTimeout`/`await sleep()` in `execute` hangs with *"Code Mode has no timers or sleep"*. Fire the action, then read state in the next call.
+- **`eval` must return one plain JSON value.** Returning an array or a mix (`[tabId, json]`) fails with `SyntaxError: Unexpected non-whitespace character after JSON at position 4`. Return a single `String(...)` / `JSON.stringify(...)` and print that.
+- **Key names for `press`:** `ArrowDown`/`ArrowUp`/`ArrowLeft`/`ArrowRight`, `PageDown`, `PageUp`, `Space`, `Enter`, `Escape`, `
 `/static/reader.js` and `/static/detail.js` go through `br_asset` (`src/http/http_pages.cpp:292`), which serves `static/<name>.js.br` whenever it exists (and it does, tracked in git). Editing only the `.js` is invisible in the browser — the old brotli body keeps shipping and Alpine data shows no new fields. After any edit: `brotli -q 11 -f -o static/reader.js.br static/reader.js`, then navigate (not just reload) and check the new state key exists.

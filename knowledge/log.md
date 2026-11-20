@@ -1,4 +1,8 @@
 ## 2026-11-20
+* **Update**: Linked `decisions/library-pin.md` to `decisions/saved-manga-detail-source-of-truth.md`.
+* **Creation**: Documented concept `decisions/library-pin.md` (Pinned titles: a flag on saved_manga, rendered as its own grid section).
+* **Update**: Linked `decisions/reader-keyboard-nav.md` to `architecture/reader-fullscreen.md`.
+* **Creation**: Documented concept `decisions/reader-keyboard-nav.md` (Reader keyboard map: arrows pan, page only at the edge).
 * **Creation**: Documented concept `decisions/clang-doc-generation.md` (clang-doc generation: one process, src-only, md needs vendored templates).
 
 ## 2026-11-19
