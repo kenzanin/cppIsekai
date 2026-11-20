@@ -14,6 +14,10 @@
 #
 # Build: ./build.sh  (Nim -> objects, wasi-sdk clang -> main.wasm)
 
+import std/json
+import std/parsejson
+import std/streams
+
 const Cap = 1 shl 16
 
 var inbuf: array[Cap, char]     # host writes the envelope here
@@ -40,45 +44,43 @@ proc call1(f: proc(a: uint32; b: uint32; c: uint32; d: uint32): int32 {.cdecl.};
   result = newString(int(n))
   copyMem(addr result[0], addr scratch[0], int(n))
 
-proc findFrom(hay, needle: string; start: int): int =
-  if needle.len == 0 or hay.len < needle.len: return -1
-  var i = start
-  while i + needle.len <= hay.len:
-    var k = 0
-    while k < needle.len and hay[i + k] == needle[k]: inc k
-    if k == needle.len: return i
-    inc i
-  -1
-
-# Value of a top-level JSON string field; enough for the host envelope, which
-# is always flat {"api":1,"method":"..","params":{..}} or nested one level.
-proc jsonField(env, key: string): string =
-  let pat = "\"" & key & "\""
-  var at = 0
+# Envelope fields via std/parsejson (the lexer layer under std/json).
+# nim 2.4.2 note: the convenient parseJson() SIGSEGVs the compiler when
+# reachable from an exportc proc with --os:standalone --cpu:wasm32, so the
+# event walker below is used instead; %* / $ for building replies are fine.
+proc envStr(env, key: string): string =
+  # next() is an event API: ':' / ',' never surface, so key-vs-value is tracked
+  # here -- after '{' or a ',' in an object the next string is a key.
+  var ss = newStringStream(env)
+  var p: JsonParser
+  p.open(ss, "env")
+  var stack: seq[bool]   # true = object, false = array
+  var pendingKey = ""
+  var phaseValue = false # true: last string was a key, next token is its value
   while true:
-    let i = findFrom(env, pat, at)
-    if i < 0: return ""
-    var j = i + pat.len
-    while j < env.len and env[j] in {' ', '\t', '\n', '\r'}: inc j
-    if j < env.len and env[j] == ':':
-      inc j
-      while j < env.len and env[j] in {' ', '\t', '\n', '\r'}: inc j
-      if j < env.len and env[j] == '"':
-        inc j
-        result = ""
-        while j < env.len and env[j] != '"':
-          if env[j] == '\\' and j + 1 < env.len:
-            inc j
-            case env[j]
-            of 'n': result.add '\n'
-            of 't': result.add '\t'
-            of 'r': result.add '\r'
-            else: result.add env[j]
-          else: result.add env[j]
-          inc j
-        return
-      return
-    at = i + pat.len
+    p.next()
+    case p.tok
+    of tkEof: break
+    of tkCurlyLe:
+      stack.add true; phaseValue = false
+    of tkBracketLe:
+      stack.add false; phaseValue = false
+    of tkCurlyRi, tkBracketRi:
+      if stack.len > 0: discard stack.pop
+      phaseValue = false
+    of tkComma:
+      phaseValue = stack.len > 0 and stack[stack.high]
+    of tkString:
+      if not phaseValue and (stack.len == 0 or stack[stack.high]):
+        pendingKey = p.str
+        phaseValue = true
+      else:
+        if pendingKey == key: p.close(); return p.str
+        phaseValue = false
+    else:
+      phaseValue = false # int/true/... value consumed the pending key
+  p.close()
+  return ""
 
 proc jesc(s: string): string =
   result = ""
@@ -107,9 +109,9 @@ proc handle*(envPtr, len: uint32): uint32 {.exportc: "handle", cdecl.} =
   else:
     var env = newString(int(len))
     copyMem(addr env[0], byteAddr(envPtr), int(len))
-    let meth = jsonField(env, "method")
+    let meth = envStr(env, "method")
     if meth == "search":
-      let q = call1(hostTextTrim, jsonField(env, "title"))
+      let q = call1(hostTextTrim, envStr(env, "title"))
       if q.len == 0: errReply("empty query")
       else:
         let enc = call1(hostUrlEncode, q)
@@ -118,7 +120,7 @@ proc handle*(envPtr, len: uint32): uint32 {.exportc: "handle", cdecl.} =
                 "\"cover\":\"\"}],\"total\":1,\"echo\":{\"trimmed\":\"" & jesc(q) &
                 "\",\"url_encoded\":\"" & jesc(enc) & "\"}}}"
     elif meth == "detail":
-      let id = jsonField(env, "id")
+      let id = envStr(env, "id")
       reply = "{\"ok\":true,\"data\":{\"id\":\"" & jesc(id) &
               "\",\"name\":\"Nim guest: " & jesc(id) & "\",\"cover\":\"\"," &
               "\"status\":\"Unknown\",\"tags\":[\"nim\",\"wasm\"]," &
