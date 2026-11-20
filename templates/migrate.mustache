@@ -1,5 +1,7 @@
 {{>top.mustache}}
-<div x-data="migratePage" x-init="boot()">
+<div id="migrate-root" x-data="migratePage" x-init="boot()"
+     data-plugin="{{plugin}}" data-slug="{{slug}}" data-name="{{name}}"
+     data-altkeys="{{altkeys}}" data-src-ch="{{src_ch}}" data-src-read="{{src_read}}">
   <div class="flex items-center justify-between mb-4">
     <div class="min-w-0">
       <h1 class="text-xl font-semibold truncate" x-text="name"></h1>
@@ -59,11 +61,15 @@
 </div>
 <script>
 function migratePage() {
+  // Server constants ride data-* attributes: mustache HTML-escapes them into
+  // the attribute (e.g. ' -> &#39;) and the HTML parser decodes that back when
+  // read via dataset. Interpolating {{name}} straight into a <script> string
+  // would leave the entity literal (script content is not entity-decoded).
+  const seed = document.getElementById('migrate-root').dataset;
   return {
-    // server-injected constants (mustache): source identity + exact-match keys
-    plugin: '{{plugin}}', slug: '{{slug}}', name: '{{name}}',
-    keys: '{{altkeys}}'.split(',').filter(Boolean),
-    srcCh: {{src_ch}}, srcRead: {{src_read}},
+    plugin: seed.plugin, slug: seed.slug, name: seed.name || '',
+    keys: (seed.altkeys || '').split(',').filter(Boolean),
+    srcCh: +seed.srcCh, srcRead: +seed.srcRead,
     plugins: [], sel: {}, q: '', results: [],
     busy: false, migrating: false, ran: false, err: '',
     get srcPluginName() { return this.plugins.find(p => p.key === this.plugin)?.name || this.plugin },
