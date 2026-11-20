@@ -1,0 +1,9 @@
+{
+  "name": "Nim Example",
+  "id": "nimexample",
+  "version": "1.0.0",
+  "website": "https://nim-lang.org",
+  "runtime": "wasm",
+  "capabilities": ["search", "detail"],
+  "api": 1
+}
