@@ -12,6 +12,7 @@ function gridPage() {
     page: 1, perPage: 30,
     pages: 1, count: 0, total: 0, pins: 0, hasDup: false, hasStats: false,
     init() {
+      if (this.dup) this.sort = 'dup'; // restored chip keeps cluster order
       this.rescan();
       this.updatePerPage();
       const p = new URLSearchParams(location.search).get('plugin');
@@ -27,7 +28,7 @@ function gridPage() {
       }
       window.addEventListener('grid:reset', () => this.reset());
       window.addEventListener('grid:plugin', (e) => { this.plugin = e.detail || ''; this.page = 1; this.apply(); });
-      window.addEventListener('grid:toggle-dup', () => { this.dup = !this.dup; this.page = 1; this.apply(); });
+      window.addEventListener('grid:toggle-dup', () => this.toggleDup());
       window.addEventListener('resize', () => this.updatePerPage());
       document.body.addEventListener('htmx:afterSwap', () => { this.rescan(); this.apply(); });
       this.apply();
@@ -52,7 +53,12 @@ function gridPage() {
       st[kind] = cur === 'off' ? 'show' : cur === 'show' ? 'hide' : 'off';
       this.page = 1; this.apply();
     },
-    toggleDup() { this.dup = !this.dup; this.page = 1; this.apply(); },
+    toggleDup() { // chip re-engages cluster order (library-dedup 3.2; regressed in the prefs-v2 rewrite)
+      this.dup = !this.dup;
+      if (this.dup) { this.sort = 'dup'; }
+      else if (this.sort === 'dup') { this.sort = 'read'; this.sortDir.read = 'desc'; }
+      this.page = 1; this.apply();
+    },
     setPlugin(p) { this.plugin = (this.plugin === p ? '' : p); this.page = 1; this.apply(); },
     setSort(s) { // 3-state per key: off -> asc -> desc -> off(default recent-read); the default key only toggles asc/desc
       const cur = this.sort === s ? (this.sortDir[s] || 'asc') : null;
@@ -127,11 +133,13 @@ function gridPage() {
       const pinSet = new Set(pin), libSet = new Set(lib);
       this.pins = pin.length;
       this.count = vis.length;
-      // library-pin: two sections — matching pins render unpaged into #pinned-cards
+      // library-pin: two sections — sorted append keeps cmp order in BOTH lists
+      // (regressed to source order in the pin split); filtered-out cards hide in place
+      for (const c of pin) { pinUl.appendChild(c); c.style.display = ''; } // pins render unpaged
+      for (const c of lib) ul.appendChild(c); // display decided by the page slice below
       for (const c of this.cards) {
-        if (pinSet.has(c)) { pinUl.appendChild(c); c.style.display = ''; }
-        else if (libSet.has(c)) { ul.appendChild(c); } // display decided by the page slice below
-        else if (pinUl && pinUl.contains(c)) { c.style.display = 'none'; }
+        if (pinSet.has(c) || libSet.has(c)) continue;
+        if (pinUl && pinUl.contains(c)) { c.style.display = 'none'; }
         else { ul.appendChild(c); c.style.display = 'none'; }
       }
       const pages = Math.max(1, Math.ceil(lib.length / this.perPage));
