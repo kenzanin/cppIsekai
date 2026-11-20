@@ -1,21 +1,21 @@
 {{>top.mustache}}
 <div x-data="settingsPage" x-init="boot()">
   <h1 class="text-lg font-semibold mb-3">Settings</h1>
-  <p class="text-xs text-zinc-500 mb-3">Values resolve per layer: default &lt; ini &lt; <code>CPPISEKAI_*</code> env &lt; <code>--flag</code>. Rows won by env/flag are read-only. Save writes the ini in place; comments survive.</p>
+  <p class="text-xs text-zinc-400 mb-3">Values resolve per layer: default &lt; ini &lt; <code>CPPISEKAI_*</code> env &lt; <code>--flag</code>. Rows won by env/flag are read-only. Save writes the ini in place; comments survive.</p>
   <p class="text-sm text-red-400 mb-2" x-show="err" x-text="err" x-cloak></p>
-  <p class="text-sm text-zinc-500 mb-2" x-show="note" x-text="note" x-cloak></p>
+  <p class="text-sm text-zinc-400 mb-2" x-show="note" x-text="note" x-cloak></p>
 
-  <div x-show="loading" class="text-sm text-zinc-500">…</div>
+  <div x-show="loading" class="text-sm text-zinc-400">…</div>
 
   <template x-for="section in sections()" :key="section">
     <section class="mb-5">
-      <h2 class="text-xs uppercase tracking-wide text-zinc-500 mb-2" x-text="section"></h2>
+      <h2 class="text-xs uppercase tracking-wide text-zinc-400 mb-2" x-text="section"></h2>
       <ul class="space-y-2">
         <template x-for="k in knobs.filter(x => x.section === section)" :key="k.fullKey">
           <li class="border border-zinc-800 rounded p-3">
             <div class="flex items-center gap-2 flex-wrap">
-              <code class="text-xs text-zinc-400" x-text="k.fullKey"></code>
-              <span class="text-[10px] uppercase rounded px-1.5 py-0.5 bg-zinc-800 text-zinc-400" x-text="sourceOf(k)"></span>
+              <code class="text-xs text-zinc-300" x-text="k.fullKey"></code>
+              <span class="text-[10px] uppercase rounded px-1.5 py-0.5 bg-zinc-800 text-zinc-300" x-text="sourceOf(k)"></span>
               <span class="text-[10px] rounded px-1.5 py-0.5 bg-amber-900/40 text-amber-400" x-show="k.restart">restart to apply</span>
               <span class="text-[10px] rounded px-1.5 py-0.5 bg-emerald-900/40 text-emerald-400" x-show="k.live">applied live</span>
               <span class="flex-1"></span>
@@ -46,12 +46,12 @@
                            :value="k.value" :disabled="readOnly(k)"
                            @input="dirty[k.fullKey] = $event.target.value">
                   </template>
-                  <button type="button" x-show="k.fullKey === 'server.proxy'" class="text-xs text-zinc-500 underline"
+                  <button type="button" x-show="k.fullKey === 'server.proxy'" class="text-xs text-zinc-400 underline"
                           @click="reveal[k.fullKey] = !reveal[k.fullKey]" x-text="reveal[k.fullKey] ? 'hide' : 'show'"></button>
                 </span>
               </template>
             </div>
-            <p class="text-xs text-zinc-500 mt-1" x-text="k.doc"></p>
+            <p class="text-xs text-zinc-400 mt-1" x-text="k.doc"></p>
             <p class="text-xs text-amber-500/80 mt-1" x-show="readOnly(k)"
                x-text="'won by ' + sourceOf(k) + ' — editing the ini will not change this value'"></p>
           </li>
