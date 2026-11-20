@@ -242,8 +242,25 @@ function readerPage() {
     },
     zoomIn() { this._adoptVisibleZoom(); this.zoom = 'custom'; this.zoomPct = Math.min(400, this.zoomPct + 15); this.persist(); },
     zoomOut() { this._adoptVisibleZoom(); this.zoom = 'custom'; this.zoomPct = Math.max(25, this.zoomPct - 15); this.persist(); },
-    _scrollBy(f) { window.scrollBy({top: f * window.innerHeight, behavior: 'smooth'}); },
-    _resetScroll() { const shell = this.$root.querySelector('[data-shell]'); if (shell) shell.scrollTop = 0; },
+    _scroller() { // the element that actually scrolls: the shell pane in paged/spread, the document in webtoon
+      if (this.mode === 'webtoon') return document.scrollingElement || document.documentElement;
+      const shell = this.$root.querySelector('[data-shell]');
+      if (shell && shell.scrollHeight > shell.clientHeight + 2) return shell;
+      return document.scrollingElement || document.documentElement;
+    },
+    _scrollBy(f) { const sc = this._scroller(); sc.scrollBy({top: f * sc.clientHeight}); },
+    _atEdge(d) {
+      const sc = this._scroller();
+      if (sc.scrollHeight <= sc.clientHeight + 2) return true; // nothing to pan: page instead
+      return d > 0 ? sc.scrollTop + sc.clientHeight >= sc.scrollHeight - 2 : sc.scrollTop <= 2;
+    },
+    _vscroll(d) { // Arrow Up/Down pan the image; at the edge they turn the page
+      if (this._atEdge(d)) { this.step(d); return; }
+      const sc = this._scroller();
+      sc.scrollBy({top: d * Math.round(sc.clientHeight * 0.8)});
+    },
+    _resetScroll() { const shell = this.$root.querySelector('[data-shell]'); if (shell) shell.scrollTop = 0;
+      if (this.mode === 'webtoon' && document.scrollingElement) document.scrollingElement.scrollTop = 0; },
     keys(e) {
       if (e.key === 'Escape' && this.done) { this.done = false; return; }
       if (/^(SELECT|INPUT|TEXTAREA)$/.test(e.target.tagName)) return; // form controls first, always
@@ -252,9 +269,12 @@ function readerPage() {
       if (e.key === '0') { e.preventDefault(); this.zoom = 'custom'; this.zoomPct = 100; this.persist(); return; }
       const s = this.dir === 'rtl' ? -1 : 1; // RTL flips horizontal arrows (manga reads right-to-left)
       if (this.mode === 'webtoon') {
-        // ArrowLeft/Right = prev/next page everywhere; webtoon additionally scrolls natively on Up/Down
+        // ArrowLeft/Right = prev/next page; Up/Down scroll the strip (the default action is not reliable here)
         if (e.key === 'ArrowRight') { e.preventDefault(); this.goto_page(this.page + 1); }
         else if (e.key === 'ArrowLeft') { e.preventDefault(); this.goto_page(this.page - 1); }
+        else if (e.key === 'ArrowDown') { e.preventDefault(); this._scrollBy(0.15); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); this._scrollBy(-0.15); }
+        else if (e.key === ' ') { e.preventDefault(); this._scrollBy(e.shiftKey ? -0.9 : 0.9); }
         else if (e.key === 'PageDown') { e.preventDefault(); this._scrollBy(0.9); }
         else if (e.key === 'PageUp') { e.preventDefault(); this._scrollBy(-0.9); }
         else if (e.key === 'Home') { e.preventDefault(); this.goto_page(1); }
@@ -262,9 +282,12 @@ function readerPage() {
         return;
       }
       if (e.key === 'ArrowRight') { e.preventDefault(); this.step(s); }
+      else if (e.key === ' ') { e.preventDefault(); this.step(e.shiftKey ? -1 : 1); } // Space pages (Shift reverses)
       else if (e.key === 'ArrowLeft') { e.preventDefault(); this.step(-s); }
-      else if (e.key === 'ArrowDown' || e.key === 'PageDown') { e.preventDefault(); this.step(1); }
-      else if (e.key === 'ArrowUp' || e.key === 'PageUp') { e.preventDefault(); this.step(-1); }
+      else if (e.key === 'ArrowDown') { e.preventDefault(); this._vscroll(1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); this._vscroll(-1); }
+      else if (e.key === 'PageDown') { e.preventDefault(); this.step(1); }
+      else if (e.key === 'PageUp') { e.preventDefault(); this.step(-1); }
       else if (e.key === 'Home') { e.preventDefault(); this.goto_page(1); }
       else if (e.key === 'End') { e.preventDefault(); this.goto_page(this.pages.length); }
     },
