@@ -22,8 +22,10 @@ end
 -- Card = one top-level '<article class="bg-base-300' block; the desktop anchor
 -- inside it carries ULID + slug + title, Year/Status/Tags live in the trailing
 -- section of the same block. Scope = [previous sentinel, next sentinel).
-local function trim_commas(s)
-  return host.text.trim((s:gsub(",%s*$", "")))
+-- site HTML carries entities like &#39; / &amp; / &#x27; — decode once so they
+-- never reach the UI as literal text (the digits in &#39; read as "a number").
+local function txt(s)
+  return host.text.unescape(host.text.trim(s or ""))
 end
 
 local function cards(body)
@@ -45,18 +47,18 @@ local function cards(body)
       local year = scope:match("<strong>Year:</strong>%s*<span>(%d+)</span>")
       local status = scope:match("<strong>Status:</strong>%s*<span>([^<]+)</span>")
       local authors = {}
-      for name in scope:gmatch('search%?author=[^"]*"[^>]*>([^<]+)</a>') do authors[#authors + 1] = name end
+      for name in scope:gmatch('search%?author=[^"]*"[^>]*>([^<]+)</a>') do authors[#authors + 1] = txt(name) end
       local tags = {}
       local tblock = scope:match("<strong>Tag%(s%):%s*</strong>(.-)</div>")
       if tblock then
         for t in tblock:gmatch("<span>([^<]+)</span>") do
-          local tag = trim_commas(t)
+          local tag = txt(t:gsub(",%s*$", ""))
           if tag ~= "" then tags[#tags + 1] = tag end
         end
       end
       out[#out + 1] = {
         id = ulid,
-        name = host.text.trim(title),
+        name = txt(title),
         cover = "https://temp.compsci88.com/cover/fallback/" .. ulid .. ".jpg",
         status = STATUS[string.lower(status or "")] or "unknown",
         tags = tags,
@@ -100,17 +102,17 @@ function methods.detail(params)
   local year = body:match('<strong>Released:%s*</strong>%s*<span>([^<]+)</span>')
   local type_ = body:match('<strong>Type:%s*</strong>%s*<a[^>]*>([^<]+)</a>')
   local authors, tags = {}, {}
-  for name in body:gmatch('search%?author=[^"]*"[^>]*>([^<]+)</a>') do authors[#authors + 1] = name end
-  for t in body:gmatch('included_tag=[^"]*"[^>]*>([^<]+)</a>') do tags[#tags + 1] = t end
+  for name in body:gmatch('search%?author=[^"]*"[^>]*>([^<]+)</a>') do authors[#authors + 1] = txt(name) end
+  for t in body:gmatch('included_tag=[^"]*"[^>]*>([^<]+)</a>') do tags[#tags + 1] = txt(t) end
   return { ok = true, data = {
     id = id,
-    name = host.text.trim(title or id),
+    name = txt(title or id),
     cover = "https://temp.compsci88.com/cover/fallback/" .. id .. ".jpg",
     status = STATUS[string.lower(status or "")] or "unknown",
     tags = tags,
     authors = authors,
     artists = {},
-    description = desc and host.text.trim(desc) or "",
+    description = desc and txt(desc) or "",
     release_at = year and tonumber(year:match("%d%d%d%d")) and (year:match("%d%d%d%d") .. "-01-01") or 0,
     url = BASE .. "/series/" .. id,
   } }
@@ -132,7 +134,7 @@ function methods.chapters(params)
       out[#out + 1] = {
         id = ch_id,
         number = host.text.chapter_num(label or ""),
-        title = host.text.trim(label or ""),
+        title = txt(label),
         release_at = dt and dt:sub(1, 10) or 0,
         created_at = dt or 0,
         pages = 0,
