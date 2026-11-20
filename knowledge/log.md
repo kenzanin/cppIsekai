@@ -1,4 +1,5 @@
 ## 2026-11-20
+* **Creation**: Documented concept `decisions/library-migrate-source.md` (Library migrate-source: repoint, read-boundary carry).
 * **Update**: Linked `decisions/library-pin.md` to `decisions/saved-manga-detail-source-of-truth.md`.
 * **Creation**: Documented concept `decisions/library-pin.md` (Pinned titles: a flag on saved_manga, rendered as its own grid section).
 * **Update**: Linked `decisions/reader-keyboard-nav.md` to `architecture/reader-fullscreen.md`.
