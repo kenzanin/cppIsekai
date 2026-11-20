@@ -61,6 +61,21 @@ return function(ctx)
       out = kept
     end
     host.log.info("1manga: search found " .. tostring(#out) .. " for " .. q .. " tags=" .. #tags)
-    return { ok = true, data = { items = out, total = #out } }
+
+    -- The site serves ~30 cards per page and this scraper walks two site pages,
+    -- but the host pager asks for a fixed slice (limit, page). Slice the merged
+    -- stream here instead of dumping everything: without it every host page
+    -- repeated the same 60 cards and the migrate picker showed the whole catalog.
+    local limit = tonumber(params.limit) or 12
+    if limit < 1 then limit = 12 end
+    local page = tonumber(params.page) or 1
+    if page < 1 then page = 1 end
+    local total = #out
+    local start = (page - 1) * limit + 1
+    local slice = {}
+    for i = start, math.min(start + limit - 1, total) do
+      slice[#slice + 1] = out[i]
+    end
+    return { ok = true, data = { items = slice, total = total, pages = math.ceil(total / limit) } }
   end
 end
