@@ -1,0 +1,15 @@
+# TSan suppressions for cppIsekai.
+#
+# System libraries are not instrumented with TSan, so their own thread pools
+# look like data races to an instrumented process: libvips spawns worker
+# threads (and libglib/libwebp with it) that touch refcounts and GQueues
+# without any TSan-visible synchronisation. Every such report is inside the
+# library; our code only shows up as the pthread_create/alloc call site
+# (tests/test_transcode.cpp calls vips from the main thread).
+#
+# Real findings in src/ are NOT suppressed -- nothing here matches our symbols.
+race:libvips*
+race:libglib*
+race:libgobject*
+race:libwebp*
+race:libjxl*

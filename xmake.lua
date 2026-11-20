@@ -428,14 +428,23 @@ task("gate")
 task("scan")
     set_menu {usage = "xmake scan", description = "release gate: ASan+UBSan suite, TSan suite, restore release"}
     on_run(function()
+        -- task sandbox has no global pcall; xmake's try/catch is the idiom here
         local function run(cmd)
             print("[scan] " .. cmd)
-            local ok, out = pcall(os.iorun, cmd)
-            if not ok then
-                print("[scan] FAILED: " .. cmd)
-                print(out)
-            end
-            return ok
+            local r = try {
+                function ()
+                    os.iorun(cmd)
+                    return true
+                end,
+                catch {
+                    function (errors)
+                        print("[scan] FAILED: " .. cmd)
+                        print(errors)
+                        return false
+                    end
+                }
+            }
+            return r == true
         end
         local ok = true
         -- address+undefined: leaks, lifetime, integer UB, out-of-bounds. ASan
@@ -447,7 +456,15 @@ task("scan")
         -- when the leak pass failed -- one sweep should surface both.
         ok = run("xmake f -m debug --sanitize=thread -y") and ok
         ok = run("xmake -y") and ok
-        ok = run("TSAN_OPTIONS='halt_on_error=0 second_deadlock_stack=1 history_size=7' xmake test") and ok
+        -- os.execv cannot take a VAR=value prefix (it is parsed as the program
+        -- name), so the TSan knobs go through the environment instead. The
+        -- suppression list mutes uninstrumented system libs (libvips/glib spawn
+        -- their own worker threads); reports inside src/ are still fatal.
+        os.setenv("TSAN_OPTIONS",
+            "halt_on_error=0 second_deadlock_stack=1 history_size=7 suppressions=" ..
+            path.join(os.scriptdir(), "scripts", "tsan.supp"))
+        ok = run("xmake test") and ok
+        os.setenv("TSAN_OPTIONS", "")
         run("xmake f -m release --sanitize=none -y")
         run("xmake -y")
         if not ok then
