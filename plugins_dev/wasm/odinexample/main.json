@@ -1,0 +1,9 @@
+{
+  "name": "Odin Example",
+  "id": "odinexample",
+  "version": "1.0.0",
+  "website": "https://odin-lang.org",
+  "runtime": "wasm",
+  "capabilities": ["search", "detail"],
+  "api": 1
+}
