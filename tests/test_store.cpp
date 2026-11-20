@@ -953,6 +953,67 @@ TEST_CASE("Store: chapter flags bitfield (chapter-state 1.3-1.6)") {
     }
 }
 
+TEST_CASE("Store: migrate_source rekeys the entry and carries the read boundary (library-migrate)") {
+    Store store("test_store.db");
+    const auto run = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+    const std::string old_p = "md", old_s = "mg-" + run;
+    const std::string new_p = "fl", new_s = "mg2-" + run;
+    const auto seed = [](const std::string& id, double n) { return ChapterSeed{id, n, "t" + id, ""}; };
+
+    store.save_manga({old_p, old_s, "Old Name", "old.jpg", 0});
+    store.chapters_upsert(old_p, old_s, {seed("a1", 1), seed("a2", 2), seed("a3", 3), seed("a4", 4), seed("a5", 5)});
+    store.chapter_flags_apply(old_p, old_s, {"a3"}, false, 1, 0); // read through ch 3
+    store.chapter_pages_replace(old_p, old_s, "a1", {"p1", "p2"});
+    // target side: rows a future open would materialize + a preview title_meta
+    store.chapters_upsert(new_p, new_s, {seed("b1", 1), seed("b2", 2), seed("b2b", 2.5), seed("b3", 3), seed("b9", 9)});
+    store.chapter_flags_apply(new_p, new_s, {"b2"}, false, 1, 0); // previewed read on the target
+    store.title_meta_put_fetched(old_p, old_s, R"([{"source":"x","fetched_at":5,"data":{}}])", 5);
+    store.title_meta_put_chosen(new_p, new_s, R"({"title":"preview"})");
+
+    SUBCASE("happy path: rekey, boundary carry, old rows gone, meta moved") {
+        const bool ok = store.migrate_source(old_p, old_s, new_p, new_s,
+                                             {.name = "New Name", .cover = "new.jpg", .status = "Ongoing", .total_ch = 5});
+        CHECK(ok);
+
+        const auto src = store.saved_get(old_p, old_s);
+        CHECK_FALSE(src.has_value()); // old pair rekeyed away
+        const auto dst = store.saved_get(new_p, new_s);
+        REQUIRE(dst.has_value());
+        CHECK(dst->name == "New Name");
+        CHECK(dst->cover == "new.jpg");
+        CHECK(dst->status == "Ongoing");
+        CHECK(dst->total_ch == 5);
+        CHECK(dst->read_ch == 4); // b1 b2 b2b b3 (<= 3); b9 stays unread
+        CHECK(dst->added_at > 0); // library seniority rides the rekey
+        CHECK((dst->status_flags & 2) == 0); // 4/5 read: NOT done
+
+        // read boundary carried by number, sub-chapters included, previews kept
+        CHECK(store.chapter_flags_get(new_p, new_s, "b1") == 1);
+        CHECK(store.chapter_flags_get(new_p, new_s, "b2") == 1); // preview read, OR-preserving
+        CHECK(store.chapter_flags_get(new_p, new_s, "b2b") == 1);
+        CHECK(store.chapter_flags_get(new_p, new_s, "b3") == 1);
+        CHECK(store.chapter_flags_get(new_p, new_s, "b9") == 0);
+
+        // old-pair rows dropped
+        CHECK(store.chapter_flags_list(old_p, old_s).empty());
+        CHECK(store.chapter_pages_count(old_p, old_s, "a1") == 0);
+
+        // title_meta: the entry's fetched history moved to the new pair
+        const auto meta = store.title_meta_get(new_p, new_s);
+        REQUIRE(meta.has_value());
+        CHECK(meta->fetched.find("source") != std::string::npos);
+    }
+
+    SUBCASE("refusals: absent source, saved target, degenerate pair") {
+        CHECK_FALSE(store.migrate_source("nope", old_s, new_p, new_s, {}));
+        store.save_manga({new_p, new_s, "Taken", "", 0});
+        CHECK_FALSE(store.migrate_source(old_p, old_s, new_p, new_s, {}));
+        store.unsave_manga(new_p, new_s);
+        CHECK_FALSE(store.migrate_source(old_p, old_s, old_p, old_s, {}));
+        CHECK_FALSE(store.migrate_source("", old_s, new_p, new_s, {}));
+    }
+}
+
 TEST_CASE("Store: maintenance snapshot + prune (backup knobs)") {
     TestStoreDb fixture;
     Store store(fixture.path);

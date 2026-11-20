@@ -10,6 +10,8 @@ void register_library(Ctx& c) {
     auto& app = c.app;
     auto& store = c.store;
     auto& db = c.db;
+    auto& plugin_pool = c.plugin_pool;
+    auto& plugins = c.plugins;
 
     CROW_ROUTE(app, "/api/library")
     ([&] {
@@ -120,6 +122,94 @@ void register_library(Ctx& c) {
                 return 0;
             }); // dedup 2.3
             crow::response r{R"({"ok":true,"saved":false})"};
+            r.set_header("Content-Type", "application/json");
+            return r;
+        });
+
+    // library-migrate 2.1: repoint the saved entry at another source. The
+    // target's detail+chapters envelopes are fetched here (cached path, same
+    // as a plain open) so the store txn is pure DB; chapters rows materialize
+    // first, then migrate_source rekeys + carries the read boundary.
+    CROW_ROUTE(app, "/api/migrate")
+        .methods(crow::HTTPMethod::POST)([&](const crow::request& req) -> crow::response {
+            const auto json = crow::json::load(req.body);
+            const auto field = [&](const char* k) {
+                return json && json.has(k) && json[k].t() == crow::json::type::String ? std::string{json[k].s()}
+                                                                                      : std::string{};
+            };
+            const auto bad = [](std::string msg) {
+                crow::json::wvalue out;
+                out["ok"] = false;
+                out["error"] = std::move(msg);
+                crow::response r{out};
+                r.set_header("Content-Type", "application/json");
+                return r;
+            };
+            const std::string from_plugin = field("from_plugin");
+            const std::string from_slug = field("from_slug");
+            const std::string to_plugin = field("to_plugin");
+            const std::string to_slug = field("to_slug");
+            if (from_plugin.empty() || from_slug.empty() || to_plugin.empty() || to_slug.empty()) {
+                return bad("missing from/to plugin/slug");
+            }
+            if (!valid_title_pair(to_plugin, to_slug)) {
+                return bad("bad target");
+            }
+            // pre-flight on the db pool: clean errors before any plugin call
+            if (!on_pool(db, [&] { return store.saved_get(from_plugin, from_slug); })) {
+                return bad("source not in library");
+            }
+            if (on_pool(db, [&] { return store.saved_get(to_plugin, to_slug); })) {
+                return bad("target already in library");
+            }
+            if (!on_pool(db, [&] { return store.plugin_enabled(to_plugin); })) {
+                return bad("target plugin disabled");
+            }
+
+            crow::json::wvalue p;
+            p["id"] = to_slug;
+            const std::string params = p.dump();
+            const auto fetch_env = [&](const char* method) {
+                return on_pool(plugin_pool, [&] {
+                    return call_cached(store, to_plugin, method, params,
+                                       [&] { return plugins.call(to_plugin, method, params); }, &plugins);
+                });
+            };
+            const std::string detail_env = fetch_env("detail");
+            const std::string chapters_env = fetch_env("chapters");
+            const auto chs = envelope_data(chapters_env);
+            if (!chs) {
+                return bad("target chapters unavailable");
+            }
+            std::string name;
+            std::string cover;
+            std::string status;
+            if (const auto obj = ::detail::envelope_object(detail_env)) {
+                name = ::detail::envelope_str(*obj, "name");
+                cover = ::detail::envelope_str(*obj, "cover");
+                status = ::detail::envelope_str(*obj, "status");
+            }
+            // chapters identity rows first (legacy skip/read inheritance and
+            // the fingerprint ride inside chapters_upsert)
+            materialize_chapters(store, db, to_plugin, to_slug, chapters_env);
+            const int total = static_cast<int>(chs->size());
+            const bool ok = on_pool(db, [&] {
+                const bool moved =
+                    store.migrate_source(from_plugin, from_slug, to_plugin, to_slug,
+                                         {.name = name, .cover = cover, .status = status, .total_ch = total});
+                if (moved) {
+                    store.recompute_dup_groups();
+                }
+                return moved;
+            });
+            if (!ok) {
+                return bad("migrate failed (raced library change?)");
+            }
+            crow::json::wvalue out;
+            out["ok"] = true;
+            out["plugin"] = to_plugin;
+            out["slug"] = to_slug;
+            crow::response r{out};
             r.set_header("Content-Type", "application/json");
             return r;
         });

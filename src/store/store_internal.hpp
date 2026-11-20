@@ -2,12 +2,15 @@
 /** \file store_internal.hpp
  *  \brief Storage entities + Impl plumbing shared by the store TUs.
  */
+#include "store.hpp"
 #include "store_ops.hpp"
 
+#include <algorithm>
 #include <atomic>
 #include <memory>
 #include <sqlite3.h>
 #include <string>
+#include <string_view>
 #include <sqlite_orm/sqlite_orm.h>
 namespace store_detail {
 using namespace sqlite_orm;
@@ -210,4 +213,35 @@ namespace store_detail {
 void fts_sync(StoreImpl& impl, const std::string& plugin, const std::string& slug, const std::string& name,
               const std::string& alt_titles, const std::string& synopsis);
 void fts_delete(StoreImpl& impl, const std::string& plugin, const std::string& slug);
+} // namespace store_detail
+
+// saved-row bitfield composition, shared by the writers (store_saved.cc + the
+// library-migrate path). The dim bit is owned by the toggle path and always
+// survives; an empty incoming status derives the category from the stored one.
+namespace store_detail {
+inline unsigned status_category_mask(std::string_view status) {
+    std::string low(status);
+    std::transform(low.begin(), low.end(), low.begin(), [](unsigned char c) { return std::tolower(c); });
+    if (low == "ongoing") {
+        return static_cast<unsigned>(std::to_underlying(StatusFlag::kOngoing));
+    }
+    if (low == "hiatus") {
+        return static_cast<unsigned>(std::to_underlying(StatusFlag::kHiatus));
+    }
+    if (low == "canceled" || low == "cancelled") {
+        return static_cast<unsigned>(std::to_underlying(StatusFlag::kCanceled));
+    }
+    if (low == "completed") {
+        return static_cast<unsigned>(std::to_underlying(StatusFlag::kCompleted));
+    }
+    return 0;
+}
+
+inline int compose_flags(const SavedMangaEntity& e, const std::string& status, bool is_new) {
+    const unsigned cat = status_category_mask(status.empty() ? e.status : status);
+    const bool done = e.total_ch > 0 && e.read_ch >= e.total_ch;
+    const unsigned new_bit = (is_new && !done) ? static_cast<unsigned>(std::to_underlying(StatusFlag::kNew)) : 0u;
+    const unsigned dim = static_cast<unsigned>(e.status_flags) & static_cast<unsigned>(std::to_underlying(StatusFlag::kDim));
+    return static_cast<int>(cat | (done ? static_cast<unsigned>(std::to_underlying(StatusFlag::kDone)) : 0u) | new_bit | dim);
+}
 } // namespace store_detail

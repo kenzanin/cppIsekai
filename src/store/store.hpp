@@ -297,6 +297,25 @@ public:
      *  the next open re-resolves them. No-op when the row is absent. */
     void saved_detail_clear(const std::string& plugin, const std::string& slug);
 
+    /** \brief library-migrate: the target identity + envelope-derived fields for
+     *  migrate_source. Empty name/cover/status keep the stored ones. */
+    struct MigrateTarget {
+        std::string name;
+        std::string cover;
+        std::string status;
+        int total_ch{}; // chapters the target serves (seed count); read_ch recomputed
+    };
+    /** \brief Repoint the saved entry (old_plugin, old_slug) at (new_plugin,
+     *  new_slug) in one transaction: saved row rekeyed (added_at/pinned/signals
+     *  ride), old-pair chapters+pages+reader position+update attempts dropped,
+     *  title_meta moved (chosen state survives), read chapters carried by
+     *  number boundary (chapter_number <= max read) onto the target rows that
+     *  chapters_upsert materialized before this call. FTS reindexed after
+     *  commit. false when the source row is absent, the target is already
+     *  saved, or the pair is degenerate. */
+    bool migrate_source(const std::string& old_plugin, const std::string& old_slug,
+                        const std::string& new_plugin, const std::string& new_slug, const MigrateTarget& to);
+
     /** \brief One enrichment row for a saved manga; fetched/chosen are raw JSON text. */
     struct TitleMetaRow {
         std::string plugin;

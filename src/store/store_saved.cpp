@@ -37,37 +37,9 @@ static store_detail::SavedMangaEntity saved_row(const SavedManga& m, std::int64_
 }
 
 namespace {
-// status-fold -> one-hot category mask (design D3): lowercase compare, unknown
-// strings carry no category bit and are not an error.
-unsigned status_category_mask(std::string_view status) {
-    std::string low(status);
-    std::transform(low.begin(), low.end(), low.begin(), [](unsigned char c) { return std::tolower(c); });
-    if (low == "ongoing") {
-        return static_cast<unsigned>(std::to_underlying(StatusFlag::kOngoing));
-    }
-    if (low == "hiatus") {
-        return static_cast<unsigned>(std::to_underlying(StatusFlag::kHiatus));
-    }
-    if (low == "canceled" || low == "cancelled") {
-        return static_cast<unsigned>(std::to_underlying(StatusFlag::kCanceled));
-    }
-    if (low == "completed") {
-        return static_cast<unsigned>(std::to_underlying(StatusFlag::kCompleted));
-    }
-    return 0;
-}
-// Single composition for every stat writer (design D2): rebuild the bitfield
-// from the entity + incoming change so the bits never drift apart. An empty
-// incoming status means "leave the stored status alone" -> the category is
-// derived from the stored status; the dim bit is owned by the toggle path and
-// always survives.
-int compose_flags(const store_detail::SavedMangaEntity& e, const std::string& status, bool is_new) {
-    const unsigned cat = status_category_mask(status.empty() ? e.status : status);
-    const bool done = e.total_ch > 0 && e.read_ch >= e.total_ch;
-    const unsigned new_bit = (is_new && !done) ? static_cast<unsigned>(std::to_underlying(StatusFlag::kNew)) : 0u;
-    const unsigned dim = static_cast<unsigned>(e.status_flags) & static_cast<unsigned>(std::to_underlying(StatusFlag::kDim));
-    return static_cast<int>(cat | (done ? static_cast<unsigned>(std::to_underlying(StatusFlag::kDone)) : 0u) | new_bit | dim);
-}
+// Single composition for every stat writer (design D2): the bitfield helpers
+// live in store_internal.hpp (shared with the library-migrate path).
+using store_detail::compose_flags;
 } // namespace
 
 void Store::save_manga(const SavedManga& m) {

@@ -1,0 +1,126 @@
+{{>top.mustache}}
+<div x-data="migratePage" x-init="boot()">
+  <div class="flex items-center justify-between mb-4">
+    <div class="min-w-0">
+      <h1 class="text-xl font-semibold truncate" x-text="name"></h1>
+      <p class="text-sm text-zinc-400">Migrate source &middot; now on <span class="text-zinc-300" x-text="srcPluginName"></span> &middot; <span x-text="srcRead"></span>/<span x-text="srcCh"></span> ch read</p>
+    </div>
+    <a :href="'/view/manga/'+encodeURIComponent(plugin)+'/'+encodeURIComponent(slug)"
+       class="shrink-0 px-3 py-1.5 text-sm border border-zinc-700 text-zinc-300 hover:bg-zinc-800 rounded-md">Back</a>
+  </div>
+  <p class="text-xs text-zinc-400 mb-3">Read chapters move to the new source (everything up to your highest read chapter). Reader positions and downloaded pages do not carry over.</p>
+
+  <!-- query + plugin checkboxes -->
+  <div class="flex gap-2 mb-3">
+    <input x-model="q" @keydown.enter="run()" placeholder="Search title on other sources&hellip;"
+           class="focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:border-transparent transition flex-1 bg-zinc-900 border border-zinc-700 rounded px-3 py-1.5">
+    <button @click="run()" :disabled="busy || !q.trim()"
+            class="px-4 py-1.5 text-sm bg-zinc-800 rounded hover:bg-zinc-700 disabled:opacity-40" x-text="busy ? 'Searching\u2026' : 'Search'"></button>
+  </div>
+  <div class="flex flex-wrap gap-1.5 mb-4">
+    <template x-for="p in plugins" :key="p.key">
+      <label class="flex items-center gap-1 text-xs px-2 py-1 rounded border cursor-pointer"
+             :class="sel[p.key] ? 'border-zinc-100 bg-zinc-100 text-zinc-900' : 'border-zinc-700 text-zinc-400'">
+        <input type="checkbox" class="hidden" x-model="sel[p.key]">
+        <span x-text="p.name"></span>
+      </label>
+    </template>
+  </div>
+
+  <p class="text-sm text-red-400 mb-2" x-show="err" x-text="err" x-cloak></p>
+
+  <div x-show="busy" class="text-sm text-zinc-400" x-cloak>searching sources&hellip;</div>
+
+  <!-- candidates -->
+  <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4" x-show="results.length" x-cloak>
+    <template x-for="it in results" :key="it.plugin+'/'+it.slug">
+      <div class="rounded overflow-hidden border" :class="it.exact ? 'border-emerald-700' : 'border-zinc-800'">
+        <a :href="'/plugin/'+encodeURIComponent(it.plugin)" target="_blank" rel="noopener">
+          <img :src="'/cache/img?url='+encodeURIComponent(it.cover||'')+'&cover=1&plugin='+encodeURIComponent(it.plugin)"
+               class="w-full aspect-[2/3] object-cover bg-zinc-900" loading="lazy" alt="">
+        </a>
+        <div class="p-2">
+          <div class="text-xs text-zinc-300 truncate" x-text="it.pluginName"></div>
+          <div class="text-[11px] text-zinc-500 truncate" :title="it.title" x-text="it.title"></div>
+          <div class="text-[11px] mt-0.5">
+            <span class="text-emerald-400" x-show="it.exact">EXACT</span>
+            <span class="text-zinc-500" x-text="it.ch === null ? '' : it.ch + ' ch'"></span>
+            <span class="text-yellow-500" x-show="it.ch !== null && srcCh > 0 && it.ch < srcRead && srcRead > 0"
+                  title="fewer chapters than you have read">fewer</span>
+          </div>
+          <button @click="migrate(it)" :disabled="migrating"
+                  class="mt-1 w-full text-xs px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40"
+                  x-text="migrating ? '...' : 'Migrate here'"></button>
+        </div>
+      </div>
+    </template>
+  </div>
+  <p class="text-sm text-zinc-500 mt-4" x-show="!busy && ran && !results.length" x-cloak>no candidates</p>
+</div>
+<script>
+function migratePage() {
+  return {
+    // server-injected constants (mustache): source identity + exact-match keys
+    plugin: '{{plugin}}', slug: '{{slug}}', name: '{{name}}',
+    keys: '{{altkeys}}'.split(',').filter(Boolean),
+    srcCh: {{src_ch}}, srcRead: {{src_read}},
+    plugins: [], sel: {}, q: '', results: [],
+    busy: false, migrating: false, ran: false, err: '',
+    get srcPluginName() { return this.plugins.find(p => p.key === this.plugin)?.name || this.plugin },
+    norm(s) { return (s || '').toLowerCase().replace(/[^a-z0-9]+/g, '') },
+    async boot() {
+      const j = await (await fetch('/api/plugins')).json()
+      this.plugins = (j.plugins || []).filter(p => p.enabled && p.key && p.key !== this.plugin)
+      for (const p of this.plugins) this.sel[p.key] = true
+      if (this.name) this.q = this.name
+    },
+    async run() {
+      if (!this.q.trim()) return
+      this.busy = true; this.err = ''; this.results = []; this.ran = false
+      const targets = this.plugins.filter(p => this.sel[p.key])
+      const probes = await Promise.allSettled(targets.map(async p => {
+        const u = new URL(`/plugin/${p.key}/search`, location.origin)
+        u.searchParams.set('title', this.q); u.searchParams.set('page', 1); u.searchParams.set('limit', 12)
+        const j = await (await fetch(u)).json()
+        const items = (j && j.ok && j.data && Array.isArray(j.data.items)) ? j.data.items : []
+        return items.map(it => ({
+          plugin: p.key, pluginName: p.name, slug: String(it.id ?? ''), title: it.name || '',
+          cover: it.cover || '', exact: this.keys.includes(this.norm(it.name)), ch: null,
+        })).filter(it => it.slug && it.slug !== this.slug)
+      }))
+      const seen = new Set(); const out = []
+      for (const r of probes) {
+        if (r.status !== 'fulfilled') continue
+        for (const it of r.value) {
+          const k = it.plugin + '/' + it.slug
+          if (!seen.has(k)) { seen.add(k); out.push(it) }
+        }
+      }
+      out.sort((a, b) => (b.exact ? 1 : 0) - (a.exact ? 1 : 0))
+      this.results = out
+      this.ran = true; this.busy = false
+      // chapter counts: one cached call per candidate, parallel, best effort
+      Promise.allSettled(this.results.map(async it => {
+        try {
+          const j = await (await fetch(`/api/chapters/${encodeURIComponent(it.plugin)}/${encodeURIComponent(it.slug)}`)).json()
+          it.ch = (j && j.ok && Array.isArray(j.data)) ? j.data.length : null
+        } catch { /* leave null */ }
+      }))
+    },
+    async migrate(it) {
+      this.migrating = true; this.err = ''
+      try {
+        const r = await fetch('/api/migrate', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ from_plugin: this.plugin, from_slug: this.slug, to_plugin: it.plugin, to_slug: it.slug }),
+        })
+        const j = await r.json()
+        if (j.ok) { location = `/view/manga/${encodeURIComponent(j.plugin)}/${encodeURIComponent(j.slug)}`; return }
+        this.err = j.error || 'migrate failed'
+      } catch { this.err = 'migrate failed' }
+      this.migrating = false
+    },
+  }
+}
+</script>
+{{>bottom.mustache}}

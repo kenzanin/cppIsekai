@@ -13,6 +13,7 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <cctype>
 #include <map>
 #include <string>
 #include <vector>
@@ -21,6 +22,20 @@ namespace http {
 namespace {
 
 constexpr int kPageSize = 12;
+
+// library-migrate: normalized title key (alnum, lowercased) for the exact-match
+// badge; the corpus is the stored name + every alt title, precomputed here.
+std::string title_key(const std::string& s) {
+    std::string out;
+    out.reserve(s.size());
+    for (const char c : s) {
+        const unsigned char u = static_cast<unsigned char>(c);
+        if (std::isalnum(u) != 0) {
+            out += static_cast<char>(std::tolower(u));
+        }
+    }
+    return out;
+}
 
 crow::json::wvalue layout(Store& /*store*/, BS::thread_pool<>& /*db*/, const char* active) {
     crow::json::wvalue ctx;
@@ -249,6 +264,43 @@ void register_pages(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, L
         // 0 = disabled: the page's manual-update button renders dead (plugin-lifecycle 1.3)
         ctx["pe"] = on_pool(db, [&] { return store.plugin_enabled(plugin); }) ? 1 : 0;
         return html("detail.mustache", ctx);
+    });
+
+    // library-migrate 1.1: source picker shell; results hydrate client-side
+    // exactly like the search page (per-plugin /plugin/<id>/search), then
+    // POST /api/migrate rekeys the row server-side.
+    CROW_ROUTE(app, "/view/migrate/<string>/<string>")
+    ([&](const crow::request&, std::string plugin, std::string slug) -> crow::response {
+        const auto row = on_pool(db, [&] { return store.saved_get(plugin, slug); });
+        if (!row) { // unsaved/deleted pair: back to the detail page it came from
+            crow::response r;
+            r.code = 302;
+            r.set_header("Location", "/view/manga/" + plugin + "/" + slug);
+            return r;
+        }
+        auto ctx = layout(store, db, "library");
+        ctx["plugin"] = plugin;
+        ctx["slug"] = slug;
+        ctx["name"] = row->name;
+        ctx["src_ch"] = row->total_ch;
+        ctx["src_read"] = row->read_ch;
+        // exact-badge corpus: normalized name + alt titles, comma-joined (the
+        // keys are [a-z0-9]+ so the separator cannot collide)
+        std::string keys = title_key(row->name);
+        glz::generic arr;
+        if (!row->alt_titles.empty() && glz::read_json(arr, row->alt_titles) == glz::error_code{} && arr.is_array()) {
+            for (const auto& el : arr.get_array()) {
+                if (const auto* s = std::get_if<std::string>(&el.data); s != nullptr && !s->empty()) {
+                    const std::string k = title_key(*s);
+                    if (!k.empty()) {
+                        keys += ',';
+                        keys += k;
+                    }
+                }
+            }
+        }
+        ctx["altkeys"] = keys;
+        return html("migrate.mustache", ctx);
     });
 
     CROW_ROUTE(app, "/plugins")([&] { return html("plugins.mustache", layout(store, db, "plugins")); });

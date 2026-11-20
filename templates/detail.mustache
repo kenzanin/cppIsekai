@@ -57,10 +57,9 @@
         <button @click="refresh()" :disabled="refreshing || !pe"
                 class="px-3 py-1.5 text-sm border border-zinc-700 text-zinc-300 hover:bg-zinc-800 rounded-md disabled:opacity-40"
                 x-text="refreshing ? '…' : '⟳ Update'"></button>
-        <button disabled
-                :disabled="true"
-                class="px-3 py-1.5 text-sm border border-zinc-500 text-zinc-500 rounded-md opacity-50"
-                x-text="'Migrate'"></button>
+        <a x-show="inLibrary" x-cloak
+           :href="'/view/migrate/'+encodeURIComponent(plugin)+'/'+encodeURIComponent(slug)"
+           class="px-3 py-1.5 text-sm border border-zinc-700 text-zinc-300 hover:bg-zinc-800 rounded-md">Migrate</a>
       </div>
       <p class="text-xs text-red-400 mt-2" x-show="err" x-text="err" x-cloak></p>
       <!-- enrichment (detail-enrichment-fields): fetch detail/covers, picker, reset. Saved-manga library gate is enforced server-side (not in library = 404). -->
