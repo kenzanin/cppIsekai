@@ -16,14 +16,20 @@
   <div class="flex gap-2 mb-3">
     <input x-model="q" @keydown.enter="run()" placeholder="Search title on other sources&hellip;"
            class="focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:border-transparent transition flex-1 bg-zinc-900 border border-zinc-700 rounded px-3 py-1.5">
-    <button @click="run()" :disabled="busy || !q.trim()"
-            class="px-4 py-1.5 text-sm bg-zinc-800 rounded hover:bg-zinc-700 disabled:opacity-40" x-text="busy ? 'Searching\u2026' : 'Search'"></button>
+    <button @click="run()" :disabled="busy || !q.trim() || !selected.length"
+            class="px-4 py-1.5 text-sm bg-zinc-800 rounded hover:bg-zinc-700 disabled:opacity-40"
+            x-text="busy ? 'Searching\u2026' : 'Search'"></button>
   </div>
+  <p class="text-xs text-amber-300 mb-2" x-show="!selected.length" x-cloak>
+    Select at least one target source below, then search. No source is selected by default.
+  </p>
   <div class="flex flex-wrap gap-1.5 mb-4">
     <template x-for="p in plugins" :key="p.key">
-      <label class="flex items-center gap-1 text-xs px-2 py-1 rounded border cursor-pointer"
+      <label class="flex items-center gap-1.5 text-xs px-2 py-1 rounded border cursor-pointer"
              :class="sel[p.key] ? 'border-zinc-100 bg-zinc-100 text-zinc-900' : 'border-zinc-700 text-zinc-400'">
         <input type="checkbox" class="hidden" x-model="sel[p.key]">
+        <img :src="'/plugin/'+encodeURIComponent(p.key)+'/logo'"
+             class="w-5 h-5 rounded object-cover shrink-0" @error="$el.style.display='none'" alt="">
         <span x-text="p.name"></span>
       </label>
     </template>
@@ -72,18 +78,21 @@ function migratePage() {
     srcCh: +seed.srcCh, srcRead: +seed.srcRead,
     plugins: [], sel: {}, q: '', results: [],
     busy: false, migrating: false, ran: false, err: '',
+    get selected() { return this.plugins.filter(p => this.sel[p.key]) },
     get srcPluginName() { return this.plugins.find(p => p.key === this.plugin)?.name || this.plugin },
     norm(s) { return (s || '').toLowerCase().replace(/[^a-z0-9]+/g, '') },
     async boot() {
       const j = await (await fetch('/api/plugins')).json()
       this.plugins = (j.plugins || []).filter(p => p.enabled && p.key && p.key !== this.plugin)
-      for (const p of this.plugins) this.sel[p.key] = true
+      // default: none selected — the caller picks the target source(s) explicitly.
+      // Selecting everything fans out to every site and floods the picker with
+      // loose fuzzy matches (incl. the guest-language example plugins).
       if (this.name) this.q = this.name
     },
     async run() {
-      if (!this.q.trim()) return
+      if (!this.q.trim() || !this.selected.length) return
       this.busy = true; this.err = ''; this.results = []; this.ran = false
-      const targets = this.plugins.filter(p => this.sel[p.key])
+      const targets = this.selected
       const probes = await Promise.allSettled(targets.map(async p => {
         const u = new URL(`/plugin/${p.key}/search`, location.origin)
         u.searchParams.set('title', this.q); u.searchParams.set('page', 1); u.searchParams.set('limit', 12)
