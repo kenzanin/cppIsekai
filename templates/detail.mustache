@@ -45,6 +45,10 @@
                 class="px-3 py-1.5 text-sm border rounded-md disabled:opacity-40"
                 :class="inLibrary ? 'border-emerald-700 bg-emerald-900/40 text-emerald-300 hover:bg-emerald-900/60' : 'border-zinc-700 text-zinc-300 hover:bg-zinc-800'"
                 x-text="inLibrary ? 'In library' : 'Add to library'"></button>
+        <button x-show="inLibrary" x-cloak @click="togglePin()"
+                class="px-3 py-1.5 text-sm border rounded-md disabled:opacity-40"
+                :class="pinned ? 'border-amber-600 bg-amber-900/40 text-amber-300 hover:bg-amber-900/60' : 'border-zinc-700 text-zinc-300 hover:bg-zinc-800'"
+                x-text="pinned ? '\u2605 Pinned' : '\u2606 Pin'"></button>
         <button @click="startOrContinue()"
                 :disabled="!inLibrary"
                 class="px-3 py-1.5 text-sm border rounded-md disabled:opacity-40"

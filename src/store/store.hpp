@@ -105,6 +105,7 @@ struct SavedManga {
     std::string artists;          // JSON array verbatim
     std::string tags;             // merged list the page renders, JSON array verbatim
     std::string synopsis_display; // resolved display synopsis; '' falls back to source synopsis
+    int pinned{};                 // library-pin: 1 = rendered into the grid's Pinned section
 };
 
 /** \brief manga-detail-table D3 predicate: the row carries materialized display
@@ -269,6 +270,7 @@ public:
     void unsave_manga(const std::string& plugin, const std::string& slug);
     std::vector<SavedManga> saved_list(); // added_at desc
     std::optional<SavedManga> saved_get(const std::string& plugin, const std::string& slug);
+    void saved_set_pinned(const std::string& plugin, const std::string& slug, bool pinned);
     /** \brief Dim+blur toggle: sets or clears status_flags bit6 on the row; no-op when the
      *  manga is not saved (unsaved entries have no row to hold the bit). */
     void saved_dim_update(const std::string& plugin, const std::string& slug, bool on);

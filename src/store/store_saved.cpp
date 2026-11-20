@@ -32,6 +32,7 @@ static store_detail::SavedMangaEntity saved_row(const SavedManga& m, std::int64_
         .artists = m.artists,
         .tags = m.tags,
         .synopsis_display = m.synopsis_display,
+        .pinned = m.pinned,
     };
 }
 
@@ -87,8 +88,8 @@ void Store::save_manga(const SavedManga& m) {
         e.alt_titles = rows[0].alt_titles;
         e.dup_group = rows[0].dup_group;
         e.status_flags = rows[0].status_flags;
-        // manga-detail-table: materialized display detail survives a re-save
         e.authors = rows[0].authors;
+        e.pinned = rows[0].pinned; // library-pin: re-save never unpins
         e.artists = rows[0].artists;
         e.tags = rows[0].tags;
         e.synopsis_display = rows[0].synopsis_display;
@@ -306,6 +307,7 @@ std::vector<SavedManga> Store::saved_list() {
             .artists = r.artists,
             .tags = r.tags,
             .synopsis_display = r.synopsis_display,
+            .pinned = r.pinned,
         });
     }
     return out;

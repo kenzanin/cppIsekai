@@ -29,6 +29,7 @@ void register_library(Ctx& c) {
             row["total_ch"] = r.total_ch;
             row["read_ch"] = r.read_ch;
             row["status_flags"] = r.status_flags; // bit0 carries the New state (was has_update)
+            row["pinned"] = r.pinned; // library-pin: grid Pinned section membership
             row["last_read_at"] = static_cast<double>(r.last_read_at);
             row["updated_at"] = static_cast<double>(r.updated_at);
             // manga-detail-table 1.3: expose the materialized display columns (raw
@@ -88,6 +89,22 @@ void register_library(Ctx& c) {
         r.set_header("Content-Type", "application/json");
         return r;
     });
+
+    CROW_ROUTE(app, "/api/library/pin")
+        .methods(crow::HTTPMethod::POST)([&](const crow::request& req) -> crow::response {
+            const auto json = crow::json::load(req.body);
+            if (!json || !json.has("plugin") || !json.has("slug")) {
+                return crow::response{R"({"ok":false,"error":"missing plugin/slug"})"};
+            }
+            const bool pinned = !json.has("pinned") || json["pinned"].b();
+            on_pool(db, [&] {
+                store.saved_set_pinned(json["plugin"].s(), json["slug"].s(), pinned);
+                return 0;
+            });
+            crow::response r{pinned ? R"({"ok":true,"pinned":true})" : R"({"ok":true,"pinned":false})"};
+            r.set_header("Content-Type", "application/json");
+            return r;
+        });
 
     CROW_ROUTE(app, "/api/library/remove")
         .methods(crow::HTTPMethod::POST)([&](const crow::request& req) -> crow::response {

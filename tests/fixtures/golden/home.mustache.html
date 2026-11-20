@@ -131,7 +131,7 @@
             sortDir: V2 ? (prefs.sortDir || {}) : { read: 'desc' }, dup: V2 && !!prefs.dup,
             filterState: Object.assign({ new: 'off', done: 'off', ongoing: 'off', hiatus: 'off', canceled: 'off', completed: 'off' }, prefs.filterState || {}),
             page: 1, perPage: 30,
-            pages: 1, count: 0, total: 0, hasDup: false, hasStats: false,
+            pages: 1, count: 0, total: 0, pins: 0, hasDup: false, hasStats: false,
             init() {
               this.rescan();
               this.updatePerPage();
@@ -160,7 +160,7 @@
             syncSidebar() { document.querySelectorAll('[data-grid-plugin]').forEach(el => el.classList.toggle('bg-zinc-800', (el.dataset.gridPlugin || '') === this.plugin)); },
             rescan() {
               this.cards = typeof document !== 'undefined'
-                ? Array.from(document.querySelectorAll('#saved-cards > li'))
+                ? Array.from(document.querySelectorAll('#pinned-cards > li, #saved-cards > li'))
                 : [];
               this.total = this.cards.length;
               this.hasDup = this.cards.some(c => (+c.dataset.dup || 0) > 0);
@@ -225,25 +225,42 @@
               return true;
             },
             dir(sortKey) { return (this.sortDir[sortKey] || 'asc') === 'desc' ? -1 : 1; },
+            cmpFn() { // single ordering shared by the Pinned and Library sections
+              const d = this.dir(this.sort);
+              return (a, b) => {
+                if (this.sort === 'title') return d * a.dataset.name.localeCompare(b.dataset.name) || (+b.dataset.added || 0) - (+a.dataset.added || 0);
+                if (this.sort === 'progress') return d * (this.ratio(b) - this.ratio(a)) || (+b.dataset.added || 0) - (+a.dataset.added || 0);
+                if (this.sort === 'read') return d * ((+b.dataset.lastread || 0) - (+a.dataset.lastread || 0)) || (+b.dataset.added || 0) - (+a.dataset.added || 0);
+                if (this.sort === 'update') return d * ((+b.dataset.updated || 0) - (+a.dataset.updated || 0)) || (+b.dataset.added || 0) - (+a.dataset.added || 0);
+                if (this.sort === 'dup') return d * ((+a.dataset.dup || 0) === 0 ? -1 : (+b.dataset.dup || 0) === 0 ? 1 : (+b.dataset.dup || 0) - (+a.dataset.dup || 0)) || a.dataset.name.localeCompare(b.dataset.name);
+                return (+b.dataset.added || 0) - (+a.dataset.added || 0); // 'added'
+              };
+            },
+            isPinned(c) { return c.dataset.pinned === '1' || c.dataset.pinned === 'true'; },
             apply() {
               const ul = document.getElementById('saved-cards');
+              const pinUl = document.getElementById('pinned-cards');
               if (!ul) return;
-              let vis = this.cards.filter(c => this.matches(c));
-              const d = this.dir(this.sort);
-              if (this.sort === 'title') vis.sort((a, b) => d * a.dataset.name.localeCompare(b.dataset.name) || (+b.dataset.added || 0) - (+a.dataset.added || 0));
-              else if (this.sort === 'progress') vis.sort((a, b) => d * (this.ratio(b) - this.ratio(a)) || (+b.dataset.added || 0) - (+a.dataset.added || 0));
-              else if (this.sort === 'read') vis.sort((a, b) => d * ((+b.dataset.lastread || 0) - (+a.dataset.lastread || 0)) || (+b.dataset.added || 0) - (+a.dataset.added || 0));
-              else if (this.sort === 'update') vis.sort((a, b) => d * ((+b.dataset.updated || 0) - (+a.dataset.updated || 0)) || (+b.dataset.added || 0) - (+a.dataset.added || 0));
-              else if (this.sort === 'dup') vis.sort((a, b) => d * ((+a.dataset.dup || 0) === 0 ? -1 : (+b.dataset.dup || 0) === 0 ? 1 : (+b.dataset.dup || 0) - (+a.dataset.dup || 0)) || a.dataset.name.localeCompare(b.dataset.name));
-              else vis.sort((a, b) => (+b.dataset.added || 0) - (+a.dataset.added || 0)); // 'added'
+              const cmp = this.cmpFn();
+              const vis = this.cards.filter(c => this.matches(c)).sort(cmp);
+              const pin = vis.filter(c => this.isPinned(c));
+              const lib = vis.filter(c => !this.isPinned(c));
+              const pinSet = new Set(pin), libSet = new Set(lib);
+              this.pins = pin.length;
               this.count = vis.length;
-              const pages = Math.max(1, Math.ceil(vis.length / this.perPage));
+              // library-pin: two sections — matching pins render unpaged into #pinned-cards
+              for (const c of this.cards) {
+                if (pinSet.has(c)) { pinUl.appendChild(c); c.style.display = ''; }
+                else if (libSet.has(c)) { ul.appendChild(c); } // display decided by the page slice below
+                else if (pinUl && pinUl.contains(c)) { c.style.display = 'none'; }
+                else { ul.appendChild(c); c.style.display = 'none'; }
+              }
+              const pages = Math.max(1, Math.ceil(lib.length / this.perPage));
               this.pages = pages;
               if (this.page > pages) this.page = pages;
-              for (const c of vis) ul.appendChild(c);
               const start = (this.page - 1) * this.perPage, end = this.page * this.perPage;
-              const shown = new Set(vis.slice(start, end));
-              for (const c of this.cards) c.style.display = shown.has(c) ? '' : 'none';
+              const shown = new Set(lib.slice(start, end));
+              for (const c of lib) c.style.display = shown.has(c) ? '' : 'none';
               this.syncSidebar();
               this.save();
             },
@@ -274,8 +291,13 @@
           No manga matches
           <button @click="reset()" class="underline underline-offset-2 hover:text-zinc-300">Reset filters</button>
         </div>
+         <div x-show="pins > 0" x-cloak>
+          <h2 class="text-sm font-semibold text-zinc-300 mb-2">Pinned</h2>
+          <ul id="pinned-cards" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-6"></ul>
+         </div>
+         <h2 class="text-sm font-semibold text-zinc-300 mb-2">Library</h2>
         <ul id="saved-cards" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                  <li data-name="One Piece" data-plugin="mangadex" data-status="" data-total="" data-read="" data-status-flags="" data-added="" data-lastread="" data-updated="" data-dup="3" data-syn="" data-alt="">
+                  <li data-name="One Piece" data-plugin="mangadex" data-status="" data-total="" data-read="" data-status-flags="" data-added="" data-lastread="" data-updated="" data-dup="3" data-pinned="" data-syn="" data-alt="">
             <a href="&#x2F;view&#x2F;manga&#x2F;mangadex&#x2F;one-piece" class="group block min-w-0">
               <div class="relative">
                   <img src="/cache/img?url=http%3A%2F%2Fexample%2Fcover.jpg&cover=1&plugin=mangadex&slug=one-piece"
@@ -298,7 +320,7 @@
               <p class="text-xs text-zinc-500" x-show="(+$el.closest('li').dataset.total || 0) > 0"><span x-text="$el.closest('li').dataset.read"></span> / <span x-text="$el.closest('li').dataset.total"></span> read</p>
             </a>
           </li>
-                  <li data-name="No Cover" data-plugin="baka" data-status="" data-total="" data-read="" data-status-flags="" data-added="" data-lastread="" data-updated="" data-dup="0" data-syn="" data-alt="">
+                  <li data-name="No Cover" data-plugin="baka" data-status="" data-total="" data-read="" data-status-flags="" data-added="" data-lastread="" data-updated="" data-dup="0" data-pinned="" data-syn="" data-alt="">
             <a href="&#x2F;view&#x2F;manga&#x2F;baka&#x2F;no-cover" class="group block min-w-0">
               <div class="relative">
                   <img src="/cache/img?url=&cover=1&plugin=baka&slug=no-cover"

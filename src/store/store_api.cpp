@@ -96,6 +96,14 @@ int Store::api_cache_clear(const std::string& plugin_id) {
     return changes;
 }
 
+void Store::saved_set_pinned(const std::string& plugin, const std::string& slug, bool pinned) {
+    const store_detail::OpTrace _op{"saved_set_pinned"};
+    impl_->storage.update_all(
+        set(c(&store_detail::SavedMangaEntity::pinned) = pinned ? 1 : 0),
+        where(c(&store_detail::SavedMangaEntity::plugin) == plugin &&
+              c(&store_detail::SavedMangaEntity::slug) == slug));
+}
+
 std::optional<SavedManga> Store::saved_get(const std::string& plugin, const std::string& slug) {
     const store_detail::OpTrace _op{"saved_get"};
     auto rows = impl_->storage.get_all<store_detail::SavedMangaEntity>(where(
@@ -124,6 +132,7 @@ std::optional<SavedManga> Store::saved_get(const std::string& plugin, const std:
         .artists = r.artists,
         .tags = r.tags,
         .synopsis_display = r.synopsis_display,
+        .pinned = r.pinned,
     };
 }
 

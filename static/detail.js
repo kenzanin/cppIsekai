@@ -4,7 +4,7 @@ function detailPage() {
     plugin: parts[2] || '', slug: parts.slice(3).join('/') || '',
     detail: {}, chapters: [], cached: false, loading: true, refreshing: false, pe: window.CFG.pe,
     err: '', coverBroken: false, hint: null, related: [], pluginName: '', pluginLogoOk: true, pluginCaps: '',
-    inLibrary: false, libraryBusy: false,
+    inLibrary: false, libraryBusy: false, pinned: false,
     enrichment: null, enrichLastFetched: 0, enrichSources: [],
     enrichOpen: false, enrichKind: 'detail', enrichBusy: false, busySources: {}, cand: {}, enrichErr: '',
     hiddenTags: [],
@@ -297,7 +297,19 @@ function detailPage() {
         const r = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
         const j = await r.json().catch(() => null);
         if (!r.ok || !j || j.ok === false) { this.err = (j && j.error) || 'library failed'; }
-        else this.inLibrary = !this.inLibrary;
+        else { this.inLibrary = !this.inLibrary; if (!this.inLibrary) this.pinned = false; }
+      } catch (e) { this.err = String(e); }
+      this.libraryBusy = false;
+    },
+    async togglePin() { // library-pin: membership in the grid's Pinned section
+      if (this.libraryBusy || !this.inLibrary) return;
+      this.libraryBusy = true;
+      try {
+        const r = await fetch('/api/library/pin', {method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({plugin: this.plugin, slug: this.slug, pinned: !this.pinned})});
+        const j = await r.json().catch(() => null);
+        if (!r.ok || !j || j.ok === false) { this.err = (j && j.error) || 'pin failed'; }
+        else this.pinned = !this.pinned;
       } catch (e) { this.err = String(e); }
       this.libraryBusy = false;
     },
@@ -306,7 +318,9 @@ function detailPage() {
         const r = await fetch('/api/library');
         if (r.ok) {
           const j = await r.json();
-          if (j.ok) this.inLibrary = (j.data || []).some(m => m.plugin === this.plugin && m.slug === this.slug);
+          const me = (j.data || []).find(m => m.plugin === this.plugin && m.slug === this.slug);
+          this.inLibrary = !!me;
+          this.pinned = !!(me && me.pinned);
         }
       } catch (e) { /* toggle stays at default false; err line untouched */ }
     },

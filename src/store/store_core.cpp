@@ -57,11 +57,12 @@ void migrate_saved_manga(const std::string& path) {
         "ALTER TABLE saved_manga ADD COLUMN artists TEXT NOT NULL DEFAULT ''",
         "ALTER TABLE saved_manga ADD COLUMN tags TEXT NOT NULL DEFAULT ''",
         "ALTER TABLE saved_manga ADD COLUMN synopsis_display TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE saved_manga ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0",
     };
     constexpr std::string_view names[] = {
         "status",     "total_ch", "read_ch",    "last_read_at", "updated_at",
         "synopsis",   "alt_titles", "dup_group", "status_flags",
-        "authors", "artists", "tags", "synopsis_display",
+        "authors", "artists", "tags", "synopsis_display", "pinned",
     };
     for (std::size_t i = 0; i < std::size(stmts); ++i) {
         if (!have.contains(std::string(names[i]))) {

@@ -165,6 +165,7 @@ crow::json::wvalue home_context(Store& store, BS::thread_pool<>& db, const crow:
         row["last_read_at"] = static_cast<double>(m.last_read_at);
         row["added_at"] = static_cast<double>(m.added_at);
         row["dup"] = m.dup_group; // library-dedup 3.1: grid duplicate filter/sort marker
+        row["pinned"] = m.pinned; // library-pin: client splits the grid into Pinned/Library
         row["updated_at"] = static_cast<double>(m.updated_at);
         // library-search 1.1: client-side match corpus — display synopsis (D4
         // fallback, same rule as detail) + source alt titles verbatim JSON.

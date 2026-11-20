@@ -68,6 +68,7 @@ struct SavedMangaEntity {
     std::string artists;         // JSON array verbatim
     std::string tags;            // merged list the page renders (hidden filtered), JSON array verbatim
     std::string synopsis_display; // resolved display synopsis; '' = fall back to source synopsis
+    int pinned{};                // library-pin: 1 = grid Pinned section
 };
 
 struct TitleMetaEntity {
@@ -157,6 +158,7 @@ inline auto create_storage(const std::string& path) {
                    make_column("artists", &SavedMangaEntity::artists, default_value("")),
                    make_column("tags", &SavedMangaEntity::tags, default_value("")),
                    make_column("synopsis_display", &SavedMangaEntity::synopsis_display, default_value("")),
+                   make_column("pinned", &SavedMangaEntity::pinned, default_value(0)),
                    primary_key(&SavedMangaEntity::plugin, &SavedMangaEntity::slug)),
         make_table("title_meta", make_column("plugin", &TitleMetaEntity::plugin),
                    make_column("slug", &TitleMetaEntity::slug), make_column("fetched", &TitleMetaEntity::fetched),

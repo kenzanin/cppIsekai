@@ -196,6 +196,19 @@ TEST_CASE("Store: saved_manga save/unsave/list (library-save 1.2)") {
         CHECK(got->cover == "https://cover/one-v2.jpg");
     }
 
+    SUBCASE("pin toggle: set/clear persists, re-save preserves (library-pin)") {
+        store.unsave_manga("md", "pin-slug");
+        store.save_manga({"md", "pin-slug", "Pinned One", "", 0});
+        CHECK_FALSE(store.saved_get("md", "pin-slug")->pinned);
+        store.saved_set_pinned("md", "pin-slug", true);
+        CHECK(store.saved_get("md", "pin-slug")->pinned);
+        store.save_manga({"md", "pin-slug", "Pinned One v2", "", 0}); // re-save keeps the pin
+        CHECK(store.saved_get("md", "pin-slug")->pinned);
+        store.saved_set_pinned("md", "pin-slug", false);
+        CHECK_FALSE(store.saved_get("md", "pin-slug")->pinned);
+        store.saved_set_pinned("md", "pin-slug-absent", true); // no row: silent no-op
+    }
+
     SUBCASE("list orders by added_at desc (newest first)") {
         store.unsave_manga("md", "abc-slug-old");
         store.unsave_manga("md", "abc-slug-new");
