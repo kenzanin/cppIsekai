@@ -351,6 +351,13 @@ cxx_bin("test_templates", {
     test = true,
 })
 
+cxx_bin("test_gridjs", {
+    files = {"tests/test_gridjs.cpp"},
+    defs = {'CPPISEKAI_GRID_SRC="$(projectdir)/templates/grid_body.mustache"'},
+    reqs = {"quickjs-ng"},
+    test = true,
+})
+
 -- --- gate tasks: prod code only (src/**), tests/third_party untouched ---
 -- tasks run in a fresh lua sandbox: no shared globals, no shell pipes (os.exec passes | to argv).
 task("format")
