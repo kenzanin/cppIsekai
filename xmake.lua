@@ -358,6 +358,13 @@ cxx_bin("test_gridjs", {
     test = true,
 })
 
+-- --- web assets: minify+brotli custom static js (bun; sources untouched) ---
+task("js")
+    set_menu {usage = "xmake js", description = "minify+brotli static/*.js (skip *.min.*) via scripts/minbr.ts"}
+    on_run(function()
+        os.exec("bun scripts/minbr.ts")
+    end)
+
 -- --- gate tasks: prod code only (src/**), tests/third_party untouched ---
 -- tasks run in a fresh lua sandbox: no shared globals, no shell pipes (os.exec passes | to argv).
 task("format")
