@@ -2,8 +2,8 @@
 type: Fact
 title: "Atsumaru plugin (atsu.moe): Typesense search, CDN images, composite chapter ids"
 description: "Atsumaru (atsu.moe) plugin: Typesense search, CDN images, composite mangaId:chapterId ids, epoch-ms createdAt, chapter-number dedupe, uppercase-id guard; chapters envelope now emits pages from pageCount (2026-11-12) so host read_ch rollup works."
-tags: [atsumaru, plugin, lua, typesense, cdn, goisekai, live-verified]
-generated: { by: agent/cli, at: "2026-11-12T01:03:29Z" }
+tags: [atsumaru, plugin, lua, typesense, cdn, goisekai, novel, live-verified]
+generated: { by: agent/mcp, at: "2026-11-21T10:28:55Z" }
 status: stable
 ---
 
@@ -20,5 +20,13 @@ status: stable
 - **Uppercase ids (4091b5c)**: atsumaru ids (`H6P2Z`) carry uppercase; the host `valid_title_pair` guard was lowercase-only and 404'd every atsumaru detail with `unknown title`. Guard is now case-preserving; unit-locked in test_http_enrich.
 - **Logo**: MangaUpdates-style mascot kept for enrichment-mangaupdates (`logo.png` from mangaupdates.com/images/mascot.png, 55KB); atsumaru logo.png ported from the goIsekai example.
 - Live-verified (2026-11-11): search 'one piece' 20/43, detail H6P2Z OK after guard fix, 48 chapters (deduped), 31 pages (ch1), 16 genres; `/plugins/reload` count=4.
+
+## Novel vs manga: use `medium`, never `hasUploads` (2026-11-21)
+
+- `mangaPage.hasUploads` is `false` for BOTH real manga and novels. First detection used it and falsely flagged `5QVaH` (Comic, 31 real page images) as a novel. The HAR capture `tmp/atsumaru.har` has no `hasUploads` key at all but does carry `medium`.
+- Discriminator: `medium == "Novel"` (case-insensitive substring); fallback `type` containing "novel". `type` alone is a format label (`Manga`/`Manwha`) and cannot identify novels (`Owlv` is `Manwha` + `medium: Novel`).
+- Plugin emits `is_novel` + `url` in the detail envelope. Because row-served details come from `saved_manga` (which has no column for these), `materialize_detail` stores them in generic `plugin_state` under `host/novel/<plugin>/<slug>` and `host/detail_url/<plugin>/<slug>`, and `saved_detail_response` restores them. No schema change.
+- Detail UI: amber `novel · no images` badge, warning with link to the original site, and the Start/Continue button hidden (computed `display:none`, verified in real Chrome).
+- Real novel (`Owlv`): all 1174 chapters `pageCount: 0`, `/api/read/chapter` returns `pages: []`, site redirects to `/novel/...`. Host now propagates the plugin's real error (`atsumaru: no pages`) instead of the misleading `unknown chapter` 404.
 
 See also `decisions/api-cache-lock-miss-regression` (the OTHER half of the original unknown-title symptom).
