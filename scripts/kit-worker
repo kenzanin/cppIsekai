@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# cppIsekai KIT worker: bounded headless task with codebase-memory + okf MCP.
+# Usage:  export OMNIROUTE_API_KEY=...
+#         ./scripts/kit-worker "<prompt>"
+# Extra KIT flags can be passed after the prompt, e.g. --json.
+set -euo pipefail
+: "${OMNIROUTE_API_KEY:?set OMNIROUTE_API_KEY to the local router key}"
+
+export KIT_PROVIDER_API_KEY="$OMNIROUTE_API_KEY"
+export KIT_PROVIDER_URL="${KIT_PROVIDER_URL:-http://localhost:20128/v1}"
+export KIT_PROVIDER_WIRE="${KIT_PROVIDER_WIRE:-openai-compat}"
+
+cd "$(dirname "$0")/.."
+exec "${KIT_BIN:-$HOME/.local/bin/kit}" --no-session --quiet "$@"
