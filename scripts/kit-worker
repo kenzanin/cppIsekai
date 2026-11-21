@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 # cppIsekai KIT worker: bounded headless task with codebase-memory + okf MCP.
 # Usage:  export OMNIROUTE_API_KEY=...
-#         ./scripts/kit-worker "<prompt>"
-# Extra KIT flags can be passed after the prompt, e.g. --json.
+#         ./scripts/kit-worker "<prompt>"                       # new session
+#         ./scripts/kit-worker --continue "<follow-up prompt>"  # resume last
+#         ./scripts/kit-worker --resume                           # pick a session
+# KIT persists tree-based JSONL sessions under ~/.kit/sessions/<cwd>/
+# so a failed lane can be continued instead of restarted from scratch.
 set -euo pipefail
 : "${OMNIROUTE_API_KEY:?set OMNIROUTE_API_KEY to the local router key}"
 
@@ -11,4 +14,4 @@ export KIT_PROVIDER_URL="${KIT_PROVIDER_URL:-http://localhost:20128/v1}"
 export KIT_PROVIDER_WIRE="${KIT_PROVIDER_WIRE:-openai-compat}"
 
 cd "$(dirname "$0")/.."
-exec "${KIT_BIN:-$HOME/.local/bin/kit}" --no-session --quiet "$@"
+exec "${KIT_BIN:-$HOME/.local/bin/kit}" --quiet "$@"
