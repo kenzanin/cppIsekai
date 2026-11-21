@@ -54,9 +54,10 @@
       const on = !dimSet.has(k);
       try {
         const r = await fetch('/api/display/dim-blur', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ plugin, slug, on }) });
-        if (!r.ok) return;
+        if (!r.ok) { window.toast('error', 'dim failed'); return; }
         if (on) dimSet.add(k); else dimSet.delete(k);
         paintDim();
+        window.toast('success', on ? 'Cover dimmed' : 'Cover restored');
       } catch (e) { /* leave UI unchanged */ }
     };
     document.addEventListener('DOMContentLoaded', loadDim);

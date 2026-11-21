@@ -29,31 +29,37 @@ function pluginsPage() {
       return r.state === 'error' ? 'text-yellow-400' : 'text-green-400'
     },
     async toggle(r) {
-      const res = await fetch('/plugin/' + r.id + '/enabled', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled: !r.enabled })
-      })
-      const j = await res.json().catch(() => ({}))
-      if (!res.ok) window.toast('error', j.error || 'HTTP ' + res.status)
-      else window.toast('success', (j.enabled ? 'Enabled ' : 'Disabled ') + r.name)
+      try {
+        const res = await fetch('/plugin/' + r.id + '/enabled', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled: !r.enabled })
+        })
+        const j = await res.json().catch(() => ({}))
+        if (!res.ok) window.toast('error', j.error || 'HTTP ' + res.status)
+        else window.toast('success', (j.enabled ? 'Enabled ' : 'Disabled ') + r.name)
+      } catch (e) { window.toast('error', String(e)) }
       await this.load()
     },
     async reload() {
       this.busy = true
-      const res = await fetch('/plugins/reload', { method: 'POST' })
-      const j = await res.json().catch(() => ({}))
-      if (!res.ok) window.toast('error', j.error || 'HTTP ' + res.status)
-      else window.toast('success', 'Reloaded ' + (j.count ?? '?') + ' plugin(s)')
+      try {
+        const res = await fetch('/plugins/reload', { method: 'POST' })
+        const j = await res.json().catch(() => ({}))
+        if (!res.ok) window.toast('error', j.error || 'HTTP ' + res.status)
+        else window.toast('success', 'Reloaded ' + (j.count ?? '?') + ' plugin(s)')
+      } catch (e) { window.toast('error', String(e)) }
       await this.load()
     },
     async clearCache(r) { // drop cached envelopes; next plugin call refetches
-      const res = await fetch('/plugins/cache-clear', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plugin: r.key })
-      })
-      const j = await res.json().catch(() => ({}))
-      if (!res.ok || j.ok === false) window.toast('error', j.error || 'HTTP ' + res.status)
-      else window.toast('success', 'Cleared ' + (j.cleared ?? '?') + ' for ' + r.name)
+      try {
+        const res = await fetch('/plugins/cache-clear', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ plugin: r.key })
+        })
+        const j = await res.json().catch(() => ({}))
+        if (!res.ok || j.ok === false) window.toast('error', j.error || 'HTTP ' + res.status)
+        else window.toast('success', 'Cleared ' + (j.cleared ?? '?') + ' for ' + r.name)
+      } catch (e) { window.toast('error', String(e)) }
     },
   }
 }
