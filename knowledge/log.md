@@ -1,3 +1,6 @@
+## 2026-11-21
+* **Creation**: Documented concept `decisions/suwayomi-webui-contract-first.md` (Suwayomi WebUI adoption: contract first, no Go port).
+
 ## 2026-11-20
 * **Creation**: Documented concept `decisions/library-migrate-source.md` (Library migrate-source: repoint, read-boundary carry).
 * **Update**: Linked `decisions/library-pin.md` to `decisions/saved-manga-detail-source-of-truth.md`.
