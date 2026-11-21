@@ -17,17 +17,21 @@ Server base URL: `http://localhost:8090`. Port precedence: `--port` > `$PORT` > 
 
 Everything below is implemented and verified against the running daemon.
 
-- **Library** — save manga rows with name/cover, search with Unicode NFKD + casefold normalization, duplicate grouping (`dup_group`) and status flags.
-- **Saved-row detail** — detail/chapters for saved rows serve from SQLite without calling the plugin; enrichment data (MangaDex + a metadata aggregator: authors, artists, tags, synopsis) is materialized onto the row. Chosen alt-title/cover overrides apply on both live-fetch and row-serve paths.
-- **Stale-first fetch** — plugin API responses are cached in `api_cache` (SQLite, with raw-JSONB payload) and served stale-on-error; image bytes land in a disk LRU under `cache/` (layout v2: `<plugin>/covers/<slug>.<ext>`, `<plugin>/<slug>/chNNN/pNNN.<ext>`; whole-file eviction on overflow).
-- **Reader** — 10-page window, RTL/LTR, skip-aware, position resumed from the store, prev/next resolved by stable number order + index so duplicate chapter numbers (24a/24b) stay individually reachable; the reader links and prefetches by chapter id (`?ch_id=`), old number-only URLs keep working.
+- **Library** — save manga rows with name/cover, client-side search over title/alt-title/synopsis, 3-state sort with recent-read default, duplicate grouping (`dup_group`) and status flags. Pinned titles get their own section above the library grid.
+- **Saved-row detail** — detail/chapters for saved rows serve from SQLite without calling the plugin; enrichment data (MangaDex + a metadata aggregator: authors, artists, tags, synopsis) is materialized onto the row. Chosen alt-title/cover overrides apply on both live-fetch and row-serve paths, and the Fetch detail / Fetch covers wizard can restore the scraper's original values (SRC badge) per field. Novel/text sources are detected via the site's `medium` field: detail shows a badge + warning and the reader button is skipped.
+- **Stale-first fetch** — plugin API responses are cached in `api_cache` (SQLite, with raw-JSONB payload) and served stale-on-error; per-method TTLs come from the plugin manifest (`cache_ttl`, else a host default), expired rows are pruned on the scheduler tick. Image bytes land in a disk LRU under `cache/` (layout v4: `<slug[:40]>-<sha1[:8]>` title dirs, covers and zero-padded page dirs; whole-file eviction on overflow, one-time migration stamp).
+- **Reader** — 10-page window, RTL/LTR, skip-aware, position resumed from the store, prev/next resolved by stable number order + index so duplicate chapter numbers (24a/24b) stay individually reachable; the reader links and prefetches by chapter id (`?ch_id=`), old number-only URLs keep working. Spread modes anchor at the page that was open, ↑/↓ pan the image and only change page at the edge, and zoom values persist per title.
 - **Plugins** — per-site plugin-per-runtime; hosts expose a JSON ABI plus `http.fetch`, `storage.*`, `log.*`, `host.re2`, `host.html`, `host.crypto`, `host.text` (NFKD/casefold, `date_to_iso`) and `host.browser` (see Browser automation).
   - Lua 5.4 (sol2): MangaDex + four aggregator ports (+ metadata-only enrichment sources `enrichment-mangadex`, `enrichment-mangaupdates`)
   - WASM (wasm3): two aggregator ports
   - JavaScript (quickjs-ng): one aggregator port
-  - one WASM site's reader is currently broken (upstream URL/shape change); tracked in `openspec/changes/plugin-port-multi-runtime/`.
+  - one WASM reader port is kept as a reference build; the maintained path for that site is its Lua plugin.
 - **CBZ export** — `GET /export/cbz?plugin=&slug=` (libzippp).
 - **Cover pipeline** — vips transcode to WebP/AVIF, `/cache/img` serves through the LRU.
+- **Chapter state & migrate** — read/hidden flags live in one bitfield column per chapter row; bulk mark-all/clear-all and mark-previous from the detail page. Migrate source switches a saved title to another plugin in one transaction, carrying the read boundary and discarding per-page positions.
+- **Action feedback** — every server-backed button shows a toast and flashes a LED on the clicked control; local-only interactions stay silent.
+- **Maintenance** — VACUUM + snapshot backups on a configurable interval with a keep count (`[backup]` knobs, `GET`/`POST /api/backup`); restore stays a manual stop → copy → start. Optional system-tray with configurable labels/icon, and `xmake scan` runs ASan+UBSan then TSan and restores the release build.
+- **API-first** — 57 routes, all reachable with curl; `/api/logs` exposes the log ring buffer and `/config` exposes the config registry.
 - **About page** — renders this README.md live (see below).
 
 ## Architecture
@@ -50,7 +54,7 @@ flowchart TB
         Worker --> ImgCache{"Image cache<br/>disk · per-plugin tree"}
         HTTP -- /cache/img --> ImgCache
         ImgCache -- hit --> HTTP
-        ImgCache -- miss --> Curl["direct curl<br/>manifest image_referer"]
+        ImgCache -- miss --> Curl["direct curl<br/>domain-matched referer / manifest sentinel"]
         Curl --> Vips["vips transcode<br/>WebP/AVIF"] --> ImgCache
     end
     Lua --> Sites[("Manga sites")]
@@ -89,7 +93,7 @@ sequenceDiagram
     alt disk hit
         C-->>H: path -> 200 image
     else miss
-        C->>X: direct curl + manifest image_referer
+        C->>X: direct curl + domain-matched referer
         X-->>C: image bytes
         C->>C: vips transcode (WebP/AVIF) -> store
         C-->>H: path -> 200 image
@@ -163,6 +167,9 @@ erDiagram
         string authors
         string tags
         string synopsis_display
+        int dup_group
+        int status_flags
+        int pinned
     }
     title_meta {
         string plugin PK
@@ -192,6 +199,7 @@ erDiagram
         string key PK
         string value
     }
+    note for plugin_state "host/read + host/skip legacy keys,<br/>host/novel + host/detail_url for row-served flags"
     update_attempts {
         string plugin PK
         string slug PK
@@ -231,14 +239,16 @@ erDiagram
 | hash-library | 2021.09.29 | `host.crypto.*` (SHA-256/MD5/HMAC) |
 | simpleini | 4.27 | ini config read/write |
 | spdlog | 1.17.0 | logging (+ zlib for crow compression) |
+| zlib | 1.3.2 | crow compression |
+| backward-cpp | pinned | crash stack traces |
 | date | 3.0.4 | `host.text.date_to_iso` layout parsing |
 
 ## Engineering notes
 
 - **Config** — one registry (`src/config/`): CLI flag + `CPPISEKAI_*` env + ini layers; precedence default < ini < env < flag. `--dump-config` renders the template, `POST /config` merge-saves.
 - **Plugin ABI** — JSON-text in/out; single wrap point `call_cached` (`cached:true` stale-serve). Host-wide `CURLOPT_PROXY` via `plugin::applyProxy`.
-- **Cache layout v2** — `<plugin>/covers/<slug>.<ext>`, `<plugin>/<slug>/chNNN/pNNN.<ext>` (zero-padded order = reading order), stale `api/<sha>.json` on disk plus the `api_cache` table; boot scan purges once via `.cache-v2` stamp.
-- **Build** — glaze/clang story: the toolchain is clang (`xmake f -m release`); see `knowledge/constraints/test-binary-releasedbg-vs-release` for why `xmake test` runs the releasedbg binary.
+- **Cache layout v4** — `<plugin>/<slug[:40]>-<sha1(slug)[:8]>/covers/<file>` and `<plugin>/<slugdir>/<ch>/<pNNN>.<ext>` (zero-padded order = reading order), stale `api/<sha>.json` on disk plus the `api_cache` table; boot migrates the old tree once via the `.cache-v4-slugdir` stamp.
+- **Build** — glaze/clang story: the toolchain is clang (`xmake f -m release`); see `knowledge/constraints/test-binary-releasedbg-vs-release` for why `xmake test` runs the releasedbg binary. Handy tasks: `xmake js` (minify + brotli the static assets), `xmake doc` (clang-doc HTML, or `XMAKE_DOC_FORMAT=md` for grep-friendly markdown), `xmake scan` (ASan+UBSan then TSan, always restores release), `xmake gate` (full gate).
 - **Diagrams** — this file is the single source for GitHub and the in-app About page; Mermaid blocks render natively on GitHub and in-app via mermaid.js. Keep diagrams as ` ```mermaid ` fenced blocks.
 
 ## About page
