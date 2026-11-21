@@ -8,6 +8,7 @@
     info: 'bg-zinc-700 text-zinc-100'
   };
   window.toast = function (kind, msg) {
+    if (document.activeElement && document.activeElement.tagName === 'BUTTON') led(document.activeElement, kind === 'success' ? 'bg-emerald-400' : kind === 'error' ? 'bg-red-400' : 'bg-amber-400', 3000);
     while (host.children.length >= 4) host.firstElementChild.remove();
     const t = document.createElement('div');
     t.className = 'px-3 py-2 rounded shadow-lg text-sm cursor-pointer max-w-xs ' + (KINDS[kind] || KINDS.info);
