@@ -138,6 +138,7 @@ function migratePage() {
       out.sort((a, b) => (b.exact ? 1 : 0) - (a.exact ? 1 : 0))
       this.results = out
       this.page = 1
+      if (!out.length) window.toast('info', 'no matches for "' + this.q + '"')
       this.ran = true; this.busy = false
       this.loadCh()
     },
@@ -158,9 +159,9 @@ function migratePage() {
           body: JSON.stringify({ from_plugin: this.plugin, from_slug: this.slug, to_plugin: it.plugin, to_slug: it.slug }),
         })
         const j = await r.json()
-        if (j.ok) { location = `/view/manga/${encodeURIComponent(j.plugin)}/${encodeURIComponent(j.slug)}`; return }
-        this.err = j.error || 'migrate failed'
-      } catch { this.err = 'migrate failed' }
+        if (j.ok) { window.toast('success', 'Migrating to ' + it.pluginName); location = `/view/manga/${encodeURIComponent(j.plugin)}/${encodeURIComponent(j.slug)}`; return }
+        this.err = j.error || 'migrate failed'; window.toast('error', this.err)
+      } catch { this.err = 'migrate failed'; window.toast('error', this.err) }
       this.migrating = false
     },
   }
