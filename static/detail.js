@@ -245,12 +245,13 @@ function detailPage() {
       } catch (e) { this.err = String(e); }
       this.loading = false;
     },
-    async refresh() {
+    async refresh() { // ponytail: no LED/disable via runFeedback -- wrap body in runFeedback(job, btn) when the LED lands
+      this.err = '';
       this.refreshing = true;
       try {
         const r = await (await fetch(`/api/refresh/${this.plugin}/${encodeURIComponent(this.slug)}`, {method: 'POST'})).json();
-        if (!r.ok) { this.err = r.error || 'refresh failed'; } else { await this.load(); this.cached = false; }
-      } catch (e) { this.err = String(e); }
+        if (!r.ok) { this.err = r.error || 'refresh failed'; window.toast('error', this.err); } else { await this.load(); this.cached = false; window.toast('success', 'Refreshed'); }
+      } catch (e) { this.err = String(e); window.toast('error', this.err); }
       this.refreshing = false;
     },
     chNum(n) { const [i, f] = String(n).split('.'); return i.padStart(3, '0') + (f ? '.' + f : ''); },
@@ -289,6 +290,7 @@ function detailPage() {
     },
     async toggleLibrary() {
       if (this.libraryBusy) return;
+      this.err = '';
       this.libraryBusy = true;
       try {
         const url = this.inLibrary ? '/api/library/remove' : '/api/library';
@@ -296,21 +298,22 @@ function detailPage() {
                       cover: (this.detail && this.detail.cover) || ''};
         const r = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
         const j = await r.json().catch(() => null);
-        if (!r.ok || !j || j.ok === false) { this.err = (j && j.error) || 'library failed'; }
-        else { this.inLibrary = !this.inLibrary; if (!this.inLibrary) this.pinned = false; }
-      } catch (e) { this.err = String(e); }
+        if (!r.ok || !j || j.ok === false) { this.err = (j && j.error) || 'library failed'; window.toast('error', this.err); }
+        else { this.inLibrary = !this.inLibrary; if (!this.inLibrary) this.pinned = false; window.toast('success', this.inLibrary ? 'Added to library' : 'Removed from library'); }
+      } catch (e) { this.err = String(e); window.toast('error', this.err); }
       this.libraryBusy = false;
     },
     async togglePin() { // library-pin: membership in the grid's Pinned section
       if (this.libraryBusy || !this.inLibrary) return;
+      this.err = '';
       this.libraryBusy = true;
       try {
         const r = await fetch('/api/library/pin', {method: 'POST', headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({plugin: this.plugin, slug: this.slug, pinned: !this.pinned})});
         const j = await r.json().catch(() => null);
-        if (!r.ok || !j || j.ok === false) { this.err = (j && j.error) || 'pin failed'; }
-        else this.pinned = !this.pinned;
-      } catch (e) { this.err = String(e); }
+        if (!r.ok || !j || j.ok === false) { this.err = (j && j.error) || 'pin failed'; window.toast('error', this.err); }
+        else { this.pinned = !this.pinned; window.toast('success', this.pinned ? 'Pinned' : 'Unpinned'); }
+      } catch (e) { this.err = String(e); window.toast('error', this.err); }
       this.libraryBusy = false;
     },
     async loadLibrary() {
