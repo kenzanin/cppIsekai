@@ -131,8 +131,8 @@ local function cover_urls(rec)
       if not seen[url] then seen[url] = true; out[#out + 1] = url end
     end
   end
-  -- full cover catalogue (all editions)
-  local cat = get(string.format("%s/cover?manga%%5B%%5D=%s&limit=50", API, id))
+  -- full cover catalogue (all editions) — no client-side cap: fetch the whole catalogue
+  local cat = get(string.format("%s/cover?manga%%5B%%5D=%s&limit=100", API, id))
   if cat and type(cat.data) == "table" then
     -- locale preference: English, then Japanese, then unknown
     local en, ja, rest = {}, {}, {}
@@ -154,8 +154,6 @@ local function cover_urls(rec)
     for _, u in ipairs(ja) do out[#out + 1] = u end
     for _, u in ipairs(rest) do out[#out + 1] = u end
   end
-  -- cap at 5 candidates: primary cover first, then locale-preferred catalogue
-  while #out > 5 do out[#out] = nil end
   return out
 end
 
@@ -178,12 +176,12 @@ local function build_recommendations(rec)
     end
   end
   table.sort(scored, function(a, b) return a.score > b.score end)
-  while #scored > 10 do scored[#scored] = nil end
+  -- no cap: return every recommended manga, highest score first
   if #scored == 0 then return { ok = true, data = { items = {} } } end
   local ids = {}
   for _, s in ipairs(scored) do ids[#ids + 1] = s.id end
   local ids_q = table.concat(ids, "&ids[]=")
-  local bbody = get(string.format("%s/manga?limit=10&ids[]=%s&includes[]=cover_art", API, ids_q))
+  local bbody = get(string.format("%s/manga?limit=100&ids[]=%s&includes[]=cover_art", API, ids_q))
   local by_id = {}
   if bbody and type(bbody.data) == "table" then
     for _, m in ipairs(bbody.data) do by_id[m.id] = m end
