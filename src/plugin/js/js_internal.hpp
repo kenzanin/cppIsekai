@@ -2,7 +2,7 @@
 
 /** \file js_internal.hpp
  *  \brief Helpers shared by the js load/invoke half (js_rt.cpp) and the
- *  C bindings half (js_bindings.cpp).
+ *  registration table (js_bindings.cpp); handler bodies live in bindings/.
  */
 
 #include "js_rt.hpp"

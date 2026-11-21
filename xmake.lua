@@ -44,7 +44,19 @@ local ENRICH_SRC = {"src/http/enrich_chosen.cpp", "src/http/enrich_detail.cpp"}
 local PLUGIN_SRC = {"src/plugin/plugin_core.cpp", "src/plugin/plugin_load.cpp", "src/plugin/plugin_call.cpp",
                     "src/plugin/lua/bridge.cpp", "src/plugin/lua/lua_runtime.cpp", "src/plugin/http_client.cpp",
                     "src/plugin/wasm/wasm_rt.cpp", "src/plugin/wasm/wasm_load.cpp", "src/plugin/wasm/wasm_imports.cpp",
-                    "src/plugin/js/js_rt.cpp", "src/plugin/js/js_bindings.cpp", "src/plugin/htmltext_re2.cpp",
+                    "src/plugin/wasm/imports/log.cpp", "src/plugin/wasm/imports/storage.cpp",
+                    "src/plugin/wasm/imports/http.cpp", "src/plugin/wasm/imports/json.cpp",
+                    "src/plugin/wasm/imports/re2_match.cpp", "src/plugin/wasm/imports/re2_edit.cpp",
+                    "src/plugin/wasm/imports/html.cpp",
+                    "src/plugin/wasm/imports/url.cpp", "src/plugin/wasm/imports/text.cpp",
+                    "src/plugin/wasm/imports/codec.cpp", "src/plugin/wasm/imports/crypto.cpp",
+                    "src/plugin/wasm/imports/browser.cpp",
+                    "src/plugin/js/js_rt.cpp", "src/plugin/js/js_bindings.cpp",
+                    "src/plugin/js/bindings/core.cpp", "src/plugin/js/bindings/http.cpp",
+                    "src/plugin/js/bindings/text.cpp", "src/plugin/js/bindings/re2.cpp",
+                    "src/plugin/js/bindings/html.cpp", "src/plugin/js/bindings/storage.cpp",
+                    "src/plugin/js/bindings/crypto.cpp", "src/plugin/js/bindings/browser.cpp",
+                    "src/plugin/htmltext_re2.cpp",
                     "src/plugin/htmltext_html.cpp", "src/browser/chrome.cpp"}
 local FETCH_SRC = {"src/fetch/fetch.cpp", "src/fetch/fetch_curl.cpp"}
 
