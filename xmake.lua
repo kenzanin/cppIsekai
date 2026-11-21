@@ -42,7 +42,10 @@ local STORE_SRC = {"src/store/store_core.cpp", "src/store/store_search.cpp", "sr
 local CACHE_SRC = {"src/cache/cache.cpp", "src/cache/cache_img.cpp"}
 local ENRICH_SRC = {"src/http/enrich_chosen.cpp", "src/http/enrich_detail.cpp"}
 local PLUGIN_SRC = {"src/plugin/plugin_core.cpp", "src/plugin/plugin_load.cpp", "src/plugin/plugin_call.cpp",
-                    "src/plugin/lua/bridge.cpp", "src/plugin/lua/lua_runtime.cpp", "src/plugin/http_client.cpp",
+                    "src/plugin/lua/bridge.cpp", "src/plugin/lua/lua_runtime.cpp", "src/plugin/lua/bindings/http.cpp",
+                    "src/plugin/lua/bindings/io.cpp", "src/plugin/lua/bindings/json.cpp", "src/plugin/lua/bindings/lib.cpp",
+                    "src/plugin/lua/bindings/log.cpp", "src/plugin/lua/bindings/meta.cpp", "src/plugin/lua/bindings/storage.cpp",
+                    "src/plugin/lua/bindings/url.cpp", "src/plugin/lua/bindings/rest.cpp", "src/plugin/http_client.cpp",
                     "src/plugin/wasm/wasm_rt.cpp", "src/plugin/wasm/wasm_load.cpp", "src/plugin/wasm/wasm_imports.cpp",
                     "src/plugin/wasm/imports/log.cpp", "src/plugin/wasm/imports/storage.cpp",
                     "src/plugin/wasm/imports/http.cpp", "src/plugin/wasm/imports/json.cpp",
