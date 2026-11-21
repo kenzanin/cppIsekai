@@ -41,7 +41,8 @@ function settingsPage() {
     async restart() {
       if (!confirm('Restart server sekarang? Koneksi akan putus sebentar.')) return;
       this.restarting = true;
-      if (window.__srvRestart) await window.__srvRestart();
+      if (window.__srvRestart) { await window.__srvRestart(); window.toast('success', 'Restarting'); }
+      else window.toast('error', 'Restart hook unavailable');
     },
     async save() {
       this.saving = true; this.err = ''; this.note = '';
@@ -49,9 +50,9 @@ function settingsPage() {
         const r = await fetch('/config', { method: 'POST', headers: {'Content-Type': 'application/json'},
                                            body: JSON.stringify(this.patched()) });
         const j = await r.json();
-        if (!j.ok) { this.err = j.error || ('HTTP ' + r.status); }
-        else { this.note = 'saved (' + j.written + ' key(s) written)'; this.dirty = {}; await this.boot(); }
-      } catch (e) { this.err = String(e); }
+        if (!j.ok) { this.err = j.error || ('HTTP ' + r.status); window.toast('error', this.err); }
+        else { this.note = 'saved (' + j.written + ' key(s) written)'; window.toast('success', 'Settings saved'); this.dirty = {}; await this.boot(); }
+      } catch (e) { this.err = String(e); window.toast('error', this.err); }
       this.saving = false;
     },
   };
