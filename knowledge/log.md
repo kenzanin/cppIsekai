@@ -1,4 +1,6 @@
 ## 2026-11-21
+* **Update**: Linked `findings/kit-impact-review-smoke.md` to `findings/store-migrate-source-callers.md` (Same call-site inventory, more detail; this finding records the graph-index gap that blocked the tooling path.).
+* **Creation**: Documented concept `findings/kit-impact-review-smoke.md` (Store::migrate_source inbound call sites (graph smoke review)).
 * **Update**: Linked `findings/store-migrate-source-callers.md` to `decisions/library-migrate-source.md` (Impact analysis of the migrate_source entry point recorded by the worker; relates to the migrate-source design decision.).
 * **Creation**: Documented concept `findings/store-migrate-source-callers.md` (Store::migrate_source inbound call sites).
 * **Creation**: Documented concept `decisions/suwayomi-webui-contract-first.md` (Suwayomi WebUI adoption: contract first, no Go port).
