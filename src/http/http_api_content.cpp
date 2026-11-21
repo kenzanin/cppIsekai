@@ -12,6 +12,24 @@ namespace fs = std::filesystem;
 
 namespace {
 
+// Error string from a plugin envelope, for propagating a real upstream
+// failure instead of the generic "unknown chapter" 404.
+std::string envelope_error(const std::string& env) {
+    glz::generic g;
+    if (glz::read_json(g, env) || !g.is_object()) {
+        return {};
+    }
+    const auto& obj = g.get_object();
+    const auto it = obj.find("error");
+    if (it == obj.end()) {
+        return {};
+    }
+    if (const auto* s = std::get_if<std::string>(&it->second.data)) {
+        return *s;
+    }
+    return {};
+}
+
 // Resolve the chapter id for the pages call: the `ch_id` query param picks the
 // exact entry when it matches a list entry, else the first number match. An
 // absent or unmatched ch_id behaves exactly as the number-only path (design
@@ -204,6 +222,7 @@ void register_content(Ctx& c) {
         // chapter list; derived from the pages payload, zero plugin help.
         std::string total_id;
         int total_pages = 0;
+        std::string pages_error;
         const std::string body = on_pool(plugin_pool, [&] {
             const std::string chs_env = call_cached(store, plugin, "chapters", chs_params,
                                                     [&] { return plugins.call(plugin, "chapters", chs_params); }, &plugins);
@@ -243,6 +262,9 @@ void register_content(Ctx& c) {
                     store.chapter_pages_replace(plugin, slug, pages_id, urls);
                     break;
                 }
+                if (std::string e = envelope_error(pages_env); !e.empty()) {
+                    pages_error = std::move(e); // keep the real upstream reason for the 404 body
+                }
             }
             return build_pages_response(chs_env, pages_env,
                                         PagesCtx{.plugin = plugin, .slug = slug, .ch = chd, .ch_id = pages_id})
@@ -257,7 +279,14 @@ void register_content(Ctx& c) {
         crow::response r;
         if (body.empty()) {
             r.code = 404;
-            r.body = R"({"ok":false,"error":"unknown chapter"})";
+            if (pages_error.empty()) {
+                r.body = R"({"ok":false,"error":"unknown chapter"})";
+            } else {
+                crow::json::wvalue err;
+                err["ok"] = false;
+                err["error"] = pages_error;
+                r.body = err.dump();
+            }
         } else {
             r.body = body;
         }
