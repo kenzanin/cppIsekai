@@ -101,6 +101,7 @@ void bind_host_globals(JSContext* c) {
     bind(text_tbl, "trim", JS_NewCFunction(c, js_text_trim, "trim", 1));
     bind(text_tbl, "unescape", JS_NewCFunction(c, js_text_unescape, "unescape", 1));
     bind(text_tbl, "strip_html", JS_NewCFunction(c, js_text_strip_html, "strip_html", 1));
+    bind(text_tbl, "clean", JS_NewCFunction(c, js_text_clean, "clean", 1));
     bind(text_tbl, "date_epoch", JS_NewCFunction(c, js_text_date_epoch, "date_epoch", 1));
     bind(text_tbl, "json_blob", JS_NewCFunction(c, js_text_json_blob, "json_blob", 2));
     bind(host, "text", text_tbl);

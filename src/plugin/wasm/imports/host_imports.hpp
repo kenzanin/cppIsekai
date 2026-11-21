@@ -45,6 +45,7 @@ const void* host_text_chapter_num(IM3Runtime, IM3ImportContext, uint64_t*, void*
 const void* host_text_date_to_iso(IM3Runtime, IM3ImportContext, uint64_t*, void*);
 const void* host_text_trim(IM3Runtime, IM3ImportContext, uint64_t*, void*);
 const void* host_text_unescape(IM3Runtime, IM3ImportContext, uint64_t*, void*);
+const void* host_text_clean(IM3Runtime, IM3ImportContext, uint64_t*, void*);
 const void* host_text_strip_html(IM3Runtime, IM3ImportContext, uint64_t*, void*);
 const void* host_codec_base64_encode(IM3Runtime, IM3ImportContext, uint64_t*, void*);
 const void* host_codec_base64_decode(IM3Runtime, IM3ImportContext, uint64_t*, void*);

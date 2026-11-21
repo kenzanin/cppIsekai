@@ -165,6 +165,34 @@ TEST_CASE("host_text: url_abs four branches (madaradex canonical)") {
     CHECK(url_abs("no-scheme", "/p") == "/p");
 }
 
+TEST_CASE("host_text: clean decodes entities to a fixpoint (text-entity-fixpoint)") {
+    using plugin::host_text::clean;
+    // single, double, triple and hex encodings all land on the same apostrophe
+    CHECK(clean("So What&#39;s Wrong") == "So What's Wrong");
+    CHECK(clean("A&amp;#39;s") == "A's");
+    CHECK(clean("A&amp;039;s") == "A's");
+    CHECK(clean("A&#x27;s") == "A's");
+    CHECK(clean("A&x27;s") == "A's"); // lenient: '#' dropped entirely
+
+    // plain text and a real '&' in a URL pass through unchanged
+    CHECK(clean("  Tom & Jerry  ") == "Tom & Jerry");
+    CHECK(clean("https://x/api?a=1&b=2") == "https://x/api?a=1&b=2");
+    CHECK(clean("Ch. 12") == "Ch. 12"); // no '&': no parse at all
+
+    // malformed numeric references stay literal (0, surrogate, > U+10FFFF)
+    CHECK(clean("&#0;") == "&#0;");
+    CHECK(clean("&#xD800;") == "&#xD800;");
+    CHECK(clean("&#1114112;") == "&#1114112;");
+
+    // pathological nesting terminates within the 4-pass cap, no throw
+    std::string deep = "&#39;";
+    for (int i = 0; i < 8; ++i) {
+        deep = "&amp;" + deep.substr(1); // add one encoding layer per iteration
+    }
+    CHECK_NOTHROW(clean(deep));
+    CHECK(clean(deep) != deep); // made progress, did not spin
+}
+
 TEST_CASE("htmltext: re2_capture group / no-group / no-match") {
     auto cap = plugin::re2_capture(R"rx(src="([^"]+)")rx", "<img src=\"a.png\">");
     CHECK(cap.value_or("") == "a.png");

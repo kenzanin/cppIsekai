@@ -1,4 +1,8 @@
 ## 2026-11-21
+* **Update**: Linked `decisions/plugin-host-promotion.md` to `architecture/plugin-system.md` (Host promotion is the mechanism behind the plugin system's shared host-tool surface: cores live in src/plugin, runtimes keep thin marshals.).
+* **Update**: Linked `decisions/host-text-entity-fixpoint.md` to `decisions/plugin-host-promotion.md` (Extends the plugin-host-promotion series: entity decoding/display cleanup is one more shared host core instead of per-plugin code (mangabuddy's private deep_unescape was the last copy).).
+* **Creation**: Documented concept `decisions/plugin-host-promotion.md` (Plugin host promotion: shared host cores, thin runtime marshals).
+* **Creation**: Documented concept `decisions/host-text-entity-fixpoint.md` (host.text.clean: lexbor entity fixpoint + RE2/utf8proc numeric sweep).
 * **Update**: Linked `findings/kit-impact-review-smoke.md` to `findings/store-migrate-source-callers.md` (Same call-site inventory, more detail; this finding records the graph-index gap that blocked the tooling path.).
 * **Creation**: Documented concept `findings/kit-impact-review-smoke.md` (Store::migrate_source inbound call sites (graph smoke review)).
 * **Update**: Linked `findings/store-migrate-source-callers.md` to `decisions/library-migrate-source.md` (Impact analysis of the migrate_source entry point recorded by the worker; relates to the migrate-source design decision.).

@@ -15,11 +15,11 @@ below.
 - **THEN** the result is `So What's Wrong`
 
 #### Scenario: Double and triple encoding
-- **WHEN** a plugin calls `clean("A &amp;#39;s")` or `clean("A &amp;039;s")`
+- **WHEN** a plugin calls `clean("A&amp;#39;s")` or `clean("A&amp;039;s")`
 - **THEN** both results are `A's`
 
 #### Scenario: Hex numeric reference
-- **WHEN** a plugin calls `clean("A &#x27;s")`
+- **WHEN** a plugin calls `clean("A&#x27;s")`
 - **THEN** the result is `A's`
 
 #### Scenario: Plain text and real ampersand are preserved

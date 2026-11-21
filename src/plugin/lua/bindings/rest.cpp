@@ -40,6 +40,7 @@ void bind_rest(lua_State* L, sol::table host, const HostCtx& ctx) {
     text_tbl["trim"] = [](const std::string& s) { return plugin::host_text::trim(s); };
     text_tbl["unescape"] = [](const std::string& s) { return plugin::host_text::unescape(s); };
     text_tbl["strip_html"] = [](const std::string& s) { return plugin::host_text::strip_html(s); };
+    text_tbl["clean"] = [](const std::string& s) { return plugin::host_text::clean(s); };
     host["text"] = text_tbl;
 
     // host.codecs: base64/hex encodings (P6, host_codecs.hpp one core, thin

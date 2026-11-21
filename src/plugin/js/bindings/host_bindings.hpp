@@ -31,6 +31,7 @@ JSValue js_text_date_to_iso(JSContext* ctx, JSValueConst this_val, int argc, JSV
 JSValue js_text_trim(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv);
 JSValue js_text_unescape(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv);
 JSValue js_text_strip_html(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv);
+JSValue js_text_clean(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv);
 JSValue js_text_date_epoch(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv);
 JSValue js_text_json_blob(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv);
 

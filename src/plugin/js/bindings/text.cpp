@@ -69,6 +69,14 @@ JSValue js_text_strip_html(JSContext* ctx, JSValueConst /*this*/, int argc, JSVa
     return JS_NewStringLen(ctx, out.data(), out.size());
 }
 
+JSValue js_text_clean(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
+    if (argc != 1 || !JS_IsString(argv[0])) {
+        return JS_ThrowTypeError(ctx, "text.clean(string)");
+    }
+    const std::string out = plugin::host_text::clean(arg_str(ctx, argv[0]));
+    return JS_NewStringLen(ctx, out.data(), out.size());
+}
+
 // plugin-host-promotion D5/D7 parity.
 JSValue js_text_date_epoch(JSContext* ctx, JSValueConst /*this*/, int argc, JSValueConst* argv) {
     if (argc != 1 || !JS_IsString(argv[0])) {

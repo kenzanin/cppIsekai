@@ -44,6 +44,7 @@ constexpr std::array kImports{
     Import{"text_date_to_iso", "i(iiii)", imports::host_text_date_to_iso},
     Import{"text_trim", "i(iiii)", imports::host_text_trim},
     Import{"text_unescape", "i(iiii)", imports::host_text_unescape},
+    Import{"text_clean", "i(iiii)", imports::host_text_clean},
     Import{"text_strip_html", "i(iiii)", imports::host_text_strip_html},
     Import{"codec_base64_encode", "i(iiii)", imports::host_codec_base64_encode},
     Import{"codec_base64_decode", "i(iiii)", imports::host_codec_base64_decode},
