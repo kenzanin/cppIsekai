@@ -44,7 +44,20 @@ namespace http::api {
     const std::string authors = arr_json("authors");
     const std::string artists = arr_json("artists");
     const std::string tags = arr_json("tags");
+    // Extra plugin flags are not columns on saved_manga: keep them in the
+    // generic host KV so the row-served envelope can restore them verbatim.
+    bool is_novel = false;
+    if (const auto it = d.find("is_novel"); it != d.end()) {
+        if (const auto* b = std::get_if<bool>(&it->second.data)) {
+            is_novel = *b;
+        }
+    }
+    const std::string novel_key = "host/novel/" + plugin + "/" + slug;
+    const std::string url_key = "host/detail_url/" + plugin + "/" + slug;
+    const std::string detail_url = str_of("url");
     on_pool(db, [&] {
+        store.state_set(kStateHost, novel_key, is_novel ? "1" : "0");
+        store.state_set(kStateHost, url_key, detail_url);
         store.saved_detail_put({.plugin = plugin,
                                 .slug = slug,
                                 .name = name,
@@ -85,6 +98,16 @@ namespace http::api {
     set_arr("artists", saved->artists);
     set_arr("tags", saved->tags);
     set_arr("alt_titles", saved->alt_titles); // source verbatim; chosen never touches it
+    // Restore the extra plugin flags/kv captured at materialize time -- the
+    // saved row only stores the canonical columns (no schema change needed).
+    const auto novel = on_pool(db, [&] {
+        return store.state_get(kStateHost, "host/novel/" + plugin + "/" + slug);
+    });
+    d["is_novel"].data = novel.has_value() && *novel == "1";
+    const auto url = on_pool(db, [&] {
+        return store.state_get(kStateHost, "host/detail_url/" + plugin + "/" + slug);
+    });
+    set_str("url", url.value_or(""));
 
     root["ok"].data = true;
     root["data"] = std::move(data);

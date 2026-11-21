@@ -102,6 +102,11 @@ methods.detail = function(params)
   for _, g in ipairs(page.genres or {}) do
     if type(g) == "table" and g.name then genres[#genres + 1] = g.name end
   end
+  -- Novel/text entries have no uploaded page images: the site routes them to
+  -- /novel/... and /api/read/chapter returns pages=[] for every chapter.
+  -- Flag them so the detail page can show a badge and skip the reader button.
+  local is_novel = page.hasUploads == false
+    or tostring(page.type or ""):lower():find("novel", 1, true) ~= nil
   return {
     ok = true,
     data = {
@@ -115,6 +120,7 @@ methods.detail = function(params)
       authors = authors,
       artists = {},
       url = BASE .. "/manga/" .. tostring(id),
+      is_novel = is_novel,
     },
   }
 end

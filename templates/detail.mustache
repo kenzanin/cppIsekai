@@ -17,6 +17,7 @@
           <img :src="'/plugin/'+encodeURIComponent(plugin)+'/logo'" class="h-5 w-5 object-contain rounded" @error="pluginLogoOk=false" alt="">
         </template>
         <span x-show="pluginName" x-text="pluginName"></span>
+        <span class="px-2 py-0.5 rounded-full bg-amber-900/50 text-amber-300 border border-amber-800" x-show="detail.is_novel" x-cloak>novel · no images</span>
         <span class="px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300" x-show="detail.status && detail.status !== 'unknown' && !(detail.status_flags & 60)" x-text="detail.status"></span>
         <span class="px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400" x-show="detail.release_at" x-text="fmtDate(detail.release_at)"></span>
         <span class="px-2 py-0.5 rounded-full bg-emerald-900/40 text-emerald-300 border border-emerald-800" x-show="cached">cached</span>
@@ -49,7 +50,7 @@
                 class="px-3 py-1.5 text-sm border rounded-md disabled:opacity-40"
                 :class="pinned ? 'border-amber-600 bg-amber-900/40 text-amber-300 hover:bg-amber-900/60' : 'border-zinc-700 text-zinc-300 hover:bg-zinc-800'"
                 x-text="pinned ? '\u2605 Pinned' : '\u2606 Pin'"></button>
-        <button @click="startOrContinue()"
+        <button x-show="inLibrary && !detail.is_novel" x-cloak @click="startOrContinue()"
                 :disabled="!inLibrary"
                 class="px-3 py-1.5 text-sm border rounded-md disabled:opacity-40"
                 :class="inLibrary ? (hint ? 'border-emerald-700 bg-emerald-900/40 text-emerald-300 hover:bg-emerald-900/60' : 'border-emerald-700 text-emerald-300 hover:bg-zinc-800') : 'border-zinc-700 text-zinc-500'"
@@ -61,6 +62,9 @@
            :href="'/view/migrate/'+encodeURIComponent(plugin)+'/'+encodeURIComponent(slug)"
            class="px-3 py-1.5 text-sm border border-zinc-700 text-zinc-300 hover:bg-zinc-800 rounded-md">Migrate</a>
       </div>
+      <p class="text-xs text-amber-300 mt-2" x-show="detail.is_novel" x-cloak>
+        Novel entry — this source has no page images. Read it on the <a :href="detail.url || '#'" target="_blank" rel="noopener" class="underline">original site</a> instead.
+      </p>
       <p class="text-xs text-red-400 mt-2" x-show="err" x-text="err" x-cloak></p>
       <!-- enrichment (detail-enrichment-fields): fetch detail/covers, picker, reset. Saved-manga library gate is enforced server-side (not in library = 404). -->
       <div class="mt-4 flex flex-wrap items-center gap-2" x-show="inLibrary" x-cloak>
