@@ -3,7 +3,7 @@ type: Fact
 title: "Atsumaru plugin (atsu.moe): Typesense search, CDN images, composite chapter ids"
 description: "Atsumaru (atsu.moe) plugin: Typesense search, CDN images, composite mangaId:chapterId ids, epoch-ms createdAt, chapter-number dedupe, uppercase-id guard; chapters envelope now emits pages from pageCount (2026-11-12) so host read_ch rollup works."
 tags: [atsumaru, plugin, lua, typesense, cdn, goisekai, novel, live-verified]
-generated: { by: agent/mcp, at: "2026-11-21T10:28:55Z" }
+generated: { by: agent/mcp, at: "2026-11-21T10:31:51Z" }
 status: stable
 ---
 
@@ -28,5 +28,6 @@ status: stable
 - Plugin emits `is_novel` + `url` in the detail envelope. Because row-served details come from `saved_manga` (which has no column for these), `materialize_detail` stores them in generic `plugin_state` under `host/novel/<plugin>/<slug>` and `host/detail_url/<plugin>/<slug>`, and `saved_detail_response` restores them. No schema change.
 - Detail UI: amber `novel · no images` badge, warning with link to the original site, and the Start/Continue button hidden (computed `display:none`, verified in real Chrome).
 - Real novel (`Owlv`): all 1174 chapters `pageCount: 0`, `/api/read/chapter` returns `pages: []`, site redirects to `/novel/...`. Host now propagates the plugin's real error (`atsumaru: no pages`) instead of the misleading `unknown chapter` 404.
+- `medium: Novel` also covers `DmcL` (type `Manga`, `hasUploads: true`, 693 chapters) — proof that neither `type` nor `hasUploads` can be trusted. Because the flag is materialized into `plugin_state` at detail fetch, an existing saved row keeps the OLD value until `POST /api/refresh/<plugin>/<slug>`; a plugin-logic change alone does not retroactively fix cached rows.
 
 See also `decisions/api-cache-lock-miss-regression` (the OTHER half of the original unknown-title symptom).
