@@ -163,6 +163,7 @@
               <span class="text-[10px] text-zinc-400" x-show="!busySources[src.id] && candFor(src.id, enrichKind) && candFor(src.id, enrichKind).cached">(cached)</span>
             </div>
             <div class="flex flex-wrap gap-2">
+              <template x-for="u in ((candFor(src.id, 'covers') && candFor(src.id, 'covers').data && candFor(src.id, 'covers').data.covers) || [])" :key="u">
                 <button @click="pickField('cover', u)" class="w-20 border rounded overflow-hidden hover:ring-2 hover:ring-emerald-600" :class="chosenNow().cover === u ? 'ring-2 ring-emerald-600' : ''">
                   <!-- enrichment covers come from another site: use the SOURCE id so the image referer matches (MangaDex serves a placeholder to foreign referers) -->
                   <img :src="'/cache/img?url='+encodeURIComponent(u)+'&cover=1&plugin='+encodeURIComponent(src.id)+'&slug='+encodeURIComponent(slug)" class="w-full aspect-[2/3] object-cover" loading="lazy" alt="">

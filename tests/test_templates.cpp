@@ -42,9 +42,28 @@ int first_diff_line(const std::string& got, const std::string& want) {
 // tests/fixtures/golden/<name>.html -- locks the partial include graph and the
 // context keys each page reads. Re-lock is two-step: CPPISEKAI_UPDATE_GOLDEN=1
 // rewrites + reports and FAILS until CPPISEKAI_UPDATE_GOLDEN_ACK=1 is also set.
+// Alpine's <template> loops must balance: an orphan closing tag throws at
+// component init and silently kills every later binding (chapters never load).
+std::pair<int, int> template_tag_counts(const std::string& s) {
+    int open = 0;
+    int close = 0;
+    for (std::size_t p = 0; (p = s.find("<template", p)) != std::string::npos; ++p) {
+        ++open;
+        p += 8;
+    }
+    for (std::size_t p = 0; (p = s.find("</template>", p)) != std::string::npos; ++p) {
+        ++close;
+        p += 10;
+    }
+    return {open, close};
+}
+
 void check_golden(const std::string& name, const crow::json::wvalue& ctx) {
     crow::mustache::set_base(CPPISEKAI_TEMPLATES_DIR);
     const std::string got = crow::mustache::load(name).render(ctx).dump();
+    const auto [opens, closes] = template_tag_counts(got);
+    MESSAGE(name, ": template tags ", opens, " open / ", closes, " close");
+    CHECK(opens == closes);
     const std::string golden = std::string(CPPISEKAI_GOLDEN_DIR) + "/" + name + ".html";
 
     if (std::getenv("CPPISEKAI_UPDATE_GOLDEN") != nullptr) {
