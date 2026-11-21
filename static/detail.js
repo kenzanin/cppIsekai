@@ -164,11 +164,13 @@ function detailPage() {
     },
     async openEnrich(kind, force) { // per-source fetch; cached unless force=true
       this.enrichKind = kind; this.enrichOpen = true; this.enrichErr = ''; this.enrichBusy = true;
+      let failMsg = '';
       for (const src of this.enrichSources) {
         this.busySources = { ...this.busySources, [src.id]: true };
         try {
           const r = await fetch(`/api/enrichment/${encodeURIComponent(src.id)}/${kind}?plugin=${encodeURIComponent(this.plugin)}&slug=${encodeURIComponent(this.slug)}&force=${force ? 1 : 0}`);
           const j = await r.json();
+          if (j && j.ok === false) failMsg = j.error || 'enrichment failed';
           this.cand = { ...this.cand, [src.id + ':' + kind]: j };
           if (j && j.fetched_at) this.enrichLastFetched = Math.max(this.enrichLastFetched || 0, j.fetched_at);
           if (kind === 'detail') { // wizard also needs recommendations for the related-readings segment
@@ -177,10 +179,11 @@ function detailPage() {
               this.cand = { ...this.cand, [src.id + ':recommendations']: await rr.json() };
             } catch (e) { this.cand = { ...this.cand, [src.id + ':recommendations']: { ok: false, error: String(e) } }; }
           }
-        } catch (e) { this.cand = { ...this.cand, [src.id + ':' + kind]: { ok: false, error: String(e) } }; }
+        } catch (e) { this.cand = { ...this.cand, [src.id + ':' + kind]: { ok: false, error: String(e) } }; failMsg = String(e); }
         this.busySources = { ...this.busySources, [src.id]: false };
       }
       this.enrichBusy = false;
+      if (failMsg) window.toast('error', failMsg); else window.toast('success', 'Enrichment fetched');
     },
     candFor(id, kind) { return this.cand[id + ':' + (kind || this.enrichKind)] || null; },
     chosenNow() { return (this.enrichment && this.enrichment.chosen) || {}; },
@@ -189,8 +192,9 @@ function detailPage() {
       for (const k of Object.keys(chosen)) if (chosen[k] === undefined || chosen[k] === null) delete chosen[k];
       const r = await fetch('/api/enrichment/chosen', {method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ plugin: this.plugin, slug: this.slug, chosen })});
-      if (!r.ok) { this.enrichErr = 'save failed'; return; }
+      if (!r.ok) { this.enrichErr = 'save failed'; window.toast('error', 'save failed'); return; }
       await this.load(); // re-renders merged detail + enrichment block
+      window.toast('success', 'Saved');
     },
     async pickField(field, value) { await this.saveChosen({ [field]: value }); },
     async toggleName(field, name) { // artist/author: union of chosen names (array)
