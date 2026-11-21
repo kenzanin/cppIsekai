@@ -1,4 +1,6 @@
 ## 2026-11-21
+* **Update**: Linked `findings/store-migrate-source-callers.md` to `decisions/library-migrate-source.md` (Impact analysis of the migrate_source entry point recorded by the worker; relates to the migrate-source design decision.).
+* **Creation**: Documented concept `findings/store-migrate-source-callers.md` (Store::migrate_source inbound call sites).
 * **Creation**: Documented concept `decisions/suwayomi-webui-contract-first.md` (Suwayomi WebUI adoption: contract first, no Go port).
 
 ## 2026-11-20
