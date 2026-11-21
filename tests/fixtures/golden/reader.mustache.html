@@ -9,6 +9,59 @@
   <style>[x-cloak]{display:none !important}</style>
 </head>
 <body class="bg-black text-zinc-100 h-screen overflow-y-auto">
+<div id="toast-host" class="fixed bottom-4 right-4 z-50 flex flex-col items-end gap-2"></div>
+<script>
+(function () {
+  const host = document.getElementById('toast-host');
+  const KINDS = {
+    success: 'bg-emerald-600 text-white',
+    error: 'bg-red-600 text-white',
+    info: 'bg-zinc-700 text-zinc-100'
+  };
+  window.toast = function (kind, msg) {
+    if (document.activeElement && document.activeElement.tagName === 'BUTTON') led(document.activeElement, kind === 'success' ? 'bg-emerald-400' : kind === 'error' ? 'bg-red-400' : 'bg-amber-400', 3000);
+    while (host.children.length >= 4) host.firstElementChild.remove();
+    const t = document.createElement('div');
+    t.className = 'px-3 py-2 rounded shadow-lg text-sm cursor-pointer max-w-xs ' + (KINDS[kind] || KINDS.info);
+    t.textContent = msg;
+    t.onclick = function () { t.remove(); };
+    host.appendChild(t);
+    setTimeout(function () { t.remove(); }, kind === 'error' ? 8000 : 5000);
+    return t;
+  };
+  const led = function (btn, color, ms) {
+    if (!btn) return;
+    let d = btn.querySelector(':scope > .feedback-led');
+    if (!d) {
+      d = document.createElement('span');
+      d.className = 'feedback-led inline-block w-2 h-2 rounded-full ml-2 align-middle';
+      btn.appendChild(d);
+    }
+    d.className = 'feedback-led inline-block w-2 h-2 rounded-full ml-2 align-middle ' + color;
+    if (ms > 0) {
+      clearTimeout(d._t);
+      d._t = setTimeout(function () { d.remove(); }, ms);
+    }
+  };
+  window.runFeedback = async function (job, btn) {
+    if (btn) { btn.disabled = true; btn.classList.add('opacity-60'); }
+    led(btn, 'bg-amber-400'); // persistent until job resolves
+    let r = null;
+    try {
+      r = await job();
+    } catch (e) {
+      window.toast('error', (e && e.message) || String(e));
+      led(btn, 'bg-red-400', 3000);
+      if (btn) { btn.disabled = false; btn.classList.remove('opacity-60'); }
+      return;
+    }
+    const ok = !!(r && r.ok);
+    window.toast(ok ? 'success' : 'error', ok ? ((r && r.message) || 'Done') : ((r && r.error) || 'Failed'));
+    led(btn, ok ? 'bg-emerald-400' : 'bg-red-400', 3000);
+    if (btn) { btn.disabled = false; btn.classList.remove('opacity-60'); }
+  };
+})();
+</script>
 <main class="min-h-screen">
 
 <div x-data="readerPage" x-init="boot()" @keydown.window="keys($event)" @scroll.window="track()" @wheel.window.passive="wheel($event)"
@@ -150,6 +203,7 @@
     }
     window.__srvRestart = async function () {
       wasDown = true;
+      window.toast("info", "Restarting server...");
       try { await fetch('/admin/restart', {method: 'POST'}); } catch (e) { /* expected: connection drops */ }
       el.textContent = 'Server restarting… waiting for it to come back';
       el.style.background = '#78350f'; el.style.color = '#fde68a'; el.style.display = 'block';

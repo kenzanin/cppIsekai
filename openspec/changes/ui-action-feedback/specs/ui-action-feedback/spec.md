@@ -27,14 +27,15 @@ a maximum of 4 simultaneous toasts. Local-only state changes SHALL NOT emit toas
 
 ### Requirement: Pending and result indicators
 
-Every wired button SHALL show a pending indicator while its request is in flight and
-a result LED for 3 seconds afterward. The button SHALL be disabled while pending and
-re-enabled in both the success and failure paths. A thrown exception SHALL be converted
-to an error toast rather than an unhandled rejection.
+Every wired button SHALL show its existing busy state while a request is in flight
+(the per-page `refreshing` / `libraryBusy` / `enrichBusy` flags and `…` labels), SHALL
+be disabled while pending where a flag exists, and SHALL receive a result LED flashed
+on the clicked button for 3 seconds by the toast helper. A thrown exception SHALL be
+converted to an error toast rather than an unhandled rejection.
 
 #### Scenario: Pending state
 - **WHEN** a save request is in flight
-- **THEN** the Save button is disabled and its LED is amber
+- **THEN** the page's existing busy flag/label keeps the button disabled or shows `…`
 
 #### Scenario: Exception during request
 - **WHEN** `fetch` throws (network failure)
