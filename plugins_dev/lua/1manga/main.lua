@@ -1,10 +1,10 @@
 -- 1Manga.co plugin (https://1manga.co): HTML scrape, api 1.
--- The site's public GraphQL (api.mghcdn.com/graphql/mn03) is locked to its own
--- client since the 2025 rewrite: every key answers 403 "app does not have
--- permission". What it does serve is fully server-rendered HTML -- search
--- results, detail metadata, the whole chapter list and every page image
--- (imgx.mghcdn.com, plain GET, no referer, no crypto) -- so this port scrapes
--- that. Class names are hashed per deploy, so selectors stay structural
+-- The site's public api.mghcdn.com GraphQL is locked to its own client (403
+-- "app does not have permission"), but the SAME-ORIGIN /graphql answers with
+-- a minted mhub_access cookie -- pages.lua uses that (the chapter HTML
+-- server-renders only the first 6 images). What the HTML does serve fully is
+-- search results, detail metadata and the whole chapter list, so those stay
+-- scrapes. Class names are hashed per deploy, so selectors stay structural
 -- (bootstrap classes, labels, anchors) and never key on _3SlhO-style names.
 --
 -- The source is split by purpose; this file only wires the handlers.
