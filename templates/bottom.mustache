@@ -23,6 +23,7 @@
     }
     window.__srvRestart = async function () {
       wasDown = true;
+      window.toast("info", "Restarting server...");
       try { await fetch('/admin/restart', {method: 'POST'}); } catch (e) { /* expected: connection drops */ }
       el.textContent = 'Server restarting… waiting for it to come back';
       el.style.background = '#78350f'; el.style.color = '#fde68a'; el.style.display = 'block';
