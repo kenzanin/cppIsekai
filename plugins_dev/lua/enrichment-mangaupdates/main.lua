@@ -93,6 +93,7 @@ local function best_series(query)
     data.description = record.description
   end
   data.recommendations = data.recommendations or record.recommendations or {}
+  data.related_series = data.related_series or record.related_series or {}
   return data
 end
 
@@ -191,21 +192,32 @@ function handle(req)
   end
 
   if kind == "recommendations" then
-    -- weight-ordered, cap 5; series_image thumburl only (full art not exposed by v1)
-    local recs = {}
+    -- Two MangaUpdates sections carry related reading: `recommendations`
+    -- (weighted) and `related_series` (spin-off / side-story relations).
+    -- Either can be empty alone, so merge both and de-duplicate by series id.
+    local function id_str(v)
+      local n = tonumber(v)
+      if n ~= nil and n == math.floor(n) then return string.format("%d", n) end
+      return tostring(v or "")
+    end
+    local recs, seen = {}, {}
+    local function add(name, url, sid, weight)
+      name = tostring(name or "")
+      if name == "" then return end
+      url = tostring(url or SITE)
+      sid = id_str(sid)
+      local key = sid ~= "" and sid or url
+      if seen[key] then return end
+      seen[key] = true
+      recs[#recs + 1] = { name = name, url = url, id = sid, weight = weight }
+    end
     for _, r in ipairs(data.recommendations or {}) do
-      local name = tostring(r.series_name or "")
-      if name ~= "" then
-        recs[#recs + 1] = {
-          name = name,
-          url = tostring(r.series_url or SITE),
-          id = tostring(r.series_id or ""),
-          weight = tonumber(r.weight) or 0,
-        }
-      end
+      add(r.series_name, r.series_url, r.series_id, tonumber(r.weight) or 0)
+    end
+    for _, r in ipairs(data.related_series or {}) do
+      add(r.related_series_name, r.related_series_url, r.related_series_id, -1)
     end
     table.sort(recs, function(a, b) return a.weight > b.weight end)
-    while #recs > 10 do recs[#recs] = nil end
     for _, r in ipairs(recs) do r.weight = nil end
     return { ok = true, data = { items = recs } }
   end

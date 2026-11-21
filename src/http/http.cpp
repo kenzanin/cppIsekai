@@ -25,7 +25,7 @@ cache::Fetcher makeCurlFetcher(const std::string& proxy, const plugin::Host& plu
             fetch::Request rq;
             rq.url = url;
             rq.profile = engine; // timeout_ms defaults to 30 s
-            if (const std::string referer = plugins.image_referer(plugin);
+            if (const std::string referer = plugins.image_referer_for_url(url, plugin);
                 !referer.empty() && referer != "none") { // "none": sentinel, no header (D-sentinel)
                 rq.headers = {{"Referer", referer}};
             }
@@ -48,7 +48,7 @@ cache::Fetcher makeCurlFetcher(const std::string& proxy, const plugin::Host& plu
         // plugin's manifest `image_referer` override, else `website` origin.
         std::string referer;
         if (!plugin.empty()) {
-            if (const std::string ref = plugins.image_referer(plugin); !ref.empty() && ref != "none") {
+            if (const std::string ref = plugins.image_referer_for_url(url, plugin); !ref.empty() && ref != "none") {
                 referer = " -e '" + quote(ref) + "'";
             }
         }

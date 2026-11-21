@@ -124,6 +124,13 @@ public:
      *  Empty on unknown id / nothing to derive (js-image-referer-gap). */
     [[nodiscard]] std::string image_referer(const std::string& id) const;
 
+    /** \brief Referer chosen from the image URL's own domain: when a registered
+     *  plugin's website/image_referer shares the URL's site (subdomains count),
+     *  use that plugin's referer instead of the title plugin's. This is what
+     *  keeps cross-site enrichment covers off MangaDex's hotlink placeholder.
+     *  Falls back to `image_referer(fallback_id)` when no site matches. */
+    [[nodiscard]] std::string image_referer_for_url(const std::string& url, const std::string& fallback_id) const;
+
     /** \brief curl-impersonate profile for this plugin's image fetches; empty
      *  = legacy plain curl (stock TLS). CF-fronted image CDNs opt in
      *  (image-engine-profile). */

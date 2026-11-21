@@ -1,5 +1,9 @@
 #include "plugin_internal.hpp"
 
+#include <algorithm>
+#include <string_view>
+#include <vector>
+
 namespace fs = std::filesystem;
 
 namespace plugin {
@@ -55,6 +59,49 @@ std::string Host::image_referer(const std::string& id) const {
     }
     const auto path = site.find('/', scheme + 3);
     return path == std::string::npos ? site : site.substr(0, path);
+}
+
+namespace {
+
+// Host part of a URL (scheme optional); no scheme -> everything before '/'.
+std::string url_host(std::string_view u) {
+    std::size_t b = 0;
+    if (const auto s = u.find("://"); s != std::string_view::npos) {
+        b = s + 3;
+    }
+    const auto stop = std::min({u.find('/', b), u.find('?', b), u.find('#', b)});
+    return std::string(u.substr(b, stop == std::string_view::npos ? u.size() - b : stop - b));
+}
+
+// Same registrable site: exact, or one is a subdomain of the other.
+bool same_site(std::string a, std::string b) {
+    if (a.empty() || b.empty()) return false;
+    if (a == b) return true;
+    if (a.size() > b.size() && a.ends_with("." + b)) return true;
+    return b.size() > a.size() && b.ends_with("." + a);
+}
+
+} // namespace
+
+std::string Host::image_referer_for_url(const std::string& url, const std::string& fallback_id) const {
+    const std::string host = url_host(url);
+    std::vector<std::string> ids;
+    if (!host.empty()) {
+        const std::scoped_lock lock(impl_->mu);
+        for (const auto& [id, rt] : impl_->plugins) {
+            const auto& info = rt->info;
+            if (same_site(host, url_host(info.website)) ||
+                same_site(host, url_host(info.image_referer))) {
+                ids.push_back(id);
+            }
+        }
+    }
+    for (const auto& id : ids) {
+        if (std::string ref = image_referer(id); !ref.empty()) {
+            return ref; // "none" sentinel is honored by the caller
+        }
+    }
+    return image_referer(fallback_id);
 }
 
 std::string Host::image_engine(const std::string& id) const {

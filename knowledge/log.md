@@ -1,4 +1,6 @@
 ## 2026-11-21
+* **Update**: Linked `decisions/image-referer-domain-match.md` to `decisions/host-text-entity-fixpoint.md` (Both keep host-side cross-runtime behavior data-driven; image referer now follows the URL domain instead of the caller plugin.).
+* **Creation**: Documented concept `decisions/image-referer-domain-match.md` (Image referer follows the URL's own site domain).
 * **Update**: Linked `decisions/ui-action-feedback.md` to `decisions/host-text-entity-fixpoint.md` (Both are shared-core contracts: ui-action-feedback keeps action feedback in one template partial exactly as host-text-entity-fixpoint keeps text cleanup in one host core; single-source-of-truth over per-site copies.).
 * **Creation**: Documented concept `decisions/ui-action-feedback.md` (Shared toast + LED action-feedback contract (feedback.mustache; no new lib/route)).
 * **Update**: Linked `decisions/plugin-host-promotion.md` to `architecture/plugin-system.md` (Host promotion is the mechanism behind the plugin system's shared host-tool surface: cores live in src/plugin, runtimes keep thin marshals.).
