@@ -7,6 +7,7 @@ function detailPage() {
     inLibrary: false, libraryBusy: false, pinned: false,
     enrichment: null, enrichLastFetched: 0, enrichSources: [],
     enrichOpen: false, enrichKind: 'detail', enrichBusy: false, busySources: {}, cand: {}, enrichErr: '',
+    sourceDetail: null, sourceCover: '', // raw scraper envelope = website defaults, shown as a wizard source
     hiddenTags: [],
     chPage: 0, showHidden: false, readState: {}, cbzReady: {}, // id -> {skip, read} (chapter-list-controls 1.2); cbzReady: chapter fully cached
     get pageCount() { return Math.max(1, Math.ceil(this.visibleChapters().length / 20)); },
@@ -84,16 +85,18 @@ function detailPage() {
     altTitleCandidates() {
       // merge main title + altTitles from all sources; normalized dedupe; MangaDex wins on collision
       const seen = new Map();
-      for (const src of this.enrichSources) {
-        const c = this.candFor(src.id, 'detail');
-        const alts = c && c.data && Array.isArray(c.data.alt_titles) ? c.data.alt_titles : [];
-        for (const t of alts) {
+      // website default first, then enrichment sources; normalized dedupe
+      for (const src of ['source', ...this.enrichSources.map(s => s.id)]) {
+        const c = this.srcData(src);
+        const alts = Array.isArray(c.alt_titles) ? c.alt_titles : [];
+        const mainTitle = c.name ? [{ title: c.name, lang: '', main: true }] : [];
+        for (const t of [...mainTitle, ...alts]) {
           const raw = String(t && t.title || '').trim();
           if (!raw) continue;
           const key = this.normAltTitle(raw);
           if (!key) continue;
           if (!seen.has(key)) {
-            seen.set(key, { title: raw, lang: String(t.lang || ''), main: !!t.main, source: src.id });
+            seen.set(key, { title: raw, lang: String(t.lang || ''), main: !!t.main, source: src });
           }
         }
       }
@@ -140,22 +143,25 @@ function detailPage() {
       await this.load();
       window.toast('success', 'Related removed');
     },
-    srcData(id) { const c = this.candFor(id, 'detail'); return (c && c.data) || {}; },
-    mergedList(field) { // MD first; MU shown only when no normalized collision
-      const md = this.srcData('mangadex-enrichment')[field];
-      const mu = this.srcData('mangaupdates-enrichment')[field];
+    badge(src) { return src === 'source' ? 'SRC' : src === 'mangadex-enrichment' ? 'MD' : 'MU'; },
+    srcData(id) { if (id === 'source') return this.sourceDetail || {}; const c = this.candFor(id, 'detail'); return (c && c.data) || {}; },
+    mergedList(field) { // source first (website default), then MD, then MU on non-collision
       const out = []; const seen = new Set();
       const push = (v, source) => { const raw = String(v || '').trim(); const k = this.normAltTitle(raw); if (k && !seen.has(k)) { seen.add(k); out.push({ name: raw, source }); } };
-      (Array.isArray(md) ? md : []).forEach(v => push(v, 'mangadex-enrichment'));
-      (Array.isArray(mu) ? mu : []).forEach(v => push(v, 'mangaupdates-enrichment'));
+      for (const id of ['source', ...this.enrichSources.map(s => s.id)]) {
+        const v = this.srcData(id)[field];
+        (Array.isArray(v) ? v : []).forEach(x => push(x, id));
+      }
       return out;
     },
     mergedSynopses() {
-      const md = this.srcData('mangadex-enrichment').synopsis;
-      const mu = this.srcData('mangaupdates-enrichment').synopsis;
       const out = [];
-      if (md) out.push({ src: 'mangadex-enrichment', text: md, key: this.normAltTitle(md) });
-      if (mu) { const k = this.normAltTitle(mu); if (!out.length || out[0].key !== k) out.push({ src: 'mangaupdates-enrichment', text: mu, key: k }); }
+      for (const id of ['source', ...this.enrichSources.map(s => s.id)]) {
+        const text = this.srcData(id).synopsis;
+        if (!text) continue;
+        const k = this.normAltTitle(text);
+        if (!out.some(x => x.key === k)) out.push({ src: id, text, key: k });
+      }
       return out;
     },
     async loadEnrichSources() { // loaded enrichment plugins (picker needs the list)
@@ -167,6 +173,14 @@ function detailPage() {
     async openEnrich(kind, force) { // per-source fetch; cached unless force=true
       this.enrichKind = kind; this.enrichOpen = true; this.enrichErr = ''; this.enrichBusy = true;
       let failMsg = '';
+      // Website defaults: raw scraper detail payload. Shown as the SRC source
+      // so any field/tag can be put back the way the site's own plugin emits it.
+      try {
+        const sr = await fetch(`/plugin/${encodeURIComponent(this.plugin)}/detail?id=${encodeURIComponent(this.slug)}`);
+        const sj = await sr.json();
+        this.sourceDetail = (sj && sj.ok && sj.data) ? sj.data : null;
+        this.sourceCover = (this.sourceDetail && this.sourceDetail.cover) || '';
+      } catch (e) { this.sourceDetail = null; this.sourceCover = ''; }
       for (const src of this.enrichSources) {
         this.busySources = { ...this.busySources, [src.id]: true };
         try {
@@ -197,6 +211,10 @@ function detailPage() {
       if (!r.ok) { this.enrichErr = 'save failed'; window.toast('error', 'save failed'); return; }
       await this.load(); // re-renders merged detail + enrichment block
       window.toast('success', 'Saved');
+    },
+    async restoreSource(field) { // drop chosen override -> host falls back to the site's own value
+      if (field === 'tags') await this.saveChosen({ tags_add: undefined, tags_hidden: undefined });
+      else await this.saveChosen({ [field]: undefined });
     },
     async pickField(field, value) { await this.saveChosen({ [field]: value }); },
     async toggleName(field, name) { // artist/author: union of chosen names (array)
