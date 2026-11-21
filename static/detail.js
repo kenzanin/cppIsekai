@@ -127,16 +127,18 @@ function detailPage() {
       else delete chosen.related_add;
       const r = await fetch('/api/enrichment/chosen', {method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ plugin: this.plugin, slug: this.slug, chosen })});
-      if (!r.ok) { this.enrichErr = 'save failed'; return; }
+      if (!r.ok) { this.enrichErr = 'save failed'; window.toast('error', 'save failed'); return; }
       await this.load();
+      window.toast('success', 'Related added');
     },
     async removeAllRelated() {
       const chosen = { ...this.chosenNow() };
       delete chosen.related_add;
       const r = await fetch('/api/enrichment/chosen', {method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ plugin: this.plugin, slug: this.slug, chosen })});
-      if (!r.ok) { this.enrichErr = 'save failed'; return; }
+      if (!r.ok) { this.enrichErr = 'save failed'; window.toast('error', 'save failed'); return; }
       await this.load();
+      window.toast('success', 'Related removed');
     },
     srcData(id) { const c = this.candFor(id, 'detail'); return (c && c.data) || {}; },
     mergedList(field) { // MD first; MU shown only when no normalized collision
@@ -219,12 +221,16 @@ function detailPage() {
       await this.saveChosen({ tags_hidden: arr.length ? arr : undefined });
     },
     async resetCover() {
-      try { await fetch('/api/enrichment/reset', {method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ plugin: this.plugin, slug: this.slug, mode: 'cover' })}); await this.load(); } catch (e) {}
+      try { const r = await fetch('/api/enrichment/reset', {method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ plugin: this.plugin, slug: this.slug, mode: 'cover' })});
+        if (!r.ok) { window.toast('error', 'reset failed'); return; }
+        await this.load(); window.toast('success', 'Cover reset'); } catch (e) { window.toast('error', String(e)); }
     },
     async resetDetail() { // clears non-tag choseD fields, keeps chosen.cover (task 4.3)
-      try { await fetch('/api/enrichment/reset', {method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ plugin: this.plugin, slug: this.slug, mode: 'detail' })}); await this.load(); } catch (e) {}
+      try { const r = await fetch('/api/enrichment/reset', {method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ plugin: this.plugin, slug: this.slug, mode: 'detail' })});
+        if (!r.ok) { window.toast('error', 'reset failed'); return; }
+        await this.load(); window.toast('success', 'Detail reset'); } catch (e) { window.toast('error', String(e)); }
     },
     fmtEnrichDate(ts) { return ts ? this.fmtDate(ts) : ''; },
     async load() {
