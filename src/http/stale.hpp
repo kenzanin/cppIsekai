@@ -32,9 +32,13 @@ inline constexpr std::int64_t kApiCacheTtl = 24 * 3600;
 inline constexpr const char* kOrphanEnv = R"({"ok":false,"error":"plugin removed"})";
 
 /** \brief Gate helper: disabled and removed plugins both stay quiet; the
- *  distinction is only the envelope text. */
-inline bool plugin_quiet(const Store& store, const std::string& id) {
-    return store.plugin_upstream(id) != Upstream::live;
+ *  distinction is only the envelope text. A loaded-but-unregistered runtime is
+ *  NOT an orphan -- enrichment sources load without a registry row. */
+inline bool plugin_quiet(const Store& store, const plugin::Host* plugins, const std::string& id) {
+    if (store.plugin_upstream(id) == Upstream::live) {
+        return false;
+    }
+    return !(plugins != nullptr && plugins->loaded(id));
 }
 
 /** \brief Per-method host defaults; manifest `cache_ttl` (plugin-side) wins
@@ -121,7 +125,7 @@ std::string call_cached(Store& store, const std::string& id, const std::string& 
     // still serve; no cache at all answers with this and the net stays quiet.
     static constexpr const char* kDisabledEnv = R"({"ok":false,"error":"plugin disabled"})";
     if (!stale_optin(method)) {
-        if (plugin_quiet(store, id)) {
+        if (plugin_quiet(store, plugins, id)) {
             return store.plugin_upstream(id) == Upstream::orphan ? kOrphanEnv : kDisabledEnv;
         }
         return call();
@@ -153,7 +157,7 @@ std::string call_cached(Store& store, const std::string& id, const std::string& 
     }
     spdlog::debug("[plugin:{}] {} api_cache MISS", id, method);
 
-    if (plugin_quiet(store, id)) {
+    if (plugin_quiet(store, plugins, id)) {
         return store.plugin_upstream(id) == Upstream::orphan ? kOrphanEnv : kDisabledEnv;
     }
     std::string res = call();

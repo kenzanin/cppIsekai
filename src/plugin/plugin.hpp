@@ -95,6 +95,12 @@ public:
     /** \brief True when id is an enrichment source (capability `enrichment`). */
     [[nodiscard]] bool is_enrichment(const std::string& id) const;
 
+    /** \brief True when a runtime for this id is loaded in this process. Not
+     *  the same as "registered": enrichment sources load without a registry
+     *  row, so an unregistered id is only an orphan when it is also unloaded
+     *  (library-ownership D5). */
+    [[nodiscard]] bool loaded(const std::string& id) const;
+
     /** \brief Enrichment call (task 1.3): kind ∈ `detail` | `covers`. Gates
      *  on the plugin's `enrichment` capability, routes through the shared
      *  `call` path (same envelope, health, proxy, cookie handling), and

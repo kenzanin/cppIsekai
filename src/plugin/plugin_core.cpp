@@ -187,6 +187,11 @@ std::vector<Host::EnrichmentRow> Host::enrichment_rows() const {
     return out;
 }
 
+bool Host::loaded(const std::string& id) const {
+    const std::scoped_lock lock(impl_->mu);
+    return impl_->plugins.contains(id);
+}
+
 bool Host::is_enrichment(const std::string& id) const {
     const std::scoped_lock lock(impl_->mu);
     const auto it = impl_->plugins.find(id);

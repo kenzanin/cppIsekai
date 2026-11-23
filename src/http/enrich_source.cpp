@@ -5,6 +5,71 @@ namespace http::api {
 
 
 // GET /api/enrichment/<id>/<detail|covers>?plugin=&slug=&force=0|1
+/** \brief Titles to retry with when the library name finds nothing upstream:
+ *  the scraper detail envelope's own title/name, then every title a previous
+ *  enrichment match recorded (with its alt titles). Order is best-first and
+ *  deduped against \p first; bounded so one bad name costs a few calls, not a
+ *  crawl. (library-ownership follow-up: the 5-cover report was a stale stored
+ *  candidate whose refetch could never match the library's spelling.) */
+inline std::vector<std::string> retry_titles(Store& store, const std::string& plugin, const std::string& slug,
+                                             const std::string& first) {
+    std::vector<std::string> out;
+    const auto push = [&](const std::string& t) {
+        if (!t.empty() && t != first && std::ranges::find(out, t) == out.end() && out.size() < 4) {
+            out.push_back(t);
+        }
+    };
+    if (const auto row = store.title_meta_get(plugin, slug); row.has_value()) {
+        glz::generic fetched;
+        if (!glz::read_json(fetched, row->fetched) && fetched.is_array()) {
+            for (const auto& entry : fetched.get_array()) {
+                if (!entry.is_object()) {
+                    continue;
+                }
+                const auto& d = entry.get_object().find("data");
+                if (d == entry.get_object().end() || !d->second.is_object()) {
+                    continue;
+                }
+                const auto& data = d->second.get_object();
+                if (const auto* t = data.find("title"); t != data.end()) {
+                    if (const auto* s = std::get_if<std::string>(&t->second.data)) {
+                        push(*s);
+                    }
+                }
+                if (const auto* t = data.find("name"); t != data.end()) {
+                    if (const auto* s = std::get_if<std::string>(&t->second.data)) {
+                        push(*s);
+                    }
+                }
+                if (const auto* a = data.find("alt_titles"); a != data.end() && a->second.is_array()) {
+                    for (const auto& el : a->second.get_array()) {
+                        if (const auto* s = std::get_if<std::string>(&el.data)) {
+                            push(*s);
+                        } else if (el.is_object()) {
+                            if (const auto* t = el.get_object().find("title"); t != el.get_object().end()) {
+                                if (const auto* s = std::get_if<std::string>(&t->second.data)) {
+                                    push(*s);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    // Scraper's own detail envelope last: it is what the source site calls the
+    // work, which is usually the spelling the aggregators index too.
+    crow::json::wvalue p;
+    p["id"] = slug;
+    if (const auto row = store.api_cache_get(plugin, stale_key(plugin, "detail", p.dump())); row.has_value()) {
+        if (const auto obj = detail::envelope_object(row->payload)) {
+            push(detail::envelope_str(*obj, "title"));
+            push(detail::envelope_str(*obj, "name"));
+        }
+    }
+    return out;
+}
+
 // cached-or-fetch / force per source. Never writes saved_manga / api_cache.
  crow::response enrichment_source_response(plugin::Host& plugins, BS::thread_pool<>& db,
                                                  BS::thread_pool<>& plugin_pool, Store& store, const std::string& id,
@@ -31,9 +96,29 @@ namespace http::api {
         }
     }
 
-    const std::string raw = on_pool(plugin_pool, [&] { return plugins.enrich(id, title, kind); });
+    const auto ok_env = [](const std::string& body, glz::generic& out) {
+        return !glz::read_json(out, body) && envelope_ok(out);
+    };
+    std::string raw = on_pool(plugin_pool, [&] { return plugins.enrich(id, title, kind); });
     glz::generic env;
-    if (glz::read_json(env, raw) || !envelope_ok(env)) {
+    if (!ok_env(raw, env)) {
+        // The library name is often an editorial label the source does not
+        // index ("Sengoku Komachi Kurou Tan!" vs MangaDex's "Sengoku Komachi
+        // Kuroutan"), which surfaced as "no match found" over a title the
+        // source does have. Retry down a short candidate chain (source detail
+        // name/title, then the titles already matched by any enrichment
+        // source) before falling back to the stored candidate.
+        for (const std::string& alt : on_pool(db, [&] { return retry_titles(store, plugin, slug, title); })) {
+            const std::string retry = on_pool(plugin_pool, [&] { return plugins.enrich(id, alt, kind); });
+            glz::generic env2;
+            if (ok_env(retry, env2)) {
+                raw = retry;
+                env = std::move(env2);
+                break;
+            }
+        }
+    }
+    if (!envelope_ok(env)) {
         if (existing) {
             std::int64_t fetched_at = existing->fetched_at;
             if (auto cached = stored_source(existing->fetched, id, kind, fetched_at)) {

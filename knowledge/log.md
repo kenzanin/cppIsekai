@@ -1,4 +1,6 @@
 ## 2026-11-23
+* **Update**: Linked `findings/enrichment-search-title-mismatch.md` to `decisions/library-ownership-model.md` (Follow-up: the orphan gate must treat loaded-but-unregistered enrichment runtimes as live.).
+* **Creation**: Documented concept `findings/enrichment-search-title-mismatch.md` ('Capped at 5 covers' was a stale candidate plus a title the source does not index).
 * **Update**: Linked `findings/browse-writes-nothing-orphan-free.md` to `decisions/library-ownership-model.md` (Evidence for the implemented model: 73% of chapter rows were browse dust before the routing change.).
 * **Creation**: Documented concept `findings/browse-writes-nothing-orphan-free.md` (Routing unsaved pairs to memory removes the orphan class entirely (measured 73%)).
 * **Update**: Updated concept `decisions/library-ownership-model.md`.
