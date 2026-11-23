@@ -177,6 +177,9 @@ crow::json::wvalue home_context(Store& store, BS::thread_pool<>& db, const crow:
         row["total_ch"] = m.total_ch;
         row["read_ch"] = m.read_ch;
         row["status_flags"] = m.status_flags; // bit0 carries the New state (was has_update)
+        // display-dim 2.1: SSR the dim class -- the client paintDim repaint must
+        // never be the first styler, or dimmed covers flash unstyled on refresh.
+        row["dimmed"] = (m.status_flags & static_cast<int>(std::to_underlying(StatusFlag::kDim))) != 0;
         row["last_read_at"] = static_cast<double>(m.last_read_at);
         row["added_at"] = static_cast<double>(m.added_at);
         row["dup"] = m.dup_group; // library-dedup 3.1: grid duplicate filter/sort marker
