@@ -5,7 +5,7 @@
 // --keep-fnames keeps every fn name for inline-template/sibling callers.
 // ponytail: swap to esbuild --minify for ~15% smaller output if ever needed.
 import { brotliCompressSync, constants } from "node:zlib";
-import { readdirSync, statSync, writeFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 let n = 0;
@@ -28,4 +28,22 @@ for (const f of readdirSync("static")) {
   console.log(`${f}: ${statSync(src).size}B -> min ${Buffer.byteLength(min)}B -> br ${br.length}B`);
   n++;
 }
-console.log(`${n} asset(s) regenerated`);
+// Tailwind: compile the utility CSS from templates + inline :class strings.
+// The old static/tailwind.min.js was the Play CDN runtime hosted locally;
+// this is the real compiled stylesheet, so no CDN-style JIT in the browser.
+const tw = Bun.spawnSync(
+  ["tailwindcss", "-i", "static/input.css", "-o", "static/app.css", "--minify"],
+  { stdout: "pipe", stderr: "inherit" },
+);
+if (!tw.success || tw.exitCode !== 0) {
+  console.error(`tailwindcss failed (exit ${tw.exitCode})`);
+  process.exit(1);
+}
+const css = "static/app.css";
+const cssBr = brotliCompressSync(statSync(css).size ? readFileSync(css) : Buffer.alloc(0), {
+  params: { [constants.BROTLI_PARAM_QUALITY]: 11 },
+});
+writeFileSync(`${css}.br`, cssBr);
+console.log(`app.css: ${statSync(css).size}B -> br ${cssBr.length}B`);
+
+console.log(`${n} js asset(s) regenerated`);

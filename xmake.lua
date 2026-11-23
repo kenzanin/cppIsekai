@@ -376,7 +376,7 @@ cxx_bin("test_gridjs", {
 
 -- --- web assets: minify+brotli custom static js (bun; sources untouched) ---
 task("js")
-    set_menu {usage = "xmake js", description = "minify+brotli static/*.js (skip *.min.*) via scripts/minbr.ts"}
+    set_menu {usage = "xmake js", description = "minify+brotli static/*.js + compile Tailwind CSS -> static/app.css via scripts/minbr.ts"}
     on_run(function()
         os.exec("bun scripts/minbr.ts")
     end)

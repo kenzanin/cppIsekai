@@ -1,0 +1,7 @@
+@import "tailwindcss";
+
+/* Tailwind v4 scans these sources for class names. Templates are mustache, so
+   the scanner must be told explicitly; JS holds conditional :class strings. */
+@source "../templates";
+@source "./detail.js";
+@source "./reader.js";
