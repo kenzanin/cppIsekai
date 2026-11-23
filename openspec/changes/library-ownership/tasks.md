@@ -5,6 +5,7 @@
 - [ ] 1.1 `StoreImpl` gains `Ephemeral`: pair -> {chapters (id/number/title/url/release_at/flags/
       read_max/pages), reader position, title_meta, per-pair host fields}; pair-count LRU bound
       (design D1); plain map, no lock (single db worker)
+- [ ] 1.1a Routing surface (graph-verified, callers unchanged): chapters_upsert (materialize_chapters), chapters_list (chapters_row_response), chapter_pages_replace (register_content), chapter_pages_count (chapter_read_max_bump, register_state), chapter_flags_apply + chapter_read_max_bump (register_state, register_reader), chapter_flags_list (reader_window, apply_read_rollup, register_state), position_set (register_reader), position_get (register_reader, register_pages), position_last (register_state), title_meta_* (chosen_title, chosen_cover, apply_chosen, enrichment_source_response, saved_detail_response, register_enrich)
 - [ ] 1.2 `saved_exists(plugin, slug)` predicate + dispatch in every pair-keyed store method
       (chapters_upsert/list, chapter_pages_replace, chapter_flags_apply/get/list,
       chapter_read_max_bump/list, chapter_pages_count, position_set/get/last, title_meta_*) —
@@ -16,7 +17,8 @@
 ## 2. Promote on save
 
 - [ ] 2.1 Promotion moves the ephemeral pair into SQLite in one transaction (flags + read_max +
-      pages + position + title_meta + host fields), then erases the memory entry (design D3)
+      pages + position + title_meta + host fields), then erases the memory entry; it reads the map
+      **directly**, not through the routed readers (the new saved row flips routing) (design D3)
 - [ ] 2.2 Keep the existing `materialize_detail` / `sync_saved_stats` path from the cached
       envelopes; a save with nothing cached and nothing browsed stays a plain row insert
 - [ ] 2.3 Test: read marks produced before saving land in the library (read 5, save, read_ch = 5)
@@ -41,7 +43,9 @@
 - [ ] 4.1 `saved_manga` gains `chapters_fp`, `novel`, `detail_url`; boot migration copies the
       `plugin_state` values once and deletes those keys (design D10)
 - [ ] 4.2 Drop the dead `title` table and its `store.search`/`count` paths + the search-page seed
-      branch; drop the unused `host/pos` key constant
+      branch; drop the unused `host/pos` key constant. Callers are only `http_pages.cpp:53/56`
+      (`home_context`) plus the `test_store` title-seed assertions (~10), which go with it
+      (graph-verified: no other caller).
 - [ ] 4.3 Boot migration: delete leftover `host/skip|read|total` shadows if any remain (already
       retired) and log counts
 

@@ -1,4 +1,5 @@
 ## 2026-11-23
+* **Update**: Updated concept `decisions/library-ownership-model.md`.
 * **Update**: Linked `decisions/library-ownership-model.md` to `decisions/library-promote-on-save.md` (Supersedes the where-to-stage question: the staging store is process memory, not api_cache, and promotion carries pre-save read state.).
 * **Creation**: Documented concept `decisions/library-ownership-model.md` (Library ownership: RAM for browse, SQLite for saved, plugin memory marked orphan (planned, openspec library-ownership)).
 * **Update**: Linked `findings/client-painted-classes-fouc.md` to `decisions/library-promote-on-save.md` (Same batch: the grid wipe/SSR work surfaced the FOUC; dim class now server-rendered from status_flags.).

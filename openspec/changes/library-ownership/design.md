@@ -6,9 +6,12 @@
 page URLs, reader position, title_meta, per-pair host fields), plus an LRU bound on pair count.
 No DDL, no second connection, no temp database.
 
-**Why.** Every store call already runs on the single db worker thread, so a plain `std::map` needs no
-lock. A `CREATE TEMP TABLE` would add DDL, prepared statements and bind marshalling for five shapes
-that already have typed structs, and would still share the connection's transaction/busy semantics.
+**Why.** Every store method already opens a `store_detail::OpTrace`, which holds the process-wide
+recursive `db_mutex` for the whole call, so a plain `std::map` is serialized by machinery that exists.
+(Note: store calls are *not* thread-confined — `call_cached` reaches `plugin_enabled`/`api_cache_*`
+from a plugin-pool thread — so the mutex, not the thread, is what makes the map safe.) A
+`CREATE TEMP TABLE` would add DDL, prepared statements and bind marshalling for five shapes that
+already have typed structs, and would still share the connection's transaction/busy semantics.
 "Gone on restart" is satisfied by both; the map is strictly less code.
 
 **Consequence.** Browse state dies with the process (D4). Memory is bounded by the LRU pair cap.
@@ -35,6 +38,9 @@ from the map. The detail envelope path (`apply_chosen` -> `materialize_detail`) 
 lose the exact state the user just built (read 5 chapters, then add the title).
 
 **Consequence.** Save does more writes than a row insert; it stays one transaction and one db task.
+Promotion reads the map **directly**, never through the routed readers: the moment the `saved_manga`
+row exists the routing flips to SQLite, so a routed read during promotion would silently see an empty
+pair.
 
 ## D4. Restart drops browse state
 
