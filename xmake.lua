@@ -388,18 +388,19 @@ task("js")
         os.exec("bun scripts/minbr.ts")
     end)
 
+-- Only the brotli bodies the browser actually receives. Plain .js/.css are
+-- build sources (br_asset always prefers the .br sibling), and the /about-only
+-- docs libs (marked/mermaid ~1.25 MB) stay on disk -- those routes fall back
+-- to disk on a cache miss. Extend the drop list if a new route needs one.
 task("pack-assets")
-    set_menu {usage = "xmake pack-assets", description = "pack templates/ static/ icon/ into assets.zip for [assets] path"}
+    set_menu {usage = "xmake pack-assets", description = "pack used templates + .br statics + tray icon into assets.zip"}
     on_run(function()
-        local stage = "build/assets-root"
         local out = path.absolute("assets.zip")
-        os.rm(stage)
-        os.mkdir(stage .. "/icon")
-        os.cp("templates", stage .. "/templates")
-        os.cp("static", stage .. "/static")
-        os.cp("assets/tray.png", stage .. "/icon/tray.png")
-        os.exec("zip -qr " .. out .. " templates static icon", {curdir = stage})
-        print("packed " .. out)
+        -- -FS = filesync: drop stale entries from earlier archives.
+        os.exec("zip -qr -FS " .. out .. " templates static assets/tray.png")
+        os.exec("zip -qd " .. out ..
+                " 'static/*.js' 'static/*.css' 'static/marked.min.js.br' 'static/mermaid.min.js.br'")
+        print("packed " .. out .. " (brotli bodies only)")
     end)
 
 -- --- gate tasks: prod code only (src/**), tests/third_party untouched ---

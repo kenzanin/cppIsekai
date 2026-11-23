@@ -27,7 +27,8 @@ constexpr std::size_t kMaxBytes = 32u * 1024u * 1024u; // whole asset root ceili
 constexpr std::size_t kMaxFile = 8u * 1024u * 1024u;   // mermaid ~5.5 MB, headroom
 
 bool wanted(std::string_view key) {
-    return key.starts_with("templates/") || key.starts_with("static/") || key.starts_with("icon/");
+    return key.starts_with("templates/") || key.starts_with("static/") ||
+           key.starts_with("icon/") || key == "assets/tray.png";
 }
 
 void add(std::string key, std::string bytes) {
@@ -133,7 +134,10 @@ std::filesystem::path icon_path(const std::string& fallback) {
     if (!g_icon_temp.empty() && std::filesystem::exists(g_icon_temp, ec)) {
         return g_icon_temp;
     }
-    const auto it = g_files.find("icon/tray.png");
+    auto it = g_files.find("icon/tray.png");
+    if (it == g_files.end()) {
+        it = g_files.find("assets/tray.png"); // pack-assets keeps the repo path
+    }
     if (it == g_files.end()) {
         const auto abs = std::filesystem::absolute(fallback, ec);
         return ec ? std::filesystem::path(fallback) : abs;

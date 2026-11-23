@@ -1,4 +1,5 @@
 ## 2026-11-23
+* **Update**: Updated concept `decisions/in-memory-assets-zip.md`.
 * **Update**: Linked `decisions/in-memory-assets-zip.md` to `architecture/cli-config.md` (adds one registry knob with a new readonly flag surfaced through describe() and GET /config).
 * **Update**: Linked `decisions/in-memory-assets-zip.md` to `decisions/static-assets-br.md` (supersedes disk-only brotli asset serving with an optional in-memory zip/folder root; .br bodies are unchanged).
 * **Creation**: Documented concept `decisions/in-memory-assets-zip.md` (Assets: optional in-memory zip/folder root with read-only ini knob).
