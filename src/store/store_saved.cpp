@@ -254,25 +254,6 @@ void Store::unsave_manga(const std::string& plugin, const std::string& slug) {
     auto& st = impl_->storage;
     store_detail::TxGuard tx{st};
     st.begin_transaction();
-    // legacy host/skip|read|total shadows are chapter-id-keyed (no slug): the
-    // pair's ids are the chapters rows below -- sweep their shadows first so
-    // re-add starts flag-fresh (D2 inheritance has nothing to resurrect).
-    // flags on chapters are the canonical state; these keys are write-through
-    // legacy compat (http_api_state/content/reader).
-    auto legacy_ids = st.select(&store_detail::ChapterEntity::chapter_id,
-                                where(c(&store_detail::ChapterEntity::plugin) == plugin &&
-                                      c(&store_detail::ChapterEntity::slug) == slug));
-    if (!legacy_ids.empty()) {
-        std::vector<std::string> shadow_keys;
-        shadow_keys.reserve(legacy_ids.size() * 3);
-        for (const auto& id : legacy_ids) {
-            shadow_keys.push_back(std::string(kSkipPrefix) + id);
-            shadow_keys.push_back(std::string(kReadPrefix) + id);
-            shadow_keys.push_back(std::string(kTotalPrefix) + id);
-        }
-        st.remove_all<store_detail::StateEntity>(where(c(&store_detail::StateEntity::plugin_id) == kStateHost &&
-                                                      in(&store_detail::StateEntity::key, std::move(shadow_keys))));
-    }
     st.remove_all<store_detail::SavedMangaEntity>(
         where(c(&store_detail::SavedMangaEntity::plugin) == plugin &&
               c(&store_detail::SavedMangaEntity::slug) == slug));

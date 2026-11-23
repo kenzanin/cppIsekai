@@ -44,9 +44,9 @@ from local rows only.
 
 `POST /api/library/remove` SHALL delete, besides the `saved_manga` row: the pair's `chapters`,
 `chapter_pages`, `reader_positions`, `update_attempts`, `title_meta` and pair-scoped `plugin_state`
-rows, the pair's `api_cache` envelope rows, and the pair's disk image tree. Legacy chapter-id-keyed
-`host/skip|read|total` shadows swept with the pair's chapter ids; re-adding the pair SHALL equal
-adding a never-opened title.
+rows, the pair's `api_cache` envelope rows, and the pair's disk image tree. Read progress lives on
+the master row (`chapters.read_max`) -- the legacy host shadows are retired and boot-backfilled;
+re-adding the pair SHALL equal adding a never-opened title.
 
 #### Scenario: Remove leaves no pair data
 - **WHEN** a saved manga with chapters, reader position, enrichment chosen and cached envelopes is removed

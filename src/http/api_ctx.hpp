@@ -39,12 +39,9 @@ struct Ctx {
     const config::Overrides& overrides;
 };
 
-// Reserved plugin_state rows for host bookkeeping: per-chapter skip/read
-// flags and the last reader position (the anchor the skip-rerun reads back).
+// Reserved plugin_state rows for host bookkeeping: the last reader position
+// (the anchor the skip-rerun reads back) and per-pair detail flags.
 inline constexpr const char* kStateHost = "host";
-inline constexpr const char* kSkipPrefix = "host/skip/";
-inline constexpr const char* kReadPrefix = "host/read/";
-inline constexpr const char* kTotalPrefix = "host/total/";
 inline constexpr const char* kPositionKey = "host/pos";
 
 // Typed readers for request/state JSON: absent or wrong-typed -> default.

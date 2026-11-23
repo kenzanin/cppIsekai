@@ -97,7 +97,6 @@ void register_state(Ctx& c) {
             }
 
             on_pool(db, [&] {
-                store.state_set(kStateHost, std::string(kSkipPrefix) + id, skipped ? "1" : "0");
                 if (!plugin.empty() && !slug.empty()) {
                     if (skipped) {
                         store.chapter_flags_apply(plugin, slug, {id}, false, std::to_underlying(ChapterFlag::kSkip), 0);
@@ -160,16 +159,17 @@ void register_state(Ctx& c) {
             }
             bool done = false;
             on_pool(db, [&] {
-                store.state_set(kStateHost, std::string(kReadPrefix) + id, std::to_string(page));
                 if (!plugin.empty() && !slug.empty()) {
                     if (page <= 0) {
                         store.chapter_flags_apply(plugin, slug, {id}, false, 0,
                                                   std::to_underlying(ChapterFlag::kRead));
-                    } else if (const int total = store.chapter_pages_count(plugin, slug, id);
-                               total > 0 && page >= total) {
-                        store.chapter_flags_apply(plugin, slug, {id}, false,
-                                                  std::to_underlying(ChapterFlag::kRead), 0);
-                        done = true;
+                    } else {
+                        // read progress lives on the master row (read_max); the
+                        // bit flips host-side at the stored page count.
+                        store.chapter_read_max_bump(plugin, slug, id, page);
+                        if (const int total = store.chapter_pages_count(plugin, slug, id); total > 0 && page >= total) {
+                            done = true;
+                        }
                     }
                 }
                 return 0;
@@ -304,10 +304,13 @@ void register_state(Ctx& c) {
         };
         crow::json::wvalue out;
         on_pool(db, [&] {
-            // chapter-store 3.2: skip/read DONE come from the flags bitfield
-            // (single truth); progress/total/cached stay key/table derived.
+            // chapter-store 3.2: skip/read DONE come from the flags bitfield,
+            // progress from the master row, total from the pages table -- the
+            // legacy host shadows are gone.
             const std::map<std::string, int> flags =
                 plugin.empty() ? std::map<std::string, int>{} : store.chapter_flags_list(plugin, slug);
+            const std::map<std::string, int> read_max =
+                plugin.empty() ? std::map<std::string, int>{} : store.chapter_read_max_list(plugin, slug);
             for (const auto& id : ids) {
                 if (const auto f = flags.find(id); f != flags.end()) {
                     if (f->second & std::to_underlying(ChapterFlag::kSkip)) {
@@ -317,13 +320,11 @@ void register_state(Ctx& c) {
                         out[id]["done"] = true;
                     }
                 }
-                if (const auto r = store.state_get(kStateHost, std::string(kReadPrefix) + id);
-                    r && !r->empty() && *r != "0") {
-                    out[id]["read"] = parse::to_int(*r);
+                if (const auto r = read_max.find(id); r != read_max.end() && r->second > 0) {
+                    out[id]["read"] = r->second;
                 }
-                if (const auto t = store.state_get(kStateHost, std::string(kTotalPrefix) + id);
-                    t && !t->empty() && *t != "0") {
-                    out[id]["total"] = parse::to_int(*t);
+                if (const int t = plugin.empty() ? 0 : store.chapter_pages_count(plugin, slug, id); t > 0) {
+                    out[id]["total"] = t;
                 }
                 if (const auto c2 = cached_for(id); c2 && *c2 > 0) {
                     out[id]["cached"] = *c2;

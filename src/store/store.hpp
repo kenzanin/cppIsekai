@@ -62,14 +62,10 @@ enum class ChapterFlag : unsigned {
     kSkip = 1U << 1, // reader window skips the chapter (legacy "hidden")
 };
 
-/** Reserved plugin_state rows for host bookkeeping: per-chapter skip/read
- *  progress legacy keys (chapter-state D2 inheritance) + the position key.
- *  Flags themselves live in chapters.flags; these remain the progress-count
- *  and legacy-inheritance source. */
+/** Reserved plugin_state rows for host bookkeeping: the position key and
+ *  per-pair detail flags. Legacy per-chapter shadows (host/skip|read|total)
+ *  are gone -- chapters.flags/read_max on the master pair carry all of it. */
 inline constexpr const char* kStateHost = "host";
-inline constexpr const char* kSkipPrefix = "host/skip/";
-inline constexpr const char* kReadPrefix = "host/read/";
-inline constexpr const char* kTotalPrefix = "host/total/";
 inline constexpr const char* kChaptersFpPrefix = "host/chapters_fp/"; // store-contention C3 seed fingerprint
 
 /** One parsed chapter identity for chapters_upsert (chapter-store): the
@@ -214,6 +210,15 @@ public:
                                          const std::string& chapter_id);
     /** \brief chapter_id -> flags for every row of the manga. */
     std::map<std::string, int> chapter_flags_list(const std::string& plugin, const std::string& slug);
+    /** \brief chapter_id -> max page turned (master-held read progress, the
+     *  former host/read shadow). Absent ids read 0 by omission. */
+    std::map<std::string, int> chapter_read_max_list(const std::string& plugin, const std::string& slug);
+    /** \brief Merge progress: read_max = max(read_max, page); the read bit
+     *  flips host-side once it reaches the stored page count (chapter-store
+     *  3.3/D5 -- last page turned == read). Returns the new max; 0 when the
+     *  chapter row is absent. */
+    int chapter_read_max_bump(const std::string& plugin, const std::string& slug, const std::string& chapter_id,
+                              int page);
     /** \brief Stored page-url count (completion threshold); 0 when unparsed. */
     int chapter_pages_count(const std::string& plugin, const std::string& slug, const std::string& chapter_id);
 

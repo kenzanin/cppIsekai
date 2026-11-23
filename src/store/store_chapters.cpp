@@ -72,7 +72,6 @@ int Store::chapters_upsert(const std::string& plugin, const std::string& slug,
     }
     std::vector<store_detail::ChapterEntity> writes;
     writes.reserve(rows.size());
-    int inherited = 0;
     for (const auto& r : rows) {
         if (r.chapter_id.empty()) {
             continue;
@@ -95,24 +94,8 @@ int Store::chapters_upsert(const std::string& plugin, const std::string& slug,
                                       .url = r.url,
                                       .release_at = r.release_at,
                                       .flags = 0,
+                                      .read_max = 0,
                                       .updated_at = now};
-        // chapter-state D2: one-shot legacy inheritance on first sight -- the
-        // host/* keys carry no manga identity, so the parse claiming the id is
-        // the attribution. skip=1 -> bit1; read>=total(>0) -> bit0.
-        std::int64_t legacy = 0;        if (const auto s = state_get(kStateHost, std::string(kSkipPrefix) + r.chapter_id); s && *s == "1") {
-            legacy |= std::to_underlying(ChapterFlag::kSkip);
-        }
-        if (const auto total = state_get(kStateHost, std::string(kTotalPrefix) + r.chapter_id);
-            total && !total->empty() && *total != "0") {
-            if (const auto rd = state_get(kStateHost, std::string(kReadPrefix) + r.chapter_id);
-                rd && !rd->empty()) {
-                if (const int p = parse::to_int(*rd), t = parse::to_int(*total); p >= t && p > 0) {
-                    legacy |= std::to_underlying(ChapterFlag::kRead);
-                }
-            }
-        }
-        e.flags = static_cast<int>(legacy);
-        inherited += legacy != 0 ? 1 : 0;
         writes.push_back(std::move(e));
     }
     if (writes.empty()) {
@@ -126,9 +109,6 @@ int Store::chapters_upsert(const std::string& plugin, const std::string& slug,
     }
     st.replace(store_detail::StateEntity{.plugin_id = kStateHost, .key = fp_key, .value = fp});
     tx.commit();
-    if (inherited > 0) {
-        spdlog::debug("chapter-store: {} legacy flag(s) inherited for {}/{}", inherited, plugin, slug);
-    }
     return static_cast<int>(writes.size());
 }
 
@@ -238,6 +218,51 @@ std::map<std::string, int> Store::chapter_flags_list(const std::string& plugin, 
         out.emplace(std::move(id), flags);
     }
     return out;
+}
+
+std::map<std::string, int> Store::chapter_read_max_list(const std::string& plugin, const std::string& slug) {
+    const store_detail::OpTrace _op{"chapter_read_max_list"};
+    std::map<std::string, int> out;
+    if (plugin.empty() || slug.empty()) {
+        return out;
+    }
+    auto rows = impl_->storage.select(
+        columns(&store_detail::ChapterEntity::chapter_id, &store_detail::ChapterEntity::read_max),
+        where(c(&store_detail::ChapterEntity::plugin) == plugin && c(&store_detail::ChapterEntity::slug) == slug));
+    for (auto& [id, read_max] : rows) {
+        out.emplace(std::move(id), read_max);
+    }
+    return out;
+}
+
+int Store::chapter_read_max_bump(const std::string& plugin, const std::string& slug,
+                                 const std::string& chapter_id, int page) {
+    const store_detail::OpTrace _op{"chapter_read_max_bump"};
+    if (plugin.empty() || slug.empty() || chapter_id.empty() || page < 0) {
+        return 0;
+    }
+    auto rows = impl_->storage.get_all<store_detail::ChapterEntity>(
+        where(c(&store_detail::ChapterEntity::plugin) == plugin && c(&store_detail::ChapterEntity::slug) == slug &&
+              c(&store_detail::ChapterEntity::chapter_id) == chapter_id));
+    if (rows.empty()) {
+        return 0;
+    }
+    auto& e = rows.front();
+    const int now = std::max(e.read_max, page);
+    if (now == e.read_max && (e.flags & std::to_underlying(ChapterFlag::kRead)) != 0) {
+        return now; // nothing to merge, already read
+    }
+    e.read_max = now;
+    // chapter-store 3.3/D5: last page turned == read, no client flagging.
+    // count==0 = pages never parsed; no threshold to reach yet.
+    if ((e.flags & std::to_underlying(ChapterFlag::kRead)) == 0) {
+        if (const int total = chapter_pages_count(plugin, slug, chapter_id); total > 0 && now >= total) {
+            e.flags |= std::to_underlying(ChapterFlag::kRead);
+        }
+    }
+    e.updated_at = std::time(nullptr);
+    impl_->storage.update(e);
+    return now;
 }
 
 int Store::chapter_pages_count(const std::string& plugin, const std::string& slug, const std::string& chapter_id) {

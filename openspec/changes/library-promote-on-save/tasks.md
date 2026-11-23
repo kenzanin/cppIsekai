@@ -41,3 +41,7 @@
       LRU index; route captures the cover before the row goes, purges on the plugin pool
 - [x] 4.3 Tests: store purge leaves neighbours + re-add fresh (`test_store`); cache purge isolation +
       re-writable pair (`test_cache`); full suite green
+- [x] 4.4 Retire the host/skip|read|total shadows: `chapters.read_max` carries read progress
+      (`chapter_read_max_bump`/`_list`, bump flips the read bit at the pages count), the state GET
+      reads flags/read_max/pages table, dual-writes + D2 inheritance removed, boot pass backfills
+      read_max from old shadows then drops the keys

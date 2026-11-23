@@ -953,6 +953,35 @@ TEST_CASE("Store: chapter flags bitfield (chapter-state 1.3-1.6)") {
     }
 }
 
+TEST_CASE("Store: read_max master progress + bump threshold (library-promote-on-save 4.4)") {
+    Store store("test_store.db");
+    const auto run = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+    const std::string plugin = "md", slug = "rm-" + run;
+    store.chapters_upsert(plugin, slug, {ChapterSeed{"c1", 1, "t", "u", ""}, ChapterSeed{"c2", 2, "t", "u", ""}});
+    store.chapter_pages_replace(plugin, slug, "c1", {"p1", "p2", "p3"});
+
+    SUBCASE("bump merges max; auto-read at the stored page count") {
+        CHECK(store.chapter_read_max_bump(plugin, slug, "c1", 2) == 2);
+        CHECK((store.chapter_flags_get(plugin, slug, "c1").value_or(0) & 1) == 0); // 2/3: not done
+        CHECK(store.chapter_read_max_bump(plugin, slug, "c1", 1) == 2); // max stays
+        CHECK(store.chapter_read_max_bump(plugin, slug, "c1", 3) == 3);
+        CHECK((store.chapter_flags_get(plugin, slug, "c1").value_or(0) & 1) != 0); // 3/3: read
+    }
+
+    SUBCASE("read_max survives a re-parse; absent rows read zero") {
+        store.chapter_read_max_bump(plugin, slug, "c1", 2);
+        store.chapters_upsert(plugin, slug, {ChapterSeed{"c1", 1, "t2", "u2", "x"}}); // identity refresh
+        CHECK(store.chapter_read_max_list(plugin, slug)["c1"] == 2);
+        CHECK(store.chapter_read_max_list(plugin, slug)["c2"] == 0);
+        CHECK(store.chapter_read_max_bump(plugin, slug, "nope", 5) == 0);
+    }
+
+    SUBCASE("unsave wipes read_max with the pair") {
+        store.chapter_read_max_bump(plugin, slug, "c1", 2);
+        store.unsave_manga(plugin, slug);
+        CHECK(store.chapter_read_max_list(plugin, slug).empty());
+    }
+}
 TEST_CASE("Store: unsave purges every pair-keyed row (library-promote-on-save 4.1)") {
     Store store("test_store.db");
     const auto run = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
@@ -965,11 +994,6 @@ TEST_CASE("Store: unsave purges every pair-keyed row (library-promote-on-save 4.
     store.upsert_update_attempt(plugin, slug, "ok", "");
     store.title_meta_put_chosen(plugin, slug, R"({"title":"T"})");
     store.state_set("host", std::string("host/novel/") + plugin + "/" + slug, "1");
-    store.state_set("host", "host/skip/" + aid + "x", "1"); // wrong-id shadow, survives
-    store.state_set("host", "host/skip/" + aid, "1");       // pair chapter shadow, swept
-    store.state_set("host", "host/read/" + aid, "3");
-    store.state_set("host", "host/total/" + aid, "5");
-    store.state_set("host", "host/skip/" + bid, "1"); // other slug's shadow survives
     store.state_set("host", "keep-unrelated-" + run, "1");
     // neighbours that must survive: other slug, other plugin, non-pair cache rows
     store.chapters_upsert(plugin, other_slug, {ChapterSeed{bid, 1, "t", "u", ""}});
@@ -987,11 +1011,6 @@ TEST_CASE("Store: unsave purges every pair-keyed row (library-promote-on-save 4.
     CHECK_FALSE(store.update_attempt_get(plugin, slug).has_value());
     CHECK_FALSE(store.title_meta_get(plugin, slug).has_value());
     CHECK_FALSE(store.state_get("host", std::string("host/novel/") + plugin + "/" + slug).has_value());
-    CHECK_FALSE(store.state_get("host", "host/skip/" + aid).has_value());
-    CHECK_FALSE(store.state_get("host", "host/read/" + aid).has_value());
-    CHECK_FALSE(store.state_get("host", "host/total/" + aid).has_value());
-    CHECK(store.state_get("host", "host/skip/" + bid).value_or("") == "1"); // other slug shadow
-    CHECK(store.state_get("host", "host/skip/" + aid + "x").value_or("") == "1"); // wrong-id lookalike
     CHECK(store.state_get("host", "keep-unrelated-" + run).value_or("") == "1");
     CHECK_FALSE(store.api_cache_get(plugin, "h1").has_value());
     CHECK_FALSE(store.api_cache_get(plugin, "h2").has_value());
