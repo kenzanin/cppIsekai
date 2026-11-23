@@ -225,6 +225,22 @@ void register_state(Ctx& c) {
             }
             crow::json::wvalue out;
             auto touched = on_pool(db, [&] { return store.chapter_flags_apply(plugin, slug, ids, all, set, clear); });
+            // Keep the saved row's read rollup in lockstep with the bits the UI
+            // just changed. Waiting for a later detail open is fragile: the
+            // row-served path may have no chapters envelope in api_cache, which
+            // used to leave read_ch stale and the library Done badge dark.
+            const auto all_flags = on_pool(db, [&] { return store.chapter_flags_list(plugin, slug); });
+            if (!all_flags.empty()) {
+                int read = 0;
+                for (const auto& [cid, f] : all_flags) {
+                    if (f & std::to_underlying(ChapterFlag::kRead)) {
+                        ++read;
+                    }
+                }
+                const int total = static_cast<int>(all_flags.size());
+                on_pool(db, [&] { store.saved_stats_update(plugin, slug, "", total); return 0; });
+                on_pool(db, [&] { store.saved_read_rollup(plugin, slug, read, 0); return 0; });
+            }
             out["ok"] = true;
             crow::json::wvalue flags(crow::json::type::Object);
             for (const auto& [cid, f] : touched) {

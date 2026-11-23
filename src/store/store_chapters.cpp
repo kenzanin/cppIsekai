@@ -150,7 +150,8 @@ std::vector<ChapterSeed> Store::chapters_list(const std::string& plugin, const s
                                           .number = c.number,
                                           .title = c.title,
                                           .url = c.url,
-                                          .release_at = c.release_at});
+                                          .release_at = c.release_at,
+                                          .flags = c.flags});
             }
             std::ranges::sort(out, {}, &ChapterSeed::number);
         }
@@ -166,7 +167,8 @@ std::vector<ChapterSeed> Store::chapters_list(const std::string& plugin, const s
                                   .number = r.number,
                                   .title = r.title,
                                   .url = r.url,
-                                  .release_at = r.release_at});
+                                  .release_at = r.release_at,
+                                  .flags = r.flags});
     }
     return out;
 }

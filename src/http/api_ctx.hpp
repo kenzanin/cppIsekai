@@ -243,26 +243,30 @@ inline std::string chapters_row_response(Store& store, BS::thread_pool<>& db, co
         o["title"].data = std::move(r.title);
         o["url"].data = std::move(r.url);
         o["release_at"].data = std::move(r.release_at);
+        // flags: the row is served local-first for saved pairs, so the UI's
+        // done/new badges need the bitfield on the wire. Library-ownership
+        // follow-up: /api/chapters reported no flags (DB says DONE, UI none).
+        o["flags"].data = static_cast<double>(r.flags);
         arr.push_back(std::move(item));
     }
     root["data"] = std::move(arr);
     return glz::write_json(env).value_or(std::string{});
 }
 
-// Read a chapters envelope, count entries flagged read in the store, and
-// write the rollup onto the saved-manga row. No-op when the envelope is
-// missing (a cached-only open must not zero an existing read count).
+// Count flagged-read chapter rows and write the rollup onto the saved-manga
+// row. An absent chapters envelope is NOT a reason to bail: on a row-served
+// detail open the api_cache payload may be NULL/pruned while the rows still
+// hold every flag. The guard is at the end -- skip only when neither the rows
+// nor the envelope learned a chapter count.
 inline void apply_read_rollup(Store& store, BS::thread_pool<>& db, const std::string& plugin, const std::string& slug, const std::string& chapters_env) {
     materialize_chapters(store, db, plugin, slug, chapters_env);
     const auto chs = envelope_data(chapters_env);
-    if (!chs) {
-        return;
-    }
     // chapter-store 1.8: the read rollup counts bit0 rows (single truth), no
     // longer the per-id progress>=pages derive.
     // chapter-store 1.8: the read rollup counts bit0 rows (single truth), no
     // longer the per-id progress>=pages derive.
     int completed = 0;
+    std::size_t total = 0;
     {
         std::map<std::string, int> flags;
         http::on_pool(db, [&] {
@@ -274,11 +278,18 @@ inline void apply_read_rollup(Store& store, BS::thread_pool<>& db, const std::st
                 ++completed;
             }
         }
+        // The chapter rows are the source of truth for the total too. A
+        // row-served detail open can have no chapters envelope in api_cache
+        // (payload NULL/pruned); using that envelope's size left read_ch stale
+        // while every row was flagged read, so Done never lit up. Only an
+        // unsaved pair (flags in the ephemeral store, no rows) falls back.
+        total = (flags.empty() && chs) ? chs->size() : flags.size();
+        if (total == 0) {
+            return; // nothing learned: no rows and no envelope
+        }
     }
-    // The chapters envelope is in hand, so total_ch is refreshed here too:
-    // row-served opens never run the full sync, and a total learned only on
-    // the live path leaves done = read_ch >= total_ch stuck at total 0.
-    const std::size_t total = chs->size();
+    // Keep total_ch fresh on row-served opens: a total learned only on the
+    // live path leaves done = read_ch >= total_ch stuck at total 0.
     http::on_pool(db, [&] {
         store.saved_stats_update(plugin, slug, "", static_cast<int>(total));
         return 0;

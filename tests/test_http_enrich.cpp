@@ -337,6 +337,28 @@ TEST_CASE("enrich: apply_read_rollup heals total_ch and counts done (row-serve p
     CHECK((row->status_flags & 2) != 0); // done
 }
 
+TEST_CASE("enrich: apply_read_rollup counts chapter rows when the chapters envelope is absent (NULL api_cache payload)") {
+    TempRoot root;
+    Store store = store_at(root.path);
+    BS::thread_pool<> db(1);
+    seed_saved(store, "mangadex", "rollup-noenv");
+
+    const std::string env =
+        R"({"ok":true,"data":[{"number":1,"id":"a1"},{"number":2,"id":"b2"}]})";
+    apply_read_rollup(store, db, "mangadex", "rollup-noenv", env); // materialize rows
+    store.chapter_flags_apply("mangadex", "rollup-noenv", {"a1", "b2"}, false, 1, 0);
+
+    // A row-served open with a NULL/pruned api_cache chapters payload used to
+    // hit the envelope guard and leave read_ch stale forever, so Done never
+    // lit up even though every chapter row was flagged read.
+    apply_read_rollup(store, db, "mangadex", "rollup-noenv", "");
+    auto row = store.saved_get("mangadex", "rollup-noenv");
+    REQUIRE(row.has_value());
+    CHECK_EQ(row->total_ch, 2);
+    CHECK_EQ(row->read_ch, 2);
+    CHECK((row->status_flags & 2) != 0); // done
+}
+
 TEST_CASE("promote: save-time promotion materializes cached envelopes; no-cache is a no-op (library-promote-on-save)") {
     TempRoot root;
     Store store = store_at(root.path);

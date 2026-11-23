@@ -70,6 +70,7 @@ struct ChapterSeed {
     std::string title;
     std::string url;        // source href; '' when the envelope omits it
     std::string release_at; // verbatim: epoch seconds, ISO date text, or ''
+    int flags{};            // read/hidden bits; 0 on seeds -- the store keeps them
 };
 
 /** One user-saved manga (library-save): denormalized name/cover so the grid
