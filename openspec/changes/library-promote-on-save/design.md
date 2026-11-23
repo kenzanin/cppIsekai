@@ -73,7 +73,9 @@ machinery.
 search: empty row, cold envelope cache, cold images. Leaving satellites behind would silently
 restore old detail, chosen overlays and the reader position on re-add. Legacy
 `host/skip|read|total` keys stay: they are chapter-id-keyed with no slug, and D2 inheritance
-attributes them on next sight.
+attributes them on next sight. The legacy `host/skip|read|total` shadows are swept too, via the
+pair's chapter ids (the rows about to die) -- after unsave nothing references the pair, and re-add
+starts flag-fresh.
 
 **Consequence.** Unsave is heavier than a one-row delete and destroys curation
 (`title_meta.chosen`) by design. Plugin removal keeps `plugin_prune_absent`; `api_cache` aging
