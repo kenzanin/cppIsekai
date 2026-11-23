@@ -66,6 +66,17 @@ function detailPage() {
         body: JSON.stringify({plugin: this.plugin, slug: this.slug, ids, set: 1})});
         if (r.ok) window.toast('success', `Marked ${ids.length} read`); else window.toast('error', 'update failed'); } catch (e) { window.toast('error', String(e)); }
     },
+    async unmarkNextRead(ch) { // inverse of markPrevRead: this chapter and every canonically-later one
+      this.err = '';
+      const canon = [...this.chapters].sort((a, b) => (a.number || 0) - (b.number || 0));
+      const ids = canon.filter(c => (c.number || 0) >= (ch.number || 0)).map(c => c.id);
+      if (ids.length < 2 || !confirm(`Clear read status on ${ids.length} chapters (this and all later)?`)) return;
+      ids.forEach(id => { this.readState[id] = {...(this.readState[id] || {}), done: undefined}; });
+      try {
+        const r = await fetch('/chapter/flags', {method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({plugin: this.plugin, slug: this.slug, ids, clear: 1})});
+        if (r.ok) window.toast('success', `Cleared ${ids.length} chapters`); else window.toast('error', 'update failed'); } catch (e) { window.toast('error', String(e)); }
+    },
     async toggleDone(ch) {
       this.err = '';
       ch.done = !ch.done;

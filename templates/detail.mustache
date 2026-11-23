@@ -245,6 +245,10 @@
         <button x-show="!isRead(ch)" @click="markPrevRead(ch)" class="shrink-0 text-zinc-500 hover:text-emerald-300" title="mark previous read">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 20 20"><path d="M10 16V5m0 0 4 4m-4-4-4 4M4 3h12" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
+        <!-- inverse: only on read rows -- clear this and every canonically-later chapter -->
+        <button x-show="isRead(ch)" @click="unmarkNextRead(ch)" class="shrink-0 text-zinc-500 hover:text-amber-300" title="clear read from here onward" :aria-label="'Clear read status from chapter ' + chLabel(ch) + ' onward'">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 20 20"><path d="M10 4v11m0 0 4-4m-4 4-4-4M4 17h12" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
         <a x-show="cbzReady[ch.id]" :href="'/export/cbz?plugin='+plugin+'&slug='+encodeURIComponent(slug+'/'+chSlug(ch))"
            class="text-xs h-7 px-2 inline-flex items-center rounded border border-zinc-700 text-zinc-300 hover:bg-zinc-800" title="export cached chapter as cbz">⬇ cbz</a>
         <span x-show="!cbzReady[ch.id]" class="text-xs h-7 px-2 inline-flex items-center rounded border border-zinc-800 text-zinc-500 cursor-not-allowed" title="chapter not fully cached yet">⬇ cbz</span>
