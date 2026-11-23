@@ -1,9 +1,9 @@
 ---
 type: Decision
 title: "Library promotion: api_cache is the staging store; chapters become a read source (planned, openspec library-promote-on-save)"
-description: "PLANNED (openspec library-promote-on-save, 2026-11-23): POST /api/library promotes the already-cached detail+chapters envelopes (api_cache JSONB) onto saved_manga and chapters rows in the save's db task by reusing materialize_detail/materialize_chapters/sync_saved_stats -- no new staging table, no JSON1 column; /api/chapters gains a row-served path backed by a new chapters.release_at column; saved_manga stays master of user state only (satellites are identity-keyed caches, no FK/cascade)."
+description: "IMPLEMENTED (branch library-promote-on-save, 5d6af9d + unsave-purge): POST /api/library promotes cached detail+chapters onto saved_manga/chapters rows via the existing materializers (api_cache = the staging store, no new table); /api/chapters row-served via chapters.release_at; D5 revised: unsave now WIPES the pair (satellites+api_cache via json_extract+disk images via Cache::purge_pair) so re-add equals a fresh add; no FKs, plugin GC + prune unchanged."
 tags: [library, saved_manga, api_cache, chapter-store, local-first, openspec, planned]
-generated: { by: agent/mcp, at: "2026-11-23T04:05:11Z" }
+generated: { by: agent/mcp, at: "2026-11-23T05:20:33Z" }
 status: stable
 ---
 

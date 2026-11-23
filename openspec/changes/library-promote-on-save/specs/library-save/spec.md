@@ -39,3 +39,22 @@ from local rows only.
 #### Scenario: Library open is fully local after add
 - **WHEN** the user opens a promoted entry while the plugin is unreachable and the `api_cache` rows have been pruned
 - **THEN** both `GET /api/detail` and `GET /api/chapters` answer from local rows with `cached:true`
+
+### Requirement: Unsave wipes the pair
+
+`POST /api/library/remove` SHALL delete, besides the `saved_manga` row: the pair's `chapters`,
+`chapter_pages`, `reader_positions`, `update_attempts`, `title_meta` and pair-scoped `plugin_state`
+rows, the pair's `api_cache` envelope rows, and the pair's disk image tree. Legacy chapter-id-keyed
+`host/skip|read|total` state SHALL survive; re-adding the pair SHALL equal adding a never-opened title.
+
+#### Scenario: Remove leaves no pair data
+- **WHEN** a saved manga with chapters, reader position, enrichment chosen and cached envelopes is removed
+- **THEN** none of those rows remain for the pair and its image directory is gone
+
+#### Scenario: Neighbours survive
+- **WHEN** the pair is removed
+- **THEN** other slugs of the same plugin and the same slug under other plugins keep their rows and images
+
+#### Scenario: Re-add equals a fresh add
+- **WHEN** the pair is added again after the remove
+- **THEN** its row carries no display detail and the next detail open pays a cold cache miss

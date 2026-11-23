@@ -59,23 +59,28 @@ cover it or a release-date-only refresh would be short-circuited as "unchanged s
 
 **Consequence.** One column, one migration, no backfill: older rows read `''` until the next parse.
 
-## D5. `saved_manga` is master of user state; satellites stay un-referenced caches
+## D5. Unsave wipes the pair; plugins GC by folder, the scheduler GCes by age
 
-**Decision.** No foreign keys from satellite tables to `saved_manga`, no cascade on unsave. Unsave
-deletes the saved row (and its FTS entry) only.
+**Decision.** `POST /api/library/remove` performs a full pair wipe: one store txn takes the
+`saved_manga` row, `chapters`, `chapter_pages`, `reader_positions`, `update_attempts`, `title_meta`
+and the pair-scoped host keys (`host/novel|detail_url`, chapters fingerprint); the pair's `api_cache`
+rows (exact id + `<slug>:...` page keys via `json_extract`) go on the raw connection; the route then
+calls `Cache::purge_pair` for the disk image tree (`<ns>/manga/<slug_dir>` plus covers hashed from
+the stored cover URL). No foreign keys: the cascade is one explicit store operation, not schema
+machinery.
 
-**Why.** These tables are keyed by the work's identity `(plugin, slug)`, not by a library
-membership; a chapter's read flag, a reader position and an FTS signal are meaningful before and
-after a save. A cascade would throw away exactly the data that makes re-adding instant and would
-need a composite-string-FK migration on a table sqlite_orm cannot `ALTER` cheaply. Plugin removal
-(`plugin_prune_absent`) already GCs every per-plugin table, which is the only deletion that must be
-complete.
+**Why.** The user-facing contract is "unsave = forget", and re-add must equal a fresh add from
+search: empty row, cold envelope cache, cold images. Leaving satellites behind would silently
+restore old detail, chosen overlays and the reader position on re-add. Legacy
+`host/skip|read|total` keys stay: they are chapter-id-keyed with no slug, and D2 inheritance
+attributes them on next sight.
 
-**Consequence.** A title that is opened and never saved leaves `chapters`/`api_cache` rows behind —
-bounded by the existing prune for `api_cache` and by the library's own small scale for the rest. If
-that ever hurts, the upgrade path is one scheduler-tick `DELETE ... WHERE NOT EXISTS (saved_manga)`,
-not a schema change.
+**Consequence.** Unsave is heavier than a one-row delete and destroys curation
+(`title_meta.chosen`) by design. Plugin removal keeps `plugin_prune_absent`; `api_cache` aging
+keeps `cache_prune_expired` for never-saved browsing dust.
 
+ponytail: purge covers via the saved row's URL only -- a chosen-cover image survives until LRU
+eviction; add its URL to the purge list if that ever shows.
 ## D6. Prune behavior is untouched; only the dependency is removed
 
 **Decision.** `cache_prune_expired` keeps its `fetched_at + ttl + 7d` rule. `pages` stays

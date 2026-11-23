@@ -116,6 +116,13 @@ public:
      *  layout + sidecar. nullopt on fetch/write failure. */
     std::optional<std::string> img_ensure(const std::string& key, const CoverCtx& cover_ctx, const PageCtx& page_ctx);
 
+    /** \brief Drop one manga's disk footprint: the pair's whole page tree
+     *  (img/<ns>/manga/<slug_dir>) and every cover hashed from \p cover_urls
+     *  (img/<ns>/cover/<sha16>-*). Index entries leave with their bytes;
+     *  absent paths are fine. Returns the removed entry count. */
+    std::size_t purge_pair(const std::string& plugin, const std::string& slug,
+                           const std::vector<std::string>& cover_urls);
+
     /** \brief Extension-free cover lookup (D1): scan the boot index for
      *  img/<plugin>/covers/<sha1(url)-16>.<ext>; old formats keep serving.
      *  nullopt when absent. */

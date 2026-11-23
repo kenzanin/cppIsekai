@@ -953,6 +953,50 @@ TEST_CASE("Store: chapter flags bitfield (chapter-state 1.3-1.6)") {
     }
 }
 
+TEST_CASE("Store: unsave purges every pair-keyed row (library-promote-on-save 4.1)") {
+    Store store("test_store.db");
+    const auto run = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+    const std::string plugin = "md", slug = "purge-" + run, other_slug = "keep-" + run;
+    store.save_manga(SavedManga{.plugin = plugin, .slug = slug, .name = "Gone"});
+    store.chapters_upsert(plugin, slug, {ChapterSeed{"a1", 1, "t", "u", "2026-01-01"}});
+    store.chapter_pages_replace(plugin, slug, "a1", {"p1"});
+    store.position_set(ReaderPosition{plugin, slug, "a1", 1, 1, "", "", "", 0});
+    store.upsert_update_attempt(plugin, slug, "ok", "");
+    store.title_meta_put_chosen(plugin, slug, R"({"title":"T"})");
+    store.state_set("host", std::string("host/novel/") + plugin + "/" + slug, "1");
+    store.state_set("host", "keep-unrelated-" + run, "1");
+    // neighbours that must survive: other slug, other plugin, non-pair cache rows
+    store.chapters_upsert(plugin, other_slug, {ChapterSeed{"b1", 1, "t", "u", ""}});
+    store.api_cache_put(plugin, "h1", "{\"id\":\"" + slug + "\"}", "{}", 1, 1);
+    store.api_cache_put(plugin, "h2", "{\"id\":\"" + slug + ":c1\"}", "{}", 1, 1); // page-scoped
+    store.api_cache_put(plugin, "h3", "{\"id\":\"other\"}", "{}", 1, 1);
+    store.api_cache_put("otherp", "h4", "{\"id\":\"" + slug + "\"}", "{}", 1, 1);
+
+    store.unsave_manga(plugin, slug);
+
+    CHECK_FALSE(store.saved_get(plugin, slug).has_value());
+    CHECK(store.chapters_list(plugin, slug).empty());
+    CHECK(store.chapter_pages_count(plugin, slug, "a1") == 0);
+    CHECK_FALSE(store.position_get(plugin, slug).has_value());
+    CHECK_FALSE(store.update_attempt_get(plugin, slug).has_value());
+    CHECK_FALSE(store.title_meta_get(plugin, slug).has_value());
+    CHECK_FALSE(store.state_get("host", std::string("host/novel/") + plugin + "/" + slug).has_value());
+    CHECK(store.state_get("host", "keep-unrelated-" + run).value_or("") == "1");
+    CHECK_FALSE(store.api_cache_get(plugin, "h1").has_value());
+    CHECK_FALSE(store.api_cache_get(plugin, "h2").has_value());
+    CHECK(store.api_cache_get(plugin, "h3").has_value());
+    CHECK(store.api_cache_get("otherp", "h4").has_value());
+    CHECK(store.chapter_flags_get(plugin, other_slug, "b1").has_value());
+
+    // re-add starts fresh: row exists, no detail, no chapters
+    store.save_manga(SavedManga{.plugin = plugin, .slug = slug, .name = "Again"});
+    const auto row = store.saved_get(plugin, slug);
+    REQUIRE(row.has_value());
+    CHECK(row->name == "Again");
+    CHECK(row->authors.empty());
+    CHECK(store.chapters_list(plugin, slug).empty());
+}
+
 TEST_CASE("Store: chapters_list order + release_at round-trip/fingerprint (library-promote-on-save)") {
     Store store("test_store.db");
     const auto run = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());

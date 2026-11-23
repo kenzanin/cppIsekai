@@ -30,3 +30,14 @@
 - [x] 3.2 Re-enable the plugin and press ⟳ Update on that entry — `chapters.release_at` refreshed,
       `saved_manga` detail rewritten
 - [x] 3.3 Full `xmake test` green, zero new warnings (`-Wall -Wextra`)
+
+## 4. Unsave wipes the pair
+
+- [x] 4.1 Extend `unsave_manga`: one txn deletes the row + chapters + chapter_pages +
+      reader_positions + update_attempts + title_meta + pair-scoped host keys; raw connection
+      deletes the pair's `api_cache` rows (exact id + `<slug>:...` via `json_extract`) (design D5)
+- [x] 4.2 `Cache::purge_pair(plugin, slug, cover_urls)`: remove the pair's page tree
+      (`<ns>/manga/<slug_dir>`) and cover files (sha16 of the stored cover URL) from disk and the
+      LRU index; route captures the cover before the row goes, purges on the plugin pool
+- [x] 4.3 Tests: store purge leaves neighbours + re-add fresh (`test_store`); cache purge isolation +
+      re-writable pair (`test_cache`); full suite green
