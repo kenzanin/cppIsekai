@@ -21,8 +21,6 @@
 namespace http {
 namespace {
 
-constexpr int kPageSize = 12;
-
 // library-migrate: normalized title key (alnum, lowercased) for the exact-match
 // badge; the corpus is the stored name + every alt title, precomputed here.
 std::string title_key(const std::string& s) {

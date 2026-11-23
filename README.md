@@ -19,7 +19,7 @@ Everything below is implemented and verified against the running daemon.
 
 - **Library** — save manga rows with name/cover, client-side search over title/alt-title/synopsis, 3-state sort with recent-read default, duplicate grouping (`dup_group`) and status flags. Pinned titles get their own section above the library grid. Adding a title promotes whatever the preceding open cached (detail fields, chapter rows, stats) onto local rows in the same tick — no plugin call; removing one wipes the pair (rows, cached envelopes, disk images), so re-adding equals a fresh add from search. Browsing without saving touches no database row at all: chapter state, positions and enrichment for an unsaved title live in process memory and vanish on restart, and are promoted into the library the moment the title is saved. Uninstalling a plugin keeps its library entries as *orphans* (local rows only, refreshed/revived as soon as a plugin with the same id is installed again); they are badged and filterable in the grid and can be purged in one call. Dim+blur covers render dimmed server-side (no unstyled flash on refresh).
 - **Saved-row detail** — detail and the chapter list for saved rows serve from local rows (`saved_manga` display columns, `chapters` identity rows) regardless of cache age — only a cold miss or explicit refresh calls the plugin; enrichment data (MangaDex + a metadata aggregator: authors, artists, tags, synopsis) is materialized onto the row. Chosen alt-title/cover overrides apply on both live-fetch and row-serve paths, and the Fetch detail / Fetch covers wizard can restore the scraper's original values (SRC badge) per field. Novel/text sources are detected via the site's `medium` field: detail shows a badge + warning and the reader button is skipped.
-- **Stale-first fetch** — plugin API responses are cached in `api_cache` (SQLite, with raw-JSONB payload) and served stale-on-error; per-method TTLs come from the plugin manifest (`cache_ttl`, else a host default), expired rows are pruned on the scheduler tick. Image bytes land in a disk LRU under `cache/` (layout v4: `<slug[:40]>-<sha1[:8]>` title dirs, covers and zero-padded page dirs; whole-file eviction on overflow, one-time migration stamp).
+- **Stale-first fetch** — plugin API responses are cached in `api_cache` (SQLite, raw-JSONB payload) and served local-first: any existing row wins, an aged one carries `cached:true`, and the network is used only on a cold miss or an explicit refresh. Per-method TTLs come from the plugin manifest (`cache_ttl`, else a host default); expired rows are pruned on the scheduler tick. Image bytes land in a disk LRU under `cache/img/` — `<ns>/cover/<sha>-<ratio>.<ext>` and `<ns>/manga/<slugdir>/ch<NNN>-<id8>/p<NNN>.<ext>` (zero-padded order = reading order); whole-file eviction on overflow.
 - **Reader** — 10-page window, RTL/LTR, skip-aware, position resumed from the store, prev/next resolved by stable number order + index so duplicate chapter numbers (24a/24b) stay individually reachable; the reader links and prefetches by chapter id (`?ch_id=`), old number-only URLs keep working. Spread modes anchor at the page that was open, ↑/↓ pan the image and only change page at the edge, and zoom values persist per title.
 - **Plugins** — per-site plugin-per-runtime; hosts expose a JSON ABI plus `http.fetch`, `storage.*`, `log.*`, `host.re2`, `host.html`, `host.crypto`, `host.text` (NFKD/casefold, `date_to_iso`) and `host.browser` (see Browser automation).
   - Lua 5.4 (sol2): MangaDex + four aggregator ports (+ metadata-only enrichment sources `enrichment-mangadex`, `enrichment-mangaupdates`)
@@ -31,7 +31,7 @@ Everything below is implemented and verified against the running daemon.
 - **Chapter state & migrate** — read/hidden flags live in one bitfield column per chapter row; bulk mark-all/clear-all and mark-previous from the detail page. Migrate source switches a saved title to another plugin in one transaction, carrying the read boundary and discarding per-page positions. Read progress (max page turned) is a master-row column (`chapters.read_max`) — the legacy `host/skip|read|total` key shadows are retired and boot-backfilled.
 - **Action feedback** — every server-backed button shows a toast and flashes a LED on the clicked control; local-only interactions stay silent.
 - **Maintenance** — VACUUM + snapshot backups on a configurable interval with a keep count (`[backup]` knobs, `GET`/`POST /api/backup`); restore stays a manual stop → copy → start. Optional system-tray with configurable labels/icon, and `xmake scan` runs ASan+UBSan then TSan and restores the release build.
-- **API-first** — 57 routes, all reachable with curl; `/api/logs` exposes the log ring buffer and `/config` exposes the config registry.
+- **API-first** — 58 HTTP routes + one log websocket (`/ws/log`), all reachable with curl; `/api/logs` exposes the log ring buffer and `/config` exposes the config registry.
 - **About page** — renders this README.md live (see below).
 
 ## Architecture
@@ -42,10 +42,11 @@ Everything below is implemented and verified against the running daemon.
 flowchart TB
     UI["Browser — crow templates, Alpine.js, htmx, Tailwind"] --> HTTP
     subgraph daemon["cppIsekai daemon (Crow + asio)"]
-        HTTP["HTTP routes<br/>src/http/"] --> Store[("SQLite<br/>sqlite_orm")]
-        HTTP --> Stale{"Stale-first layer<br/>api_cache + disk LRU"}
-        Stale -- hit --> HTTP
-        Stale -- miss --> Plugins{"Plugin runtime"}
+        HTTP["HTTP routes<br/>src/http/"] --> Store[("SQLite<br/>sqlite_orm<br/>saved_manga is the root")]
+        Store --> Mem[("In-process browse store<br/>unsaved pairs only<br/>gone on restart")]
+        HTTP --> Stale{"Stale-first layer<br/>api_cache (SQLite JSONB)"}
+        Stale -- row exists --> HTTP
+        Stale -- cold miss --> Plugins{"Plugin runtime"}
         Plugins --> Lua["Lua 5.4 · sol2"]
         Plugins --> Wasm["WASM · wasm3"]
         Plugins --> Js["JS · quickjs-ng"]
@@ -69,15 +70,18 @@ flowchart TB
 sequenceDiagram
     participant B as Browser
     participant H as HTTP routes
-    participant S as Stale-first (api_cache + disk LRU)
+    participant S as Stale-first (api_cache, SQLite JSONB)
     participant P as Plugin runtime (Lua/WASM/JS)
     participant X as Manga site
     participant C as Image cache (disk, per-plugin tree)
     participant W as Reader worker (10-page window)
 
     B->>H: GET /view/... + /api/pages
+    alt saved pair (local rows answer, no plugin)
+        H-->>B: row-served envelope (cached:true)
+    else unsaved / cold
     H->>S: envelope (detail/chapters/pages)
-    alt cache hit
+    alt cache row exists
         S-->>H: cached envelope
     else miss
         S->>P: call handler
@@ -87,6 +91,7 @@ sequenceDiagram
         S-->>H: envelope (persisted)
     end
     H-->>B: page URLs (/cache/img) + prev/next
+    end
 
     B->>H: GET /cache/img/…
     H->>C: img_ensure(key, page_ctx)
@@ -132,18 +137,19 @@ Manifest knob: `"image_referer": "none"` sends image fetches with no `Referer` a
 
 ## Database
 
-One SQLite file (`data/library.db`), one connection, all store access funneled through `src/store/` — plugins never touch SQLite directly (host `storage.*` only). Relationships are **logical** keys (`plugin` columns hold the plugin slug); the only enforced FK is `title.plugin_id → plugin.id`.
+One SQLite file (`data/library.db`), one long-lived ORM connection (plus short raw opens for the JSONB and raw-SQL paths), all store access funneled through `src/store/` — plugins never touch SQLite directly (host `storage.*` only). There are **no enforced foreign keys**: every relationship is a logical key on the string pair `(plugin, slug)`, and `saved_manga` is the root of the data the user keeps. For a pair with no saved row the store keeps its browse state in process memory instead, so no child row can exist without a master row.
 
 ```mermaid
 erDiagram
-    plugin ||--o{ plugin_state : "host keys (novel/detail_url/fp/pos)"
-    plugin ||--o{ api_cache : "shaped by params_json"
-    plugin ||--o{ saved_manga : "rows the user keeps"
-    saved_manga ||--o{ chapters : "per-pair identity + state"
+    plugin ||--o{ plugin_state : "plugin-owned keys (cookies, tokens)"
+    plugin ||--o{ api_cache : "envelopes, shaped by params_json"
+    plugin ||--o{ saved_manga : "source of the saved rows"
+    saved_manga ||--o{ chapters : "identity + flags + read_max"
     chapters ||--o{ chapter_pages : "page urls"
-    plugin ||--o{ title_meta : "enrichment payloads"
-    plugin ||--o{ update_attempts : "fetch backoff"
-    plugin ||--o{ reader_positions : "resume state"
+    saved_manga ||--o{ reader_positions : "resume state"
+    saved_manga ||--o{ title_meta : "enrichment fetched/chosen"
+    saved_manga ||--o{ update_attempts : "fetch backoff"
+    saved_manga ||--o{ library_fts : "FTS5 mirror (name/alt/synopsis)"
 
     plugin {
         int id PK
@@ -157,15 +163,24 @@ erDiagram
         string slug PK
         string name
         string cover
+        int added_at
         string status
         int total_ch
         int read_ch
-        string authors
-        string tags
-        string synopsis_display
+        int last_read_at
+        int updated_at
+        string synopsis
+        string alt_titles
         int dup_group
         int status_flags
+        string authors
+        string artists
+        string tags
+        string synopsis_display
         int pinned
+        string chapters_fp
+        int novel
+        string detail_url
     }
     title_meta {
         string plugin PK
@@ -188,6 +203,8 @@ erDiagram
         real chapter_number
         int page
         string mode
+        string direction
+        string zoom
         int updated_at
     }
     chapters {
@@ -212,11 +229,21 @@ erDiagram
         string key PK
         string value
     }
+    library_fts {
+        string plugin UNINDEXED
+        string slug UNINDEXED
+        string name
+        string alt_titles
+        string synopsis
+    }
     note for plugin_state "plugin-owned hosting keys only;<br/>removal GCs these and the registry, never the library"
+    note for saved_manga "root of user data:<br/>children are written only when this row exists"
     update_attempts {
         string plugin PK
         string slug PK
         int last_attempt_at
+        string outcome
+        string error
         int consecutive_errors
         int backoff_until
     }
@@ -261,7 +288,7 @@ erDiagram
 - **Config** — one registry (`src/config/`): CLI flag + `CPPISEKAI_*` env + ini layers; precedence default < ini < env < flag. `--dump-config` renders the template, `POST /config` merge-saves.
 - **Store ownership** — `saved_manga` is the root of everything the user keeps (chapters+flags+read_max, page URLs, position, enrichment, per-pair host fields as columns). A pair with no saved row routes to an in-process map instead of SQLite (`saved_exists` dispatch, LRU-bounded), so browse traffic can never orphan rows; a save promotes that map in one transaction. Orphan state is derived from the plugin registry, never stored.
 - **Plugin ABI** — JSON-text in/out; single wrap point `call_cached` (`cached:true` stale-serve). Host-wide `CURLOPT_PROXY` via `plugin::applyProxy`.
-- **Cache layout v4** — `<plugin>/<slug[:40]>-<sha1(slug)[:8]>/covers/<file>` and `<plugin>/<slugdir>/<ch>/<pNNN>.<ext>` (zero-padded order = reading order), stale `api/<sha>.json` on disk plus the `api_cache` table; boot migrates the old tree once via the `.cache-v4-slugdir` stamp.
+- **Cache layout v4** — covers `<ns>/cover/<sha1(url)[:16]>-<ratio4>.<ext>`, pages `<ns>/manga/<slug[:40]>-<sha1(slug)[:8]>/ch<NNN>[-<id8>]/p<NNN>.<ext>` (zero-padded order = reading order), where `<ns>` is the plugin's display-name slug; the api layer is the `api_cache` table only (no on-disk api pool). Boot migrates the old tree once via the `.cache-v4-slugdir` stamp.
 - **Build** — glaze/clang story: the toolchain is clang (`xmake f -m release`); see `knowledge/constraints/test-binary-releasedbg-vs-release` for why `xmake test` runs the releasedbg binary. Handy tasks: `xmake js` (minify + brotli the static assets), `xmake doc` (clang-doc HTML, or `XMAKE_DOC_FORMAT=md` for grep-friendly markdown), `xmake scan` (ASan+UBSan then TSan, always restores release), `xmake gate` (full gate).
 - **Diagrams** — this file is the single source for GitHub and the in-app About page; Mermaid blocks render natively on GitHub and in-app via mermaid.js. Keep diagrams as ` ```mermaid ` fenced blocks.
 

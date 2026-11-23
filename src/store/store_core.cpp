@@ -104,8 +104,9 @@ Store::Store(const std::string& path) : impl_(std::make_unique<StoreImpl>(path))
     // attached and surface SQLITE_BUSY as a thrown std::system_error
     // (test_store 2.2 abort, state_set i0). Also skips per-op open/close churn.
     impl_->storage.open_forever();
-    // FK: pragma_t has no foreign_keys setter in v1.9.1; make_storage enables it
-    // automatically because the schema declares a foreign_key.
+    // No FK: the schema declares none (title.plugin_id went with the legacy
+    // title table), so make_storage has nothing to enforce; every relationship
+    // is a logical (plugin, slug) key.
     //
     // The saved_manga migration runs BEFORE sync_schema: sqlite_orm drops db
     // columns the storage schema does not map, so an unmapped has_update would
