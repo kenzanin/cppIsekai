@@ -1,6 +1,7 @@
 #include "enrich_internal.hpp"
 #include "http_routes.hpp"
 
+#include "assets/assets.hpp"
 #include "plugin/url_codec.hpp"
 
 #include <glaze/glaze.hpp>
@@ -349,24 +350,40 @@ void br_asset(const crow::request& req, crow::response& res, const char* path, c
     // top of the brotli body (browser decodes gzip, gets brotli, JS explodes).
     const std::string ae = req.get_header_value("Accept-Encoding");
     const bool wants_br = ae.contains("br");
-    // Vendored assets ship .br only; fall back to it even for clients that
-    // did not advertise br (brotli is universal in modern browsers).
-    std::string file = wants_br ? std::string(path) + ".br" : std::string(path);
-    std::ifstream f(file, std::ios::binary);
-    bool served_br = wants_br;
-    if (!f) {
-        file = std::string(path) + ".br";
-        f.open(file, std::ios::binary);
+    std::string body;
+    bool served_br = false;
+    bool found = false;
+    // [assets] in-memory root wins when present; .br first, plain next.
+    if (const auto* mem = assets::read(std::string(path) + ".br")) {
+        body = *mem;
         served_br = true;
+        found = true;
+    } else if (const auto* mem = assets::read(path)) {
+        body = *mem;
+        found = true;
+    }
+    if (!found) {
+        // Vendored assets ship .br only; fall back to it even for clients that
+        // did not advertise br (brotli is universal in modern browsers).
+        std::string file = wants_br ? std::string(path) + ".br" : std::string(path);
+        std::ifstream f(file, std::ios::binary);
+        if (!f) {
+            file = std::string(path) + ".br";
+            f.open(file, std::ios::binary);
+            served_br = true;
+        } else {
+            served_br = wants_br;
+        }
         if (!f) {
             res.code = 404;
             res.end();
             return;
         }
+        std::stringstream ss;
+        ss << f.rdbuf();
+        body = ss.str();
     }
-    std::stringstream ss;
-    ss << f.rdbuf();
-    res.body = ss.str();
+    res.body = std::move(body);
     res.compressed = false; // precompressed (br or plain bytes) — never re-deflate
     res.set_header("Content-Type", mime);
     if (served_br) {

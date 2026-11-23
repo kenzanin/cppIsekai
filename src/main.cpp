@@ -1,4 +1,5 @@
 #include "main.hpp"
+#include "assets/assets.hpp"
 #include "tray.hpp"
 
 int main(int argc, char** argv) {
@@ -128,11 +129,13 @@ int main(int argc, char** argv) {
     update::Scheduler scheduler{store, db_pool, plugin_pool, plugins, ini_path, overrides};
     scheduler.start();
 
+    assets::init(cfg.assets_path); // in-memory asset root when [assets] path is set
     spdlog::info("cppIsekai listening on :{} (config: {})", cfg.port, ini_path);
     tray::start(cfg); // detached UI thread; no-op headless or [tray] enabled=0
     serve(store, db_pool, plugin_pool, plugins, logs, images, cfg.port, ini_path, overrides, cfg.templates_dir);
     scheduler.stop();
     browser::shutdown(); // app-owned child only; adopted externals survive (D12)
+    assets::shutdown();  // drop in-memory assets + temp tray icon
     if (tray::restart_requested) // tray-initiated: respawn once teardown is done
         tray::detail::spawn("exec ./run-cppIsekai.sh restart >>/tmp/cppisekai-restart.log 2>&1");
     running.store(false);

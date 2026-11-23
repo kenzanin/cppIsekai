@@ -292,6 +292,13 @@ cxx_bin("test_config", {
     test = true,
 })
 
+cxx_bin("test_assets", {
+    files = {"tests/test_assets.cpp", "src/assets/assets.cpp"},
+    incs = {"src"},
+    reqs = {"crow", "libzippp", "spdlog"},
+    test = true,
+})
+
 cxx_bin("test_http_img", {
     files = {"tests/test_http_img.cpp", CACHE_SRC},
     incs = {"src"},
@@ -379,6 +386,20 @@ task("js")
     set_menu {usage = "xmake js", description = "minify+brotli static/*.js + compile Tailwind CSS -> static/app.css via scripts/minbr.ts"}
     on_run(function()
         os.exec("bun scripts/minbr.ts")
+    end)
+
+task("pack-assets")
+    set_menu {usage = "xmake pack-assets", description = "pack templates/ static/ icon/ into assets.zip for [assets] path"}
+    on_run(function()
+        local stage = "build/assets-root"
+        local out = path.absolute("assets.zip")
+        os.rm(stage)
+        os.mkdir(stage .. "/icon")
+        os.cp("templates", stage .. "/templates")
+        os.cp("static", stage .. "/static")
+        os.cp("assets/tray.png", stage .. "/icon/tray.png")
+        os.exec("zip -qr " .. out .. " templates static icon", {curdir = stage})
+        print("packed " .. out)
     end)
 
 -- --- gate tasks: prod code only (src/**), tests/third_party untouched ---

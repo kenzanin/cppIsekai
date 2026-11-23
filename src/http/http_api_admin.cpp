@@ -263,6 +263,7 @@ void register_admin(Ctx& c) {
             k["default"] = d.def;
             k["value"] = d.value;
             k["source"] = d.source;
+            k["readonly"] = d.readonly;
             knobs[i++] = std::move(k);
         }
         crow::json::wvalue out;
@@ -291,6 +292,13 @@ void register_admin(Ctx& c) {
         std::string parse_err;
         if (!config::parse_updates(req.body, updates, parse_err)) {
             return fail(400, parse_err);
+        }
+        // Registry-declared read-only knobs (e.g. [assets] path) cannot be
+        // changed through HTTP either -- the UI is not the only client.
+        for (const auto& d : config::describe(ini_path, overrides_ref)) {
+            if (d.readonly) {
+                updates.erase(d.full_key);
+            }
         }
 
         std::string err;

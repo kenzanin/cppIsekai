@@ -17,3 +17,6 @@ compile_commands.json
 .tmp-*
 session-*.md
 docs/api/
+
+# generated in-memory asset archive (xmake pack-assets)
+assets.zip

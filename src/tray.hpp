@@ -17,6 +17,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include "assets/assets.hpp"
 #include "config/config.hpp"
 
 #include <atomic>
@@ -71,10 +72,10 @@ inline void start(const config::Config& cfg) {
     // path ("assets/tray.png") looks like a missing theme name and the item comes
     // up blank; an absolute path is loaded straight from file. Wayland hosts took
     // the relative form, hence "works on Wayland, invisible on X11".
-    std::string icon = cfg.tray_icon;
+    // [assets] memory mode exposes the icon through a temp file (GTK needs a
+    // real path); disk mode keeps the configured absolute path.
     std::error_code ec;
-    const auto abs = std::filesystem::absolute(icon, ec);
-    if (!ec && std::filesystem::exists(abs)) icon = abs.string();
+    std::string icon = assets::icon_path(cfg.tray_icon).string();
     std::thread([port = cfg.port, icon, title = cfg.tray_title, label = cfg.tray_label,
                  open_label = cfg.tray_open_label, restart_label = cfg.tray_restart_label,
                  stop_label = cfg.tray_stop_label] {

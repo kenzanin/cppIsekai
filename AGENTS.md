@@ -51,6 +51,7 @@ xmake test                          # full suite (doctest)
 xmake test <target>                 # single target, e.g. xmake test test_store
 xmake doc                           # clang-doc docs for src/ -> docs/api/{html,md} (gitignored; XMAKE_DOC_FORMAT=md for markdown)
 xmake js                            # minify+brotli static/*.js + compile Tailwind CSS -> static/app.css{.br}
+xmake pack-assets                   # pack templates/ static/ icon/ -> assets.zip for [assets] path (in-memory root)
 ./run-cppIsekai.sh                   # run (bare boot refuses with usage; --help exit 0)
 ```
 

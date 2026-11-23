@@ -23,10 +23,11 @@ struct Entry {
     const char* doc;
     Type type;
     long long min_value = 0; // lower bound for numeric knobs; 0 = no bound (docs/tests rely on designated initializers)
+    bool readonly = false;   // UI shows the value but never lets it be edited/saved
 };
 
 // Order is the projection order consumed by config.hpp -- do not reorder.
-inline constexpr std::array<Entry, 30> kEntries{
+inline constexpr std::array<Entry, 31> kEntries{
     {
         // section      key                   flag                 alias          env def doc
         // type
@@ -335,6 +336,17 @@ inline constexpr std::array<Entry, 30> kEntries{
             .def = "Stop server",
             .doc = "Menu entry that stops the daemon",
             .type = Type::Str,
+        },
+        {
+            .section = "assets",
+            .key = "path",
+            .flag = "",
+            .alias = "",
+            .env = "CPPISEKAI_ASSETS_PATH",
+            .def = "",
+            .doc = "Asset root: .zip archive or folder with templates/, static/, icon/; empty = repo layout (read-only, restart to apply)",
+            .type = Type::Str,
+            .readonly = true,
         },
     },
 };

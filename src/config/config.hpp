@@ -54,6 +54,7 @@ struct Config {
     std::string tray_open_label;    // [tray] open_label: open-reader entry
     std::string tray_restart_label; // [tray] restart_label: restart entry
     std::string tray_stop_label;    // [tray] stop_label: stop entry
+    std::string assets_path;        // [assets] path: zip archive or folder root, empty = repo layout
 };
 
 // Per-knob CLI state. Explicit = opt->count() > 0 (D7), never value comparison;
@@ -142,6 +143,7 @@ inline Config to_config(const std::array<std::string, kEntryCount>& v) {
     c.tray_open_label = v[27];
     c.tray_restart_label = v[28];
     c.tray_stop_label = v[29];
+    c.assets_path = v[30];
     if (c.port <= 0) {
         c.port = num_or<int>(kEntries[0].def, kEntries[0].def); // design ceiling: port > 0
     }
@@ -158,6 +160,7 @@ inline Config to_config(const std::array<std::string, kEntryCount>& v) {
 struct Describe {
     std::string section, key, full_key, doc, flag, env, def, value, source;
     Type type{};
+    bool readonly{};
 };
 
 inline std::vector<Describe> describe(
@@ -178,6 +181,7 @@ inline std::vector<Describe> describe(
         d.env = e.env;
         d.def = e.def;
         d.type = e.type;
+        d.readonly = e.readonly;
         d.value = e.def;
         d.source = "default";
         if (have_ini) {

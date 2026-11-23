@@ -1,7 +1,7 @@
 <script>
 function settingsPage() {
   const RESTART = new Set(['server.port', 'paths.library', 'paths.log_file', 'paths.data_dir', 'paths.templates_dir',
-                           'cache.cache_max_mb', 'cache.image_format', 'cache.cover_max_px', 'log.level']);
+                           'cache.cache_max_mb', 'cache.image_format', 'cache.cover_max_px', 'log.level', 'assets.path']);
   const LIVE = new Set(['plugin.fetch_profile', 'update.interval_days', 'update.per_plugin_limit', 'update.request_delay_ms',
                          'backup.interval_h', 'backup.keep']);
   // fetch_profile options come from the ini ([plugin] fetch_profiles), surfaced as
@@ -26,7 +26,7 @@ function settingsPage() {
     sections() { return [...new Set(this.knobs.map(k => k.section))]; },
     sourceOf(k) { return k.source; },
     enumOf(k) { return k.fullKey === 'plugin.fetch_profile' ? this.fetchProfiles : (ENUMS[k.fullKey] || null); },
-    readOnly(k) { return k.source === 'env' || k.source === 'flag'; },
+    readOnly(k) { return k.source === 'env' || k.source === 'flag' || k.readonly === true; },
     patched() {
       const out = {};
       for (const [key, value] of Object.entries(this.dirty)) {

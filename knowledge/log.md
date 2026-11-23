@@ -1,4 +1,7 @@
 ## 2026-11-23
+* **Update**: Linked `decisions/in-memory-assets-zip.md` to `architecture/cli-config.md` (adds one registry knob with a new readonly flag surfaced through describe() and GET /config).
+* **Update**: Linked `decisions/in-memory-assets-zip.md` to `decisions/static-assets-br.md` (supersedes disk-only brotli asset serving with an optional in-memory zip/folder root; .br bodies are unchanged).
+* **Creation**: Documented concept `decisions/in-memory-assets-zip.md` (Assets: optional in-memory zip/folder root with read-only ini knob).
 * **Update**: Linked `findings/enrichment-search-title-mismatch.md` to `decisions/library-ownership-model.md` (Follow-up: the orphan gate must treat loaded-but-unregistered enrichment runtimes as live.).
 * **Creation**: Documented concept `findings/enrichment-search-title-mismatch.md` ('Capped at 5 covers' was a stale candidate plus a title the source does not index).
 * **Update**: Linked `findings/browse-writes-nothing-orphan-free.md` to `decisions/library-ownership-model.md` (Evidence for the implemented model: 73% of chapter rows were browse dust before the routing change.).
