@@ -229,3 +229,131 @@ When the detail API serves a resolved envelope for a saved manga and the resolve
 #### Scenario: Plugin unreachable on re-add
 - **WHEN** a saved manga without stored detail is re-added while its plugin is unreachable and the page submits the slug as the name
 - **THEN** the stored name is left as-is
+
+### Requirement: Browse data is ephemeral
+
+Data produced for a pair with no `saved_manga` row SHALL be held in process memory, not in the
+database: chapter identities with flags/read_max, page URLs, reader position, enrichment rows and the
+per-pair host fields. A daemon restart SHALL discard it. Store methods SHALL keep their signatures; the
+routing between memory and SQLite is internal.
+
+#### Scenario: Browsing writes nothing to SQLite
+- **WHEN** a title from search is opened, read and left unsaved
+- **THEN** no `chapters`, `chapter_pages`, `reader_positions` or `title_meta` row exists for the pair, while the reader and the detail page work normally
+
+#### Scenario: Restart clears browse state
+- **WHEN** the daemon restarts after browsing an unsaved title
+- **THEN** that title starts with no flags, no progress and no position
+
+#### Scenario: Saved pairs are unaffected
+- **WHEN** a saved pair is read after a restart
+- **THEN** its flags, read_max and position are the ones stored before the restart
+
+### Requirement: Saving promotes the browse state
+
+`POST /api/library` SHALL move the pair's ephemeral state into SQLite in one transaction: chapter
+identities with their `flags` and `read_max`, page URL rows, reader position, enrichment rows and the
+per-pair host fields, then release the memory entry. Chapter reads produced before saving SHALL survive.
+
+#### Scenario: Read five chapters then save
+- **WHEN** the user reads five chapters of an unsaved title and then adds it to the library
+- **THEN** those five chapters carry their read marks and page progress into the saved rows and the library shows the matching read count
+
+#### Scenario: Promotion needs no network
+- **WHEN** the plugin is unreachable at the moment of saving
+- **THEN** promotion still completes from memory and cached envelopes
+
+### Requirement: Removed plugins retain their library entries
+
+When a scan finds a registered plugin id with no folder, the host SHALL delete only that plugin's
+caches and registry row (`title`, `api_cache`, `plugin_state` for the id, then the `plugin` row). Every
+`saved_manga` row and its children SHALL be retained. The retained entries SHALL be reported as
+`orphan` and SHALL serve from local rows without any plugin call.
+
+#### Scenario: Plugin folder deleted
+- **WHEN** a plugin folder is removed and the library is next scanned
+- **THEN** the plugin leaves the registry while its saved titles, chapter rows and positions remain
+
+#### Scenario: Orphan behaves like offline
+- **WHEN** an orphan entry's detail page is opened while the plugin is absent
+- **THEN** the page renders from local rows with the cached badge and makes no plugin call
+
+#### Scenario: Reinstall revives entries
+- **WHEN** a plugin with the same id is installed again
+- **THEN** its retained entries are live again with no migration and no write to the library rows
+
+### Requirement: Orphan entries are visible, migratable and purgeable
+
+`GET /api/library` SHALL report each entry's upstream state (live, offline, orphan). The grid SHALL
+render an orphan badge and offer an orphan filter. `POST /api/library/purge-orphans` SHALL delete every
+orphan pair through the existing remove path (rows, cached envelopes, disk images).
+
+#### Scenario: Orphan badge and filter
+- **WHEN** the library contains an entry whose plugin is absent
+- **THEN** its card shows the orphan badge and the orphan filter selects only such cards
+
+#### Scenario: Purge orphans
+- **WHEN** `POST /api/library/purge-orphans` runs
+- **THEN** every orphan pair's rows, cached envelopes and images are gone and live entries are untouched
+
+#### Scenario: Migrating an orphan
+- **WHEN** the user migrates an orphan entry to a live plugin
+- **THEN** the library row is rekeyed and the orphan state disappears
+
+### Requirement: Adding a manga promotes its cached detail
+
+`POST /api/library` SHALL promote the title's cached detail onto its saved row within the save's db
+task: `name`, `cover`, `authors`, `artists`, `tags`, `synopsis_display` from the cached,
+chosen-merged `detail` envelope. It SHALL reuse the existing materialization helpers, be idempotent
+(unchanged values are not rewritten), and call no plugin. With no cached envelope it SHALL be a
+no-op, leaving the lazy resolve-on-open path in place.
+
+#### Scenario: Add right after opening the title
+- **WHEN** a title's detail page was opened and the user then adds it to the library
+- **THEN** its `saved_manga` row carries `authors`, `artists`, `tags` and `synopsis_display` before the next open
+
+#### Scenario: Add with nothing cached
+- **WHEN** `POST /api/library` runs for a pair with no `api_cache` row
+- **THEN** the saved row is written with the submitted name/cover, the display detail stays empty, and the next detail open resolves and materializes it
+
+#### Scenario: Promotion needs no network
+- **WHEN** the plugin is disabled or unreachable at the moment of saving
+- **THEN** the promotion still completes from local rows and no plugin call is attempted
+
+#### Scenario: Re-add does not rewrite unchanged rows
+- **WHEN** an already-promoted entry is saved again with identical cached data
+- **THEN** no display-detail column is rewritten
+
+### Requirement: Adding a manga promotes its chapters and stats
+
+The same save SHALL promote the cached `chapters` envelope into chapter identity rows for the pair
+and write the `status`/`total_ch` stats, so a promoted entry answers detail and chapter-list reads
+from local rows only.
+
+#### Scenario: Chapter rows exist right after add
+- **WHEN** a title with a cached chapters envelope is added to the library
+- **THEN** `chapters` rows exist for the pair without any plugin call
+
+#### Scenario: Library open is fully local after add
+- **WHEN** the user opens a promoted entry while the plugin is unreachable and the `api_cache` rows have been pruned
+- **THEN** both `GET /api/detail` and `GET /api/chapters` answer from local rows with `cached:true`
+
+### Requirement: Unsave wipes the pair
+
+`POST /api/library/remove` SHALL delete, besides the `saved_manga` row: the pair's `chapters`,
+`chapter_pages`, `reader_positions`, `update_attempts`, `title_meta` and pair-scoped `plugin_state`
+rows, the pair's `api_cache` envelope rows, and the pair's disk image tree. Read progress lives on
+the master row (`chapters.read_max`) -- the legacy host shadows are retired and boot-backfilled;
+re-adding the pair SHALL equal adding a never-opened title.
+
+#### Scenario: Remove leaves no pair data
+- **WHEN** a saved manga with chapters, reader position, enrichment chosen and cached envelopes is removed
+- **THEN** none of those rows remain for the pair and its image directory is gone
+
+#### Scenario: Neighbours survive
+- **WHEN** the pair is removed
+- **THEN** other slugs of the same plugin and the same slug under other plugins keep their rows and images
+
+#### Scenario: Re-add equals a fresh add
+- **WHEN** the pair is added again after the remove
+- **THEN** its row carries no display detail and the next detail open pays a cold cache miss
