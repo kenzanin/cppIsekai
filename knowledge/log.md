@@ -1,4 +1,6 @@
 ## 2026-11-23
+* **Update**: Linked `findings/client-painted-classes-fouc.md` to `decisions/library-promote-on-save.md` (Same batch: the grid wipe/SSR work surfaced the FOUC; dim class now server-rendered from status_flags.).
+* **Creation**: Documented concept `findings/client-painted-classes-fouc.md` (Client-side class painting after a fetch = FOUC; SSR the class instead).
 * **Update**: Updated concept `decisions/library-promote-on-save.md`.
 * **Update**: Linked `decisions/library-promote-on-save.md` to `decisions/api-cache-null-payload.md` (Promotion treats a NULL/empty payload row as nothing cached (no-op), same miss rule.).
 * **Update**: Linked `decisions/library-promote-on-save.md` to `architecture/local-first-reads.md` (Closes the gap where a saved title's chapters still depended on api_cache age for local-first reads.).

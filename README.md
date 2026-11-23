@@ -17,8 +17,8 @@ Server base URL: `http://localhost:8090`. Port precedence: `--port` > `$PORT` > 
 
 Everything below is implemented and verified against the running daemon.
 
-- **Library** — save manga rows with name/cover, client-side search over title/alt-title/synopsis, 3-state sort with recent-read default, duplicate grouping (`dup_group`) and status flags. Pinned titles get their own section above the library grid.
-- **Saved-row detail** — detail/chapters for saved rows serve from SQLite without calling the plugin; enrichment data (MangaDex + a metadata aggregator: authors, artists, tags, synopsis) is materialized onto the row. Chosen alt-title/cover overrides apply on both live-fetch and row-serve paths, and the Fetch detail / Fetch covers wizard can restore the scraper's original values (SRC badge) per field. Novel/text sources are detected via the site's `medium` field: detail shows a badge + warning and the reader button is skipped.
+- **Library** — save manga rows with name/cover, client-side search over title/alt-title/synopsis, 3-state sort with recent-read default, duplicate grouping (`dup_group`) and status flags. Pinned titles get their own section above the library grid. Adding a title promotes whatever the preceding open cached (detail fields, chapter rows, stats) onto local rows in the same tick — no plugin call; removing one wipes the pair (rows, cached envelopes, disk images), so re-adding equals a fresh add from search. Dim+blur covers render dimmed server-side (no unstyled flash on refresh).
+- **Saved-row detail** — detail and the chapter list for saved rows serve from local rows (`saved_manga` display columns, `chapters` identity rows) regardless of cache age — only a cold miss or explicit refresh calls the plugin; enrichment data (MangaDex + a metadata aggregator: authors, artists, tags, synopsis) is materialized onto the row. Chosen alt-title/cover overrides apply on both live-fetch and row-serve paths, and the Fetch detail / Fetch covers wizard can restore the scraper's original values (SRC badge) per field. Novel/text sources are detected via the site's `medium` field: detail shows a badge + warning and the reader button is skipped.
 - **Stale-first fetch** — plugin API responses are cached in `api_cache` (SQLite, with raw-JSONB payload) and served stale-on-error; per-method TTLs come from the plugin manifest (`cache_ttl`, else a host default), expired rows are pruned on the scheduler tick. Image bytes land in a disk LRU under `cache/` (layout v4: `<slug[:40]>-<sha1[:8]>` title dirs, covers and zero-padded page dirs; whole-file eviction on overflow, one-time migration stamp).
 - **Reader** — 10-page window, RTL/LTR, skip-aware, position resumed from the store, prev/next resolved by stable number order + index so duplicate chapter numbers (24a/24b) stay individually reachable; the reader links and prefetches by chapter id (`?ch_id=`), old number-only URLs keep working. Spread modes anchor at the page that was open, ↑/↓ pan the image and only change page at the edge, and zoom values persist per title.
 - **Plugins** — per-site plugin-per-runtime; hosts expose a JSON ABI plus `http.fetch`, `storage.*`, `log.*`, `host.re2`, `host.html`, `host.crypto`, `host.text` (NFKD/casefold, `date_to_iso`) and `host.browser` (see Browser automation).
@@ -28,7 +28,7 @@ Everything below is implemented and verified against the running daemon.
   - one WASM reader port is kept as a reference build; the maintained path for that site is its Lua plugin.
 - **CBZ export** — `GET /export/cbz?plugin=&slug=` (libzippp).
 - **Cover pipeline** — vips transcode to WebP/AVIF, `/cache/img` serves through the LRU.
-- **Chapter state & migrate** — read/hidden flags live in one bitfield column per chapter row; bulk mark-all/clear-all and mark-previous from the detail page. Migrate source switches a saved title to another plugin in one transaction, carrying the read boundary and discarding per-page positions.
+- **Chapter state & migrate** — read/hidden flags live in one bitfield column per chapter row; bulk mark-all/clear-all and mark-previous from the detail page. Migrate source switches a saved title to another plugin in one transaction, carrying the read boundary and discarding per-page positions. Read progress (max page turned) is a master-row column (`chapters.read_max`) — the legacy `host/skip|read|total` key shadows are retired and boot-backfilled.
 - **Action feedback** — every server-backed button shows a toast and flashes a LED on the clicked control; local-only interactions stay silent.
 - **Maintenance** — VACUUM + snapshot backups on a configurable interval with a keep count (`[backup]` knobs, `GET`/`POST /api/backup`); restore stays a manual stop → copy → start. Optional system-tray with configurable labels/icon, and `xmake scan` runs ASan+UBSan then TSan and restores the release build.
 - **API-first** — 57 routes, all reachable with curl; `/api/logs` exposes the log ring buffer and `/config` exposes the config registry.
@@ -137,9 +137,11 @@ One SQLite file (`data/library.db`), one connection, all store access funneled t
 ```mermaid
 erDiagram
     plugin ||--o{ title : "has"
-    plugin ||--o{ plugin_state : "host/skip + cache flags"
+    plugin ||--o{ plugin_state : "host keys (novel/detail_url/fp/pos)"
     plugin ||--o{ api_cache : "shaped by params_json"
     plugin ||--o{ saved_manga : "rows the user keeps"
+    saved_manga ||--o{ chapters : "per-pair identity + state"
+    chapters ||--o{ chapter_pages : "page urls"
     plugin ||--o{ title_meta : "enrichment payloads"
     plugin ||--o{ update_attempts : "fetch backoff"
     plugin ||--o{ reader_positions : "resume state"
@@ -194,12 +196,29 @@ erDiagram
         string mode
         int updated_at
     }
+    chapters {
+        string plugin PK
+        string slug PK
+        string chapter_id PK
+        real number
+        string url
+        string release_at
+        int flags
+        int read_max
+    }
+    chapter_pages {
+        string plugin PK
+        string slug PK
+        string chapter_id PK
+        int idx PK
+        string url
+    }
     plugin_state {
         string plugin_id PK
         string key PK
         string value
     }
-    note for plugin_state "host/read + host/skip legacy keys,<br/>host/novel + host/detail_url for row-served flags"
+    note for plugin_state "per-pair host keys only:<br/>host/novel, host/detail_url, chapters fp, host/pos"
     update_attempts {
         string plugin PK
         string slug PK
@@ -258,3 +277,4 @@ The `/about` page fetches `README.md` from the repo root (`/about/readme`, per-r
 ## License
 
 MIT — © 2026 kenzanin <kenzanin@gmail.com>. See [LICENSE](LICENSE).
+
