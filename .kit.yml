@@ -1,6 +1,66 @@
 # KIT worker config for cppIsekai.
 # Provider URL/key/wire are supplied by scripts/kit-worker (never commit the key).
+# NOTE: project config REPLACES (not merges) map sections of ~/.kit.yml, so the
+# 9router model catalog is mirrored here -- otherwise the /model picker in this
+# repo is empty. Keys come from env (OMNIROUTE_API_KEY), never committed.
 model: openai/free
+
+providers:
+  9router:
+    name: "9router"
+    wire: openai-compat
+    baseUrl: "http://localhost:20128/v1"
+    apiKeyEnv: [OMNIROUTE_API_KEY]
+
+customModels:
+  orchestrator:
+    name: "9router orchestrator"
+    baseUrl: "http://localhost:20128/v1"
+    temperature: true
+    cost: {input: 0.0, output: 0.0}
+    limit: {context: 262144, output: 8192}
+  explorer:
+    name: "9router explorer"
+    baseUrl: "http://localhost:20128/v1"
+    temperature: true
+    cost: {input: 0.0, output: 0.0}
+    limit: {context: 262144, output: 8192}
+  fixer:
+    name: "9router fixer"
+    baseUrl: "http://localhost:20128/v1"
+    temperature: true
+    cost: {input: 0.0, output: 0.0}
+    limit: {context: 262144, output: 8192}
+  librarian:
+    name: "9router librarian"
+    baseUrl: "http://localhost:20128/v1"
+    temperature: true
+    cost: {input: 0.0, output: 0.0}
+    limit: {context: 262144, output: 8192}
+  oracle:
+    name: "9router oracle"
+    baseUrl: "http://localhost:20128/v1"
+    temperature: true
+    cost: {input: 0.0, output: 0.0}
+    limit: {context: 262144, output: 8192}
+  designer:
+    name: "9router designer"
+    baseUrl: "http://localhost:20128/v1"
+    temperature: true
+    cost: {input: 0.0, output: 0.0}
+    limit: {context: 262144, output: 8192}
+  free:
+    name: "9router free"
+    baseUrl: "http://localhost:20128/v1"
+    temperature: true
+    cost: {input: 0.0, output: 0.0}
+    limit: {context: 262144, output: 16000}
+  vision:
+    name: "9router vision"
+    baseUrl: "http://localhost:20128/v1"
+    temperature: true
+    cost: {input: 0.0, output: 0.0}
+    limit: {context: 262144, output: 8192}
 
 mcpServers:
   codebase-memory-mcp:
