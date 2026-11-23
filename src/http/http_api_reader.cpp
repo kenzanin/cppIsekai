@@ -179,25 +179,13 @@ void register_reader(Ctx& c) {
                     }
                 }
                 store.position_set(merge_position(stored, next));
-                // detail-enrichment 1.1 (chapter-list-controls): max pages-read per chapter for the row counter/check.
+                // chapter-list-controls: max pages-read lives on the master row
+                // (chapters.read_max); the read bit flips host-side at the stored
+                // page count (chapter-store 3.3/D5) -- last page == read, no
+                // client flagging. count==0 = pages never parsed; no threshold.
                 if (!chapter.empty()) {
-                    int prev = 0;
-                    if (const auto s = store.state_get(kStateHost, std::string(kReadPrefix) + chapter);
-                        s && !s->empty()) {
-                        prev = parse::to_int(*s); // state_get returns the stored "N"
-                    }
                     const int p = pos.page > 1 ? pos.page : 1;
-                    const int now = std::max(prev, p);
-                    store.state_set(kStateHost, std::string(kReadPrefix) + chapter, std::to_string(now));
-                    // chapter-store 3.3: the read bit is host-set the moment
-                    // progress reaches the stored page count (D5) -- last page
-                    // turned == read, no client flagging. count==0 = pages
-                    // never parsed here; no threshold to reach yet.
-                    const int total = store.chapter_pages_count(plugin, manga, chapter);
-                    if (total > 0 && now >= total) {
-                        store.chapter_flags_apply(plugin, manga, {chapter}, false,
-                                                  std::to_underlying(ChapterFlag::kRead), 0);
-                    }
+                    store.chapter_read_max_bump(plugin, manga, chapter, p);
                 }
                 // library-grid-stats 2.4: reader touch stamps last_read_at + clears the New bit.
                 store.saved_clear_update(plugin, manga);

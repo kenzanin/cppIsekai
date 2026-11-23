@@ -12,6 +12,7 @@ void register_library(Ctx& c) {
     auto& db = c.db;
     auto& plugin_pool = c.plugin_pool;
     auto& plugins = c.plugins;
+    auto& images = c.images;
 
     CROW_ROUTE(app, "/api/library")
     ([&] {
@@ -87,6 +88,10 @@ void register_library(Ctx& c) {
             store.recompute_dup_groups();
             return 0;
         }); // dedup 2.3
+        // library-promote-on-save 1.1: promote whatever the preceding open
+        // cached -- same materializers the detail route runs, zero plugin
+        // calls; silent no-op when nothing is cached (1.2).
+        http::api::promote_saved_cached(store, db, m.plugin, m.slug);
         crow::response r{R"({"ok":true,"saved":true})"};
         r.set_header("Content-Type", "application/json");
         return r;
@@ -116,9 +121,20 @@ void register_library(Ctx& c) {
             }
             const std::string plugin = json["plugin"].s();
             const std::string slug = json["slug"].s();
-            on_pool(db, [&] {
-                store.unsave_manga(plugin, slug);
+            // library-promote-on-save 4.2: unsave wipes the pair -- satellites +
+            // envelope cache in the store op, then the disk image tree. The
+            // cover URL must be captured BEFORE the row goes.
+            const std::string cover = on_pool(db, [&] {
+                std::string cov;
+                if (const auto row = store.saved_get(plugin, slug)) {
+                    cov = row->cover;
+                }
+                store.unsave_manga(plugin, slug); // full purge, one txn + api_cache
                 store.recompute_dup_groups();
+                return cov;
+            });
+            on_pool(plugin_pool, [&] {
+                images.purge_pair(plugin, slug, {cover}); // page tree + cover files
                 return 0;
             }); // dedup 2.3
             crow::response r{R"({"ok":true,"saved":false})"};

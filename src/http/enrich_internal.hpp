@@ -70,4 +70,11 @@ void materialize_detail(Store& store, BS::thread_pool<>& db, const std::string& 
 std::string saved_detail_response(Store& store, BS::thread_pool<>& db, const std::string& plugin,
                                   const std::string& slug);
 
+/** \brief library-promote-on-save D2: promote the pair's cached detail/chapters
+ *  envelopes onto local rows -- the exact helpers the detail route runs
+ *  (apply_chosen -> materialize_detail, materialize_chapters, sync_saved_stats),
+ *  zero plugin calls. Silent no-op when nothing is cached (lazy resolve-on-open
+ *  stays the fallback). Called from POST /api/library after the upsert. */
+void promote_saved_cached(Store& store, BS::thread_pool<>& db, const std::string& plugin, const std::string& slug);
+
 } // namespace http::api

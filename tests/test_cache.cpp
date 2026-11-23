@@ -265,6 +265,42 @@ TEST_CASE("cache: one-time purge flattens v1 pools; rollback copy swept next boo
 }
 
 
+TEST_CASE("cache: purge_pair drops the pair's pages+cover, leaves neighbours (library-promote-on-save)") {
+    TempRoot root;
+    auto state = std::make_shared<FakeState>();
+    cache::Cache cache(cache::Config{root.path.string(), 1 << 20},
+                       [state](const std::string& k, const std::string&) { return state->get(k); });
+
+    const cache::Cache::PageCtx pg{.plugin = "mangadex", .slug = "solo-leveling", .chapter = 1, .page = 1,
+                                   .chapter_id = ""};
+    const auto page = cache.img_store("http://x/p1.png", "B", {}, pg);
+    const cache::Cache::CoverCtx cv{.url = "http://x/cover.png", .plugin = "mangadex", .w = 800, .h = 1200,
+                                    .ratio = 0.6667, .cover = true};
+    const auto cover = cache.img_store("http://x/cover.png", "F", cv, {});
+    const cache::Cache::PageCtx og{.plugin = "comix", .slug = "solo-leveling", .chapter = 1, .page = 1,
+                                   .chapter_id = ""};
+    const auto other_plugin = cache.img_store("http://x/o.png", "C", {}, og);
+    const cache::Cache::PageCtx os{.plugin = "mangadex", .slug = "other-slug", .chapter = 1, .page = 1,
+                                   .chapter_id = ""};
+    const auto other_slug = cache.img_store("http://x/s.png", "C", {}, os);
+    REQUIRE(ok(page));
+    REQUIRE(ok(cover));
+    REQUIRE(ok(other_plugin));
+    REQUIRE(ok(other_slug));
+
+    const auto removed = cache.purge_pair("mangadex", "solo-leveling", {"http://x/cover.png"});
+    CHECK(removed >= 2);
+    CHECK_FALSE(fs::exists(*page));
+    CHECK_FALSE(fs::exists(*cover));
+    CHECK(fs::exists(*other_plugin)); // same slug, other plugin namespace
+    CHECK(fs::exists(*other_slug));   // other slug, same plugin
+
+    // re-add path: the pair is writable again straight after the purge
+    const auto again = cache.img_store("http://x/p2.png", "C", {}, pg);
+    REQUIRE(ok(again));
+    CHECK(fs::path(*again).parent_path().parent_path().filename() == cache::slug_dir("solo-leveling"));
+}
+
 // V3 (cache-layout-v3): context-aware landing paths, sidecar, extension-free lookup.
 TEST_CASE("cache v3: page landing paths + duplicate chapter disambiguation") {
     TempRoot root;

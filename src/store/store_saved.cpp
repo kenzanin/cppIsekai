@@ -246,9 +246,59 @@ std::vector<std::pair<std::string, std::string>> Store::saved_dim_list() {
 
 void Store::unsave_manga(const std::string& plugin, const std::string& slug) {
     const store_detail::OpTrace _op{"unsave_manga"};
-    impl_->storage.remove_all<store_detail::SavedMangaEntity>(where(
-        c(&store_detail::SavedMangaEntity::plugin) == plugin && c(&store_detail::SavedMangaEntity::slug) == slug));
+    // library-promote-on-save 4.1: unsave = full wipe. One txn takes the row
+    // and every pair-keyed satellite (chapters/pages/position/attempts/title_meta
+    // + the pair-scoped host keys); the api_cache rows go on a raw connection
+    // after commit (JSONB/JSON1, same pattern as api_cache_get). Re-add hence
+    // starts exactly like a fresh title from search: empty row, cold cache.
+    auto& st = impl_->storage;
+    store_detail::TxGuard tx{st};
+    st.begin_transaction();
+    st.remove_all<store_detail::SavedMangaEntity>(
+        where(c(&store_detail::SavedMangaEntity::plugin) == plugin &&
+              c(&store_detail::SavedMangaEntity::slug) == slug));
+    st.remove_all<store_detail::ChapterEntity>(
+        where(c(&store_detail::ChapterEntity::plugin) == plugin && c(&store_detail::ChapterEntity::slug) == slug));
+    st.remove_all<store_detail::ChapterPageEntity>(
+        where(c(&store_detail::ChapterPageEntity::plugin) == plugin &&
+              c(&store_detail::ChapterPageEntity::slug) == slug));
+    st.remove_all<store_detail::ReaderPositionEntity>(
+        where(c(&store_detail::ReaderPositionEntity::plugin) == plugin &&
+              c(&store_detail::ReaderPositionEntity::slug) == slug));
+    st.remove_all<store_detail::UpdateAttemptsEntity>(
+        where(c(&store_detail::UpdateAttemptsEntity::plugin) == plugin &&
+              c(&store_detail::UpdateAttemptsEntity::slug) == slug));
+    st.remove_all<store_detail::TitleMetaEntity>(
+        where(c(&store_detail::TitleMetaEntity::plugin) == plugin &&
+              c(&store_detail::TitleMetaEntity::slug) == slug));
+    // pair-scoped host bookkeeping only; the legacy host/skip|read|total keys
+    // are chapter_id-keyed (no slug) and ride the D2 inheritance by design.
+    const std::string novel = std::string(kStateHost) + "/novel/" + plugin + "/" + slug;
+    const std::string detail_url = std::string(kStateHost) + "/detail_url/" + plugin + "/" + slug;
+    const std::string fp = std::string(kChaptersFpPrefix) + plugin + "/" + slug;
+    st.remove_all<store_detail::StateEntity>(where(c(&store_detail::StateEntity::plugin_id) == kStateHost &&
+                                                  (c(&store_detail::StateEntity::key) == novel ||
+                                                   c(&store_detail::StateEntity::key) == detail_url ||
+                                                   c(&store_detail::StateEntity::key) == fp)));
+    tx.commit();
     store_detail::fts_delete(*impl_, plugin, slug); // library-dedup 1.4
+    // envelope cache: exact id + the chapter-scoped "<slug>:..." page keys
+    sqlite3* raw = nullptr;
+    if (sqlite3_open(impl_->path.c_str(), &raw) == SQLITE_OK) {
+        store_detail::attach_busy(raw);
+        sqlite3_stmt* stmt = nullptr;
+        const char* sql =
+            "DELETE FROM api_cache WHERE plugin_id=? AND (json_extract(params_json,'$.id')=? OR "
+            "json_extract(params_json,'$.id') LIKE ?||':%')";
+        if (sqlite3_prepare_v2(raw, sql, -1, &stmt, nullptr) == SQLITE_OK &&
+            sqlite3_bind_text(stmt, 1, plugin.c_str(), -1, SQLITE_TRANSIENT) == SQLITE_OK &&
+            sqlite3_bind_text(stmt, 2, slug.c_str(), -1, SQLITE_TRANSIENT) == SQLITE_OK &&
+            sqlite3_bind_text(stmt, 3, slug.c_str(), -1, SQLITE_TRANSIENT) == SQLITE_OK) {
+            sqlite3_step(stmt);
+        }
+        sqlite3_finalize(stmt);
+        sqlite3_close(raw);
+    }
 }
 
 std::vector<SavedManga> Store::saved_list() {

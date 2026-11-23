@@ -127,6 +127,56 @@ Store::Store(const std::string& path) : impl_(std::make_unique<StoreImpl>(path))
             sqlite3_close(db);
         }
     }
+    // ponytail: sqlite_orm sync_schema won't ALTER an existing table; the
+    // saved-manga stat columns are added additively in migrate_saved_manga().
+    // library-promote-on-save: chapters.release_at (verbatim epoch/ISO text)
+    // added additively here for the same reason.
+    {
+        const auto cols = impl_->storage.pragma.table_info("chapters");
+        bool has_release = false;
+        for (const auto& c : cols) {
+            has_release = has_release || c.name == "release_at";
+        }
+        if (!has_release) {
+            sqlite3* db = nullptr;
+            sqlite3_open(path.c_str(), &db);
+            sqlite3_exec(db, "ALTER TABLE chapters ADD COLUMN release_at TEXT NOT NULL DEFAULT ''", nullptr, nullptr,
+                         nullptr);
+            sqlite3_close(db); // one-shot migration alongside the ORM connection
+        }
+        bool has_read_max = false;
+        for (const auto& c : cols) {
+            has_read_max = has_read_max || c.name == "read_max";
+        }
+        if (!has_read_max) {
+            sqlite3* db = nullptr;
+            sqlite3_open(path.c_str(), &db);
+            sqlite3_exec(db, "ALTER TABLE chapters ADD COLUMN read_max INTEGER NOT NULL DEFAULT 0", nullptr, nullptr,
+                         nullptr);
+            sqlite3_close(db);
+        }
+        // library-promote-on-save 4.4: the host/skip|read|total chapter shadows
+        // are retired -- flags/read_max on the master row are the single truth.
+        // Backfill read progress once from the shadows, then drop the keys;
+        // both statements no-op once the shadows are gone.
+        {
+            sqlite3* db = nullptr;
+            if (sqlite3_open(path.c_str(), &db) == SQLITE_OK) {
+                store_detail::attach_busy(db);
+                sqlite3_exec(db,
+                             "UPDATE chapters SET read_max = (SELECT CAST(s.value AS INTEGER) FROM plugin_state s"
+                             " WHERE s.plugin_id = 'host' AND s.key = 'host/read/' || chapters.chapter_id)"
+                             " WHERE read_max = 0 AND EXISTS(SELECT 1 FROM plugin_state s"
+                             " WHERE s.plugin_id = 'host' AND s.key = 'host/read/' || chapters.chapter_id)",
+                             nullptr, nullptr, nullptr);
+                sqlite3_exec(db,
+                             "DELETE FROM plugin_state WHERE plugin_id = 'host' AND (key LIKE 'host/skip/%' OR"
+                             " key LIKE 'host/read/%' OR key LIKE 'host/total/%')",
+                             nullptr, nullptr, nullptr);
+                sqlite3_close(db);
+            }
+        }
+    }
     // ponytail: sqlite_orm sync_schema won't ALTER an existing table; add zoom additively here.
     {
         const auto cols = impl_->storage.pragma.table_info("reader_positions");

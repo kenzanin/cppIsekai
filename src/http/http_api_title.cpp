@@ -25,6 +25,11 @@ crow::response title_data_response(plugin::Host& plugins, BS::thread_pool<>& db,
     const std::string params = p.dump();
 
     std::string body = method == "detail" ? saved_detail_response(store, db, plugin, slug) : std::string{}; // '' unless the row serves
+    if (method == "chapters") {
+        // library-promote-on-save D3: stored rows answer first; '' = cold, the
+        // cached-or-live path below runs and materializes on the way out.
+        body = chapters_row_response(store, db, plugin, slug);
+    }
     const bool row_served = !body.empty();
     if (!row_served) {
         body = on_pool(plugin_pool, [&] {

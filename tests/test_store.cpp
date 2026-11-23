@@ -953,6 +953,110 @@ TEST_CASE("Store: chapter flags bitfield (chapter-state 1.3-1.6)") {
     }
 }
 
+TEST_CASE("Store: read_max master progress + bump threshold (library-promote-on-save 4.4)") {
+    Store store("test_store.db");
+    const auto run = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+    const std::string plugin = "md", slug = "rm-" + run;
+    store.chapters_upsert(plugin, slug, {ChapterSeed{"c1", 1, "t", "u", ""}, ChapterSeed{"c2", 2, "t", "u", ""}});
+    store.chapter_pages_replace(plugin, slug, "c1", {"p1", "p2", "p3"});
+
+    SUBCASE("bump merges max; auto-read at the stored page count") {
+        CHECK(store.chapter_read_max_bump(plugin, slug, "c1", 2) == 2);
+        CHECK((store.chapter_flags_get(plugin, slug, "c1").value_or(0) & 1) == 0); // 2/3: not done
+        CHECK(store.chapter_read_max_bump(plugin, slug, "c1", 1) == 2); // max stays
+        CHECK(store.chapter_read_max_bump(plugin, slug, "c1", 3) == 3);
+        CHECK((store.chapter_flags_get(plugin, slug, "c1").value_or(0) & 1) != 0); // 3/3: read
+    }
+
+    SUBCASE("read_max survives a re-parse; absent rows read zero") {
+        store.chapter_read_max_bump(plugin, slug, "c1", 2);
+        store.chapters_upsert(plugin, slug, {ChapterSeed{"c1", 1, "t2", "u2", "x"}}); // identity refresh
+        CHECK(store.chapter_read_max_list(plugin, slug)["c1"] == 2);
+        CHECK(store.chapter_read_max_list(plugin, slug)["c2"] == 0);
+        CHECK(store.chapter_read_max_bump(plugin, slug, "nope", 5) == 0);
+    }
+
+    SUBCASE("unsave wipes read_max with the pair") {
+        store.chapter_read_max_bump(plugin, slug, "c1", 2);
+        store.unsave_manga(plugin, slug);
+        CHECK(store.chapter_read_max_list(plugin, slug).empty());
+    }
+}
+TEST_CASE("Store: unsave purges every pair-keyed row (library-promote-on-save 4.1)") {
+    Store store("test_store.db");
+    const auto run = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+    const std::string plugin = "md", slug = "purge-" + run, other_slug = "keep-" + run;
+    const std::string aid = "a" + run, bid = "b" + run; // per-run: shadow keys are global
+    store.save_manga(SavedManga{.plugin = plugin, .slug = slug, .name = "Gone"});
+    store.chapters_upsert(plugin, slug, {ChapterSeed{aid, 1, "t", "u", "2026-01-01"}});
+    store.chapter_pages_replace(plugin, slug, aid, {"p1"});
+    store.position_set(ReaderPosition{plugin, slug, aid, 1, 1, "", "", "", 0});
+    store.upsert_update_attempt(plugin, slug, "ok", "");
+    store.title_meta_put_chosen(plugin, slug, R"({"title":"T"})");
+    store.state_set("host", std::string("host/novel/") + plugin + "/" + slug, "1");
+    store.state_set("host", "keep-unrelated-" + run, "1");
+    // neighbours that must survive: other slug, other plugin, non-pair cache rows
+    store.chapters_upsert(plugin, other_slug, {ChapterSeed{bid, 1, "t", "u", ""}});
+    store.api_cache_put(plugin, "h1", "{\"id\":\"" + slug + "\"}", "{}", 1, 1);
+    store.api_cache_put(plugin, "h2", "{\"id\":\"" + slug + ":c1\"}", "{}", 1, 1); // page-scoped
+    store.api_cache_put(plugin, "h3", "{\"id\":\"other\"}", "{}", 1, 1);
+    store.api_cache_put("otherp", "h4", "{\"id\":\"" + slug + "\"}", "{}", 1, 1);
+
+    store.unsave_manga(plugin, slug);
+
+    CHECK_FALSE(store.saved_get(plugin, slug).has_value());
+    CHECK(store.chapters_list(plugin, slug).empty());
+    CHECK(store.chapter_pages_count(plugin, slug, aid) == 0);
+    CHECK_FALSE(store.position_get(plugin, slug).has_value());
+    CHECK_FALSE(store.update_attempt_get(plugin, slug).has_value());
+    CHECK_FALSE(store.title_meta_get(plugin, slug).has_value());
+    CHECK_FALSE(store.state_get("host", std::string("host/novel/") + plugin + "/" + slug).has_value());
+    CHECK(store.state_get("host", "keep-unrelated-" + run).value_or("") == "1");
+    CHECK_FALSE(store.api_cache_get(plugin, "h1").has_value());
+    CHECK_FALSE(store.api_cache_get(plugin, "h2").has_value());
+    CHECK(store.api_cache_get(plugin, "h3").has_value());
+    CHECK(store.api_cache_get("otherp", "h4").has_value());
+    CHECK(store.chapter_flags_get(plugin, other_slug, bid).has_value());
+
+    // re-add starts fresh: row exists, no detail, no chapters
+    store.save_manga(SavedManga{.plugin = plugin, .slug = slug, .name = "Again"});
+    const auto row = store.saved_get(plugin, slug);
+    REQUIRE(row.has_value());
+    CHECK(row->name == "Again");
+    CHECK(row->authors.empty());
+    CHECK(store.chapters_list(plugin, slug).empty());
+}
+
+TEST_CASE("Store: chapters_list order + release_at round-trip/fingerprint (library-promote-on-save)") {
+    Store store("test_store.db");
+    const auto run = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+    const std::string plugin = "md", slug = "rel-" + run;
+    const auto seed = [](const std::string& id, double n, const std::string& rel) {
+        return ChapterSeed{id, n, "t" + id, "", rel};
+    };
+
+    SUBCASE("reading order ascending; release_at verbatim") {
+        store.chapters_upsert(plugin, slug, {seed("b2", 2, "2026-01-02"), seed("a1", 1, "1700000000")});
+        const auto rows = store.chapters_list(plugin, slug);
+        REQUIRE(rows.size() == 2);
+        CHECK(rows[0].chapter_id == "a1");
+        CHECK(rows[0].number == 1);
+        CHECK(rows[0].release_at == "1700000000");
+        CHECK(rows[1].chapter_id == "b2");
+        CHECK(rows[1].release_at == "2026-01-02");
+    }
+
+    SUBCASE("release-only re-parse lands (C3 fingerprint covers release_at)") {
+        store.chapters_upsert(plugin, slug, {seed("a1", 1, "")});
+        store.chapters_upsert(plugin, slug, {seed("a1", 1, "2026-05-05")});
+        CHECK(store.chapters_list(plugin, slug)[0].release_at == "2026-05-05");
+    }
+
+    SUBCASE("unknown pair is empty") {
+        CHECK(store.chapters_list(plugin, "nope-" + run).empty());
+    }
+}
+
 TEST_CASE("Store: migrate_source rekeys the entry and carries the read boundary (library-migrate)") {
     Store store("test_store.db");
     const auto run = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());

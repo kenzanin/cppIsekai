@@ -39,12 +39,9 @@ struct Ctx {
     const config::Overrides& overrides;
 };
 
-// Reserved plugin_state rows for host bookkeeping: per-chapter skip/read
-// flags and the last reader position (the anchor the skip-rerun reads back).
+// Reserved plugin_state rows for host bookkeeping: the last reader position
+// (the anchor the skip-rerun reads back) and per-pair detail flags.
 inline constexpr const char* kStateHost = "host";
-inline constexpr const char* kSkipPrefix = "host/skip/";
-inline constexpr const char* kReadPrefix = "host/read/";
-inline constexpr const char* kTotalPrefix = "host/total/";
 inline constexpr const char* kPositionKey = "host/pos";
 
 // Typed readers for request/state JSON: absent or wrong-typed -> default.
@@ -199,10 +196,21 @@ inline void materialize_chapters(Store& store, BS::thread_pool<>& db, const std:
                 number = *d;
             }
         }
+        // release_at stored verbatim; a numeric epoch survives as its integer
+        // text (detail.js fmtDate accepts both shapes).
+        std::string release_at;
+        if (const auto* const rel = entry.find("release_at"); rel != entry.end()) {
+            if (const auto* s = std::get_if<std::string>(&rel->second.data)) {
+                release_at = *s;
+            } else if (const auto* d = std::get_if<double>(&rel->second.data)) {
+                release_at = std::to_string(static_cast<long long>(*d));
+            }
+        }
         seeds.push_back(ChapterSeed{.chapter_id = *id_s,
                                     .number = number,
                                     .title = detail::envelope_str(entry, "title"),
-                                    .url = detail::envelope_str(entry, "url")});
+                                    .url = detail::envelope_str(entry, "url"),
+                                    .release_at = release_at});
     }
     if (!seeds.empty()) {
         http::on_pool(db, [&] {
@@ -210,6 +218,36 @@ inline void materialize_chapters(Store& store, BS::thread_pool<>& db, const std:
             return 0;
         });
     }
+}
+
+// chapter-store row-serve (library-promote-on-save D3): the chapters envelope
+// built from stored rows; '' when the pair has none (caller falls back to
+// call_cached). cached:true -- the rows ARE the local copy; a parse or refresh
+// refreshes them.
+inline std::string chapters_row_response(Store& store, BS::thread_pool<>& db, const std::string& plugin,
+                                         const std::string& slug) {
+    auto rows = http::on_pool(db, [&] { return store.chapters_list(plugin, slug); });
+    if (rows.empty()) {
+        return {};
+    }
+    glz::generic env;
+    auto& root = env.data.emplace<glz::generic::object_t>();
+    root["ok"].data = true;
+    root["cached"].data = true;
+    glz::generic::array_t arr;
+    arr.reserve(rows.size());
+    for (auto& r : rows) {
+        glz::generic item;
+        auto& o = item.data.emplace<glz::generic::object_t>();
+        o["id"].data = std::move(r.chapter_id);
+        o["number"].data = r.number;
+        o["title"].data = std::move(r.title);
+        o["url"].data = std::move(r.url);
+        o["release_at"].data = std::move(r.release_at);
+        arr.push_back(std::move(item));
+    }
+    root["data"] = std::move(arr);
+    return glz::write_json(env).value_or(std::string{});
 }
 
 // Read a chapters envelope, count entries flagged read in the store, and

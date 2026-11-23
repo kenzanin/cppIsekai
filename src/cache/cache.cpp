@@ -174,6 +174,42 @@ std::string Cache::ns(const std::string& plugin) const {
     return out.empty() ? plugin : out;
 }
 
+std::size_t Cache::purge_pair(const std::string& plugin, const std::string& slug,
+                              const std::vector<std::string>& cover_urls) {
+    std::scoped_lock lock(mu_);
+    const fs::path img = fs::path(conf_.root) / "img";
+    const std::string manga_dir = (img / ns(plugin) / "manga" / slug_dir(slug)).string();
+    // cover_url -> sha16 file prefix; matches every ratio variant of that url
+    std::vector<std::string> cover_prefixes;
+    cover_prefixes.reserve(cover_urls.size());
+    for (const auto& url : cover_urls) {
+        if (!url.empty()) {
+            cover_prefixes.push_back((img / ns(plugin) / "cover" / sha1_hex(url).substr(0, 16)).string());
+        }
+    }
+    std::size_t removed = 0;
+    std::int64_t freed = 0;
+    std::error_code ec;
+    for (auto it = entries_.begin(); it != entries_.end();) {
+        const std::string& path = it->first;
+        bool owned = path.rfind(manga_dir, 0) == 0;
+        for (const auto& pre : cover_prefixes) {
+            owned = owned || path.rfind(pre, 0) == 0;
+        }
+        if (!owned) {
+            ++it;
+            continue;
+        }
+        fs::remove(path, ec);
+        freed += it->second.bytes;
+        it = entries_.erase(it);
+        ++removed;
+    }
+    fs::remove_all(manga_dir, ec); // empty page-tree dirs
+    bytes_ -= freed;
+    return removed;
+}
+
 std::optional<std::string> Cache::ensure(const std::string& key, const std::string& kind, const std::string& rel_path) {
     // ponytail: one lock across the (blocking) fetch serializes concurrent
     // misses; per-key inflight dedup when parallel workers actually starve.
