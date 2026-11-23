@@ -336,3 +336,75 @@ TEST_CASE("enrich: apply_read_rollup heals total_ch and counts done (row-serve p
     CHECK_EQ(row->read_ch, 2);
     CHECK((row->status_flags & 2) != 0); // done
 }
+
+TEST_CASE("promote: save-time promotion materializes cached envelopes; no-cache is a no-op (library-promote-on-save)") {
+    TempRoot root;
+    Store store = store_at(root.path);
+    BS::thread_pool<> db(1);
+    const std::string plugin = "promotetest";
+    const std::string slug = "promo-1";
+    crow::json::wvalue p;
+    p["id"] = slug;
+    const std::string params = p.dump();
+    const auto now = static_cast<std::int64_t>(std::time(nullptr));
+    const std::string detail_env =
+        R"({"ok":true,"data":{"name":"Promo Name","cover":"c.jpg","status":"ongoing","authors":["A1"],"artists":[],"tags":["T1"],"description":"The desc"}})";
+    const std::string chs_env =
+        R"({"ok":true,"data":[{"id":"c1","number":1,"title":"one","url":"u1","release_at":1700000000},{"id":"c2","number":2,"title":"two","url":"u2"}]})";
+    store.api_cache_put(plugin, stale_key(plugin, "detail", params), params, detail_env, now, 3600);
+    store.api_cache_put(plugin, stale_key(plugin, "chapters", params), params, chs_env, now, 3600);
+    seed_saved(store, plugin, slug); // the save the route performed first
+
+    SUBCASE("promotion fills detail + chapter rows with no plugin call") {
+        http::api::promote_saved_cached(store, db, plugin, slug);
+        const auto row = store.saved_get(plugin, slug);
+        REQUIRE(row.has_value());
+        CHECK(row->name == "Promo Name");
+        CHECK(row->authors == R"(["A1"])");
+        CHECK(row->synopsis_display == "The desc");
+        CHECK_EQ(row->total_ch, 2);
+        const auto chs = store.chapters_list(plugin, slug);
+        REQUIRE(chs.size() == 2); // reading order
+        CHECK(chs[0].chapter_id == "c1");
+        CHECK(chs[0].release_at == "1700000000"); // numeric epoch -> integer text
+        CHECK(chs[1].chapter_id == "c2");
+        CHECK(chs[1].release_at.empty());
+    }
+
+    SUBCASE("idempotent: a second promotion changes nothing") {
+        http::api::promote_saved_cached(store, db, plugin, slug);
+        const auto before = store.saved_get(plugin, slug);
+        http::api::promote_saved_cached(store, db, plugin, slug);
+        const auto after = store.saved_get(plugin, slug);
+        REQUIRE(before.has_value());
+        REQUIRE(after.has_value());
+        CHECK(before->authors == after->authors);
+        CHECK(before->synopsis_display == after->synopsis_display);
+        CHECK(before->updated_at == after->updated_at);
+        CHECK(store.chapters_list(plugin, slug).size() == 2);
+    }
+
+    SUBCASE("name guard: slug/empty envelope name never lands over a real one (1.3)") {
+        const std::string unnamed = R"({"ok":true,"data":{"authors":["A"],"description":"d"}})";
+        store.api_cache_put(plugin, stale_key(plugin, "detail", params), params, unnamed, now, 3600);
+        http::api::promote_saved_cached(store, db, plugin, slug);
+        const auto row = store.saved_get(plugin, slug);
+        REQUIRE(row.has_value());
+        CHECK(row->name == "Name promo-1"); // seed_saved name survives
+        CHECK(row->authors == R"(["A"])");
+    }
+
+    SUBCASE("nothing cached: silent no-op, lazy path intact") {
+        const std::string other = "promo-cold";
+        SavedManga cold;
+        cold.plugin = plugin;
+        cold.slug = other;
+        cold.name = "Cold";
+        store.save_manga(cold);
+        http::api::promote_saved_cached(store, db, plugin, other);
+        const auto row = store.saved_get(plugin, other);
+        REQUIRE(row.has_value());
+        CHECK(row->authors.empty());
+        CHECK(store.chapters_list(plugin, other).empty());
+    }
+}

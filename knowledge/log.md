@@ -1,3 +1,9 @@
+## 2026-11-23
+* **Update**: Linked `decisions/library-promote-on-save.md` to `decisions/api-cache-null-payload.md` (Promotion treats a NULL/empty payload row as nothing cached (no-op), same miss rule.).
+* **Update**: Linked `decisions/library-promote-on-save.md` to `architecture/local-first-reads.md` (Closes the gap where a saved title's chapters still depended on api_cache age for local-first reads.).
+* **Update**: Linked `decisions/library-promote-on-save.md` to `decisions/saved-manga-detail-source-of-truth.md` (Extends it: the detail row is now materialized at save time instead of on the first open after save.).
+* **Creation**: Documented concept `decisions/library-promote-on-save.md` (Library promotion: api_cache is the staging store; chapters become a read source (planned, openspec library-promote-on-save)).
+
 ## 2026-11-21
 * **Update**: Updated concept `decisions/template-golden-test.md`.
 * **Update**: Updated concept `architecture/atsumaru-plugin.md`.

@@ -35,6 +35,7 @@ std::string chapters_fingerprint(const std::vector<ChapterSeed>& rows) {
         mix_str(std::to_string(r.number), 0x1f);
         mix_str(r.title, 0x1e);
         mix_str(r.url, 0x1d);
+        mix_str(r.release_at, 0x1c);
     }
     return std::to_string(rows.size()) + ":" + std::to_string(h);
 }
@@ -81,6 +82,7 @@ int Store::chapters_upsert(const std::string& plugin, const std::string& slug,
             e.number = r.number;
             e.title = r.title;
             e.url = r.url;
+            e.release_at = r.release_at;
             e.updated_at = now;
             writes.push_back(std::move(e));
             continue;
@@ -91,6 +93,7 @@ int Store::chapters_upsert(const std::string& plugin, const std::string& slug,
                                       .number = r.number,
                                       .title = r.title,
                                       .url = r.url,
+                                      .release_at = r.release_at,
                                       .flags = 0,
                                       .updated_at = now};
         // chapter-state D2: one-shot legacy inheritance on first sight -- the
@@ -127,6 +130,26 @@ int Store::chapters_upsert(const std::string& plugin, const std::string& slug,
         spdlog::debug("chapter-store: {} legacy flag(s) inherited for {}/{}", inherited, plugin, slug);
     }
     return static_cast<int>(writes.size());
+}
+
+std::vector<ChapterSeed> Store::chapters_list(const std::string& plugin, const std::string& slug) {
+    const store_detail::OpTrace _op{"chapters_list"};
+    if (plugin.empty() || slug.empty()) {
+        return {};
+    }
+    auto rows = impl_->storage.get_all<store_detail::ChapterEntity>(
+        where(c(&store_detail::ChapterEntity::plugin) == plugin && c(&store_detail::ChapterEntity::slug) == slug),
+        order_by(&store_detail::ChapterEntity::number));
+    std::vector<ChapterSeed> out;
+    out.reserve(rows.size());
+    for (const auto& r : rows) {
+        out.push_back(ChapterSeed{.chapter_id = r.chapter_id,
+                                  .number = r.number,
+                                  .title = r.title,
+                                  .url = r.url,
+                                  .release_at = r.release_at});
+    }
+    return out;
 }
 
 void Store::chapter_pages_replace(const std::string& plugin, const std::string& slug, const std::string& chapter_id,

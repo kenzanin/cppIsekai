@@ -89,6 +89,7 @@ struct ChapterEntity {
     double number{};           // plugin-emitted; display/sort only, never identity
     std::string title;
     std::string url;           // source href, verbatim; '' when the envelope omits it
+    std::string release_at;    // verbatim epoch/ISO text; '' on legacy rows
     int flags{};               // ChapterFlag bitfield (chapter-state D1)
     std::int64_t updated_at{}; // unix seconds; stamped by the store on write
 };
@@ -185,7 +186,8 @@ inline auto create_storage(const std::string& path) {
         make_table("chapters", make_column("plugin", &ChapterEntity::plugin),
                    make_column("slug", &ChapterEntity::slug), make_column("chapter_id", &ChapterEntity::chapter_id),
                    make_column("number", &ChapterEntity::number), make_column("title", &ChapterEntity::title),
-                   make_column("url", &ChapterEntity::url), make_column("flags", &ChapterEntity::flags, default_value(0)),
+                   make_column("url", &ChapterEntity::url), make_column("release_at", &ChapterEntity::release_at, default_value("")),
+                   make_column("flags", &ChapterEntity::flags, default_value(0)),
                    make_column("updated_at", &ChapterEntity::updated_at, default_value(0)),
                    primary_key(&ChapterEntity::plugin, &ChapterEntity::slug, &ChapterEntity::chapter_id)),
         make_table("api_cache", make_column("plugin_id", &ApiCacheEntity::plugin_id),

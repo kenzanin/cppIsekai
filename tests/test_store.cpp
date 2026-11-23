@@ -953,6 +953,36 @@ TEST_CASE("Store: chapter flags bitfield (chapter-state 1.3-1.6)") {
     }
 }
 
+TEST_CASE("Store: chapters_list order + release_at round-trip/fingerprint (library-promote-on-save)") {
+    Store store("test_store.db");
+    const auto run = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+    const std::string plugin = "md", slug = "rel-" + run;
+    const auto seed = [](const std::string& id, double n, const std::string& rel) {
+        return ChapterSeed{id, n, "t" + id, "", rel};
+    };
+
+    SUBCASE("reading order ascending; release_at verbatim") {
+        store.chapters_upsert(plugin, slug, {seed("b2", 2, "2026-01-02"), seed("a1", 1, "1700000000")});
+        const auto rows = store.chapters_list(plugin, slug);
+        REQUIRE(rows.size() == 2);
+        CHECK(rows[0].chapter_id == "a1");
+        CHECK(rows[0].number == 1);
+        CHECK(rows[0].release_at == "1700000000");
+        CHECK(rows[1].chapter_id == "b2");
+        CHECK(rows[1].release_at == "2026-01-02");
+    }
+
+    SUBCASE("release-only re-parse lands (C3 fingerprint covers release_at)") {
+        store.chapters_upsert(plugin, slug, {seed("a1", 1, "")});
+        store.chapters_upsert(plugin, slug, {seed("a1", 1, "2026-05-05")});
+        CHECK(store.chapters_list(plugin, slug)[0].release_at == "2026-05-05");
+    }
+
+    SUBCASE("unknown pair is empty") {
+        CHECK(store.chapters_list(plugin, "nope-" + run).empty());
+    }
+}
+
 TEST_CASE("Store: migrate_source rekeys the entry and carries the read boundary (library-migrate)") {
     Store store("test_store.db");
     const auto run = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());

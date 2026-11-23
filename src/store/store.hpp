@@ -78,7 +78,8 @@ struct ChapterSeed {
     std::string chapter_id;
     double number{};
     std::string title;
-    std::string url; // source href; '' when the envelope omits it
+    std::string url;        // source href; '' when the envelope omits it
+    std::string release_at; // verbatim: epoch seconds, ISO date text, or ''
 };
 
 /** One user-saved manga (library-save): denormalized name/cover so the grid
@@ -196,6 +197,9 @@ public:
      *  attribution; keys carry no manga identity). One transaction. Unchanged seed set (C3
      *  fingerprint in plugin_state) short-circuits to 0 writes. */
     int chapters_upsert(const std::string& plugin, const std::string& slug, const std::vector<ChapterSeed>& rows);
+    /** \brief The pair's chapter rows in reading order (number asc), flags-free
+     *  -- the source of the row-served chapters envelope. Empty when unparsed. */
+    std::vector<ChapterSeed> chapters_list(const std::string& plugin, const std::string& slug);
     /** \brief Replace the page-url rows of one chapter (chapter-store D4):
      *  delete+insert in parse order, one transaction. */
     void chapter_pages_replace(const std::string& plugin, const std::string& slug, const std::string& chapter_id,

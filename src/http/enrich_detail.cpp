@@ -135,4 +135,34 @@ namespace http::api {
     return glz::write_json(env).value_or(std::string{});
 }
 
+void promote_saved_cached(Store& store, BS::thread_pool<>& db, const std::string& plugin,
+                          const std::string& slug) {
+    // Same params shape the detail/chapters routes mint (the cache key is the
+    // hash over it) -- a promotion can only see what a preceding open wrote.
+    crow::json::wvalue p;
+    p["id"] = slug;
+    const std::string params = p.dump();
+    const auto cached_body = [&db, &store, &plugin, &params](const char* method) {
+        return http::on_pool(db, [&] {
+            const auto row = store.api_cache_get(plugin, stale_key(plugin, method, params));
+            return row.has_value() ? row->payload : std::string{};
+        });
+    };
+    const std::string detail_env = cached_body("detail");
+    const std::string chs_env = cached_body("chapters");
+    if (detail_env.empty() && chs_env.empty()) {
+        return; // nothing cached: lazy resolve-on-open stays the path (D2)
+    }
+    std::string resolved;
+    if (!detail_env.empty()) {
+        resolved = apply_chosen(store, db, plugin, slug, detail_env);
+        materialize_detail(store, db, plugin, slug, resolved);
+    }
+    if (!chs_env.empty()) {
+        materialize_chapters(store, db, plugin, slug, chs_env);
+        // detail-less sync takes the chapters-only branch inside (stats only)
+        sync_saved_stats(store, db, plugin, slug, resolved, chs_env);
+    }
+}
+
 } // namespace http::api

@@ -87,6 +87,10 @@ void register_library(Ctx& c) {
             store.recompute_dup_groups();
             return 0;
         }); // dedup 2.3
+        // library-promote-on-save 1.1: promote whatever the preceding open
+        // cached -- same materializers the detail route runs, zero plugin
+        // calls; silent no-op when nothing is cached (1.2).
+        http::api::promote_saved_cached(store, db, m.plugin, m.slug);
         crow::response r{R"({"ok":true,"saved":true})"};
         r.set_header("Content-Type", "application/json");
         return r;

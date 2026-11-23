@@ -127,6 +127,24 @@ Store::Store(const std::string& path) : impl_(std::make_unique<StoreImpl>(path))
             sqlite3_close(db);
         }
     }
+    // ponytail: sqlite_orm sync_schema won't ALTER an existing table; the
+    // saved-manga stat columns are added additively in migrate_saved_manga().
+    // library-promote-on-save: chapters.release_at (verbatim epoch/ISO text)
+    // added additively here for the same reason.
+    {
+        const auto cols = impl_->storage.pragma.table_info("chapters");
+        bool has_release = false;
+        for (const auto& c : cols) {
+            has_release = has_release || c.name == "release_at";
+        }
+        if (!has_release) {
+            sqlite3* db = nullptr;
+            sqlite3_open(path.c_str(), &db);
+            sqlite3_exec(db, "ALTER TABLE chapters ADD COLUMN release_at TEXT NOT NULL DEFAULT ''", nullptr, nullptr,
+                         nullptr);
+            sqlite3_close(db); // one-shot migration alongside the ORM connection
+        }
+    }
     // ponytail: sqlite_orm sync_schema won't ALTER an existing table; add zoom additively here.
     {
         const auto cols = impl_->storage.pragma.table_info("reader_positions");
