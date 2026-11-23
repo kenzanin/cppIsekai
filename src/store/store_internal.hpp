@@ -7,6 +7,8 @@
 
 #include <algorithm>
 #include <atomic>
+#include <list>
+#include <map>
 #include <memory>
 #include <sqlite3.h>
 #include <string>
@@ -23,12 +25,6 @@ struct PluginEntity {
     std::string capabilities;
     int enabled = 1;
     std::string runtime;
-};
-
-struct TitleEntity {
-    std::int64_t id = 0;
-    std::int64_t plugin_id = 0;
-    std::string name;
 };
 
 struct StateEntity {
@@ -72,6 +68,10 @@ struct SavedMangaEntity {
     std::string tags;            // merged list the page renders (hidden filtered), JSON array verbatim
     std::string synopsis_display; // resolved display synopsis; '' = fall back to source synopsis
     int pinned{};                // library-pin: 1 = grid Pinned section
+    // library-ownership 4.1: per-pair host fields, formerly plugin_state keys
+    std::string chapters_fp; // store-contention C3 seed fingerprint
+    int novel{};             // source medium is novel/text
+    std::string detail_url;  // source detail href
 };
 
 struct TitleMetaEntity {
@@ -132,9 +132,6 @@ inline auto create_storage(const std::string& path) {
                    make_column("capabilities", &PluginEntity::capabilities),
                    make_column("enabled", &PluginEntity::enabled, default_value(1)),
                    make_column("runtime", &PluginEntity::runtime)),
-        make_table("title", make_column("id", &TitleEntity::id, primary_key().autoincrement()),
-                   make_column("plugin_id", &TitleEntity::plugin_id), make_column("name", &TitleEntity::name),
-                   foreign_key(&TitleEntity::plugin_id).references(&PluginEntity::id)),
         make_table("plugin_state", make_column("plugin_id", &StateEntity::plugin_id),
                    make_column("key", &StateEntity::key), make_column("value", &StateEntity::value),
                    primary_key(&StateEntity::plugin_id, &StateEntity::key)),
@@ -164,6 +161,9 @@ inline auto create_storage(const std::string& path) {
                    make_column("tags", &SavedMangaEntity::tags, default_value("")),
                    make_column("synopsis_display", &SavedMangaEntity::synopsis_display, default_value("")),
                    make_column("pinned", &SavedMangaEntity::pinned, default_value(0)),
+                   make_column("chapters_fp", &SavedMangaEntity::chapters_fp, default_value("")),
+                   make_column("novel", &SavedMangaEntity::novel, default_value(0)),
+                   make_column("detail_url", &SavedMangaEntity::detail_url, default_value("")),
                    primary_key(&SavedMangaEntity::plugin, &SavedMangaEntity::slug)),
         make_table("title_meta", make_column("plugin", &TitleMetaEntity::plugin),
                    make_column("slug", &TitleMetaEntity::slug), make_column("fetched", &TitleMetaEntity::fetched),
@@ -203,11 +203,64 @@ using StorageType = decltype(create_storage(""));
 
 } // namespace store_detail
 
+// --- library-ownership D1: ephemeral browse store -------------------------------------------
+// One unsaved pair's state. Lives only in this process: a pair with no
+// saved_manga row writes nothing to SQLite, so browse data cannot orphan.
+// Lives in store_detail beside the row shapes it mirrors.
+namespace store_detail {
+
+struct EphemChapter {
+    std::string chapter_id;
+    double number{};
+    std::string title;
+    std::string url;
+    std::string release_at;
+    int flags{};    // ChapterFlag bitfield
+    int read_max{}; // max page turned (master-column shadow, library-ownership 4.1)
+    std::map<int, std::string> pages; // idx -> url, reading order
+    std::int64_t updated_at{};
+};
+
+struct EphemPair {
+    std::map<std::string, EphemChapter> chapters; // chapter_id -> row
+    std::optional<ReaderPositionEntity> position;
+    std::optional<TitleMetaEntity> meta;
+    bool novel{};
+    std::string detail_url;
+    std::string chapters_fp; // store-contention C3 seed fingerprint shadow
+    std::uint64_t touched{}; // LRU clock
+};
+
+} // namespace store_detail
+
+/// Pair cap: browse titles are cheap (~KB) but must stay bounded. 128 recent
+/// pairs ≈ a long browsing session; ponytail: raise when eviction bites.
+inline constexpr std::size_t kEphemeralMaxPairs = 128;
+
 struct StoreImpl {
     std::string path; // kept for the raw api_cache JSONB connection
     store_detail::StorageType storage;
     bool fts5_ok = false; // library-dedup 1.3: false when the amalgamation lacks FTS5 (dedup disabled)
     std::atomic<bool> dup_dirty{true}; // store-contention C1: first tick reclusters
+
+    std::map<std::pair<std::string, std::string>, store_detail::EphemPair> ephem;
+    std::list<std::pair<std::string, std::string>> ephem_lru; // front = most recent
+    std::uint64_t ephem_tick{};
+
+    /// Mark a pair recently-used; evict the oldest beyond the cap.
+    void ephem_touch(const std::pair<std::string, std::string>& key) {
+        ephem_lru.remove(key);
+        ephem_lru.push_front(key);
+        if (const auto it = ephem.find(key); it != ephem.end()) {
+            it->second.touched = ++ephem_tick;
+        }
+        while (ephem_lru.size() > kEphemeralMaxPairs) {
+            const auto victim = ephem_lru.back();
+            ephem_lru.pop_back();
+            ephem.erase(victim);
+        }
+    }
+
     explicit StoreImpl(const std::string& p) : path(p), storage(store_detail::create_storage(p)) {}
 };
 

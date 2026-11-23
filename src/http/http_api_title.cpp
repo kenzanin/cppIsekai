@@ -128,6 +128,8 @@ void register_title(Ctx& c) {
                     return crow::response{404, R"({"ok":false,"error":"unknown title"})"};
                 case RefreshResult::kDisabled:
                     return json(200, R"({"ok":false,"error":"plugin disabled"})");
+                case RefreshResult::kOrphan:
+                    return json(200, R"({"ok":false,"error":"plugin removed"})");
                 case RefreshResult::kUpstreamFailed: {
                     const std::string body =
                         std::string(R"({"ok":false,"error":"refresh failed: )") + rr.failed_method + "\"}";

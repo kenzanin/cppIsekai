@@ -50,14 +50,38 @@ int Store::chapters_upsert(const std::string& plugin, const std::string& slug,
     }
     auto& st = impl_->storage;
     const std::int64_t now = std::time(nullptr);
-    // store-contention C3: materialize feeds every seen chapters envelope here;
+    // library-ownership 1.2: unsaved pairs keep their identities in the
+    // ephemeral store; same merge/short-circuit semantics, no SQLite rows.
+    if (!saved_exists(plugin, slug)) {
+        const std::string fp = chapters_fingerprint(rows);
+        if (pair_chapters_fp_get(plugin, slug) == fp) {
+            return 0;
+        }
+        auto& e = ephem_create(plugin, slug);
+        for (const auto& r : rows) {
+            if (r.chapter_id.empty()) {
+                continue;
+            }
+            auto& c = e.chapters[r.chapter_id];
+            const bool fresh = c.title.empty() && c.pages.empty() && c.flags == 0;
+            (void)fresh;
+            c.chapter_id = r.chapter_id;
+            c.number = r.number;
+            c.title = r.title;
+            c.url = r.url;
+            c.release_at = r.release_at;
+            c.updated_at = now;
+        }
+        pair_chapters_fp_set(plugin, slug, fp);
+        return static_cast<int>(rows.size());
+    }
+
     // an unchanged seed set would rewrite identical state (~100 ms mutexed).
-    // Fingerprint lives in plugin_state, written inside the txn below; a lost
+    // Fingerprint lives on the master row (library-ownership 4.1); a lost
     // one only costs one redundant pass. Flags never appear here, so skipping
     // preserves them by construction.
     const std::string fp = chapters_fingerprint(rows);
-    const std::string fp_key = std::string(kChaptersFpPrefix) + plugin + "/" + slug;
-    if (const auto stored = state_get(kStateHost, fp_key); stored && *stored == fp) {
+    if (pair_chapters_fp_get(plugin, slug) == fp) {
         return 0;
     }
     // Reads happen BEFORE the write transaction: a deferred transaction that
@@ -107,8 +131,8 @@ int Store::chapters_upsert(const std::string& plugin, const std::string& slug,
         // composite-PK upsert for new rows; insert() misbinds NOT NULL cols here
         known.contains(e.chapter_id) ? st.update(e) : st.replace(e);
     }
-    st.replace(store_detail::StateEntity{.plugin_id = kStateHost, .key = fp_key, .value = fp});
     tx.commit();
+    pair_chapters_fp_set(plugin, slug, fp); // master column, post-commit (idempotent)
     return static_cast<int>(writes.size());
 }
 
@@ -116,6 +140,21 @@ std::vector<ChapterSeed> Store::chapters_list(const std::string& plugin, const s
     const store_detail::OpTrace _op{"chapters_list"};
     if (plugin.empty() || slug.empty()) {
         return {};
+    }
+    if (!saved_exists(plugin, slug)) {
+        std::vector<ChapterSeed> out;
+        if (auto* e = ephem_find(plugin, slug); e != nullptr) {
+            out.reserve(e->chapters.size());
+            for (const auto& [id, c] : e->chapters) {
+                out.push_back(ChapterSeed{.chapter_id = id,
+                                          .number = c.number,
+                                          .title = c.title,
+                                          .url = c.url,
+                                          .release_at = c.release_at});
+            }
+            std::ranges::sort(out, {}, &ChapterSeed::number);
+        }
+        return out;
     }
     auto rows = impl_->storage.get_all<store_detail::ChapterEntity>(
         where(c(&store_detail::ChapterEntity::plugin) == plugin && c(&store_detail::ChapterEntity::slug) == slug),
@@ -139,6 +178,18 @@ void Store::chapter_pages_replace(const std::string& plugin, const std::string& 
         return;
     }
     auto& st = impl_->storage;
+    if (!saved_exists(plugin, slug)) {
+        auto& c = ephem_create(plugin, slug).chapters[chapter_id];
+        if (c.chapter_id.empty()) {
+            c.chapter_id = chapter_id;
+        }
+        c.pages.clear();
+        for (std::size_t i = 0; i < urls.size(); ++i) {
+            c.pages[static_cast<int>(i)] = urls[i];
+        }
+        return;
+    }
+
     store_detail::TxGuard tx{st};
     st.begin_transaction();
     st.remove_all<store_detail::ChapterPageEntity>(
@@ -161,6 +212,20 @@ std::map<std::string, int> Store::chapter_flags_apply(const std::string& plugin,
     const store_detail::OpTrace _op{"chapter_flags_apply"};
     std::map<std::string, int> out;
     if (plugin.empty() || slug.empty() || (!all && ids.empty())) {
+        return out;
+    }
+    if (!saved_exists(plugin, slug)) {
+        if (auto* e = ephem_find(plugin, slug); e != nullptr) {
+            const std::int64_t now = std::time(nullptr);
+            for (auto& [id, c] : e->chapters) {
+                if (!all && std::ranges::find(ids, id) == ids.end()) {
+                    continue;
+                }
+                c.flags = (c.flags | set) & ~clear;
+                c.updated_at = now;
+                out.emplace(id, c.flags);
+            }
+        }
         return out;
     }
     auto& st = impl_->storage;
@@ -195,6 +260,16 @@ std::optional<int> Store::chapter_flags_get(const std::string& plugin, const std
     if (plugin.empty() || slug.empty() || chapter_id.empty()) {
         return std::nullopt;
     }
+    if (!saved_exists(plugin, slug)) {
+        if (auto* e = ephem_find(plugin, slug); e != nullptr) {
+            const auto c = e->chapters.find(chapter_id);
+            if (c == e->chapters.end()) {
+                return std::nullopt;
+            }
+            return c->second.flags;
+        }
+        return std::nullopt;
+    }
     auto rows = impl_->storage.select(&store_detail::ChapterEntity::flags,
                                       where(c(&store_detail::ChapterEntity::plugin) == plugin &&
                                             c(&store_detail::ChapterEntity::slug) == slug &&
@@ -209,6 +284,14 @@ std::map<std::string, int> Store::chapter_flags_list(const std::string& plugin, 
     const store_detail::OpTrace _op{"chapter_flags_list"};
     std::map<std::string, int> out;
     if (plugin.empty() || slug.empty()) {
+        return out;
+    }
+    if (!saved_exists(plugin, slug)) {
+        if (auto* e = ephem_find(plugin, slug); e != nullptr) {
+            for (const auto& [id, c] : e->chapters) {
+                out.emplace(id, c.flags);
+            }
+        }
         return out;
     }
     auto rows = impl_->storage.select(
@@ -226,6 +309,14 @@ std::map<std::string, int> Store::chapter_read_max_list(const std::string& plugi
     if (plugin.empty() || slug.empty()) {
         return out;
     }
+    if (!saved_exists(plugin, slug)) {
+        if (auto* e = ephem_find(plugin, slug); e != nullptr) {
+            for (const auto& [id, c] : e->chapters) {
+                out.emplace(id, c.read_max);
+            }
+        }
+        return out;
+    }
     auto rows = impl_->storage.select(
         columns(&store_detail::ChapterEntity::chapter_id, &store_detail::ChapterEntity::read_max),
         where(c(&store_detail::ChapterEntity::plugin) == plugin && c(&store_detail::ChapterEntity::slug) == slug));
@@ -240,6 +331,28 @@ int Store::chapter_read_max_bump(const std::string& plugin, const std::string& s
     const store_detail::OpTrace _op{"chapter_read_max_bump"};
     if (plugin.empty() || slug.empty() || chapter_id.empty() || page < 0) {
         return 0;
+    }
+    if (!saved_exists(plugin, slug)) {
+        auto* e = ephem_find(plugin, slug);
+        if (e == nullptr) {
+            return 0; // no rows to carry progress on; nothing to bump
+        }
+        auto c = e->chapters.find(chapter_id);
+        if (c == e->chapters.end()) {
+            return 0;
+        }
+        const int now = std::max(c->second.read_max, page);
+        if (now == c->second.read_max && (c->second.flags & std::to_underlying(ChapterFlag::kRead)) != 0) {
+            return now;
+        }
+        c->second.read_max = now;
+        if ((c->second.flags & std::to_underlying(ChapterFlag::kRead)) == 0) {
+            if (const int total = static_cast<int>(c->second.pages.size()); total > 0 && now >= total) {
+                c->second.flags |= std::to_underlying(ChapterFlag::kRead);
+            }
+        }
+        c->second.updated_at = std::time(nullptr);
+        return now;
     }
     auto rows = impl_->storage.get_all<store_detail::ChapterEntity>(
         where(c(&store_detail::ChapterEntity::plugin) == plugin && c(&store_detail::ChapterEntity::slug) == slug &&
@@ -268,6 +381,14 @@ int Store::chapter_read_max_bump(const std::string& plugin, const std::string& s
 int Store::chapter_pages_count(const std::string& plugin, const std::string& slug, const std::string& chapter_id) {
     const store_detail::OpTrace _op{"chapter_pages_count"};
     if (plugin.empty() || slug.empty() || chapter_id.empty()) {
+        return 0;
+    }
+
+    if (!saved_exists(plugin, slug)) {
+        if (auto* e = ephem_find(plugin, slug); e != nullptr) {
+            const auto c = e->chapters.find(chapter_id);
+            return c != e->chapters.end() ? static_cast<int>(c->second.pages.size()) : 0;
+        }
         return 0;
     }
     return static_cast<int>(impl_->storage.count<store_detail::ChapterPageEntity>(

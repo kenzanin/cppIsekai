@@ -17,7 +17,7 @@ Server base URL: `http://localhost:8090`. Port precedence: `--port` > `$PORT` > 
 
 Everything below is implemented and verified against the running daemon.
 
-- **Library** — save manga rows with name/cover, client-side search over title/alt-title/synopsis, 3-state sort with recent-read default, duplicate grouping (`dup_group`) and status flags. Pinned titles get their own section above the library grid. Adding a title promotes whatever the preceding open cached (detail fields, chapter rows, stats) onto local rows in the same tick — no plugin call; removing one wipes the pair (rows, cached envelopes, disk images), so re-adding equals a fresh add from search. Dim+blur covers render dimmed server-side (no unstyled flash on refresh).
+- **Library** — save manga rows with name/cover, client-side search over title/alt-title/synopsis, 3-state sort with recent-read default, duplicate grouping (`dup_group`) and status flags. Pinned titles get their own section above the library grid. Adding a title promotes whatever the preceding open cached (detail fields, chapter rows, stats) onto local rows in the same tick — no plugin call; removing one wipes the pair (rows, cached envelopes, disk images), so re-adding equals a fresh add from search. Browsing without saving touches no database row at all: chapter state, positions and enrichment for an unsaved title live in process memory and vanish on restart, and are promoted into the library the moment the title is saved. Uninstalling a plugin keeps its library entries as *orphans* (local rows only, refreshed/revived as soon as a plugin with the same id is installed again); they are badged and filterable in the grid and can be purged in one call. Dim+blur covers render dimmed server-side (no unstyled flash on refresh).
 - **Saved-row detail** — detail and the chapter list for saved rows serve from local rows (`saved_manga` display columns, `chapters` identity rows) regardless of cache age — only a cold miss or explicit refresh calls the plugin; enrichment data (MangaDex + a metadata aggregator: authors, artists, tags, synopsis) is materialized onto the row. Chosen alt-title/cover overrides apply on both live-fetch and row-serve paths, and the Fetch detail / Fetch covers wizard can restore the scraper's original values (SRC badge) per field. Novel/text sources are detected via the site's `medium` field: detail shows a badge + warning and the reader button is skipped.
 - **Stale-first fetch** — plugin API responses are cached in `api_cache` (SQLite, with raw-JSONB payload) and served stale-on-error; per-method TTLs come from the plugin manifest (`cache_ttl`, else a host default), expired rows are pruned on the scheduler tick. Image bytes land in a disk LRU under `cache/` (layout v4: `<slug[:40]>-<sha1[:8]>` title dirs, covers and zero-padded page dirs; whole-file eviction on overflow, one-time migration stamp).
 - **Reader** — 10-page window, RTL/LTR, skip-aware, position resumed from the store, prev/next resolved by stable number order + index so duplicate chapter numbers (24a/24b) stay individually reachable; the reader links and prefetches by chapter id (`?ch_id=`), old number-only URLs keep working. Spread modes anchor at the page that was open, ↑/↓ pan the image and only change page at the edge, and zoom values persist per title.
@@ -136,7 +136,6 @@ One SQLite file (`data/library.db`), one connection, all store access funneled t
 
 ```mermaid
 erDiagram
-    plugin ||--o{ title : "has"
     plugin ||--o{ plugin_state : "host keys (novel/detail_url/fp/pos)"
     plugin ||--o{ api_cache : "shaped by params_json"
     plugin ||--o{ saved_manga : "rows the user keeps"
@@ -152,11 +151,6 @@ erDiagram
         string plugin_id
         string runtime
         int enabled
-    }
-    title {
-        int id PK
-        int plugin_id FK
-        string name
     }
     saved_manga {
         string plugin PK
@@ -218,7 +212,7 @@ erDiagram
         string key PK
         string value
     }
-    note for plugin_state "per-pair host keys only:<br/>host/novel, host/detail_url, chapters fp, host/pos"
+    note for plugin_state "plugin-owned hosting keys only;<br/>removal GCs these and the registry, never the library"
     update_attempts {
         string plugin PK
         string slug PK
@@ -265,6 +259,7 @@ erDiagram
 ## Engineering notes
 
 - **Config** — one registry (`src/config/`): CLI flag + `CPPISEKAI_*` env + ini layers; precedence default < ini < env < flag. `--dump-config` renders the template, `POST /config` merge-saves.
+- **Store ownership** — `saved_manga` is the root of everything the user keeps (chapters+flags+read_max, page URLs, position, enrichment, per-pair host fields as columns). A pair with no saved row routes to an in-process map instead of SQLite (`saved_exists` dispatch, LRU-bounded), so browse traffic can never orphan rows; a save promotes that map in one transaction. Orphan state is derived from the plugin registry, never stored.
 - **Plugin ABI** — JSON-text in/out; single wrap point `call_cached` (`cached:true` stale-serve). Host-wide `CURLOPT_PROXY` via `plugin::applyProxy`.
 - **Cache layout v4** — `<plugin>/<slug[:40]>-<sha1(slug)[:8]>/covers/<file>` and `<plugin>/<slugdir>/<ch>/<pNNN>.<ext>` (zero-padded order = reading order), stale `api/<sha>.json` on disk plus the `api_cache` table; boot migrates the old tree once via the `.cache-v4-slugdir` stamp.
 - **Build** — glaze/clang story: the toolchain is clang (`xmake f -m release`); see `knowledge/constraints/test-binary-releasedbg-vs-release` for why `xmake test` runs the releasedbg binary. Handy tasks: `xmake js` (minify + brotli the static assets), `xmake doc` (clang-doc HTML, or `XMAKE_DOC_FORMAT=md` for grep-friendly markdown), `xmake scan` (ASan+UBSan then TSan, always restores release), `xmake gate` (full gate).

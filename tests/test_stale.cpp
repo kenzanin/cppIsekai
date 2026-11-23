@@ -33,6 +33,10 @@ struct TempRoot {
 
 Store store_at(const fs::path& root) { return Store((root / "test.db").string()); }
 
+// library-ownership 3.3: the gates key on the registry -- register the fake ids
+// so call_cached treats them as live plugins.
+void reg(Store& store, const std::string& id) { store.upsert_plugin(id, id, "1", "", "lua"); }
+
 // The seam: scripted call outcomes; empty script slot = failing call.
 struct FakeCall {
     std::string good;  // ok:true envelope, handed out while `succeed` holds
@@ -54,6 +58,8 @@ bool has(std::string_view hay, std::string_view needle) { return hay.find(needle
 TEST_CASE("stale: success persists, then failing call serves last-good + cached:true") {
     TempRoot root;
     Store store = store_at(root.path);
+    reg(store, "mangadex");
+    reg(store, "mangadex");
     FakeCall call{R"({"ok":true,"data":{"titles":["one piece"]}})", R"({"ok":false,"error":"offline"})"};
 
     const std::string first = call_cached(store, "mangadex", "search", R"({"q":"one piece"})", std::ref(call));
@@ -74,6 +80,7 @@ TEST_CASE("stale: success persists, then failing call serves last-good + cached:
 TEST_CASE("stale: fresh row within ttl is served without calling the plugin") {
     TempRoot root;
     Store store = store_at(root.path);
+    reg(store, "m");
     FakeCall call{R"({"ok":true,"data":{"n":1}})", R"({"ok":false,"error":"offline"})"};
 
     CHECK(call_cached(store, "m", "search", R"({"q":"x"})", std::ref(call)) != "{}");
@@ -87,6 +94,7 @@ TEST_CASE("stale: fresh row within ttl is served without calling the plugin") {
 TEST_CASE("stale: expired row is served local-first, plugin not called") {
     TempRoot root;
     Store store = store_at(root.path);
+    reg(store, "m");
     // ttl_s <= 0 => always expired (test hook via direct put); local-first
     // still serves it and flags cached:true so the UI can offer Update.
     store.api_cache_put("m", stale_key("m", "search", R"({"q":"x"})"), R"({"q":"x"})",
@@ -102,6 +110,7 @@ TEST_CASE("stale: expired row is served local-first, plugin not called") {
 TEST_CASE("stale: permuted query order is one entry") {
     TempRoot root;
     Store store = store_at(root.path);
+    reg(store, "m");
     FakeCall call{R"({"ok":true,"data":{"n":1}})", R"({"ok":false,"error":"offline"})"};
 
     const std::string first = call_cached(store, "m", "chapters", R"({"a":"1","b":"2"})", std::ref(call));
@@ -117,6 +126,7 @@ TEST_CASE("stale: permuted query order is one entry") {
 TEST_CASE("stale: method outside opt-in passes through, nothing cached") {
     TempRoot root;
     Store store = store_at(root.path);
+    reg(store, "m");
     FakeCall call{R"({"ok":true,"data":{}})", "", true};
 
     const std::string res = call_cached(store, "m", "feed", R"({"x":"1"})", std::ref(call));
@@ -128,6 +138,7 @@ TEST_CASE("stale: method outside opt-in passes through, nothing cached") {
 TEST_CASE("stale: failure with no last-good returns the error envelope") {
     TempRoot root;
     Store store = store_at(root.path);
+    reg(store, "m");
     FakeCall call{"", R"({"ok":false,"error":"offline"})", false};
 
     const std::string res = call_cached(store, "m", "detail", R"({"id":"7"})", std::ref(call));

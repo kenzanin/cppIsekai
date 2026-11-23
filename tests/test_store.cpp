@@ -20,27 +20,20 @@
 static void seed_fixture(const char* path) {
     sqlite3* db = nullptr;
     if (sqlite3_open(path, &db) != SQLITE_OK) throw std::runtime_error("fixture: open failed");
-    sqlite3_exec(db, "DELETE FROM title; DELETE FROM plugin;", nullptr, nullptr, nullptr);
+    sqlite3_exec(db, "DELETE FROM saved_manga; DELETE FROM title; DELETE FROM plugin;", nullptr, nullptr, nullptr);
     for (const char* name : {"Asura", "Flame"}) {
         sqlite3_stmt* st = nullptr;
+        // library-ownership: plugin_id now carries the identity the join keys on
+        const std::string pid = name; // pair rows key on the id; fixture keeps id == name
         if (sqlite3_prepare_v2(db,
-                "INSERT INTO plugin(name, plugin_id, version, capabilities, enabled, runtime) VALUES(?,'','','',1,'')",
+                "INSERT INTO plugin(name, plugin_id, version, capabilities, enabled, runtime) VALUES(?,?,?,?,1,'')",
                 -1, &st, nullptr) == SQLITE_OK) {
             sqlite3_bind_text(st, 1, name, -1, SQLITE_STATIC);
+            sqlite3_bind_text(st, 2, pid.c_str(), -1, SQLITE_STATIC);
+            sqlite3_bind_text(st, 3, "1.0.0", -1, SQLITE_STATIC);
+            sqlite3_bind_text(st, 4, "", -1, SQLITE_STATIC);
             sqlite3_step(st);
             sqlite3_finalize(st);
-        }
-        for (int n = 1; n <= 12; ++n) {
-            st = nullptr;
-            if (sqlite3_prepare_v2(db,
-                    "INSERT INTO title(plugin_id, name) VALUES((SELECT id FROM plugin WHERE name=?), ?)",
-                    -1, &st, nullptr) == SQLITE_OK) {
-                const std::string title = std::string(name) + " Scans #" + std::to_string(n);
-                sqlite3_bind_text(st, 1, name, -1, SQLITE_STATIC);
-                sqlite3_bind_text(st, 2, title.c_str(), -1, SQLITE_TRANSIENT);
-                sqlite3_step(st);
-                sqlite3_finalize(st);
-            }
         }
     }
     sqlite3_close(db);
@@ -57,53 +50,36 @@ struct TestStoreDb {
     ~TestStoreDb() { std::remove(path.c_str()); }
 };
 
-TEST_CASE("Store: fixture, plugins, search, count") {
+TEST_CASE("Store: fixture, plugins; search/count retired") {
     TestStoreDb fixture;
     Store store(fixture.path);
 
-    SUBCASE("plugins lists 2 with 12 titles each") {
+    SUBCASE("plugins list ordered by name; saved count zero without saves") {
         auto plugins = store.plugins();
         REQUIRE(plugins.size() == 2);
         for (const auto& p : plugins) {
-            CHECK(p.titles == 12);
+            CHECK(p.saved == 0);
         }
         CHECK(plugins[0].name == "Asura"); // order_by name
     }
 
-    SUBCASE("count without filter") {
-        CHECK(store.count("", "") == 24);
+    SUBCASE("saved count follows the library") {
+        store.save_manga(SavedManga{.plugin = "Asura", .slug = "s1", .name = "S1"});
+        store.save_manga(SavedManga{.plugin = "Asura", .slug = "s2", .name = "S2"});
+        auto plugins = store.plugins();
+        REQUIRE(plugins.size() == 2);
+        CHECK(plugins[0].saved == 2); // Asura first by name, 2 saved
+        CHECK(plugins[1].saved == 0);
     }
 
-    SUBCASE("count with plugin filter") {
-        CHECK(store.count("Asura", "") == 12);
-        CHECK(store.count("Nope", "") == 0);
+    SUBCASE("search/count retired: no legacy surface") {
+        // the methods are gone; the home grid is saved-only (4.2)
     }
+}
 
-    SUBCASE("count with LIKE escaping: metacharacters stay literal") {
-        CHECK(store.count("", "_") == 0);        // no literal underscore in seeds
-        CHECK(store.count("", "%") == 0);        // % must not act as wildcard
-        CHECK(store.count("", "Scans #3") == 2); // literal # matches (Asura+Flame)
-        CHECK(store.count("", "Asura") == 12);   // plain substring still works
-    }
-
-    SUBCASE("search pagination") {
-        auto page1 = store.search("", "", 12, 0);
-        auto page2 = store.search("", "", 12, 12);
-        REQUIRE(page1.size() == 12);
-        REQUIRE(page2.size() == 12);
-        CHECK(page1[0].id != page2[0].id);
-        // ordered by name: page 2 starts where page 1 ended
-        CHECK(page1[11].name < page2[0].name);
-    }
-
-    SUBCASE("search joins plugin name") {
-        auto rows = store.search("Flame", "Scans #1", 10, 0);
-        REQUIRE(rows.size() == 4); // #1, #10, #11, #12 all match '%Scans #1%'
-        for (const auto& r : rows)
-            CHECK(r.plugin == "Flame");
-        auto exact = store.search("Flame", "Scans #1", 10, 0);
-        CHECK(exact[0].name == "Flame Scans #1"); // order_by name puts #1 first
-    }
+TEST_CASE("Store: plugin_state, positions, legacy accessors") {
+    TestStoreDb fixture;
+    Store store(fixture.path);
 
     SUBCASE("plugin state round-trip and overwrite") {
         // hermetic: probe key unique per run, the db file persists between runs
@@ -124,6 +100,7 @@ TEST_CASE("Store: fixture, plugins, search, count") {
 
     SUBCASE("reader position round-trip, upsert, per-manga scope") {
         const auto slug = "pos_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+        store.save_manga(SavedManga{.plugin = "md", .slug = slug, .name = "P"}); // durability = saved path
         CHECK_FALSE(store.position_get("md", slug).has_value());
         store.position_set({"md", slug, "ch-uuid-1", 12.5, 3, "spread-h", "rtl", "fit-w", 0});
         const auto pos = store.position_get("md", slug);
@@ -560,6 +537,10 @@ TEST_CASE("Store: title_meta round-trip and corrupt-row tolerance (enrichment 2.
     const std::string plugin = "enrich_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
     const std::string slug = "slug-" + plugin;
 
+    // library-ownership: title_meta for unsaved pairs is ephemeral; the SQL
+    // paths (and the raw corrupt-row insert below) need a saved pair.
+    store.save_manga(SavedManga{.plugin = plugin, .slug = slug, .name = "E"});
+
     CHECK_FALSE(store.title_meta_get(plugin, slug).has_value());
 
     store.title_meta_put_fetched(plugin, slug, R"([{"source":"mangadex","fetched_at":1000,"data":{"title":"A"}}])", 1000);
@@ -738,18 +719,26 @@ TEST_CASE("Store: plugin_prune_absent cascade (plugin-lifecycle 2.1)") {
     REQUIRE(removed.size() == 1);
     CHECK(removed[0] == "Asura");
 
-    // every trace gone, the survivor untouched, re-run is a no-op
+    // hosting state gone; library data retained as orphans (3.1)
     CHECK_FALSE(store.state_get("Asura", "host/pos").has_value());
-    CHECK_FALSE(store.update_attempt_get("Asura", "m1").has_value());
-    CHECK_FALSE(store.title_meta_get("Asura", "m1").has_value());
     CHECK_FALSE(store.api_cache_get("Asura", "k1").has_value());
-    CHECK_FALSE(store.position_get("Asura", "m1").has_value());
-    for (const auto& s : store.saved_list())
-        CHECK(s.plugin != "Asura");
     for (const auto& p : store.plugins())
         CHECK(p.plugin_id != "Asura");
+    CHECK(store.plugin_upstream("Asura") == Upstream::orphan);
     CHECK(store.plugin_enabled("Flame"));
-    CHECK(store.plugin_prune_absent({"Asura", "Flame"}).empty());
+    REQUIRE(store.saved_list().size() == 1); // the library survives the uninstall
+    CHECK(store.saved_list().front().plugin == "Asura");
+    CHECK(store.title_meta_get("Asura", "m1").has_value());
+    CHECK(store.update_attempt_get("Asura", "m1").has_value());
+    CHECK(store.position_get("Asura", "m1").has_value());
+    CHECK_FALSE(store.orphan_list().empty()); // discoverable...
+
+    // ...and purgeable: the wipe path clears it like any removal
+    store.unsave_manga("Asura", "m1");
+    CHECK(store.saved_list().empty());
+    CHECK(store.orphan_list().empty());
+    CHECK(store.plugin_prune_absent({"Asura", "Flame"}).empty()); // already gone
+
 }
 
 TEST_CASE("Store: title_meta_get_many batched overlay read (hot-path-perf 1.3)") {
@@ -760,6 +749,9 @@ TEST_CASE("Store: title_meta_get_many batched overlay read (hot-path-perf 1.3)")
     const std::string s1 = "many-a-" + std::to_string(run);
     const std::string s2 = "many-b-" + std::to_string(run);
 
+    // hot-path reader = the library grid: saved pairs only
+    store.save_manga(SavedManga{.plugin = plugin, .slug = s1, .name = "A"});
+    store.save_manga(SavedManga{.plugin = plugin, .slug = s2, .name = "B"});
     store.title_meta_put_fetched(plugin, s1, R"([{"source":"m","fetched_at":1,"data":{}}])", 1);
     store.title_meta_put_chosen(plugin, s1, R"({"title":"T1","cover":"https://x/1.jpg"})");
     store.title_meta_put_fetched(plugin, s2, "[]", 2);
@@ -880,7 +872,6 @@ TEST_CASE("Store: materialized detail columns (manga-detail-table 1.4/2.1/3.2)")
     }
 }
 
-
 TEST_CASE("Store: chapter flags bitfield (chapter-state 1.3-1.6)") {
     Store store("test_store.db");
     const auto run = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
@@ -934,6 +925,7 @@ TEST_CASE("Store: chapter flags bitfield (chapter-state 1.3-1.6)") {
         // shared connection inside an open transaction, so every later BEGIN
         // failed with "cannot start a transaction within a transaction" and the
         // API stayed 500 for every title until the daemon restarted.
+        store.save_manga(SavedManga{.plugin = plugin, .slug = slug, .name = "T"}); // SQL path: trigger needs real INSERTs
         store.chapters_upsert(plugin, slug, {seed("keep1", 1)}); // pre-existing row
         sqlite3* raw = nullptr;
         REQUIRE(sqlite3_open("test_store.db", &raw) == SQLITE_OK);
@@ -1217,6 +1209,7 @@ TEST_CASE("Store: chapters_upsert fingerprint skip (store-contention 3.3)") {
     Store store("test_store.db");
     const auto run = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
     const std::string plugin = "fp", slug = "s-" + run;
+    store.save_manga(SavedManga{.plugin = plugin, .slug = slug, .name = "F"}); // fp persists via the master column
     const auto seed = [](const std::string& id, double n) {
         return ChapterSeed{id, n, "t" + id, "u" + id};
     };

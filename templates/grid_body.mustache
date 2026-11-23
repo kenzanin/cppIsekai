@@ -8,7 +8,7 @@ function gridPage() {
   return {
     q: prefs.q || '', plugin: V2 ? (prefs.plugin || '') : '', sort: V2 ? (prefs.sort || 'read') : 'read',
     sortDir: V2 ? (prefs.sortDir || {}) : { read: 'desc' }, dup: V2 && !!prefs.dup,
-    filterState: Object.assign({ new: 'off', done: 'off', ongoing: 'off', hiatus: 'off', canceled: 'off', completed: 'off' }, prefs.filterState || {}),
+    filterState: Object.assign({ new: 'off', done: 'off', ongoing: 'off', hiatus: 'off', canceled: 'off', completed: 'off', orphan: 'off' }, prefs.filterState || {}),
     page: 1, perPage: 30,
     pages: 1, count: 0, total: 0, pins: 0, hasDup: false, hasStats: false,
     init() {
@@ -72,7 +72,8 @@ function gridPage() {
     sarrow(k) { return this.sort === k ? ((this.sortDir[k] || 'asc') === 'desc' ? ' \u2193' : ' \u2191') : ''; },
     reset() { this.q = ''; const i = document.getElementById('lib-q'); if (i) i.value = '';
       this.plugin = ''; this.sort = 'read'; this.sortDir = { read: 'desc' }; this.dup = false;
-      this.filterState = { new: 'off', done: 'off', ongoing: 'off', hiatus: 'off', canceled: 'off', completed: 'off' }; this.page = 1; this.apply(); },
+      this.filterState = { new: 'off', done: 'off', ongoing: 'off', hiatus: 'off', canceled: 'off', completed: 'off', orphan: 'off' }; this.page = 1; this.apply(); },
+    hasOrphan() { return this.cards.some(c => c.dataset.state === 'orphan'); },
     ratio(c) { const t = +c.dataset.total || 0; return t > 0 ? (+c.dataset.read || 0) / t : -1; },
     badge(c) { // New/Done from stored status_flags bits (bit0=is_new, bit1=is_done); Done priority kept by caller
       const f = +c.dataset.statusFlags || 0;
@@ -107,6 +108,8 @@ function gridPage() {
       if (ns.canceled === 'hide' && (f & 16)) return false;
       if (ns.completed === 'show' && !(f & 32)) return false;
       if (ns.completed === 'hide' && (f & 32)) return false;
+      if (ns.orphan === 'show' && c.dataset.state !== 'orphan') return false;
+      if (ns.orphan === 'hide' && c.dataset.state === 'orphan') return false;
       return true;
     },
     dir(sortKey) { return (this.sortDir[sortKey] || 'asc') === 'desc' ? -1 : 1; },
@@ -162,6 +165,7 @@ function gridPage() {
   <button @click="toggleBadge('hiatus')" aria-label="Filter hiatus" class="px-2.5 py-1 text-xs rounded-full border" :class="filterState.hiatus === 'show' ? 'border-amber-500 bg-amber-900/40 text-amber-300' : filterState.hiatus === 'hide' ? 'border-amber-700 bg-amber-500/10 text-amber-400/70' : 'border-zinc-700 text-zinc-400 hover:bg-zinc-800'" :title="filterState.hiatus === 'show' ? 'show hiatus' : filterState.hiatus === 'hide' ? 'hide hiatus' : 'hiatus off'">Hiatus</button>
   <button @click="toggleBadge('canceled')" aria-label="Filter canceled" class="px-2.5 py-1 text-xs rounded-full border" :class="filterState.canceled === 'show' ? 'border-rose-500 bg-rose-900/40 text-rose-300' : filterState.canceled === 'hide' ? 'border-rose-700 bg-rose-500/10 text-rose-400/70' : 'border-zinc-700 text-zinc-400 hover:bg-zinc-800'" :title="filterState.canceled === 'show' ? 'show canceled' : filterState.canceled === 'hide' ? 'hide canceled' : 'canceled off'">Canceled</button>
   <button @click="toggleBadge('completed')" aria-label="Filter completed" class="px-2.5 py-1 text-xs rounded-full border" :class="filterState.completed === 'show' ? 'border-violet-500 bg-violet-900/40 text-violet-300' : filterState.completed === 'hide' ? 'border-violet-700 bg-violet-500/10 text-violet-400/70' : 'border-zinc-700 text-zinc-400 hover:bg-zinc-800'" :title="filterState.completed === 'show' ? 'show completed' : filterState.completed === 'hide' ? 'hide completed' : 'completed off'">Completed</button>
+ <button x-show="hasOrphan()" @click="toggleBadge('orphan')" aria-label="Filter orphan" class="px-2.5 py-1 text-xs rounded-full border" :class="filterState.orphan === 'show' ? 'border-amber-500 bg-amber-900/40 text-amber-300' : filterState.orphan === 'hide' ? 'border-amber-700 bg-amber-500/10 text-amber-400/70' : 'border-zinc-700 text-zinc-400 hover:bg-zinc-800'">Orphan</button>
  <div class="flex items-center gap-1 text-xs border border-zinc-700 rounded px-1 py-0.5">
    <span class="text-zinc-500 px-1">Sort:</span>
    <button @click="setSort('added')" :class="scls('added')" class="px-1 py-0.5" :title="sort==='added' ? ('added ' + (sortDir.added || 'asc')) : 'sort added'">added<span x-text="sarrow('added')"></span></button>
@@ -185,7 +189,7 @@ function gridPage() {
  <h2 class="text-sm font-semibold text-zinc-300 mb-2">Library</h2>
 <ul id="saved-cards" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
   {{#saved_list}}
-  <li data-name="{{name}}" data-plugin="{{plugin}}" data-status="{{status}}" data-total="{{total_ch}}" data-read="{{read_ch}}" data-status-flags="{{status_flags}}" data-added="{{added_at}}" data-lastread="{{last_read_at}}" data-updated="{{updated_at}}" data-dup="{{dup}}" data-pinned="{{pinned}}" data-syn="{{syn}}" data-alt="{{alt}}">
+  <li data-name="{{name}}" data-plugin="{{plugin}}" data-status="{{status}}" data-total="{{total_ch}}" data-read="{{read_ch}}" data-status-flags="{{status_flags}}" data-added="{{added_at}}" data-lastread="{{last_read_at}}" data-updated="{{updated_at}}" data-dup="{{dup}}" data-pinned="{{pinned}}" data-syn="{{syn}}" data-alt="{{alt}}" data-state="{{state}}">
     <a href="{{url}}" class="group block min-w-0">
       <div class="relative">
         {{#cover}}
@@ -198,6 +202,7 @@ function gridPage() {
         <div class="absolute left-2 top-2 flex items-center gap-1">
           <span x-show="badge($el.closest('li')).news" class="rounded bg-red-600/70 px-2 py-0.5 text-[12px] font-semibold uppercase tracking-wide text-white">New</span>
           <span x-show="badge($el.closest('li')).done" class="rounded bg-emerald-600/70 px-2 py-0.5 text-[12px] font-semibold uppercase tracking-wide text-white">Done</span>
+          <span x-show="$el.closest('li').dataset.state === 'orphan'" class="rounded bg-amber-600/70 px-2 py-0.5 text-[12px] font-semibold uppercase tracking-wide text-white" title="plugin not installed">Orphan</span>
           <span x-show="((+$el.closest('li').dataset.statusFlags || 0) & 4)" class="rounded bg-sky-900/60 border border-sky-700 px-2 py-0.5 text-[12px] font-medium uppercase tracking-wide text-sky-200">Ongoing</span>
           <span x-show="((+$el.closest('li').dataset.statusFlags || 0) & 8)" class="rounded bg-amber-900/60 border border-amber-700 px-2 py-0.5 text-[12px] font-medium uppercase tracking-wide text-amber-200">Hiatus</span>
           <span x-show="((+$el.closest('li').dataset.statusFlags || 0) & 16)" class="rounded bg-rose-900/60 border border-rose-700 px-2 py-0.5 text-[12px] font-medium uppercase tracking-wide text-rose-200">Canceled</span>

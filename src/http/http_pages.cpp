@@ -50,21 +50,10 @@ crow::json::wvalue home_context(Store& store, BS::thread_pool<>& db, const crow:
     const int page_no = page_of(param(req, "page"));
 
     const auto plugins = on_pool(db, [&] { return store.plugins(); });
-    const int total = on_pool(db, [&] { return store.count(plugin, q); });
-    const int pages = std::max(1, (total + kPageSize - 1) / kPageSize);
-    const int shown = std::min(page_no, pages);
-    const auto titles = on_pool(db, [&] { return store.search(plugin, q, kPageSize, (shown - 1) * kPageSize); });
 
     auto ctx = layout(store, db, "library");
     ctx["q"] = q;
     ctx["plugin"] = plugin;
-    ctx["total"] = std::to_string(total);
-    ctx["page"] = std::to_string(shown);
-    ctx["pages"] = std::to_string(pages);
-    ctx["prev"] = std::to_string(shown > 1 ? shown - 1 : 1);
-    ctx["next"] = std::to_string(shown < pages ? shown + 1 : pages);
-    ctx["has_prev"] = shown > 1;
-    ctx["has_next"] = shown < pages;
     ctx["filtered"] = !plugin.empty();
 
     // Sidebar counts the user's library (saved_manga), not the legacy title
@@ -196,16 +185,7 @@ crow::json::wvalue home_context(Store& store, BS::thread_pool<>& db, const crow:
     ctx["saved_total"] = std::to_string(saved.size());
     ctx["saved_total_all"] = std::to_string(saved_total_all); // controls 2.1: sidebar total card
 
-    std::vector<crow::json::wvalue> cards;
-    for (const auto& title : titles) {
-        crow::json::wvalue card;
-        card["name"] = title.name;
-        card["plugin"] = title.plugin;
-        card["hue"] = std::to_string(static_cast<int>(title.id * 47 % 360));
-        cards.push_back(std::move(card));
-    }
-    ctx["titles"] = std::move(cards);
-    spdlog::info("library plugin='{}' q='{}' page {} -> {} titles", plugin, q, shown, titles.size());
+    spdlog::info("library plugin='{}' q='{}' page {} -> {} saved", plugin, q, page_no, saved.size());
     return ctx;
 }
 

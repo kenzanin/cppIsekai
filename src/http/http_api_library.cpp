@@ -33,6 +33,11 @@ void register_library(Ctx& c) {
             row["read_ch"] = r.read_ch;
             row["status_flags"] = r.status_flags; // bit0 carries the New state (was has_update)
             row["pinned"] = r.pinned; // library-pin: grid Pinned section membership
+            // library-ownership 3.2: derived upstream state drives the orphan
+            // badge/filter; never stored, recomputed per request.
+            const auto up = store.plugin_upstream(r.plugin);
+            row["state"] = up == Upstream::orphan ? "orphan"
+                            : (up == Upstream::offline ? "offline" : "live");
             row["last_read_at"] = static_cast<double>(r.last_read_at);
             row["updated_at"] = static_cast<double>(r.updated_at);
             // manga-detail-table 1.3: expose the materialized display columns (raw
@@ -138,6 +143,37 @@ void register_library(Ctx& c) {
                 return 0;
             }); // dedup 2.3
             crow::response r{R"({"ok":true,"saved":false})"};
+            r.set_header("Content-Type", "application/json");
+            return r;
+        });
+
+    // library-ownership 3.5: mass cleanup for retained entries whose plugin is
+    // gone. Same wipe path as the single remove (rows + api_cache + images);
+    // live/offline entries are untouched.
+    CROW_ROUTE(app, "/api/library/purge-orphans")
+        .methods(crow::HTTPMethod::POST)([&]() -> crow::response {
+            const auto orphans = on_pool(db, [&] { return store.orphan_list(); });
+            int purged = 0;
+            for (const auto& [p, s] : orphans) {
+                const std::string cover = on_pool(db, [&] {
+                    std::string c;
+                    if (const auto row = store.saved_get(p, s)) {
+                        c = row->cover;
+                    }
+                    store.unsave_manga(p, s);
+                    store.recompute_dup_groups();
+                    return c;
+                });
+                on_pool(plugin_pool, [&] {
+                    images.purge_pair(p, s, {cover});
+                    return 0;
+                });
+                ++purged;
+            }
+            crow::json::wvalue out;
+            out["ok"] = true;
+            out["purged"] = purged;
+            crow::response r{out};
             r.set_header("Content-Type", "application/json");
             return r;
         });

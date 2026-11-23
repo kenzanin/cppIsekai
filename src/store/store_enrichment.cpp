@@ -18,6 +18,18 @@ static bool title_meta_row_bad(const std::string& json) {
 
 std::optional<Store::TitleMetaRow> Store::title_meta_get(const std::string& plugin, const std::string& slug) {
     const store_detail::OpTrace _op{"title_meta_get"};
+    if (!saved_exists(plugin, slug)) {
+        if (auto* e = ephem_find(plugin, slug); e != nullptr && e->meta.has_value()) {
+            const auto& r = *e->meta;
+            if (title_meta_row_bad(r.fetched) || title_meta_row_bad(r.chosen)) {
+                return std::nullopt;
+            }
+            return TitleMetaRow{
+                .plugin = r.plugin, .slug = r.slug, .fetched = r.fetched, .chosen = r.chosen, .fetched_at = r.fetched_at};
+        }
+        return std::nullopt;
+    }
+
     auto rows = impl_->storage.get_all<store_detail::TitleMetaEntity>(
         where(c(&store_detail::TitleMetaEntity::plugin) == plugin && c(&store_detail::TitleMetaEntity::slug) == slug));
     if (rows.empty()) {
@@ -64,7 +76,21 @@ void Store::title_meta_put_fetched(const std::string& plugin, const std::string&
                                    std::int64_t fetched_at) {
     const store_detail::OpTrace _op{"title_meta_put_fetched"};
     auto rows = impl_->storage.get_all<store_detail::TitleMetaEntity>(
-        where(c(&store_detail::TitleMetaEntity::plugin) == plugin && c(&store_detail::TitleMetaEntity::slug) == slug));
+        where(c(&store_detail::TitleMetaEntity::plugin) == plugin && c(&store_detail::TitleMetaEntity::slug) == slug));    if (!saved_exists(plugin, slug)) {
+        auto& e = ephem_create(plugin, slug);
+        if (!e.meta.has_value()) {
+            e.meta = store_detail::TitleMetaEntity{.plugin = plugin,
+                                                   .slug = slug,
+                                                   .fetched = fetched_json,
+                                                   .chosen = "{}",
+                                                   .fetched_at = fetched_at};
+        } else {
+            e.meta->fetched = fetched_json; // chosen survives a re-fetch
+            e.meta->fetched_at = fetched_at;
+        }
+        return;
+    }
+
     store_detail::TitleMetaEntity row{
         .plugin = plugin, .slug = slug, .fetched = fetched_json, .chosen = "{}", .fetched_at = fetched_at};
     if (!rows.empty()) {
@@ -77,7 +103,20 @@ void Store::title_meta_put_fetched(const std::string& plugin, const std::string&
 void Store::title_meta_put_chosen(const std::string& plugin, const std::string& slug, const std::string& chosen_json) {
     const store_detail::OpTrace _op{"title_meta_put_chosen"};
     auto rows = impl_->storage.get_all<store_detail::TitleMetaEntity>(
-        where(c(&store_detail::TitleMetaEntity::plugin) == plugin && c(&store_detail::TitleMetaEntity::slug) == slug));
+        where(c(&store_detail::TitleMetaEntity::plugin) == plugin && c(&store_detail::TitleMetaEntity::slug) == slug));    if (!saved_exists(plugin, slug)) {
+        auto& e = ephem_create(plugin, slug);
+        if (!e.meta.has_value()) {
+            e.meta = store_detail::TitleMetaEntity{.plugin = plugin,
+                                                   .slug = slug,
+                                                   .fetched = "[]",
+                                                   .chosen = chosen_json,
+                                                   .fetched_at = 0};
+        } else {
+            e.meta->chosen = chosen_json; // fetched survives a chosen save
+        }
+        return;
+    }
+
     store_detail::TitleMetaEntity row{
         .plugin = plugin, .slug = slug, .fetched = "[]", .chosen = chosen_json, .fetched_at = 0};
     if (!rows.empty()) {
@@ -103,6 +142,17 @@ bool chosen_clear(glz::generic& chosen, std::initializer_list<const char*> drop)
 
 void Store::title_meta_reset_cover(const std::string& plugin, const std::string& slug) {
     const store_detail::OpTrace _op{"title_meta_reset_cover"};
+    if (!saved_exists(plugin, slug)) {
+        if (auto* e = ephem_find(plugin, slug); e != nullptr && e->meta.has_value()) {
+            glz::generic chosen;
+            if (!glz::read_json(chosen, e->meta->chosen) && chosen_clear(chosen, {"cover"})) {
+                if (auto out = glz::write_json(chosen)) {
+                    e->meta->chosen = std::move(*out);
+                }
+            }
+        }
+        return;
+    }
     auto rows = impl_->storage.get_all<store_detail::TitleMetaEntity>(
         where(c(&store_detail::TitleMetaEntity::plugin) == plugin && c(&store_detail::TitleMetaEntity::slug) == slug));
     if (rows.empty()) {
@@ -120,6 +170,18 @@ void Store::title_meta_reset_cover(const std::string& plugin, const std::string&
 
 void Store::title_meta_reset_detail(const std::string& plugin, const std::string& slug) {
     const store_detail::OpTrace _op{"title_meta_reset_detail"};
+    if (!saved_exists(plugin, slug)) {
+        if (auto* e = ephem_find(plugin, slug); e != nullptr && e->meta.has_value()) {
+            glz::generic chosen;
+            if (!glz::read_json(chosen, e->meta->chosen) &&
+                !chosen_clear(chosen, {"title", "synopsis", "artist", "author", "tags_add", "tags_hidden", "related_add"})) {
+                // round-trip failure keeps the row untouched (parity with SQL path)
+            } else if (auto out = glz::write_json(chosen)) {
+                e->meta->chosen = std::move(*out);
+            }
+        }
+        return;
+    }
     auto rows = impl_->storage.get_all<store_detail::TitleMetaEntity>(
         where(c(&store_detail::TitleMetaEntity::plugin) == plugin && c(&store_detail::TitleMetaEntity::slug) == slug));
     if (rows.empty()) {

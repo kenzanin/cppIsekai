@@ -1,4 +1,6 @@
 ## 2026-11-23
+* **Update**: Linked `findings/browse-writes-nothing-orphan-free.md` to `decisions/library-ownership-model.md` (Evidence for the implemented model: 73% of chapter rows were browse dust before the routing change.).
+* **Creation**: Documented concept `findings/browse-writes-nothing-orphan-free.md` (Routing unsaved pairs to memory removes the orphan class entirely (measured 73%)).
 * **Update**: Updated concept `decisions/library-ownership-model.md`.
 * **Update**: Linked `decisions/library-ownership-model.md` to `decisions/library-promote-on-save.md` (Supersedes the where-to-stage question: the staging store is process memory, not api_cache, and promotion carries pre-save read state.).
 * **Creation**: Documented concept `decisions/library-ownership-model.md` (Library ownership: RAM for browse, SQLite for saved, plugin memory marked orphan (planned, openspec library-ownership)).

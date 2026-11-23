@@ -39,6 +39,15 @@ bool Store::migrate_source(const std::string& old_plugin, const std::string& old
     if (!st.get_all<store_detail::SavedMangaEntity>(where(pair_of(new_plugin, new_slug))).empty()) {
         return false; // target already saved
     }
+    // library-ownership 2.1: a browsed-but-unsaved target holds its rows in the
+    // ephemeral store -- stage them so the boundary carry sees them. The pair
+    // becomes saved within this call's txn; the entry is discarded on success.
+    // ponytail: a failure after staging leaves the staged rows until the next
+    // save/reparse reclaims them.
+    const bool staged = !saved_exists(new_plugin, new_slug);
+    if (staged) {
+        ephem_copy_into(new_plugin, new_slug);
+    }
     // Read boundary: highest read chapter number on the old pair.
     double bound = -1.0;
     for (const auto& ch : st.get_all<store_detail::ChapterEntity>(where(ch_pair_of(old_plugin, old_slug)))) {
@@ -123,6 +132,9 @@ bool Store::migrate_source(const std::string& old_plugin, const std::string& old
     }
     tx.commit();
 
+    if (staged) {
+        ephem_erase(new_plugin, new_slug);
+    }
     // FTS on its own connection, post-commit (the helpers open a second
     // handle); a crash here self-heals on the next saved write.
     store_detail::fts_delete(*impl_, old_plugin, old_slug);

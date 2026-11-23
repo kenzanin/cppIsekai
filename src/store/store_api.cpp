@@ -200,7 +200,7 @@ std::vector<UpdateAttempt> Store::update_candidates(std::int64_t now, int per_pl
                       "      FROM saved_manga s LEFT JOIN update_attempts a "
                       "           ON a.plugin = s.plugin AND a.slug = s.slug "
                       "      WHERE s.read_ch <= 1 AND (a.backoff_until IS NULL OR a.backoff_until <= ?) "
-                      "        AND COALESCE((SELECT enabled FROM plugin p WHERE p.plugin_id = s.plugin), 1) = 1) "
+                      "        AND EXISTS(SELECT 1 FROM plugin p WHERE p.plugin_id = s.plugin AND p.enabled = 1)) "
                       "WHERE rn <= ? ORDER BY plugin, (last_attempt_at IS NULL) DESC, last_attempt_at ASC";
     sqlite3_stmt* stmt = nullptr;
     std::vector<UpdateAttempt> out;
@@ -243,13 +243,11 @@ std::vector<std::string> Store::plugin_prune_absent(const std::vector<std::strin
         }
         sqlite3_finalize(stmt);
     }
+    // library-ownership 3.1: hosting state only. Library data (saved_manga,
+    // chapters, chapter_pages, reader_positions, title_meta, update_attempts)
+    // survives as orphans -- a reinstall with the same id revives it.
     const char* const cascade[] = {
-        "DELETE FROM title WHERE plugin_id IN (SELECT id FROM plugin WHERE plugin_id = ?)",
         "DELETE FROM plugin_state WHERE plugin_id = ?",
-        "DELETE FROM reader_positions WHERE plugin = ?",
-        "DELETE FROM saved_manga WHERE plugin = ?",
-        "DELETE FROM title_meta WHERE plugin = ?",
-        "DELETE FROM update_attempts WHERE plugin = ?",
         "DELETE FROM api_cache WHERE plugin_id = ?",
         "DELETE FROM plugin WHERE plugin_id = ?",
     };
