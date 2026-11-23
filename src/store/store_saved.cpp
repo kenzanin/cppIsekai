@@ -33,6 +33,9 @@ static store_detail::SavedMangaEntity saved_row(const SavedManga& m, std::int64_
         .tags = m.tags,
         .synopsis_display = m.synopsis_display,
         .pinned = m.pinned,
+        .chapters_fp = {},
+        .novel = 0,
+        .detail_url = {},
     };
 }
 
@@ -68,6 +71,9 @@ void Store::save_manga(const SavedManga& m) {
     }
     impl_->storage.replace(e);
     store_detail::fts_sync(*impl_, e.plugin, e.slug, e.name, e.alt_titles, e.synopsis); // library-dedup 1.4
+    // library-ownership 2.1: the row exists now -- promote any browse state
+    // (flags/read_max/pages/position/enrichment) accumulated before the save.
+    ephem_promote(m.plugin, m.slug);
 }
 
 void Store::saved_stats_update(const std::string& plugin, const std::string& slug, const std::string& status,
@@ -254,6 +260,7 @@ void Store::unsave_manga(const std::string& plugin, const std::string& slug) {
     auto& st = impl_->storage;
     store_detail::TxGuard tx{st};
     st.begin_transaction();
+    ephem_erase(plugin, slug); // browse state dies with the library entry
     st.remove_all<store_detail::SavedMangaEntity>(
         where(c(&store_detail::SavedMangaEntity::plugin) == plugin &&
               c(&store_detail::SavedMangaEntity::slug) == slug));

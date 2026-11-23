@@ -74,7 +74,7 @@ void register_admin(Ctx& c) {
             row["version"] = p.version;
             row["runtime"] = p.runtime;
             row["enabled"] = p.enabled;
-            row["titles"] = p.titles;
+            row["saved"] = p.saved; // library size for this plugin
             row["caps"] = p.caps;
             row["website"] = plugins.website(p.plugin_id);
             if (!p.enabled) {

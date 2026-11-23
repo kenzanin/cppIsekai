@@ -42,7 +42,6 @@ struct Ctx {
 // Reserved plugin_state rows for host bookkeeping: the last reader position
 // (the anchor the skip-rerun reads back) and per-pair detail flags.
 inline constexpr const char* kStateHost = "host";
-inline constexpr const char* kPositionKey = "host/pos";
 
 // Typed readers for request/state JSON: absent or wrong-typed -> default.
 // House crow accessors throw on a type mismatch; bodies are a trust boundary.
@@ -353,7 +352,7 @@ inline std::string refresh_error_text(const std::string& method, const std::stri
     return "refresh failed: " + method;
 }
 
-enum class RefreshResult : std::int8_t { kOk, kRejected, kDisabled, kUpstreamFailed };
+enum class RefreshResult : std::int8_t { kOk, kRejected, kDisabled, kOrphan, kUpstreamFailed };
 
 struct RefreshOutcome {
     RefreshResult result = RefreshResult::kOk;
@@ -374,6 +373,12 @@ inline RefreshOutcome refresh_title(Store& store, BS::thread_pool<>& db, BS::thr
     const bool enabled = http::on_pool(db, [&] { return store.plugin_enabled(plugin); });
     if (!enabled) {
         out.result = RefreshResult::kDisabled; // not an attempt either
+        return out;
+    }
+    // library-ownership 3.3: no registered plugin = no upstream to refresh
+    // (the entry serves from local rows; the scheduler also skips orphans).
+    if (http::on_pool(db, [&] { return store.plugin_upstream(plugin); }) == Upstream::orphan) {
+        out.result = RefreshResult::kOrphan;
         return out;
     }
     crow::json::wvalue p;

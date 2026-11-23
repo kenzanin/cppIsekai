@@ -17,18 +17,12 @@
 struct Plugin {
     std::int64_t id{};
     std::string name;
-    int titles{};
+    int saved{}; // saved_manga rows for this plugin (library sidebar count)
     std::string plugin_id; // stable plugin key (folder id); empty for seed rows
     std::string version;
     bool enabled{true};
     std::string runtime; // lua/js/wasm; empty for legacy rows
     std::string caps;    // comma-separated capability list
-};
-
-struct Title {
-    std::int64_t id{};
-    std::string name;
-    std::string plugin;
 };
 
 /** Last-good / fresh read model for plugin API responses: payload is JSONB
@@ -140,6 +134,15 @@ struct UpdateAttempt {
 
 struct StoreImpl;
 
+/** \brief Upstream state of a pair's plugin, derived from the registry
+ *  (library-ownership D5) — never stored: live = registered+enabled, offline =
+ *  registered+disabled, orphan = no plugin row. */
+enum class Upstream : std::int8_t { live, offline, orphan };
+
+namespace store_detail {
+struct EphemPair;
+}
+
 class Store {
 public:
     explicit Store(const std::string& path);
@@ -149,6 +152,19 @@ public:
     Store& operator=(const Store&) = delete;
 
     std::vector<Plugin> plugins();
+    /** \brief Registry state machine for a saved pair's plugin (D5/D7):
+     *  live = registered+enabled, offline = disabled, orphan = no row. An
+     *  empty legacy id counts as live (seed rows carry no id to gate on). */
+    Upstream plugin_upstream(const std::string& plugin_id) const;
+    /** \brief Saved pairs whose plugin id is not registered (the orphans). */
+    std::vector<std::pair<std::string, std::string>> orphan_list();
+    /** \brief Per-pair host fields, routed saved-column/ephemeral (D10). */
+    void pair_novel_set(const std::string& plugin, const std::string& slug, bool on);
+    std::optional<bool> pair_novel_get(const std::string& plugin, const std::string& slug);
+    void pair_detail_url_set(const std::string& plugin, const std::string& slug, const std::string& url);
+    std::string pair_detail_url_get(const std::string& plugin, const std::string& slug);
+    void pair_chapters_fp_set(const std::string& plugin, const std::string& slug, const std::string& fp);
+    std::string pair_chapters_fp_get(const std::string& plugin, const std::string& slug);
     /** \brief Register/upsert a discovered plugin keyed by its stable id. */
     void upsert_plugin(const std::string& id, const std::string& name, const std::string& version,
                        const std::string& capabilities, const std::string& runtime);
@@ -162,8 +178,6 @@ public:
      *  update_attempts, api_cache) and its plugin row, one transaction per
      *  plugin. Returns the removed ids. */
     std::vector<std::string> plugin_prune_absent(const std::vector<std::string>& keep_ids);
-    int count(const std::string& plugin, const std::string& query);
-    std::vector<Title> search(const std::string& plugin, const std::string& query, int limit, int offset);
 
     /** \brief Upsert one update_attempts row. Success (outcome=ok) resets
      *  consecutive_errors/backoff_until; errors increment the counter and set
@@ -348,5 +362,21 @@ public:
     void title_meta_reset_detail(const std::string& plugin, const std::string& slug);
 
 private:
+    /** \brief True when the pair has a saved_manga row: the routing switch
+     *  for every pair-keyed store method (D2). */
+    bool saved_exists(const std::string& plugin, const std::string& slug);
+    /** \brief Ephemeral pair accessors (library-ownership D1). The pointer is
+     *  null when absent; the reference creates the entry and touches the LRU.
+     *  Both must be called under the OpTrace mutex (all store methods hold it). */
+    store_detail::EphemPair* ephem_find(const std::string& plugin, const std::string& slug);
+    store_detail::EphemPair& ephem_create(const std::string& plugin, const std::string& slug);
+    void ephem_erase(const std::string& plugin, const std::string& slug);
+    /** \brief Copy an ephemeral pair into SQL rows (chapters/pages/meta/position
+     *  + host columns). Caller owns the transaction semantics: promote wraps it
+     *  in its own; migrate stages inside its own txn then discards on success. */
+    void ephem_copy_into(const std::string& plugin, const std::string& slug);
+    /** \brief Copy + erase in one txn (save_manga calls this after the row upsert). */
+    void ephem_promote(const std::string& plugin, const std::string& slug);
+
     std::unique_ptr<StoreImpl> impl_;
 };

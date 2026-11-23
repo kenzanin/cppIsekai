@@ -27,6 +27,16 @@
 /** Constant per-method TTL for the api_cache read model; ponytail: knob later. */
 inline constexpr std::int64_t kApiCacheTtl = 24 * 3600;
 
+/** Orphan envelope: the pair's plugin id is not registered (D7) — local rows
+ *  still serve via saved_detail_response/chapters_row_response before this. */
+inline constexpr const char* kOrphanEnv = R"({"ok":false,"error":"plugin removed"})";
+
+/** \brief Gate helper: disabled and removed plugins both stay quiet; the
+ *  distinction is only the envelope text. */
+inline bool plugin_quiet(const Store& store, const std::string& id) {
+    return store.plugin_upstream(id) != Upstream::live;
+}
+
 /** \brief Per-method host defaults; manifest `cache_ttl` (plugin-side) wins
  *  per plugin+method. Reader page URLs can carry short-lived signed session
  *  tokens (comico `d=` decays in minutes -> 410 on every image), so `pages`
@@ -111,7 +121,10 @@ std::string call_cached(Store& store, const std::string& id, const std::string& 
     // still serve; no cache at all answers with this and the net stays quiet.
     static constexpr const char* kDisabledEnv = R"({"ok":false,"error":"plugin disabled"})";
     if (!stale_optin(method)) {
-        return store.plugin_enabled(id) ? call() : kDisabledEnv;
+        if (plugin_quiet(store, id)) {
+            return store.plugin_upstream(id) == Upstream::orphan ? kOrphanEnv : kDisabledEnv;
+        }
+        return call();
     }
 
     const std::string key = stale_key(id, method, params_json);
@@ -140,8 +153,8 @@ std::string call_cached(Store& store, const std::string& id, const std::string& 
     }
     spdlog::debug("[plugin:{}] {} api_cache MISS", id, method);
 
-    if (!store.plugin_enabled(id)) {
-        return kDisabledEnv; // disabled and nothing cached: stay quiet
+    if (plugin_quiet(store, id)) {
+        return store.plugin_upstream(id) == Upstream::orphan ? kOrphanEnv : kDisabledEnv;
     }
     std::string res = call();
 

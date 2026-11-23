@@ -58,11 +58,15 @@ void migrate_saved_manga(const std::string& path) {
         "ALTER TABLE saved_manga ADD COLUMN tags TEXT NOT NULL DEFAULT ''",
         "ALTER TABLE saved_manga ADD COLUMN synopsis_display TEXT NOT NULL DEFAULT ''",
         "ALTER TABLE saved_manga ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE saved_manga ADD COLUMN chapters_fp TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE saved_manga ADD COLUMN novel INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE saved_manga ADD COLUMN detail_url TEXT NOT NULL DEFAULT ''",
     };
     constexpr std::string_view names[] = {
         "status",     "total_ch", "read_ch",    "last_read_at", "updated_at",
         "synopsis",   "alt_titles", "dup_group", "status_flags",
         "authors", "artists", "tags", "synopsis_display", "pinned",
+        "chapters_fp", "novel", "detail_url",
     };
     for (std::size_t i = 0; i < std::size(stmts); ++i) {
         if (!have.contains(std::string(names[i]))) {
@@ -189,6 +193,47 @@ Store::Store(const std::string& path) : impl_(std::make_unique<StoreImpl>(path))
             sqlite3_open(path.c_str(), &db);
             sqlite3_exec(db, "ALTER TABLE reader_positions ADD COLUMN zoom TEXT DEFAULT ''", nullptr, nullptr, nullptr);
             sqlite3_close(db); // one-shot migration alongside the ORM connection
+        }
+    }
+    // library-ownership 4.2: the legacy title cache table is retired.
+    {
+        sqlite3* db = nullptr;
+        if (sqlite3_open(path.c_str(), &db) == SQLITE_OK) {
+            store_detail::attach_busy(db);
+            sqlite3_exec(db, "DROP TABLE IF EXISTS title", nullptr, nullptr, nullptr);
+            sqlite3_close(db);
+        }
+    }
+    // library-ownership 4.1: per-pair plugin_state families move into columns,
+    // and the retired shadow key families go with them. Idempotent: the UPDATE
+    // joins on the keys' existence and the DELETEs no-op once empty.
+    {
+        sqlite3* db = nullptr;
+        if (sqlite3_open(path.c_str(), &db) == SQLITE_OK) {
+            store_detail::attach_busy(db);
+            sqlite3_exec(db,
+                         "UPDATE saved_manga SET chapters_fp = (SELECT s.value FROM plugin_state s"
+                         " WHERE s.plugin_id = 'host' AND s.key = 'host/chapters_fp/' || saved_manga.plugin || '/' || saved_manga.slug)"
+                         " WHERE EXISTS(SELECT 1 FROM plugin_state s WHERE s.plugin_id = 'host'"
+                         " AND s.key = 'host/chapters_fp/' || saved_manga.plugin || '/' || saved_manga.slug)",
+                         nullptr, nullptr, nullptr);
+            sqlite3_exec(db,
+                         "UPDATE saved_manga SET novel = 1 WHERE EXISTS(SELECT 1 FROM plugin_state s"
+                         " WHERE s.plugin_id = 'host' AND s.key = 'host/novel/' || saved_manga.plugin || '/' || saved_manga.slug"
+                         " AND CAST(s.value AS INTEGER) = 1)",
+                         nullptr, nullptr, nullptr);
+            sqlite3_exec(db,
+                         "UPDATE saved_manga SET detail_url = (SELECT s.value FROM plugin_state s"
+                         " WHERE s.plugin_id = 'host' AND s.key = 'host/detail_url/' || saved_manga.plugin || '/' || saved_manga.slug)"
+                         " WHERE EXISTS(SELECT 1 FROM plugin_state s WHERE s.plugin_id = 'host'"
+                         " AND s.key = 'host/detail_url/' || saved_manga.plugin || '/' || saved_manga.slug)",
+                         nullptr, nullptr, nullptr);
+            sqlite3_exec(db,
+                         "DELETE FROM plugin_state WHERE plugin_id = 'host' AND (key LIKE 'host/chapters_fp/%' OR"
+                         " key LIKE 'host/novel/%' OR key LIKE 'host/detail_url/%' OR key LIKE 'host/skip/%' OR"
+                         " key LIKE 'host/read/%' OR key LIKE 'host/total/%')",
+                         nullptr, nullptr, nullptr);
+            sqlite3_close(db);
         }
     }
     // ponytail: sqlite_orm sync_schema won't ALTER an existing table; the

@@ -52,12 +52,12 @@ namespace http::api {
             is_novel = *b;
         }
     }
-    const std::string novel_key = "host/novel/" + plugin + "/" + slug;
-    const std::string url_key = "host/detail_url/" + plugin + "/" + slug;
+    // library-ownership 4.1: the per-pair host fields are master columns
+    // (routed saved-column/ephemeral) -- no plugin_state keys anymore.
     const std::string detail_url = str_of("url");
     on_pool(db, [&] {
-        store.state_set(kStateHost, novel_key, is_novel ? "1" : "0");
-        store.state_set(kStateHost, url_key, detail_url);
+        store.pair_novel_set(plugin, slug, is_novel);
+        store.pair_detail_url_set(plugin, slug, detail_url);
         store.saved_detail_put({.plugin = plugin,
                                 .slug = slug,
                                 .name = name,
@@ -101,13 +101,13 @@ namespace http::api {
     // Restore the extra plugin flags/kv captured at materialize time -- the
     // saved row only stores the canonical columns (no schema change needed).
     const auto novel = on_pool(db, [&] {
-        return store.state_get(kStateHost, "host/novel/" + plugin + "/" + slug);
+        return store.pair_novel_get(plugin, slug);
     });
-    d["is_novel"].data = novel.has_value() && *novel == "1";
+    d["is_novel"].data = novel.has_value() && *novel;
     const auto url = on_pool(db, [&] {
-        return store.state_get(kStateHost, "host/detail_url/" + plugin + "/" + slug);
+        return store.pair_detail_url_get(plugin, slug);
     });
-    set_str("url", url.value_or(""));
+    set_str("url", url);
 
     root["ok"].data = true;
     root["data"] = std::move(data);
