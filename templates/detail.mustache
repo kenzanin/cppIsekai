@@ -43,24 +43,40 @@
       <p class="text-sm text-zinc-400 leading-relaxed" x-show="detail.description" x-text="detail.description"></p>
       <div class="flex gap-2 mt-4">
         <button @click="toggleLibrary()"
-                class="px-3 py-1.5 text-sm border rounded-md disabled:opacity-40"
+                class="icon-action relative p-2 border rounded-md disabled:opacity-40"
                 :class="inLibrary ? 'border-emerald-700 bg-emerald-900/40 text-emerald-300 hover:bg-emerald-900/60' : 'border-zinc-700 text-zinc-300 hover:bg-zinc-800'"
-                x-text="inLibrary ? 'In library' : 'Add to library'"></button>
+                :title="inLibrary ? 'In library' : 'Add to library'"
+                :aria-label="inLibrary ? 'In library' : 'Add to library'">
+          <svg x-show="!inLibrary" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          <svg x-show="inLibrary" x-cloak class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7"/></svg>
+        </button>
         <button x-show="inLibrary" x-cloak @click="togglePin()"
-                class="px-3 py-1.5 text-sm border rounded-md disabled:opacity-40"
+                class="icon-action relative p-2 border rounded-md disabled:opacity-40"
                 :class="pinned ? 'border-amber-600 bg-amber-900/40 text-amber-300 hover:bg-amber-900/60' : 'border-zinc-700 text-zinc-300 hover:bg-zinc-800'"
-                x-text="pinned ? '\u2605 Pinned' : '\u2606 Pin'"></button>
+                :title="pinned ? 'Pinned' : 'Pin'"
+                :aria-label="pinned ? 'Pinned' : 'Pin'">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" :fill="pinned ? 'currentColor' : 'none'"><path d="m12 2.6 3 6.1 6.7 1-4.9 4.7 1.2 6.7L12 18l-6 3.1 1.2-6.7-4.9-4.7 6.7-1z"/></svg>
+        </button>
         <button x-show="inLibrary && !detail.is_novel" x-cloak @click="startOrContinue()"
                 :disabled="!inLibrary"
-                class="px-3 py-1.5 text-sm border rounded-md disabled:opacity-40"
+                class="icon-action relative p-2 border rounded-md disabled:opacity-40"
                 :class="inLibrary ? (hint ? 'border-emerald-700 bg-emerald-900/40 text-emerald-300 hover:bg-emerald-900/60' : 'border-emerald-700 text-emerald-300 hover:bg-zinc-800') : 'border-zinc-700 text-zinc-500'"
-                x-text="hint ? 'Continue reading' : 'Start reading'"></button>
+                :title="hint ? 'Continue reading — ch ' + hint.ch + ' · p ' + hint.page : 'Start reading'"
+                :aria-label="hint ? 'Continue reading — ch ' + hint.ch + ' · p ' + hint.page : 'Start reading'">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg>
+        </button>
         <button @click="refresh()" :disabled="refreshing || !pe"
-                class="px-3 py-1.5 text-sm border border-zinc-700 text-zinc-300 hover:bg-zinc-800 rounded-md disabled:opacity-40"
-                x-text="refreshing ? '…' : '⟳ Update'"></button>
+                class="icon-action relative p-2 border border-zinc-700 text-zinc-300 hover:bg-zinc-800 rounded-md disabled:opacity-40"
+                title="Update" aria-label="Update">
+          <svg x-show="!refreshing" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg>
+          <svg x-show="refreshing" x-cloak class="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3a9 9 0 1 0 9 9" stroke-linecap="round"/></svg>
+        </button>
         <a x-show="inLibrary" x-cloak
            :href="'/view/migrate/'+encodeURIComponent(plugin)+'/'+encodeURIComponent(slug)"
-           class="px-3 py-1.5 text-sm border border-zinc-700 text-zinc-300 hover:bg-zinc-800 rounded-md">Migrate</a>
+           class="icon-action relative p-2 border border-zinc-700 text-zinc-300 hover:bg-zinc-800 rounded-md"
+           title="Migrate" aria-label="Migrate">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h14l-3-3M20 16H6l3 3"/></svg>
+        </a>
       </div>
       <p class="text-xs text-amber-300 mt-2" x-show="detail.is_novel" x-cloak>
         Novel entry — this source has no page images. Read it on the <a :href="detail.url || '#'" target="_blank" rel="noopener" class="underline">original site</a> instead.

@@ -263,6 +263,7 @@ function detailPage() {
             if (p && p.ch) {
               this.hint = {
                 text: `continue ch ${p.ch} p ${p.page || 1}`,
+                ch: p.ch, page: p.page || 1, // tooltip on the icon-only Continue button
                 url: `/read/${encodeURIComponent(this.plugin)}/${encodeURIComponent(this.slug)}?ch=${p.ch}`
               };
             }

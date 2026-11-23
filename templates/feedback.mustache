@@ -18,15 +18,21 @@
     setTimeout(function () { t.remove(); }, kind === 'error' ? 8000 : 5000);
     return t;
   };
+  const ledClass = function (btn, color) {
+    // Icon-only controls stay square: park the LED on the corner instead of
+    // widening the button with an inline dot.
+    return 'feedback-led w-2 h-2 rounded-full ' + color + ' ' +
+      (btn.classList.contains('icon-action') ? 'absolute -top-1 -right-1 ml-0' : 'inline-block ml-2 align-middle');
+  };
   const led = function (btn, color, ms) {
     if (!btn) return;
     let d = btn.querySelector(':scope > .feedback-led');
     if (!d) {
       d = document.createElement('span');
-      d.className = 'feedback-led inline-block w-2 h-2 rounded-full ml-2 align-middle';
+      d.className = ledClass(btn, color);
       btn.appendChild(d);
     }
-    d.className = 'feedback-led inline-block w-2 h-2 rounded-full ml-2 align-middle ' + color;
+    d.className = ledClass(btn, color);
     if (ms > 0) {
       clearTimeout(d._t);
       d._t = setTimeout(function () { d.remove(); }, ms);
