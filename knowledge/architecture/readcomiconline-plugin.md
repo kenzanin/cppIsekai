@@ -3,20 +3,24 @@ type: Decision
 title: "Read Comics Online plugin: HAR-derived Blade scraper + bound CF clearance"
 description: "Lua plugin for readcomicsonline.ru built from tmp/readcomiconline.har: server-rendered HTML, all-results search, reader-all images, Cloudflare clearance cookie+UA in manifest params."
 tags: [plugin, lua, cloudflare, har, scraper]
-generated: { by: agent/mcp, at: "2026-11-24T01:15:49Z" }
+generated: { by: agent/mcp, at: "2026-11-24T01:17:58Z" }
 status: stable
 ---
 
 ## Contract
 
-- Plugin `readcomiconline` (id from folder) under `plugins_dev/lua/`, symlinked into `data/plugins/`. Manifest declares capabilities search/detail/chapters/pages/genres and params `site_url`, `user_agent`, `cookie`.
+- Plugin `readcomiconline` (id from folder) under `plugins_dev/lua/`, symlinked into `data/plugins/`. Manifest declares capabilities search/detail/chapters/pages/genres and only non-secret `site_url`; the bound `user_agent`/`cookie` live in gitignored `config.json` and are read with `config.get`.
 - `GET /advanced-search?name=<q>&status_id=&type_id=&category=<id>` returns ALL results (60 for "batman"); no pager. `categories()` memoizes the site's numeric publisher map from the form's `<select name="category">`; the first selected tag name maps to a numeric id.
 - Detail `/comic/<slug>`: h1 name, cover from the `w-full rounded-xl` img, status from the emerald pill, genres from `/comic-list/category/<slug>` links, synopsis from the Synopsis block. Chapters are `<a href=…/comic/<slug>/N>` rows, canonical number ascending, date via host.text.date_epoch.
 - Pages: `<div id="reader-all">` holds every page image; id `slug:number`. CDN images resolve their Referer through the host's domain match (cdn.readcomicsonline.ru ↔ readcomicsonline.ru).
 
 ## Why
 
-Cloudflare challenges plain curl-impersonate profiles AND lightpanda's default UA, and Chrome CDP navigation to this host times out. The HAR contains a valid `cf_clearance` + session cookie bound to the captured Chrome/158 UA; replaying that pair with plain curl returns 200 (60 cards). Keeping them in manifest params lets operators refresh via file edit + restart, no host code change.
+Cloudflare challenges plain curl-impersonate profiles AND lightpanda's default UA, and Chrome CDP navigation to this host times out. The HAR contains a valid `cf_clearance` + session cookie bound to the captured Chrome/158 UA; replaying that pair with plain curl returns 200 (60 cards). Keeping them in `config.json` follows plugin-data-segregation: secrets never enter the distributed manifest; operators refresh by file edit + restart, no host code change.
+
+## Security note
+
+The first commit accidentally placed the clearance cookie in the manifest; follow-up commit removes it from HEAD. Because the repo is public, the value must be considered exposed and the history rewritten (or the cookie rotated) separately.
 
 ## Traps paid for
 

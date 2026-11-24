@@ -1,4 +1,5 @@
 ## 2026-11-24
+* **Update**: Updated concept `architecture/readcomiconline-plugin.md`.
 * **Update**: Linked `architecture/readcomiconline-plugin.md` to `decisions/image-referer-domain-match.md` (CDN images rely on host domain-matched Referer, no manifest override).
 * **Update**: Linked `architecture/readcomiconline-plugin.md` to `architecture/plugin-system.md` (new Lua port following the folder/manifest/JSON-text ABI; no runtime changes).
 * **Creation**: Documented concept `architecture/readcomiconline-plugin.md` (Read Comics Online plugin: HAR-derived Blade scraper + bound CF clearance).

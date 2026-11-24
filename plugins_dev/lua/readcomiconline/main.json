@@ -13,9 +13,7 @@
     "genres"
   ],
   "params": {
-    "site_url": "https://readcomicsonline.ru",
-    "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/158.0.0.0 Safari/537.36",
-    "cookie": "cf_clearance=CtdU7VZSrkeEdm2jk8ms74hhy9dotChd_Ao34kbGUaEJ-Q3Gk8N0vG3bb3hBL92CWtPI5BwVaYqyjnD4bANVSuM78nPhsno4WK2Z5kyARdhtvQZxzI5aQbBiwttf71_ZF5PO_QjRpZvqevk7FsicgjHt_pmaaz5UwRFSBlMpaxai8g5MvKZTTT9fVqLvOgk4cstJqizl0aoTH0QsGGrnZvulMGOwxI_lvhX-82lP_z_8MM9cE07ukRJTwyNKc72Yv7R7TkMJEObriGr70Y0S-Wz8cAIM4aVwKlzx1GDXfq-tPTdrE2Q1I67G7ry2sSH3-dNzSO_xMSXGs0sMs4trQeXJ6pAm4MIo6ozSxZfTNN1VrJ4Y; XSRF-TOKEN=eyJpdiI6Ilp5SmRNM0FrYjFOY3BRQWxhRmRNa0E9PSIsInZhbHVlIjoidWRvbTFrSnN4cyt4aTVqWEUyQlVLRDRaM01NT1JHZGFwV3RQdVRqNWFBTmloaTliSnhzemhYcGlTbUlhUGZ1aDh0ZlFzRzFwUkhzS2E4RjNPRjRqTmtOYkkxTjVpMllLNVp0a0R5RmsvbTZDeGpxUzcwWVF1SEFjbFZURTBCVGQiLCJtYWMiOiIyNDVkZDcxYjI2NWM0OTIwZjgzY2JkMjU1NDdkYWMzNTMxNTM1Y2YwMmY5ZWU0ZDZhZDZkMjAwMDQ3N2I3MGY4IiwidGFnIjoiIn0%3D; read-comics-online-session=eyJpdiI6IkJZZ1d5cFJQS2E1R0p4TUhUNXdjMUE9PSIsInZhbHVlIjoiL1g5aUhMSndIeWp5NjVtejNpTzlOOFNJYWxhWCtmSXRIc2Z1QUw4WTZ2QWx1c3NiUzlvWjZBQzRZZmVXVVIrYjNtcHJTOXZwby80SmVueEtveG96YlY0di9QaWVwL2xSaFZoZ3hydnFJSFdyUUk1cHprVFhKcDNFaWFJczFPR0wiLCJtYWMiOiJkN2YzZDgwODQ5Y2NhZDIzYTAwOWFiOTVhYzljOGExMzRkNzQ5MTNlNjM4MzAwMGYxY2RhZWUzZTllOTNkMTg4IiwidGFnIjoiIn0%3D"
+    "site_url": "https://readcomicsonline.ru"
   },
   "timeout": 60,
   "runtime": "lua",

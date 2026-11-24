@@ -7,8 +7,10 @@ local BASE = "https://readcomicsonline.ru"
 -- Cloudflare challenges plain clients; the HAR capture supplied the clearance
 -- cookie + its exact UA. Both live in manifest params so they can be refreshed
 -- without touching code. Every page is server-rendered, no SPA/browser needed.
-local UA = host.plugin.param("user_agent") or "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/158.0.0.0 Safari/537.36"
-local COOKIE = host.plugin.param("cookie") or ""
+-- Secrets live in gitignored config.json (plugin-data-segregation), not the
+-- distributed manifest. Refresh both there when Cloudflare rotates clearance.
+local UA = config.get("user_agent") or "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/158.0.0.0 Safari/537.36"
+local COOKIE = config.get("cookie") or ""
 local OPTS = { timeout_ms = 60000, user_agent = UA }
 if COOKIE ~= "" then OPTS.headers = { Cookie = COOKIE } end
 

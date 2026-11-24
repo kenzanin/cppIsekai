@@ -5,13 +5,14 @@ so no browser/CDP is used at runtime.
 
 ## Cloudflare clearance
 
-The site issues a Cloudflare JS challenge to plain clients. The plugin sends the
-`cf_clearance` / session cookies and the exact User-Agent captured in
-`tmp/readcomiconline.har` via manifest `params.cookie` / `params.user_agent`.
-They are bound to each other and expire: when fetches start failing with
-`upstream status 403`, copy a fresh request `Cookie` header and `User-Agent`
-from an authenticated browser session into `main.json` under `params`, then
-restart the daemon (plugins are compiled at boot). No host code changes needed.
+The site issues a Cloudflare JS challenge to plain clients. The plugin sends
+`cf_clearance` / session cookies and the exact bound User-Agent captured in
+`tmp/readcomiconline.har`. Both are secrets: they live in the gitignored
+`config.json` (`cookie`, `user_agent`), never in the distributed `main.json`.
+They expire: when fetches start failing with `upstream status 403`, copy a
+fresh request `Cookie` header and `User-Agent` from an authenticated browser
+session into that file and restart the daemon (plugins are compiled at boot).
+No host code changes needed.
 
 ## Methods
 
