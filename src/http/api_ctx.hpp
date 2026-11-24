@@ -290,11 +290,11 @@ inline void apply_read_rollup(Store& store, BS::thread_pool<>& db, const std::st
     }
     // Keep total_ch fresh on row-served opens: a total learned only on the
     // live path leaves done = read_ch >= total_ch stuck at total 0.
+    // P0: two writes on the same DB handle share one pool round-trip; they
+    // were already serialized by OpTrace's mutex, so batching only removes a
+    // promise/future + task dispatch, never changes write order.
     http::on_pool(db, [&] {
         store.saved_stats_update(plugin, slug, "", static_cast<int>(total));
-        return 0;
-    });
-    http::on_pool(db, [&] {
         store.saved_read_rollup(plugin, slug, completed, 0);
         return 0;
     });
@@ -322,9 +322,6 @@ inline void sync_saved_stats(Store& store, BS::thread_pool<>& db, const std::str
         const std::string alts = detail::envelope_raw_json(*d, "alt_titles");
         http::on_pool(db, [&] {
             store.saved_stats_update(plugin, slug, status, chs ? total : -1);
-            return 0;
-        });
-        http::on_pool(db, [&] {
             store.saved_signal_update(plugin, slug, syn, alts);
             return 0;
         });
@@ -381,14 +378,18 @@ inline RefreshOutcome refresh_title(Store& store, BS::thread_pool<>& db, BS::thr
         out.result = RefreshResult::kRejected; // not an attempt: nothing upstream was hit
         return out;
     }
-    const bool enabled = http::on_pool(db, [&] { return store.plugin_enabled(plugin); });
+    // P0: both gates are one-row reads on the same DB handle; one round-trip
+    // instead of two, evaluated in the same order as before.
+    const auto [enabled, upstream] = http::on_pool(db, [&] {
+        return std::pair{store.plugin_enabled(plugin), store.plugin_upstream(plugin)};
+    });
     if (!enabled) {
         out.result = RefreshResult::kDisabled; // not an attempt either
         return out;
     }
     // library-ownership 3.3: no registered plugin = no upstream to refresh
     // (the entry serves from local rows; the scheduler also skips orphans).
-    if (http::on_pool(db, [&] { return store.plugin_upstream(plugin); }) == Upstream::orphan) {
+    if (upstream == Upstream::orphan) {
         out.result = RefreshResult::kOrphan;
         return out;
     }
@@ -413,14 +414,15 @@ inline RefreshOutcome refresh_title(Store& store, BS::thread_pool<>& db, BS::thr
             return out;
         }
     }
-    for (std::size_t i = 0; i < methods.size(); ++i) {
-        const std::string key = stale_key(plugin, methods[i], params);
-        const std::string body = fresh[i];
-        http::on_pool(db, [&] {
-            store.api_cache_put(plugin, key, params, body, static_cast<std::int64_t>(std::time(nullptr)), kApiCacheTtl);
-            return 0;
-        });
-    }
+    // P0: one dispatch for both write-throughs (detail + chapters).
+    http::on_pool(db, [&] {
+        for (std::size_t i = 0; i < methods.size(); ++i) {
+            const std::string key = stale_key(plugin, methods[i], params);
+            store.api_cache_put(plugin, key, params, fresh[i], static_cast<std::int64_t>(std::time(nullptr)),
+                                kApiCacheTtl);
+        }
+        return 0;
+    });
     const std::string detail_env = chapters_only ? std::string{} : fresh[0];
     const std::string chapters_env = chapters_only ? fresh[0] : fresh[1];
     sync_saved_stats(store, db, plugin, slug, detail_env, chapters_env);
