@@ -9,7 +9,8 @@
   "params": {
     "api": "https://mangahub.io/graphql",
     "img_cdn": "https://imgx.mghcdn.com/",
-    "thumb_cdn": "https://thumb.mghcdn.com/"
+    "thumb_cdn": "https://thumb.mghcdn.com/",
+    "source_id": "m01"
   },
   "runtime": "lua",
   "version": "1.0.0",

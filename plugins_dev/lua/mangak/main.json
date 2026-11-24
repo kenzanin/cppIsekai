@@ -1,0 +1,17 @@
+{
+  "name": "MangaK",
+  "site_url": "https://mangak.io",
+  "image_referer": "https://mangak.io/",
+  "logo": "logo.png",
+  "contract_version": 1,
+  "paginates": true,
+  "capabilities": ["search", "detail", "chapters", "pages", "genres"],
+  "params": {
+    "api": "https://api.mangak.io",
+    "site_url": "https://mangak.io"
+  },
+  "timeout": 45,
+  "runtime": "lua",
+  "version": "1.0.0",
+  "api": 1
+}
