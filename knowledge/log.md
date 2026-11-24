@@ -1,4 +1,6 @@
 ## 2026-11-24
+* **Update**: Linked `findings/chapter-flags-route-split-404.md` to `decisions/source-layout-policy.md`.
+* **Creation**: Documented concept `findings/chapter-flags-route-split-404.md` (TU split silently dropped POST /chapter/flags (404) -- route-surface test added).
 * **Update**: Updated concept `architecture/detail-page.md`.
 * **Update**: Linked `architecture/reader-page-progress.md` to `architecture/shareable-url-state.md`.
 * **Creation**: Documented concept `architecture/shareable-url-state.md` (Every page mirrors its view state into the URL (reader parity, replaceState only)).

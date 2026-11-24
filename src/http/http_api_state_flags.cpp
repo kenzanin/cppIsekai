@@ -21,6 +21,75 @@ void register_state_flags(Ctx& c) {
     auto& plugins = c.plugins;
     auto& prefetch = c.prefetch;
 
+    // chapter-store 3.1: one generic bitfield endpoint -- set/clear any flag
+    // combination over ids or the whole manga; range logic stays client-side
+    // (D3, Suwayomi updateChapters parity). Restored after the state-TU split
+    // accidentally dropped it (the detail page's mark-prev / clear-next call it).
+    CROW_ROUTE(app, "/chapter/flags")
+        .methods(crow::HTTPMethod::POST)([&](const crow::request& req) -> crow::response {
+            const auto body = crow::json::load(req.body);
+            std::vector<std::string> ids;
+            bool all = false;
+            int set = 0, clear = 0;
+            std::string plugin, slug;
+            if (body) {
+                if (body.has("ids") && body["ids"].t() == crow::json::type::List) {
+                    for (const auto& v : body["ids"]) {
+                        if (v.t() == crow::json::type::String) {
+                            ids.push_back(v.s());
+                        }
+                    }
+                }
+                if (body.has("all") && body["all"].t() == crow::json::type::True) {
+                    all = true;
+                }
+                if (body.has("set") && body["set"].t() == crow::json::type::Number) {
+                    set = static_cast<int>(body["set"].i());
+                }
+                if (body.has("clear") && body["clear"].t() == crow::json::type::Number) {
+                    clear = static_cast<int>(body["clear"].i());
+                }
+                if (body.has("plugin") && body["plugin"].t() == crow::json::type::String) {
+                    plugin = body["plugin"].s();
+                }
+                if (body.has("slug") && body["slug"].t() == crow::json::type::String) {
+                    slug = body["slug"].s();
+                }
+            }
+            if (plugin.empty() || plugin.contains('/') || slug.empty() || slug.contains('/') || (!all && ids.empty())) {
+                crow::response r{R"({"ok":false,"error":"plugin, slug and ids|all are required"})"};
+                r.code = 400;
+                r.set_header("Content-Type", "application/json");
+                return r;
+            }
+            crow::json::wvalue out;
+            auto touched = on_pool(db, [&] { return store.chapter_flags_apply(plugin, slug, ids, all, set, clear); });
+            // Keep the saved row's read rollup in lockstep with the bits the UI
+            // just changed: a later detail open is not guaranteed to have a
+            // chapters envelope in api_cache to derive total from.
+            const auto all_flags = on_pool(db, [&] { return store.chapter_flags_list(plugin, slug); });
+            if (!all_flags.empty()) {
+                int read = 0;
+                for (const auto& [cid, f] : all_flags) {
+                    if (f & std::to_underlying(ChapterFlag::kRead)) {
+                        ++read;
+                    }
+                }
+                const int total = static_cast<int>(all_flags.size());
+                on_pool(db, [&] { store.saved_stats_update(plugin, slug, "", total); return 0; });
+                on_pool(db, [&] { store.saved_read_rollup(plugin, slug, read, 0); return 0; });
+            }
+            out["ok"] = true;
+            crow::json::wvalue flags(crow::json::type::Object);
+            for (const auto& [cid, f] : touched) {
+                flags[cid] = f;
+            }
+            out["flags"] = std::move(flags);
+            crow::response r{out};
+            r.set_header("Content-Type", "application/json");
+            return r;
+        });
+
     CROW_ROUTE(app, "/chapter/<string>/skip")
         .methods(crow::HTTPMethod::POST)([&](const crow::request& req, std::string id) -> crow::response {
             id = plugin::url_decode(id); // crow leaves %3A etc. encoded in path params

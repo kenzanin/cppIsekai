@@ -355,6 +355,12 @@ cxx_bin("test_templates", {
     test = true,
 })
 
+cxx_bin("test_routes", {
+    files = {"tests/test_routes.cpp"},
+    defs = {'CPPISEKAI_HTTP_DIR="$(projectdir)/src/http"'},
+    test = true,
+})
+
 cxx_bin("test_gridjs", {
     files = {"tests/test_gridjs.cpp"},
     defs = {'CPPISEKAI_GRID_SRC="$(projectdir)/templates/grid_body.mustache"'},
