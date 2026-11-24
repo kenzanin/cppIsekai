@@ -1,0 +1,25 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=cppIsekai
+GenericName=Manga Viewer
+Comment=Local-first manga viewer daemon
+Exec=@APP_DIR@/run-cppIsekai.sh
+Path=@APP_DIR@
+Icon=@APP_DIR@/assets/tray.png
+Terminal=true
+Categories=Network;
+StartupNotify=false
+Actions=OpenReader;Restart;Stop;
+
+[Desktop Action OpenReader]
+Name=Open Reader
+Exec=xdg-open http://localhost:8090
+
+[Desktop Action Restart]
+Name=Restart Server
+Exec=@APP_DIR@/run-cppIsekai.sh restart
+
+[Desktop Action Stop]
+Name=Stop Server
+Exec=@APP_DIR@/run-cppIsekai.sh stop

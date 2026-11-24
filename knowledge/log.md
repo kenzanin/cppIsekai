@@ -1,4 +1,6 @@
 ## 2026-11-24
+* **Update**: Linked `packaging/desktop-launcher.md` to `architecture/cli-config.md` (desktop Exec reuses the canonical --config launcher instead of duplicating boot flags).
+* **Creation**: Documented concept `packaging/desktop-launcher.md` (.desktop launcher: templated Exec/Path/Icon + install script).
 * **Update**: Updated concept `decisions/in-memory-assets-zip.md`.
 * **Update**: Updated concept `architecture/readcomiconline-plugin.md`.
 * **Update**: Linked `architecture/readcomiconline-plugin.md` to `decisions/image-referer-domain-match.md` (CDN images rely on host domain-matched Referer, no manifest override).
