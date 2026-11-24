@@ -43,7 +43,7 @@ namespace http::api {
         // source does have. Retry down a short candidate chain (source detail
         // name/title, then the titles already matched by any enrichment
         // source) before falling back to the stored candidate.
-        for (const std::string& alt : on_pool(db, [&] { return retry_titles(store, plugin, slug, title); })) {
+        for (const std::string& alt : on_pool(db, [&] { return retry_titles(store, existing, plugin, slug, title); })) {
             const std::string retry = on_pool(plugin_pool, [&] { return plugins.enrich(id, alt, kind); });
             glz::generic env2;
             if (ok_env(retry, env2)) {

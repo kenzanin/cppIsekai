@@ -9,7 +9,8 @@ namespace http::api {
  *  deduped against \p first; bounded so one bad name costs a few calls, not a
  *  crawl. (library-ownership follow-up: the 5-cover report was a stale stored
  *  candidate whose refetch could never match the library's spelling.) */
-std::vector<std::string> retry_titles(Store& store, const std::string& plugin, const std::string& slug,
+std::vector<std::string> retry_titles(Store& store, const std::optional<Store::TitleMetaRow>& title_meta,
+                                             const std::string& plugin, const std::string& slug,
                                              const std::string& first) {
     std::vector<std::string> out;
     const auto push = [&](const std::string& t) {
@@ -17,9 +18,9 @@ std::vector<std::string> retry_titles(Store& store, const std::string& plugin, c
             out.push_back(t);
         }
     };
-    if (const auto row = store.title_meta_get(plugin, slug); row.has_value()) {
+    if (title_meta.has_value()) {
         glz::generic fetched;
-        if (!glz::read_json(fetched, row->fetched) && fetched.is_array()) {
+        if (!glz::read_json(fetched, title_meta->fetched) && fetched.is_array()) {
             for (const auto& entry : fetched.get_array()) {
                 if (!entry.is_object()) {
                     continue;

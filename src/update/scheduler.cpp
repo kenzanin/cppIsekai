@@ -1,6 +1,5 @@
 #include "update/scheduler.hpp"
 
-#include "config/config.hpp"
 #include "http/api_ctx.hpp"
 #include "plugin/plugin.hpp"
 #include "store/store.hpp"
@@ -9,7 +8,6 @@
 #include <cstdlib>
 #include <ctime>
 #include <filesystem>
-#include <random>
 #include <spdlog/spdlog.h>
 
 namespace {

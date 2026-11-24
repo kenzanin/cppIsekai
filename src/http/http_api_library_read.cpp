@@ -11,16 +11,25 @@ void register_library_read(Ctx& c) {
     CROW_ROUTE(app, "/api/library")
     ([&] {
         const auto rows = on_pool(db, [&] { return store.saved_list(); });
+        // One sqlite_orm IN query per plugin replaces two title_meta_get calls
+        // per row; parse `chosen` once and read both fields from that object.
+        std::vector<std::pair<std::string, std::string>> tm_keys;
+        tm_keys.reserve(rows.size());
+        for (const auto& r : rows) {
+            tm_keys.emplace_back(r.plugin, r.slug);
+        }
+        const auto tm = on_pool(db, [&] { return store.title_meta_get_many(tm_keys); });
         crow::json::wvalue list(crow::json::type::List);
         int idx = 0;
         for (const auto& r : rows) {
             crow::json::wvalue row;
             row["plugin"] = r.plugin;
             row["slug"] = r.slug;
-            const auto ot = chosen_title(store, db, r.plugin, r.slug);
-            row["name"] = ot.value_or(r.name);
-            const auto ov = chosen_cover(store, db, r.plugin, r.slug);
-            row["cover"] = ov.value_or(r.cover);
+            glz::generic chosen;
+            const auto it = tm.find({r.plugin, r.slug});
+            const bool have = it != tm.end() && !glz::read_json(chosen, it->second.chosen) && chosen.is_object();
+            row["name"] = (have ? chosen_field(chosen, "title") : std::nullopt).value_or(r.name);
+            row["cover"] = (have ? chosen_field(chosen, "cover") : std::nullopt).value_or(r.cover);
             row["added_at"] = static_cast<double>(r.added_at);
             row["status"] = r.status;
             row["total_ch"] = r.total_ch;

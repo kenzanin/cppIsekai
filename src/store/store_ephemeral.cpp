@@ -54,9 +54,15 @@ void ephem_copy_chapters(StoreImpl& impl, const std::string& plugin, const std::
 
 bool Store::saved_exists(const std::string& plugin, const std::string& slug) {
     const store_detail::OpTrace _op{"saved_exists"};
-    return impl_->storage.count<store_detail::SavedMangaEntity>(
-               where(c(&store_detail::SavedMangaEntity::plugin) == plugin &&
-                     c(&store_detail::SavedMangaEntity::slug) == slug)) > 0;
+    // sqlite_orm EXISTS short-circuits on the composite PK instead of counting
+    // matches; still one indexed statement, but the SQL states intent clearly.
+    // sqlite_orm 1.9 only accepts EXISTS inside WHERE (not as a top-level
+    // select result), so wrap it: one indexed statement, short-circuiting.
+    const auto rows = impl_->storage.select(count<store_detail::SavedMangaEntity>(),
+                                            where(exists(select(&store_detail::SavedMangaEntity::plugin,
+                                                                where(c(&store_detail::SavedMangaEntity::plugin) == plugin &&
+                                                                      c(&store_detail::SavedMangaEntity::slug) == slug)))));
+    return !rows.empty() && rows.front() != 0;
 }
 
 store_detail::EphemPair* Store::ephem_find(const std::string& plugin, const std::string& slug) {

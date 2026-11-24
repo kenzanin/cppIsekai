@@ -40,6 +40,10 @@ crow::response enrichment_source_response(plugin::Host& plugins, BS::thread_pool
 // artist/author accept String or List<String> and normalize to array.
 std::optional<std::string> normalize_chosen(const crow::json::rvalue& ch);
 
+// Read a field from an already-parsed chosen object (batch callers avoid a
+// second title_meta_get per field).
+std::optional<std::string> chosen_field(const glz::generic& chosen, const char* key);
+
 // Chosen display title from title_meta.chosen; nullopt when unset/empty.
 std::optional<std::string> chosen_title(Store& store, BS::thread_pool<>& db, const std::string& plugin,
                                         const std::string& slug);

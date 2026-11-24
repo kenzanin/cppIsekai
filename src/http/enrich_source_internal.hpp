@@ -10,7 +10,8 @@
 
 namespace http::api {
 
-std::vector<std::string> retry_titles(Store& store, const std::string& plugin, const std::string& slug,
+std::vector<std::string> retry_titles(Store& store, const std::optional<Store::TitleMetaRow>& title_meta,
+                                      const std::string& plugin, const std::string& slug,
                                       const std::string& first);
 
 } // namespace http::api
