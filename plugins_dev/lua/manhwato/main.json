@@ -1,0 +1,16 @@
+{
+  "name": "Manhwato",
+  "site_url": "https://manhwato.com",
+  "image_referer": "https://manhwato.com/",
+  "logo": "logo.png",
+  "contract_version": 1,
+  "paginates": true,
+  "capabilities": ["search", "detail", "chapters", "pages", "genres"],
+  "params": {
+    "site_url": "https://manhwato.com"
+  },
+  "timeout": 45,
+  "runtime": "lua",
+  "version": "1.0.0",
+  "api": 1
+}

@@ -1,4 +1,6 @@
 ## 2026-11-24
+* **Update**: Linked `architecture/manhwato-plugin.md` to `architecture/plugin-system.md`.
+* **Creation**: Documented concept `architecture/manhwato-plugin.md` (Manhwato Lua plugin: SSR HTML via the daemon's Chrome bridge).
 * **Update**: Linked `findings/comik-search-pagination-2026-11-25.md` to `findings/lua-plugin-audit-2026-11-16.md`.
 * **Creation**: Documented concept `findings/comik-search-pagination-2026-11-25.md` (comik search ignored ?page -- every UI page returned the same 48 cards).
 * **Update**: Linked `architecture/mangade-plugin.md` to `architecture/plugin-system.md`.
