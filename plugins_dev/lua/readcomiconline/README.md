@@ -1,4 +1,11 @@
-# Read Comics Online plugin
+# Read Comics Online plugin — RETIRED (2026-11-24)
+
+Not linked into `data/plugins/`: the site's Cloudflare challenge needs a headed
+browser or a frequently refreshed `cf_clearance`, so the port was retired from
+the active set. Source kept here for reference; the one already-saved title
+stays in the library and remains readable from cache (disabled = cache-only).
+The refresh helper `scripts/refresh-rco-cookie.py` is kept with the source but
+is no longer part of normal operation. Nothing below runs in the daemon today.
 
 Lua scraper for `readcomicsonline.ru`. All pages are server-rendered Blade HTML,
 so no browser/CDP is used at runtime.

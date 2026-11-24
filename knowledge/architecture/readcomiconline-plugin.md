@@ -1,9 +1,9 @@
 ---
 type: Decision
 title: "Read Comics Online plugin: HAR-derived Blade scraper + bound CF clearance"
-description: "Lua plugin for readcomicsonline.ru built from tmp/readcomiconline.har: server-rendered HTML, all-results search, reader-all images, Cloudflare clearance cookie+UA in gitignored config.json. Cookie expires (403 'Just a moment...' + plugin error); refresh with `python3 scripts/refresh-rco-cookie.py` which mints it from the daemon's own Chrome (clears the JS challenge automatically) and rewrites config.json; restart to recompile Lua. Tried routing scrapes through host.browser directly: the shared Chrome page stalls on the challenge (background tab) and goto is flaky, so curl + refreshed cookie stays the reliable path."
+description: "RETIRED 2026-11-24: unlinked from data/plugins so it is no longer in the active set (Cloudflare challenge needs a headed browser or constantly refreshed cf_clearance). Source kept under plugins_dev/lua/readcomiconline for reference; the single saved title stays in the library and remains readable from cache per decisions/plugin-lifecycle. Was a Lua plugin built from tmp/readcomiconline.har: server-rendered HTML, all-results search, reader-all images, cookie+UA in gitignored config.json. scripts/refresh-rco-cookie.py stays with the source but is no longer used in normal operation."
 tags: [plugin, lua, cloudflare, har, scraper]
-generated: { by: agent/mcp, at: "2026-11-24T14:53:57Z" }
+generated: { by: agent/mcp, at: "2026-11-24T15:28:28Z" }
 status: stable
 ---
 
@@ -35,3 +35,4 @@ All methods live: search batman 60 items, detail 9 fields, 4 chapters, 31 pages 
 # Related Concepts
 - [Plugin system: folder packaging, manifest, multi-runtime data-contract ABI](plugin-system.md): new Lua port following the folder/manifest/JSON-text ABI; no runtime changes
 - [Image referer follows the URL's own site domain](../decisions/image-referer-domain-match.md): CDN images rely on host domain-matched Referer, no manifest override
+- Related to [Plugin lifecycle: disabled = cache-only reads; folder-removal GC purges every trace](../decisions/plugin-lifecycle.md)
