@@ -54,23 +54,26 @@ TEST_CASE("assets: zip root loads into memory and serves templates + statics") {
     REQUIRE(page != nullptr);
     CHECK_EQ(*page, "hi {{name}} {{>part.mustache}}");
     CHECK(assets::read("static/app.css.br") != nullptr);
-    CHECK(assets::read("icon/tray.png") != nullptr);
+    // Icons are deliberately not embedded -- they stay on disk for GTK.
+    CHECK(assets::read("icon/tray.png") == nullptr);
     CHECK(assets::read("static/missing.js") == nullptr);
 
     // Crow's partial resolution must go through the same in-memory loader.
     const auto rendered = crow::mustache::load("page.mustache").render(crow::mustache::context{{"name", "bro"}});
     CHECK_EQ(rendered.body_, "hi bro [part]");
 
-    const auto icon = assets::icon_path("assets/tray.png");
+    const fs::path icon_src = tmp.path / "tray.png";
+    { std::ofstream(icon_src, std::ios::binary) << "PNG"; }
+    const auto icon = assets::icon_path(icon_src.string());
     CHECK(icon.is_absolute());
-    CHECK(fs::exists(icon));
+    CHECK_EQ(icon, icon_src);
     {
         std::ifstream f(icon, std::ios::binary);
         CHECK_EQ(std::string(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>()), "PNG");
     }
     assets::shutdown();
     CHECK_FALSE(assets::in_memory());
-    CHECK_FALSE(fs::exists(icon));
+    CHECK(fs::exists(icon)); // disk icon is never removed by the asset layer
 }
 
 TEST_CASE("assets: folder root loads and an empty path keeps disk mode") {

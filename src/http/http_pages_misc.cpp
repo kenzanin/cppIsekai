@@ -25,7 +25,7 @@
 namespace http {
 
 void register_pages_misc(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, LogBuffer& logs,
-                    reader::CoverWorker& covers) {
+                    reader::CoverWorker& /*covers*/) {
     CROW_ROUTE(app, "/plugins")([&] { return html("plugins.mustache", layout(store, db, "plugins")); });
     CROW_ROUTE(app, "/settings")([&] { return html("settings.mustache", layout(store, db, "settings")); });
    CROW_ROUTE(app, "/about")([&] { return html("about.mustache", layout(store, db, "about")); });

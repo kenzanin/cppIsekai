@@ -371,14 +371,16 @@ task("js")
 -- docs libs (marked/mermaid ~1.25 MB) stay on disk -- those routes fall back
 -- to disk on a cache miss. Extend the drop list if a new route needs one.
 task("pack-assets")
-    set_menu {usage = "xmake pack-assets", description = "pack used templates + .br statics + tray icon into assets.zip"}
+    set_menu {usage = "xmake pack-assets", description = "pack templates + vendored .br statics into assets.zip (tray icon stays on disk)"}
     on_run(function()
         local out = path.absolute("assets.zip")
         -- -FS = filesync: drop stale entries from earlier archives.
-        os.exec("zip -qr -FS " .. out .. " templates static assets/tray.png")
-        os.exec("zip -qd " .. out ..
-                " 'static/*.js' 'static/*.css' 'static/marked.min.js.br' 'static/mermaid.min.js.br'")
-        print("packed " .. out .. " (brotli bodies only)")
+        -- Keep every brotli body the app serves (incl. /about's marked+mermaid);
+        -- drop plain .js/.css build sources. The tray/favicon PNG is read from
+        -- [tray] icon on disk, never from the archive.
+        os.exec("zip -qr -FS " .. out .. " templates static")
+        os.exec("zip -qd " .. out .. " 'static/*.js' 'static/*.css'")
+        print("packed " .. out .. " (templates + brotli bodies, no icon)")
     end)
 
 -- --- gate tasks: prod code only (src/**), tests/third_party untouched ---

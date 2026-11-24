@@ -4,22 +4,16 @@
 #include <libzippp/libzippp.h>
 #include <spdlog/spdlog.h>
 
-#include <cstdio>
-#include <cstdlib>
 #include <fstream>
 #include <functional>
 #include <iterator>
 #include <unordered_map>
 #include <utility>
-#include <vector>
-
-#include <unistd.h>
 
 namespace assets {
 namespace {
 
 std::unordered_map<std::string, std::string> g_files;
-std::string g_icon_temp;
 std::function<std::string(std::string)> g_prev_loader;
 bool g_loader_installed = false;
 
@@ -27,8 +21,7 @@ constexpr std::size_t kMaxBytes = 32u * 1024u * 1024u; // whole asset root ceili
 constexpr std::size_t kMaxFile = 8u * 1024u * 1024u;   // mermaid ~5.5 MB, headroom
 
 bool wanted(std::string_view key) {
-    return key.starts_with("templates/") || key.starts_with("static/") ||
-           key.starts_with("icon/") || key == "assets/tray.png";
+    return key.starts_with("templates/") || key.starts_with("static/");
 }
 
 void add(std::string key, std::string bytes) {
@@ -126,51 +119,17 @@ const std::string* read(std::string_view key) {
 }
 
 std::filesystem::path icon_path(const std::string& fallback) {
+    // Icons are never embedded: the tray/favicon PNG comes from [tray] icon on
+    // disk, so GTK gets a real path and no temp copy is needed.
     std::error_code ec;
-    if (g_files.empty()) {
-        const auto abs = std::filesystem::absolute(fallback, ec);
-        return ec ? std::filesystem::path(fallback) : abs;
-    }
-    if (!g_icon_temp.empty() && std::filesystem::exists(g_icon_temp, ec)) {
-        return g_icon_temp;
-    }
-    auto it = g_files.find("icon/tray.png");
-    if (it == g_files.end()) {
-        it = g_files.find("assets/tray.png"); // pack-assets keeps the repo path
-    }
-    if (it == g_files.end()) {
-        const auto abs = std::filesystem::absolute(fallback, ec);
-        return ec ? std::filesystem::path(fallback) : abs;
-    }
-    const char* tmpl = "/tmp/cppisekai-tray-XXXXXX.png";
-    std::string buf = tmpl;
-    std::vector<char> path(buf.begin(), buf.end());
-    path.push_back('\0');
-    const int fd = mkstemps(path.data(), 4);
-    if (fd < 0) {
-        return std::filesystem::absolute(fallback, ec);
-    }
-    const std::string tmp(path.data());
-    const auto out = std::fopen(tmp.c_str(), "wb"); // reopen through FILE* for simple write
-    ::close(fd);
-    if (!out) {
-        return std::filesystem::absolute(fallback, ec);
-    }
-    std::fwrite(it->second.data(), 1, it->second.size(), out);
-    std::fclose(out);
-    g_icon_temp = tmp;
-    return g_icon_temp;
+    const auto abs = std::filesystem::absolute(fallback, ec);
+    return ec ? std::filesystem::path(fallback) : abs;
 }
 
 void shutdown() {
     if (g_loader_installed) {
         crow::mustache::detail::get_loader_ref() = g_prev_loader;
         g_loader_installed = false;
-    }
-    if (!g_icon_temp.empty()) {
-        std::error_code ec;
-        std::filesystem::remove(g_icon_temp, ec);
-        g_icon_temp.clear();
     }
     g_files.clear();
 }

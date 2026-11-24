@@ -19,8 +19,8 @@ void init(const std::string& path);
  *  Returns nullptr in disk mode or on a miss, so callers fall back to disk. */
 const std::string* read(std::string_view key);
 
-/** Absolute path for the tray icon. In memory mode the icon bytes are written
- *  once to a temp file (GTK needs a real path); disk mode resolves `fallback`. */
+/** Absolute path for the tray/favicon icon. Icons are never embedded; the
+ *  configured disk path is resolved directly (GTK needs a real file). */
 std::filesystem::path icon_path(const std::string& fallback);
 
 /** Remove the temp icon and release the in-memory map. Safe to call twice. */

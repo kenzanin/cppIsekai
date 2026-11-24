@@ -3,7 +3,7 @@ type: Decision
 title: "Assets: optional in-memory zip/folder root with read-only ini knob"
 description: "[assets] path loads templates/static/icon from a zip or folder into RAM at boot; empty path keeps disk layout; knob is read-only in UI and HTTP."
 tags: [http, static-assets, config, architecture, offline-first]
-generated: { by: agent/mcp, at: "2026-11-24T01:55:54Z" }
+generated: { by: agent/mcp, at: "2026-11-24T05:35:34Z" }
 status: stable
 ---
 
@@ -28,10 +28,9 @@ Single archive for offline distribution, no CDN/runtime; in-memory reads avoid p
 - [cli-config: registry-backed config surface (CLI/env/ini/dump/save)](../architecture/cli-config.md): adds one registry knob with a new readonly flag surfaced through describe() and GET /config
 
 
-## Curation update (2026-11-23)
+## Curation update (2026-11-24)
 
-`xmake pack-assets` packs only the brotli bodies actually served — `app.css.br`, `htmx.min.js.br`, `alpine.min.js.br`, `detail.js.br`, `reader.js.br` — plus `templates/` and `assets/tray.png` (looked up as `assets/tray.png` as well as `icon/tray.png`). Plain `.js`/`.css` build sources and the /about-only `marked`/`mermaid` libs are dropped: 1.3 MB -> 90 KB. Routes whose key is absent from the memory map fall back to disk normally, so /about still works. Verified live: 30 entries loaded, `/static/app.css` 200 with 6309 B brotli from memory, `/static/marked.min.js` 200 from disk fallback, detail + about 200. Archive is rebuilt with `zip -qr -FS` then `zip -qd` so stale entries never accumulate.
-
+`xmake pack-assets` now packs all templates + **every brotli body the app serves**, including `marked.min.js.br` and `mermaid.min.js.br` for /about. It drops plain `.js`/`.css` build sources and **never packs the tray/favicon PNG** (1.3 MB curated archive vs 90 KB earlier icon-less subset). The icon is always resolved from `[tray] icon` on disk — `assets::icon_path` no longer writes a temp copy, and `favicon_response` reads `assets/tray.png` from disk. Verified: zip has 0 icon entries, `/favicon.ico` still 200 image/png 5790 B byte-identical to `assets/tray.png`, `/static/mermaid.min.js` 200 with 1,187,603 B brotli from memory, `/about` 200. 31 entries loaded.
 
 ## Favicon (2026-11-24)
 

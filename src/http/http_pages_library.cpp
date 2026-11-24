@@ -24,7 +24,7 @@
 
 namespace http {
 
-void register_pages_library(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, LogBuffer& logs,
+void register_pages_library(crow::SimpleApp& app, Store& store, BS::thread_pool<>& db, LogBuffer& /*logs*/,
                     reader::CoverWorker& covers) {
     CROW_ROUTE(app, "/")
     ([&](const crow::request& req) { return html("home.mustache", home_context(store, db, req, covers)); });
