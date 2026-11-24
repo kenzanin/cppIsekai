@@ -1,6 +1,10 @@
 <!-- bottom overlay: page list only. Shown only while navShown. -->
 <div x-show="navShown && !done" x-cloak
      class="fixed bottom-0 inset-x-0 z-30 bg-zinc-950/90 border-t border-zinc-800 backdrop-blur">
+  <!-- Manga title: the top bar is packed with controls, so it lives here. -->
+  <div x-show="mangaTitle" x-cloak class="px-3 pt-1.5 text-center">
+    <span class="inline-block max-w-full truncate text-xs text-zinc-300" x-text="mangaTitle"></span>
+  </div>
   <template x-if="pages.length <= 24">
     <div class="flex gap-1 flex-wrap justify-center px-2 py-2">
       <template x-for="n in pages.length" :key="n">

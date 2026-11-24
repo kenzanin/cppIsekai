@@ -1,7 +1,7 @@
 {{>reader_head.mustache}}
 
 <div x-data="readerPage" x-init="boot()" @keydown.window="keys($event)" @scroll.window="track()" @wheel.window.passive="wheel($event)"
-     class="relative" :dir="dir">
+     data-manga-title="{{reader_title}}" class="relative" :dir="dir">
 
   <p class="text-sm text-red-400 py-2" x-show="err" x-text="err"></p>
   <p class="text-sm text-zinc-500 py-8" x-show="!err && !pages.length">Loading&#8230;</p>

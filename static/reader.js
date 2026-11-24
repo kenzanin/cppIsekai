@@ -9,6 +9,9 @@ function readerPage() {
     page: 1, mode: 'paged', dir: 'ltr', zoom: 'fit-w', zoomPct: 100, wheelAt: 0,
     pairFrom: 1, _prevMode: '',
     navShown: false, done: false,
+    // Display title for the bottom bar; read from a data-* attribute so
+    // mustache escaping never leaves HTML entities inside a JS string.
+    mangaTitle: document.querySelector('[data-manga-title]')?.dataset.mangaTitle || '',
     seen: [], err: '', io: null, chaptersList: [],
     _prefetch: new Map(), _reqToken: 0, _chaptersReady: null, t: null,
     spacer: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',

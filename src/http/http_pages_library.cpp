@@ -55,7 +55,28 @@ void register_pages_library(crow::SimpleApp& app, Store& store, BS::thread_pool<
             dir = pos->direction;
             zoom = pos->zoom;
         }
+        // Reader chrome shows the same display title as the detail page:
+        // chosen override > saved library name > site slug. One pool round-trip;
+        // chosen_field parses the row already fetched (no nested on_pool).
+        const std::string reader_title = on_pool(db, [&] {
+            std::string t;
+            if (const auto tm = store.title_meta_get(plugin, slug)) {
+                glz::generic chosen;
+                if (!glz::read_json(chosen, tm->chosen) && chosen.is_object()) {
+                    if (const auto v = http::api::chosen_field(chosen, "title")) {
+                        t = *v;
+                    }
+                }
+            }
+            if (t.empty()) {
+                if (const auto row = store.saved_get(plugin, slug)) {
+                    t = row->name;
+                }
+            }
+            return t.empty() ? slug : t;
+        });
         auto ctx = layout(store, db, "library");
+        ctx["reader_title"] = reader_title;
         ctx["resume_ch"] = ch;
         ctx["resume_page"] = page;
         ctx["resume_mode"] = mode;
