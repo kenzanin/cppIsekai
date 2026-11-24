@@ -30,16 +30,18 @@ local methods = {}
 -- ── search ─────────────────────────────────────────────────────────────────
 -- Cards: <a href="/title/<id>" : class="block relative"><img alt="<title>"
 -- src="<cover>"...>; the anchor repeats with the alias list, so dedup by id.
-methods.search = function(params)
-  local query = tostring(params.title or params.query or params.q or "")
-  if query == "" then
-    return { ok = false, error = "comik: empty query" }
-  end
-  local body, err = http_req(BASE .. "/search?word=" .. host.url_encode(query))
-  if not body then
-    return { ok = false, error = err or "comik: search failed" }
-  end
+-- The site paginates server-side with ?page=N (48 cards/page) but renders no
+-- total in its Qwik state. Probe the last page exponentially, then binary-search
+-- it, memoized per query -- same trick as the mangagoku port. Without this the
+-- host got total = #items and every ?page=N looked identical.
+local per_page = 48
+local page_cache = {}
 
+local function fetch_search(query, page)
+  local url = BASE .. "/search?word=" .. host.url_encode(query)
+  if page > 1 then url = url .. "&page=" .. page end
+  local body, err = http_req(url)
+  if not body then return nil, err end
   local items, seen = {}, {}
   for _, m in ipairs(find_all(body,
     [[(?s)<a href="/title/([a-z0-9]+)" : class="block relative"><img[^>]*alt="([^"]*)"[^>]*src="([^"]+)"]]
@@ -54,7 +56,43 @@ methods.search = function(params)
       }
     end
   end
-  return { ok = true, data = { items = items, total = #items } }
+  return items
+end
+
+local function page_info(query, first_count)
+  local hit = page_cache[query]
+  if hit then return hit end
+  local good, step = 1, 1
+  while good < 256 do
+    local probe = math.min(good + step, 256)
+    if #(fetch_search(query, probe) or {}) == 0 then break end
+    good = probe
+    step = step * 2
+  end
+  local lo, hi = good + 1, math.min(good + step, 256)
+  while lo < hi do
+    local mid = math.floor((lo + hi) / 2)
+    if #(fetch_search(query, mid) or {}) == 0 then hi = mid else lo = mid + 1 end
+  end
+  local pages = lo - 1
+  local last = pages == 1 and first_count or #(fetch_search(query, pages) or {})
+  hit = { pages = pages, total = (pages - 1) * per_page + last }
+  page_cache[query] = hit
+  return hit
+end
+
+methods.search = function(params)
+  local query = tostring(params.title or params.query or params.q or "")
+  if query == "" then
+    return { ok = false, error = "comik: empty query" }
+  end
+  local page = math.max(1, tonumber(params.page) or 1)
+  local items, err = fetch_search(query, page)
+  if not items then return { ok = false, error = err or "comik: search failed" } end
+  local info = page_info(query, #items)
+  return { ok = true, data = {
+    items = items, total = info.total, pages = info.pages,
+  } }
 end
 
 -- ── detail ─────────────────────────────────────────────────────────────────

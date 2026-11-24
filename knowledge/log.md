@@ -1,4 +1,6 @@
 ## 2026-11-24
+* **Update**: Linked `findings/comik-search-pagination-2026-11-25.md` to `findings/lua-plugin-audit-2026-11-16.md`.
+* **Creation**: Documented concept `findings/comik-search-pagination-2026-11-25.md` (comik search ignored ?page -- every UI page returned the same 48 cards).
 * **Update**: Linked `architecture/mangade-plugin.md` to `architecture/plugin-system.md`.
 * **Creation**: Documented concept `architecture/mangade-plugin.md` (MangaDE Lua plugin: JSON API contract from tmp/mangade.har).
 * **Update**: Linked `architecture/readcomiconline-plugin.md` to `decisions/plugin-lifecycle.md`.
