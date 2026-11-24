@@ -1,4 +1,7 @@
 ## 2026-11-24
+* **Update**: Linked `architecture/mangak-mangagoku-plugins.md` to `decisions/image-referer-domain-match.md` (mangak.io and mangagoku.com image CDNs use manifest image_referer / same-site referer).
+* **Update**: Linked `architecture/mangak-mangagoku-plugins.md` to `architecture/plugin-system.md` (new Lua ports following the folder/manifest/JSON-text ABI).
+* **Creation**: Documented concept `architecture/mangak-mangagoku-plugins.md` (MangaK + MangaGoku ports, and shared MangaHub engine).
 * **Update**: Linked `packaging/desktop-launcher.md` to `architecture/cli-config.md` (desktop Exec reuses the canonical --config launcher instead of duplicating boot flags).
 * **Creation**: Documented concept `packaging/desktop-launcher.md` (.desktop launcher: templated Exec/Path/Icon + install script).
 * **Update**: Updated concept `decisions/in-memory-assets-zip.md`.
