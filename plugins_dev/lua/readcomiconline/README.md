@@ -6,13 +6,19 @@ so no browser/CDP is used at runtime.
 ## Cloudflare clearance
 
 The site issues a Cloudflare JS challenge to plain clients. The plugin sends
-`cf_clearance` / session cookies and the exact bound User-Agent captured in
-`tmp/readcomiconline.har`. Both are secrets: they live in the gitignored
-`config.json` (`cookie`, `user_agent`), never in the distributed `main.json`.
-They expire: when fetches start failing with `upstream status 403`, copy a
-fresh request `Cookie` header and `User-Agent` from an authenticated browser
-session into that file and restart the daemon (plugins are compiled at boot).
-No host code changes needed.
+`cf_clearance` / session cookies and the exact bound User-Agent; both are
+secrets stored in the gitignored `config.json` (`cookie`, `user_agent`), never
+in the distributed `main.json`. When fetches fail with `upstream status 403`
+or `Cloudflare challenge — run scripts/refresh-rco-cookie.py`, mint a fresh
+pair from the daemon's own Chrome (it clears the challenge automatically):
+
+```sh
+python3 scripts/refresh-rco-cookie.py   # needs websocket-client
+./run-cppIsekai.sh restart              # Lua is compiled at boot
+```
+
+The script opens and closes a throwaway tab, copies only the bound cookie and
+UA, and never prints their values. No host code changes needed.
 
 ## Methods
 

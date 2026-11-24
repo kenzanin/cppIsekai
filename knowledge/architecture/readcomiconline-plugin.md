@@ -1,9 +1,9 @@
 ---
 type: Decision
 title: "Read Comics Online plugin: HAR-derived Blade scraper + bound CF clearance"
-description: "Lua plugin for readcomicsonline.ru built from tmp/readcomiconline.har: server-rendered HTML, all-results search, reader-all images, Cloudflare clearance cookie+UA in manifest params."
+description: "Lua plugin for readcomicsonline.ru built from tmp/readcomiconline.har: server-rendered HTML, all-results search, reader-all images, Cloudflare clearance cookie+UA in gitignored config.json. Cookie expires (403 'Just a moment...' + plugin error); refresh with `python3 scripts/refresh-rco-cookie.py` which mints it from the daemon's own Chrome (clears the JS challenge automatically) and rewrites config.json; restart to recompile Lua. Tried routing scrapes through host.browser directly: the shared Chrome page stalls on the challenge (background tab) and goto is flaky, so curl + refreshed cookie stays the reliable path."
 tags: [plugin, lua, cloudflare, har, scraper]
-generated: { by: agent/mcp, at: "2026-11-24T01:17:58Z" }
+generated: { by: agent/mcp, at: "2026-11-24T14:53:57Z" }
 status: stable
 ---
 
