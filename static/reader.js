@@ -174,9 +174,10 @@ function readerPage() {
         return Math.round((img.clientWidth / img.naturalWidth) * 100);
       },
     zoomSeed() { return this.zoom === 'custom' ? 'custom:' + Math.round(this.zoomPct) : this.zoom; },
-    formatChapterLabel(c) { // 'ch N — Title'; cap keeps the open dropdown list sane (closed state truncates via CSS)
+    formatChapterLabel(c) { // 'ch N — Title'; hidden (skip flag) earns a leading '*'; cap keeps the open dropdown list sane (closed state truncates via CSS)
       const t = 'ch ' + c.number + (c.title ? ' \u2014 ' + c.title : '');
-      return t.length > 64 ? t.slice(0, 63) + '\u2026' : t;
+      const capped = t.length > 64 ? t.slice(0, 63) + '\u2026' : t;
+      return (c.flags & 2) === 2 ? '*' + capped : capped;
     },
     chUrl(n, page, chId) {
       const q = new URLSearchParams({ch: String(n), mode: this.mode, dir: this.dir, zoom: this.zoomSeed()});
