@@ -6,7 +6,9 @@
 #include "pages_api.hpp"
 
 #include <filesystem>
+#include <set>
 #include <string>
+#include <utility>
 
 namespace fs = std::filesystem;
 
@@ -35,6 +37,14 @@ void register_content(Ctx& c) {
             return crow::response{404, R"({"ok":false,"error":"unknown title"})"};
         }
         const std::string want_id = param(req, "ch_id"); // empty = number-only legacy path (design D1)
+        // Skip-flagged chapters are hidden from the list, so the reader must not
+        // walk into them either: prev/next resolution steps over these ids.
+        std::set<std::string> hidden;
+        for (const auto& [id, flags] : store.chapter_flags_list(plugin, slug)) {
+            if ((flags & std::to_underlying(ChapterFlag::kSkip)) != 0) {
+                hidden.insert(id);
+            }
+        }
         crow::json::wvalue q;
         q["id"] = slug;
         const std::string chs_params = q.dump();
@@ -82,7 +92,11 @@ void register_content(Ctx& c) {
                 }
             }
             return build_pages_response(chs_env, pages_env,
-                                        PagesCtx{.plugin = plugin, .slug = slug, .ch = chd, .ch_id = pages_id})
+                                        PagesCtx{.plugin = plugin,
+                                                 .slug = slug,
+                                                 .ch = chd,
+                                                 .ch_id = pages_id,
+                                                 .hidden = hidden})
                 .value_or(std::string{});
         });
         crow::response r;

@@ -110,8 +110,25 @@ std::optional<std::string> build_pages_response(const std::string& chs_env, cons
         }
         return s;
     };
-    const bool have_prev = target_idx > 0;
-    const bool have_next = target_idx + 1 < order.size();
+    // Hidden (skip-flagged) chapters are stepped over in both directions, so
+    // a chapter the list hides is never the reader's prev/next; an entry with
+    // no id can never match the set and stays reachable.
+    size_t prev_idx = order.size();
+    for (size_t i = target_idx; i-- > 0;) {
+        if (ctx.hidden.count(order[i].second) == 0) {
+            prev_idx = i;
+            break;
+        }
+    }
+    size_t next_idx = order.size();
+    for (size_t i = target_idx + 1; i < order.size(); ++i) {
+        if (ctx.hidden.count(order[i].second) == 0) {
+            next_idx = i;
+            break;
+        }
+    }
+    const bool have_prev = prev_idx < order.size();
+    const bool have_next = next_idx < order.size();
 
     const auto pages = envelope_data(pages_env);
     if (!pages || pages->empty()) {
@@ -135,15 +152,15 @@ std::optional<std::string> build_pages_response(const std::string& chs_env, cons
     out["pages"] = std::move(page_urls);
     out["ch_id"] = target_id; // lets the reader keep the exact release without re-deriving it
     if (have_prev) {
-        out["prev_ch"] = order[target_idx - 1].first;
-        if (!order[target_idx - 1].second.empty()) {
-            out["prev_ch_id"] = order[target_idx - 1].second;
+        out["prev_ch"] = order[prev_idx].first;
+        if (!order[prev_idx].second.empty()) {
+            out["prev_ch_id"] = order[prev_idx].second;
         }
     }
     if (have_next) {
-        out["next_ch"] = order[target_idx + 1].first;
-        if (!order[target_idx + 1].second.empty()) {
-            out["next_ch_id"] = order[target_idx + 1].second;
+        out["next_ch"] = order[next_idx].first;
+        if (!order[next_idx].second.empty()) {
+            out["next_ch_id"] = order[next_idx].second;
         }
     }
     return out.dump();

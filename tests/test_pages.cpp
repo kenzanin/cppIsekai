@@ -62,6 +62,34 @@ TEST_CASE("pages: descending plugin order still yields nearest neighbors") {
     CHECK(has(*dup, R"("next_ch_id":"c24a")")); // ties read in id order: a before b
 }
 
+TEST_CASE("pages: hidden chapters are stepped over in both directions") {
+    const std::string pages_env = R"({"ok":true,"data":["a"]})";
+    // c2 is skip-flagged (hidden in the chapter list): the reader must never
+    // land on it, so 1 -> 3 directly and 3 -> 1 directly.
+    const auto from1 = build_pages_response(chs_env, pages_env, {"m", "s", 1, "", {"c2"}});
+    REQUIRE(from1);
+    CHECK(has(*from1, R"("next_ch":3)"));
+    CHECK(has(*from1, R"("next_ch_id":"c3")"));
+
+    const auto from3 = build_pages_response(chs_env, pages_env, {"m", "s", 3, "", {"c2"}});
+    REQUIRE(from3);
+    CHECK(has(*from3, R"("prev_ch":1)"));
+    CHECK(has(*from3, R"("prev_ch_id":"c1")"));
+
+    // A hidden target still serves its own pages; only the walk steps over it.
+    const auto hidden_self = build_pages_response(chs_env, pages_env, {"m", "s", 2, "c2", {"c2"}});
+    REQUIRE(hidden_self);
+    CHECK(has(*hidden_self, R"("prev_ch":1)"));
+    CHECK(has(*hidden_self, R"("next_ch":3)"));
+}
+
+TEST_CASE("pages: hidden neighbors leave no next at the end of the list") {
+    const std::string pages_env = R"({"ok":true,"data":["a"]})";
+    const auto out = build_pages_response(chs_env, pages_env, {"m", "s", 1, "", {"c2", "c3"}});
+    REQUIRE(out);
+    CHECK(!has(*out, "next_ch")); // everything after chapter 1 is hidden
+}
+
 TEST_CASE("pages: boundary chapters omit the missing neighbor") {
     const std::string pages_env = R"({"ok":true,"data":["a"]})";
     const auto first = build_pages_response(chs_env, pages_env, {"m", "s", 1});
