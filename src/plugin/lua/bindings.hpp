@@ -52,5 +52,8 @@ void bind_http(lua_State* L, const HostCtx& ctx);
 
 /** \brief host.text/codecs/re2/crypto/browser/html tables (one TU). */
 void bind_rest(lua_State* L, sol::table host, const HostCtx& ctx);
+void bind_text_codecs(lua_State* L, sol::table host, const HostCtx& ctx);
+void bind_re2(lua_State* L, sol::table host, const HostCtx& ctx);
+void bind_crypto_html(lua_State* L, sol::table host, const HostCtx& ctx);
 
 } // namespace plugin::lua

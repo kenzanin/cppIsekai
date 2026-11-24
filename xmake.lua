@@ -38,9 +38,9 @@ local CURL_LIB = "$(projectdir)/" .. TP .. "/curl-impersonate/lib"
 -- shared source groups
 local STORE_SRC = os.files("src/store/**.cpp")
 local CACHE_SRC = os.files("src/cache/**.cpp")
-local ENRICH_SRC = {"src/http/enrich_chosen.cpp", "src/http/enrich_detail.cpp"} -- enrich_source.cpp needs Host::enrich (daemon-only)
-local PLUGIN_SRC = table.join(os.files("src/plugin/**.cpp"), {"src/browser/chrome.cpp"})
-local FETCH_SRC = os.files("src/fetch/**.cpp")
+local ENRICH_SRC ={"src/http/enrich_chosen.cpp", "src/http/enrich_chosen_helpers.cpp", "src/http/enrich_chosen_lookup.cpp", "src/http/enrich_detail.cpp"} -- enrich_source.cpp needs Host::enrich (daemon-only)
+local PLUGIN_SRC = table.join(os.files("src/plugin/**.cpp"), {"src/browser/chrome.cpp", "src/browser/chrome_call.cpp"})
+local FETCH_SRC = os.files("src/fetch/*.cpp")
 
 -- system shared libs via pkg-config; the rest pinned from xrepo (locked in xmake-requires.lock)
 add_requires("pkgconfig::vips", {system = true})
@@ -195,7 +195,7 @@ cxx_bin("cppIsekai", {
 
 -- --- tests (doctest, system package; `xmake test` runs all) ---
 cxx_bin("test_fetch", {
-    files = {"tests/test_fetch.cpp", FETCH_SRC, "src/browser/chrome.cpp"},
+    files = {"tests/test_fetch.cpp", FETCH_SRC, "src/browser/chrome.cpp", "src/browser/chrome_call.cpp"},
     incs = {"src"},
     deps = {"cdp-cpp"},
     reqs = {"glaze", "spdlog"},

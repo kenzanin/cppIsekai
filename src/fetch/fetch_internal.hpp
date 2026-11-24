@@ -2,6 +2,8 @@
  *  \brief Internal seam: the curl-family fn tables shared by the dlopen loader
  *  and the transfer body. */
 #pragma once
+#include "fetch.hpp"
+
 #include <curl/curl.h>
 #include <string>
 namespace fetch {
@@ -18,4 +20,7 @@ struct CurlApi {
 const CurlApi& chrome_api();
 const CurlApi* firefox_api();
 const CurlApi* system_api();
+
+/** Headless-renderer fetch for CF-challenge sites; defined in fetch_render.cpp. */
+Result rendered_fetch(const Request& req);
 } // namespace fetch

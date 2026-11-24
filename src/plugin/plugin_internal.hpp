@@ -81,6 +81,10 @@ std::string err_json(const std::string& msg);
 // timer note: lives in plugin_load.cpp (first consumer was load_all).
 wasm::HttpFetch make_wasm_fetch(const std::string& id, const Config& conf, const LiveProfile& live_profile);
 
+/** One plugin-directory scan; defined in plugin_load_scan.cpp. */
+void scan_dir(const Config& conf, LiveProfile& live_profile, Store& store, const StateGet& sget, const StateSet& sset,
+              const std::string& dir, bool is_enrichment, std::map<std::string, std::shared_ptr<Runtime>>& fresh);
+
 RawReply lua_call_entry(const Runtime& rt, const std::string& method, long instruction_budget,
                         const glz::generic& envelope);
 
