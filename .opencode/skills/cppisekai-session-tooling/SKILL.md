@@ -45,7 +45,7 @@ The goal is never "run a command". It is to get a trustworthy answer with the fe
 
 ```bash
 xmake -y                              # full build; expect "build ok"; warning baseline is zero-warning -Wall -Wextra
-xmake test                            # doctest suite, 19 targets
+xmake test                            # doctest suite, 21 targets
 xmake test test_store                 # single target
 ./build/linux/x86_64/release/test_store   # when a target fails: exact CHECK lines
 ```
@@ -112,8 +112,16 @@ Report in Indonesian, casual, and lead with what is verified vs not. A green bui
 
 `browse` drives the user's own Chrome (real profile, logins, extensions). It replaces `blueprint-mcp`/`chrome-devtools-mcp`, which were removed from `opencode.json`. Use it for any symptom the user described visually, and for behaviour that only exists at runtime (keyboard handlers, spread pairing, scroll containers).
 
-- **`navigate` returns the tab id — hold on to it.** Every later call needs `tab`; a closed tab answers `Tab <id> is gone`, and the fix is `navigate({url})` without `tab` to open a fresh one and take the new id.
-- **Code Mode has no timers.** `setTimeout`/`await sleep()` in `execute` hangs with *"Code Mode has no timers or sleep"*. Fire the action, then read state in the next call.
-- **`eval` must return one plain JSON value.** Returning an array or a mix (`[tabId, json]`) fails with `SyntaxError: Unexpected non-whitespace character after JSON at position 4`. Return a single `String(...)` / `JSON.stringify(...)` and print that.
-- **Key names for `press`:** `ArrowDown`/`ArrowUp`/`ArrowLeft`/`ArrowRight`, `PageDown`, `PageUp`, `Space`, `Enter`, `Escape`, `
+- **`navigate` returns the tab id — hold it, and close the tab when done.** Every later call needs `tab`; a stale id from an earlier turn answers `isn't a browse tab: browse didn't open it and the user didn't lend it` — list with `tabs {action:"list"}`, reopen with `navigate({url})`, never retry the dead id. Always finish with `tabs {action:"close", tab}`: the user does not want agent tabs left in their browser.
+- **Code Mode has no timers.** `setTimeout`/`setInterval` are `ReferenceError` inside `execute`; sleep with `wait_for({tab, ms: 400})` and wait on real client state with `wait_for({tab, urlRegex: /page=7/})`, `{text}`, or `{selector, state}`. `wait_for` has no `pattern`/`regex` key — that fails with *"wait_for needs a condition: text, textGone, url, urlRegex, ref or selector"*.
+- **`eval` sees only the DOM.** Page globals (`readerPage`, Alpine internals) are not reachable and raise `ReferenceError`. Assert on `document` instead: element counts, `naturalWidth > 0`, `location.search`, text content. Return one `JSON.stringify(...)` value.
+- **Key names for `press`:** `ArrowDown`/`ArrowUp`/`ArrowLeft`/`ArrowRight`, `PageDown`, `PageUp`, `Space`, `Enter`, `Escape`, `End`, `Home`; the param is `key` (string or list), with `count` to repeat.
+- **Client state is debounced.** After a keypress that triggers `history.replaceState` or a fetch, read the URL only after `wait_for({urlRegex})` — an immediate `eval` reports the previous value.
+
+Full call shapes and the trap table: skill `browse-mcp`.
+
+## 10. Asset pipeline (`/static/*.js`, `app.css`)
+
 `/static/reader.js` and `/static/detail.js` go through `br_asset` (`src/http/http_pages.cpp:292`), which serves `static/<name>.js.br` whenever it exists (and it does, tracked in git, **minified**). Editing only the `.js` is invisible in the browser — the old brotli body keeps shipping and Alpine data shows no new fields. After any edit: `xmake js` (minifies via uglify-js/bunx + brotli q11 → `scripts/minbr.ts`; sources stay editable), then navigate (not just reload) and check the new state key exists.
+
+`static/app.css` is compiled by the same `xmake js` task (Tailwind v4 over `static/input.css`, the templates and the JS `:class` strings) and served as `app.css.br` — never the Play CDN. After both, `xmake pack-assets` repacks `data/assets.zip`; the running daemon serves the zip, not the source files, so an unrepacked asset is an invisible edit.
