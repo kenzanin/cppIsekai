@@ -1,4 +1,6 @@
 ## 2026-11-24
+* **Update**: Linked `architecture/reader-page-progress.md` to `architecture/shareable-url-state.md`.
+* **Creation**: Documented concept `architecture/shareable-url-state.md` (Every page mirrors its view state into the URL (reader parity, replaceState only)).
 * **Update**: Updated concept `architecture/extension-source-four-ports.md`.
 * **Update**: Updated concept `architecture/mangak-mangagoku-plugins.md`.
 * **Update**: Updated concept `architecture/chapter-state-flags.md`.

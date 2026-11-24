@@ -3,7 +3,7 @@ type: decision
 title: "reader-page: four-mode reader UI + persisted positions (COMPLETE, archived 2026-11-10)"
 description: "reader-page complete. /cache/img page-context 404 FIXED. chapter_number persists. Worker nudge carries WindowCtx (page_base chapter-absolute); rel_path gained manga/ segment -- one file per slot. [log] level knob added. 14/14 ctest. 4.1 browser smoke passed; change archived 2026-11-10; zoom (fit H/fit W/1:1) added 2026-11-10. 2026-11-15 UX pass: defaults ltr/fit-w, fixed split topbar, parity spread pairing (1,2)(3,4), polish; 18/18 tests, goldens re-locked."
 tags: [reader-page, reader, position-persistence, cache-img-fix, logging, openspec, zoom, complete]
-generated: { by: agent/mcp, at: "2026-11-15T01:40:56Z" }
+generated: { by: agent/mcp, at: "2026-11-24T13:14:04Z" }
 status: stable
 ---
 
@@ -32,3 +32,4 @@ See references/reader-page-gaps.
 - Anchor-state approach (reanchor/_pairAnchor) discarded before landing: views stay a pure function of pages, no re-hook needed on mode change.
 - Polish: bottom-sheet page select matches topbar focus/contrast; formatChapterLabel helper added (was referenced-only -- chapter options rendered empty without it).
 - Verified: goldens re-locked (tests/fixtures/golden/reader.mustache.html), node --check on both rendered inline scripts, xmake test 18/18, daemon restarted (releasedbg :8090) /health ok.
+- Related to [Every page mirrors its view state into the URL (reader parity, replaceState only)](shareable-url-state.md)
