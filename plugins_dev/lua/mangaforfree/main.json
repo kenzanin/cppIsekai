@@ -1,0 +1,16 @@
+{
+  "verify_url": "https://mangaforfree.net",
+  "thumb_ratio": 0.694,
+  "name": "MangaForFree",
+  "site_url": "https://mangaforfree.net",
+  "image_referer": "https://mangaforfree.net/",
+  "logo": "logo.png",
+  "contract_version": 1,
+  "paginates": true,
+  "capabilities": ["search", "detail", "chapters", "pages", "genres"],
+  "params": { "site_url": "https://mangaforfree.net" },
+  "timeout": 45,
+  "runtime": "lua",
+  "version": "1.0.0",
+  "api": 1
+}

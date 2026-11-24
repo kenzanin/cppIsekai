@@ -1,0 +1,16 @@
+{
+  "verify_url": "https://asmotoon.com",
+  "thumb_ratio": 0.667,
+  "name": "Asmodeus Scans",
+  "site_url": "https://asmotoon.com",
+  "image_referer": "https://asmotoon.com/",
+  "logo": "logo.png",
+  "contract_version": 1,
+  "paginates": true,
+  "capabilities": ["search", "detail", "chapters", "pages", "genres"],
+  "params": { "site_url": "https://asmotoon.com" },
+  "timeout": 45,
+  "runtime": "lua",
+  "version": "1.0.0",
+  "api": 1
+}

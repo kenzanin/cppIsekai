@@ -1,0 +1,16 @@
+{
+  "verify_url": "https://bato1.co.uk",
+  "thumb_ratio": 0.7,
+  "name": "Bbato",
+  "site_url": "https://bato1.co.uk",
+  "image_referer": "https://bato1.co.uk/",
+  "logo": "logo.png",
+  "contract_version": 1,
+  "paginates": true,
+  "capabilities": ["search", "detail", "chapters", "pages", "genres"],
+  "params": { "site_url": "https://bato1.co.uk" },
+  "timeout": 45,
+  "runtime": "lua",
+  "version": "1.0.0",
+  "api": 1
+}
