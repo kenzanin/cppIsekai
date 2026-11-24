@@ -3,7 +3,7 @@ type: Architecture
 title: "Four extension-source ports: Asmodeus, Bbato, Dynasty, MangaForFree"
 description: Lua ports of four goIsekai extension-source plugins with live endpoint shapes and end-to-end verification.
 tags: [plugin, lua, port, extension-source]
-generated: { by: agent/mcp, at: "2026-11-24T08:36:34Z" }
+generated: { by: agent/mcp, at: "2026-11-24T12:28:33Z" }
 status: stable
 ---
 
@@ -19,6 +19,9 @@ status: stable
 All five methods green for all four plugins: mangaforfree 2 search / 111 chapters / 7 pages; asmotoon 3 search / 9 chapters / 14 pages; bbato 2 search / 75 chapters / 25 pages; dynasty 20 search / 17 chapters / 57 pages. `/cache/img` 200 image/jxl for one page of mangaforfree (761 KB), asmotoon (329 KB), bbato (16 KB). Lua syntax checked, suite 21/21, build 0 warnings.
 
 Note: dynasty's composite id contains a colon; direct `/plugin/dynasty/*` calls work, the host `/api/pages/<plugin>/<slug>/<ch>` route needs a saved row to resolve it.
+
+## Bbato reader images are lazy-loaded (src is a placeholder)
+On `/read/<slug>/<chapter>` every page image is `img[data-number]`, but only the first two carry a real `src`; the rest put an inline `data:image/svg+xml` placeholder in `src` and the real CDN URL in `data-src` (and always in `data-fallback`). A `data-number='notice'` image also rides in the same block pointing at `/assets/images/bbato.webp`. Reading `src` alone (the original port) yields 1 logo + 17 placeholders per chapter, which the reader renders as an empty/broken page — the fetch itself is fine (HTTP 200, ~57 KB), so it is not a Cloudflare gate. Fixed 2026-11-24: try `data-fallback`, then `data-src`, then `src`, take the first attribute that yields real URLs, and drop `data:` URIs plus `/assets/images/` (notice). Verified: suterare-seijo... ch1 = 19 ordered cdnb.snapvip.xyz pages, `/cache/img` 200 image/jxl; regressions 25 and 5 pages on two other titles. Titles whose `/get-chapter-list` answers `{"data":[],"total":0}` have no readable chapters upstream at all — that is the site, not the plugin.
 
 # Related Concepts
 - [goIsekai -> cppIsekai plugin porting matrix](../references/plugin-porting-matrix-goIsekai.md): four new ports from extension-source, not examples/plugins

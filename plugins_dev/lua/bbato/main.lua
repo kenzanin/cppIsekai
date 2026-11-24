@@ -112,12 +112,23 @@ methods.pages = function(params)
   if not slug or not chapter then return { ok = true, data = {} } end
   local body, err = http_req(BASE .. "/read/" .. host.url_encode(slug) .. "/" .. host.url_encode(chapter))
   if not body or body == "" then return { ok = false, error = err } end
-  local urls = host.html.attr(body, ".pages img[data-number]", "src") or {}
-  if #urls == 0 then urls = host.html.attr(body, ".pages img[data-number]", "data-src") or {} end
+  -- Page images carry data-number; only the first ones ship a real src and the
+  -- rest are lazy (inline SVG placeholder in src, real URL in data-src). The
+  -- "do not repost" notice image (data-number='notice') rides along under
+  -- /assets/images/, so read attr in order and drop placeholders/notice.
+  local function usable(u) return u ~= "" and not u:match("^data:") and not u:find("/assets/images/", 1, true) end
+  local urls = {}
+  for _, attr in ipairs({ "data-fallback", "data-src", "src" }) do
+    local list = {}
+    for _, u in ipairs(host.html.attr(body, ".pages img[data-number]", attr) or {}) do
+      u = clean(u)
+      if usable(u) then list[#list + 1] = host.url_abs(BASE, u) end
+    end
+    if #list > 0 then urls = list; break end
+  end
   local out = {}
   for _, u in ipairs(urls) do
-    u = clean(u)
-    if u ~= "" and not u:find("notice", 1, true) then out[#out + 1] = host.url_abs(BASE, u) end
+    if u ~= "" and not u:find("notice", 1, true) then out[#out + 1] = u end
   end
   return { ok = true, data = out }
 end
