@@ -1,4 +1,6 @@
 ## 2026-11-24
+* **Update**: Linked `architecture/mangade-plugin.md` to `architecture/plugin-system.md`.
+* **Creation**: Documented concept `architecture/mangade-plugin.md` (MangaDE Lua plugin: JSON API contract from tmp/mangade.har).
 * **Update**: Linked `architecture/readcomiconline-plugin.md` to `decisions/plugin-lifecycle.md`.
 * **Update**: Linked `findings/chapter-flags-route-split-404.md` to `decisions/source-layout-policy.md`.
 * **Creation**: Documented concept `findings/chapter-flags-route-split-404.md` (TU split silently dropped POST /chapter/flags (404) -- route-surface test added).

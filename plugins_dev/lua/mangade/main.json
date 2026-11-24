@@ -1,0 +1,17 @@
+{
+  "name": "MangaDE",
+  "site_url": "https://mangade.io",
+  "image_referer": "https://mangade.io/",
+  "logo": "logo.png",
+  "contract_version": 1,
+  "paginates": true,
+  "capabilities": ["search", "detail", "chapters", "pages", "genres"],
+  "params": {
+    "api": "https://api.mangade.io/api",
+    "site_url": "https://mangade.io"
+  },
+  "timeout": 45,
+  "runtime": "lua",
+  "version": "1.0.0",
+  "api": 1
+}
