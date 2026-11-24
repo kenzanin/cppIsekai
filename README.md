@@ -22,7 +22,7 @@ Everything below is implemented and verified against the running daemon.
 - **Stale-first fetch** — plugin API responses are cached in `api_cache` (SQLite, raw-JSONB payload) and served local-first: any existing row wins, an aged one carries `cached:true`, and the network is used only on a cold miss or an explicit refresh. Per-method TTLs come from the plugin manifest (`cache_ttl`, else a host default); expired rows are pruned on the scheduler tick. Image bytes land in a disk LRU under `cache/img/` — `<ns>/cover/<sha>-<ratio>.<ext>` and `<ns>/manga/<slugdir>/ch<NNN>-<id8>/p<NNN>.<ext>` (zero-padded order = reading order); whole-file eviction on overflow.
 - **Reader** — 10-page window, RTL/LTR, skip-aware, position resumed from the store, prev/next resolved by stable number order + index so duplicate chapter numbers (24a/24b) stay individually reachable; the reader links and prefetches by chapter id (`?ch_id=`), old number-only URLs keep working. Spread modes anchor at the page that was open, ↑/↓ pan the image and only change page at the edge, and zoom values persist per title.
 - **Plugins** — per-site plugin-per-runtime; hosts expose a JSON ABI plus `http.fetch`, `storage.*`, `log.*`, `host.re2`, `host.html`, `host.crypto`, `host.text` (NFKD/casefold, `date_to_iso`) and `host.browser` (see Browser automation).
-  - Lua 5.4 (sol2): MangaDex + four aggregator ports (+ metadata-only enrichment sources `enrichment-mangadex`, `enrichment-mangaupdates`)
+  - Lua 5.4 (sol2): MangaDex + 36 site ports (+ metadata-only enrichment sources `enrichment-mangadex`, `enrichment-mangaupdates`)
   - WASM (wasm3): two aggregator ports
   - JavaScript (quickjs-ng): one aggregator port
   - one WASM reader port is kept as a reference build; the maintained path for that site is its Lua plugin.
@@ -31,7 +31,7 @@ Everything below is implemented and verified against the running daemon.
 - **Chapter state & migrate** — read/hidden flags live in one bitfield column per chapter row; bulk mark-all/clear-all and mark-previous from the detail page. Migrate source switches a saved title to another plugin in one transaction, carrying the read boundary and discarding per-page positions. Read progress (max page turned) is a master-row column (`chapters.read_max`) — the legacy `host/skip|read|total` key shadows are retired and boot-backfilled.
 - **Action feedback** — every server-backed button shows a toast and flashes a LED on the clicked control; local-only interactions stay silent.
 - **Maintenance** — VACUUM + snapshot backups on a configurable interval with a keep count (`[backup]` knobs, `GET`/`POST /api/backup`); restore stays a manual stop → copy → start. Optional system-tray with configurable labels/icon, and `xmake scan` runs ASan+UBSan then TSan and restores the release build.
-- **API-first** — 58 HTTP routes + one log websocket (`/ws/log`), all reachable with curl; `/api/logs` exposes the log ring buffer and `/config` exposes the config registry.
+- **API-first** — 59 HTTP routes + one log websocket (`/ws/log`), all reachable with curl; `/api/logs` exposes the log ring buffer and `/config` exposes the config registry.
 - **About page** — renders this README.md live (see below).
 
 ## Architecture

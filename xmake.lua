@@ -1,5 +1,5 @@
 set_project("cppIsekai")
-set_version("0.1.0")
+set_version("0.2.0")
 
 set_languages("c23", "c++23")
 set_toolchains("clang")
