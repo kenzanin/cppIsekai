@@ -1,9 +1,9 @@
 ---
 type: Decision
 title: "Chapter state: one flags bitfield per chapter row, chapters as metadata hub"
-description: "chapters(plugin, slug, chapter_id, number, title, url, flags, updated_at) is the hub with bit0=read/bit1=hidden; chapter_pages is its child; POST /chapter/flags toggles by ids or all."
+description: "chapters(plugin, slug, chapter_id, number, title, url, flags, updated_at) is the hub with bit0=read/bit1=hidden; chapter_pages is its child; POST /chapter/flags toggles by ids or all; hidden ids are also stepped over by /api/pages prev/next."
 tags: [chapter-state, flags, bitfield, store, sqlite, reader, detail-page]
-generated: { by: agent/mcp, at: "2026-11-17T21:50:39Z" }
+generated: { by: agent/mcp, at: "2026-11-24T10:40:30Z" }
 status: stable
 ---
 
@@ -23,6 +23,9 @@ Landed as OpenSpec change `chapter-state` (archived 2026-11-18 under `openspec/c
 - Bulk toggle cannot use bitwise operators inside `update_all`'s set-clause: select -> XOR/AND in C++ -> batch replace, inside one OpTrace.
 - Materialization hook lives in the canonical UI path (`title_data_response` chapters branch -> `materialize_chapters` in src/http/api_ctx.hpp); hooking only `apply_read_rollup` left the table empty because `/api/chapters` never passes through it.
 - Pages/images: read bits verified both ways live (page 19 auto-sets, page 5 does not disturb it).
+
+## Hidden (bit1) is a reader-navigation flag, not just a list filter
+The chapter list already filtered `kSkip` rows, but `/api/pages` still computed prev/next from the raw number-sorted order, so the reader walked straight into hidden chapters. Fixed 2026-11-24: `PagesCtx.hidden` (set of skip-flagged chapter ids, filled from `Store::chapter_flags_list`) is stepped over when resolving prev/next in `build_pages_response` (src/http/pages_api.cpp) -- both directions, so 1 -> 3 when 2 is hidden and 3 -> 1 back. A hidden chapter opened directly still serves its own pages; only the automatic walk skips it. reader::window_parts already honored `Skipped`, so the prefetch window and `/api/pages` now agree. Live-verified in the browser: with the duplicate release hidden, PageDown at the last page jumped 32 -> ch 33 instead of the hidden id; unhiding restored 32 -> 32b.
 
 ## UI
 Detail page: header `✓ all` / `clear` (clear is confirm-guarded) plus a per-row `↑✓ mark-prev` that posts a single range update for every chapter at or before the picked one.
