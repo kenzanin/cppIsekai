@@ -3,7 +3,7 @@ type: Decision
 title: "MangaK + MangaGoku ports, and shared MangaHub engine"
 description: "Three site ports from goIsekai extension-source + HARs: mangak.io JSON API, mangagoku.com MangaBox-style site, and mangakalot.fun refactored to a shared MangaHub engine (target later changed to mangagoku.com)."
 tags: [plugin, lua, port, har, mangahub]
-generated: { by: agent/mcp, at: "2026-11-24T07:36:16Z" }
+generated: { by: agent/mcp, at: "2026-11-24T12:24:22Z" }
 status: stable
 ---
 
@@ -26,6 +26,9 @@ Reference sources: `goIsekai/examples/plugins/wasm/mangak/main.go` (older API sh
 ## Verification (2026-11-24)
 
 All methods live through daemon: mangak search/detail/chapters/pages/genres (24 pages for ch12), mangagoku search detail chapters pages genres (61 unique ordered pages, author deduped, status Ongoing), mangahub regression search still 1060 total. `/cache/img` 200 image/jxl for both new plugins (121 KB / 159 KB). Build 0 warnings, suite 21/21.
+
+## MangaGoku reader-page CDN host varies per title
+`methods.pages` reads 2xstorage URLs from the chapter HTML (`/manga/<slug>/<chapter>`) and keeps one URL per numeric `/<n>.webp` index. The subdomain is **not stable**: some titles serve `img-r1.2xstorage.com`, others `img-r2`, and others `imgs-2.2xstorage.com` (isekai-yurutto... ch1 is 100 pages, all on imgs-2). The original `img%-r%d+` pattern silently matched nothing for the imgs-2 titles, so the plugin returned `{ok=true, data={}}` and the host 404'd with a bare `unknown chapter` (empty pages look the same as a missing chapter to `build_pages_response`). Fixed 2026-11-24: pattern is `https://[%w%-]+%.2xstorage%.com/[^"\\%s]+/%d+%.webp`; the numeric-tail gate still excludes `/thumb/` covers. Verified live: isekai-yurutto 100/100 pages + `/cache/img` 200 image/jxl on pages 1/51/100; solo-leveling unchanged at 55 pages on img-r1.
 
 # Related Concepts
 - [Plugin system: folder packaging, manifest, multi-runtime data-contract ABI](plugin-system.md): new Lua ports following the folder/manifest/JSON-text ABI

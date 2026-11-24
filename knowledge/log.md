@@ -1,4 +1,5 @@
 ## 2026-11-24
+* **Update**: Updated concept `architecture/mangak-mangagoku-plugins.md`.
 * **Update**: Updated concept `architecture/chapter-state-flags.md`.
 * **Update**: Linked `architecture/extension-source-four-ports.md` to `references/plugin-porting-matrix-goIsekai.md` (four new ports from extension-source, not examples/plugins).
 * **Creation**: Documented concept `architecture/extension-source-four-ports.md` (Four extension-source ports: Asmodeus, Bbato, Dynasty, MangaForFree).
