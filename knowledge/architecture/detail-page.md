@@ -1,9 +1,9 @@
 ---
 type: Fact
 title: Detail page design + enrichment plugin (alt cover/alt info)
-description: "Detail page + enrichment (shipped 2026-11-11, 26/26 tasks): recommendations kind (MangaDex/MangaUpdates, cap 5) merged into Related; fetched keyed (source,kind); chosen cover overlays library grid + /api/library; covers cap 5; tags attributes.tags; MU Title-Case; combined alt-titles picker (unicode-aware dedupe); layout restructured (unclosed header/meta divs fixed 607ea9e; golden regen 2d91dcf); golden-file render lock (decisions/template-golden-test). Attribution row under title = ONE flex line (merged 2026-11-11): plugin logo + pluginName + status + release date + cached badge; logo guarded x-if=\"pluginName && pluginLogoOk\"; container x-show = pluginName || detail.status || detail.release_at || cached. Chapter pager 20/page client-side, single-root x-for button — see decisions/chapter-list-controls. Daemon :8090."
+description: "Detail page + enrichment (shipped 2026-11-11, 26/26 tasks). Recommendations merged into Related; fetched keyed (source,kind); chosen cover overlays library grid + /api/library; combined alt-titles picker; golden-file render lock (decisions/template-golden-test). Chapter pager 20/page client-side. Action row (2026-11-24): 8 icon-only SVG buttons on one line - library/pin/continue/update/migrate/fetch detail/fetch covers/reset detail - names only in title+aria-label; the old text action row is gone. Force-fetch lives inside each wizard: covers = force fetch + reset cover (POST /api/enrichment/reset mode=cover), detail = force fetch + restore-site title/synopsis/authors/artists/tags. Daemon :8090."
 tags: [detail, enrichment, cover, wizard, cache, plugin]
-generated: { by: agent/mcp, at: "2026-11-11T15:18:43Z" }
+generated: { by: agent/mcp, at: "2026-11-24T13:29:37Z" }
 status: stable
 ---
 
