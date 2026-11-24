@@ -192,10 +192,11 @@ methods.pages = function(params)
   if not id or not chapter then return { ok = true, data = {} } end
   local body, err = http_req("/manga/" .. host.url_encode(id) .. "/" .. host.url_encode(chapter))
   if not body or body == "" then return { ok = false, error = err } end
-  -- Reader images are 2xstorage URLs with a trailing /<n>.webp index; thumb
+  -- Reader images are 2xstorage URLs with a trailing /<n>.webp index; the CDN
+  -- host varies per title (img-r1/img-r2/imgs-2), so match any subdomain. Thumb
   -- images live under /thumb/ and never carry that numeric tail.
   local found = {}
-  for url in body:gmatch([[https://img%-r%d+%.2xstorage%.com/[^"\\%s]+/%d+%.webp]]) do
+  for url in body:gmatch([[https://[%w%-]+%.2xstorage%.com/[^"\\%s]+/%d+%.webp]]) do
     found[#found + 1] = url
   end
   -- The same page appears on several CDN mirrors; keep one URL per index.
