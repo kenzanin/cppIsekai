@@ -14,6 +14,9 @@
 #include <string>
 #include <string_view>
 #include <sqlite_orm/sqlite_orm.h>
+/** One-shot saved_manga column migration (store_core_migrate.cpp). */
+void migrate_saved_manga(const std::string& path);
+
 namespace store_detail {
 using namespace sqlite_orm;
 

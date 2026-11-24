@@ -36,33 +36,11 @@ local CURL_SO = "$(projectdir)/" .. TP .. "/curl-impersonate/lib/libcurl-imperso
 local CURL_LIB = "$(projectdir)/" .. TP .. "/curl-impersonate/lib"
 
 -- shared source groups
-local STORE_SRC = {"src/store/store_core.cpp", "src/store/store_search.cpp", "src/store/store_api.cpp",
-                   "src/store/store_maintenance.cpp", "src/store/store_enrichment.cpp", "src/store/store_dedup.cpp",
-                   "src/store/store_saved.cpp", "src/store/store_migrate.cpp", "src/store/store_chapters.cpp",
-                   "src/store/store_ephemeral.cpp"}
-local CACHE_SRC = {"src/cache/cache.cpp", "src/cache/cache_img.cpp"}
-local ENRICH_SRC = {"src/http/enrich_chosen.cpp", "src/http/enrich_detail.cpp"}
-local PLUGIN_SRC = {"src/plugin/plugin_core.cpp", "src/plugin/plugin_load.cpp", "src/plugin/plugin_call.cpp",
-                    "src/plugin/lua/bridge.cpp", "src/plugin/lua/lua_runtime.cpp", "src/plugin/lua/bindings/http.cpp",
-                    "src/plugin/lua/bindings/io.cpp", "src/plugin/lua/bindings/json.cpp", "src/plugin/lua/bindings/lib.cpp",
-                    "src/plugin/lua/bindings/log.cpp", "src/plugin/lua/bindings/meta.cpp", "src/plugin/lua/bindings/storage.cpp",
-                    "src/plugin/lua/bindings/url.cpp", "src/plugin/lua/bindings/rest.cpp", "src/plugin/http_client.cpp",
-                    "src/plugin/wasm/wasm_rt.cpp", "src/plugin/wasm/wasm_load.cpp", "src/plugin/wasm/wasm_imports.cpp",
-                    "src/plugin/wasm/imports/log.cpp", "src/plugin/wasm/imports/storage.cpp",
-                    "src/plugin/wasm/imports/http.cpp", "src/plugin/wasm/imports/json.cpp",
-                    "src/plugin/wasm/imports/re2_match.cpp", "src/plugin/wasm/imports/re2_edit.cpp",
-                    "src/plugin/wasm/imports/html.cpp",
-                    "src/plugin/wasm/imports/url.cpp", "src/plugin/wasm/imports/text.cpp",
-                    "src/plugin/wasm/imports/codec.cpp", "src/plugin/wasm/imports/crypto.cpp",
-                    "src/plugin/wasm/imports/browser.cpp",
-                    "src/plugin/js/js_rt.cpp", "src/plugin/js/js_bindings.cpp",
-                    "src/plugin/js/bindings/core.cpp", "src/plugin/js/bindings/http.cpp",
-                    "src/plugin/js/bindings/text.cpp", "src/plugin/js/bindings/re2.cpp",
-                    "src/plugin/js/bindings/html.cpp", "src/plugin/js/bindings/storage.cpp",
-                    "src/plugin/js/bindings/crypto.cpp", "src/plugin/js/bindings/browser.cpp",
-                    "src/plugin/htmltext_re2.cpp",
-                    "src/plugin/htmltext_html.cpp", "src/browser/chrome.cpp"}
-local FETCH_SRC = {"src/fetch/fetch.cpp", "src/fetch/fetch_curl.cpp"}
+local STORE_SRC = os.files("src/store/**.cpp")
+local CACHE_SRC = os.files("src/cache/**.cpp")
+local ENRICH_SRC = {"src/http/enrich_chosen.cpp", "src/http/enrich_detail.cpp"} -- enrich_source.cpp needs Host::enrich (daemon-only)
+local PLUGIN_SRC = table.join(os.files("src/plugin/**.cpp"), {"src/browser/chrome.cpp"})
+local FETCH_SRC = os.files("src/fetch/**.cpp")
 
 -- system shared libs via pkg-config; the rest pinned from xrepo (locked in xmake-requires.lock)
 add_requires("pkgconfig::vips", {system = true})
