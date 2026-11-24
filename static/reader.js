@@ -339,6 +339,10 @@ function readerPage() {
       this.t = setTimeout(() => this.save(), 300);
     },
     async save() { // fires once, with the page/mode/dir as of 300ms after the last change
+      // URL mirrors the stored state (?ch=&page=&mode=&dir=&zoom=) so the address
+      // bar always says which page is open; replaceState adds no history entry.
+      history.replaceState({ch: this.ch, page: this.page, chId: this.chId}, '',
+        this.chUrl(this.ch, this.page, this.chId));
       if (!this.chId) return;
       try {
         await fetch('/reader/position', {method: 'POST', headers: {'Content-Type': 'application/json'},
