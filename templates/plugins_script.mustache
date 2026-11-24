@@ -1,8 +1,13 @@
 <script>
 function pluginsPage() {
   return {
-    plugins: [], enrich: [], q: '', busy: false,
+    plugins: [], enrich: [], q: new URLSearchParams(location.search).get('q') || '', busy: false,
     broken: {},
+    init() { this.$watch('q', () => { // shareable filter: ?q=…
+      const u = new URL(location); u.search = '';
+      if (this.q) u.searchParams.set('q', this.q);
+      history.replaceState({}, '', u);
+    }); },
     async load() {
       this.busy = true
       const j = await (await fetch('/api/plugins')).json()

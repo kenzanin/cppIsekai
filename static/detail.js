@@ -85,12 +85,27 @@ function detailPage() {
         if (r.ok) window.toast('success', ch.done ? 'Chapter skipped' : 'Chapter unskipped'); else window.toast('error', 'skip failed'); } catch (e) { window.toast('error', String(e)); }
     },
     async boot() {
+      this.fromUrl(); // ?chpage / ?hidden — chapter list view is shareable like the reader
+      this.$watch('chPage', () => this.syncUrl());
+      this.$watch('showHidden', () => this.syncUrl());
       await this.loadPluginMeta(); // caps gate related fetch inside load()
       this.loadLibrary();
       this.loadEnrichSources();
       await this.load();
       // cover img renders via x-if after load(); paintDim at DOMContentLoaded missed it
       this.$nextTick(() => window.paintDim && window.paintDim());
+    },
+    fromUrl() { // shareable chapter-list view: ?chpage=N&hidden=1
+      const sp = new URLSearchParams(location.search);
+      if (sp.get('hidden') === '1') this.showHidden = true;
+      const n = parseInt(sp.get('chpage'), 10);
+      if (n > 1) this.chPage = n - 1;
+    },
+    syncUrl() { // replaceState like the reader: URL follows the view, no history entries
+      const u = new URL(location); u.search = '';
+      if (this.chPage > 0) u.searchParams.set('chpage', this.chPage + 1);
+      if (this.showHidden) u.searchParams.set('hidden', '1');
+      history.replaceState({}, '', u);
     },
     normAltTitle(s) { return String(s || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim(); },
     altTitleCandidates() {
@@ -288,6 +303,7 @@ function detailPage() {
         this.enrichLastFetched = Math.max(this.enrichLastFetched || 0, (this.enrichment && this.enrichment.fetched_at) || 0);
         this.hiddenTags = (this.enrichment && this.enrichment.chosen && this.enrichment.chosen.tags_hidden) || [];
         this.chapters = (Array.isArray(c.data) ? c.data : []).slice().sort((a, b) => (b.number ?? 0) - (a.number ?? 0)); // lua empty table marshals {} not []
+        if (this.chPage >= this.pageCount) { this.chPage = Math.max(0, this.pageCount - 1); } // ?chpage beyond the real list
         this.mergeSavedRelated(); // re-merge chosen.related_add now that /api/detail is in
         await this.loadChapterState(); // chapters are fresh objects -- re-apply done/read flags + cbz gating
       } catch (e) { this.err = String(e); }

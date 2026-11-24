@@ -70,7 +70,7 @@ function searchPage() {
       if (this.q) u.searchParams.set('q', this.q)
       if (this.tags.length) u.searchParams.set('tags', this.tags.join(','))
       if (this.page > 1) u.searchParams.set('page', this.page)
-      history.pushState({}, '', u)
+      history.replaceState({}, '', u) // reader parity: URL always shareable, back button leaves the page
     },
   }
 }

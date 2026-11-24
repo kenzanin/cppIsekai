@@ -61,7 +61,22 @@ var document = {
     return [];
   }
 };
-var location = { search: '' };
+var location = { search: '', pathname: '/', origin: 'http://test' };
+// URL + history shim: grid sync() builds a shareable URL from location and replaceState's it
+function URL(base) {
+  var self = this, p = {};
+  self.origin = (base && base.origin) || 'http://test'; self.pathname = (base && base.pathname) || '/';
+  function parse(s) { var o = {}; String(s || '').replace(/^\?/, '').split('&').filter(Boolean).forEach(function(kv) { var a = kv.split('='); o[a[0]] = a[1] || ''; }); return o; }
+  p = parse(base && base.search);
+  Object.defineProperty(self, 'search', { get: function() { return self.searchParams.toString() ? '?' + self.searchParams.toString() : ''; }, set: function(v) { p = parse(v); } });
+  self.searchParams = {
+    set: function(k, v) { p[k] = String(v); },
+    toString: function() { return Object.keys(p).map(function(k) { return k + '=' + p[k]; }).join('&'); }
+  };
+}
+URL.prototype.toString = function() { return this.origin + this.pathname + this.search; };
+var __history = { url: '' };
+var history = { replaceState: function(_s, _t, u) { __history.url = String(u); } };
 var localStorage = {
   _s: {},
   getItem: function(k) { return this._s[k] !== undefined ? this._s[k] : null; },
@@ -73,6 +88,7 @@ function URLSearchParams(s) {
   if (q) q.split('&').forEach(function(p) { var kv = p.split('='); this.m[kv[0]] = kv[1] || ''; }, this);
 }
 URLSearchParams.prototype.get = function(k) { return k in this.m ? this.m[k] : null; };
+URLSearchParams.prototype.has = function(k) { return k in this.m; };
 // world(cards, prefs): fresh DOM; cards = [{name, plugin, dup, added, ... pinned:'1' => pin section}]
 function __world(cards, prefs) {
   __els = { 'saved-cards': new El('ul'), 'pinned-cards': new El('ul'), 'lib-q': new El('input') };
@@ -231,8 +247,7 @@ TEST_CASE("grid component: dup chip re-engages cluster sort (library-dedup 3.2)"
         CHECK_MESSAGE(out == "ok", "pin-filter: ", out);
     }
 
-    SUBCASE("prefs persist through save()") {
-        auto out = js.eval(std::string{"(function(){\n"
+    SUBCASE("prefs persist through save()") {        auto out = js.eval(std::string{"(function(){\n"
                                       "  const c = __world("} +
                            kCards + R"js();
   c.init(); c.toggleDup();
@@ -241,5 +256,39 @@ TEST_CASE("grid component: dup chip re-engages cluster sort (library-dedup 3.2)"
   return 'ok';})()
 )js");
         CHECK_MESSAGE(out == "ok", "prefs: ", out);
+    }
+}
+
+TEST_CASE("grid component: state mirrors into a shareable URL (reader parity)") {
+    Qjs js;
+    js.eval(kShim, "shim");
+    js.eval(extract_script(slurp(CPPISEKAI_GRID_SRC)), "gridcomp");
+
+    SUBCASE("apply() writes the visible state to the URL") {
+        auto out = js.eval(std::string{"(function(){\n  const c = __world("} + kCards + R"js();
+  c.init();
+  __expect(__history.url === 'http://test/', 'defaults leave a bare URL, got ' + __history.url);
+  c.toggleDup();
+  __expect(__history.url === 'http://test/?sort=dup&dir=asc&dup=1', 'dup state in URL, got ' + __history.url);
+  c.q = 'zeta'; c.apply();
+  __expect(__history.url.indexOf('q=zeta') > 0, 'query in URL, got ' + __history.url);
+  return 'ok';})()
+)js");
+        CHECK_MESSAGE(out == "ok", "url-write: ", out);
+    }
+
+    SUBCASE("a shared URL restores state over saved prefs") {
+        auto out = js.eval(std::string{"(function(){\n"
+                                      "  location.search = '?q=zet&sort=title&dir=desc&f=done:show';\n"
+                                      "  const c = __world("} +
+                           kCards + R"js(, { v: 2, q: 'saved', sort: 'read' });
+  c.init();
+  __expect(c.q === 'zet', 'q from URL beats prefs, got ' + c.q);
+  __expect(c.sort === 'title' && c.sortDir.title === 'desc', 'sort+dir from URL, got ' + c.sort + '/' + c.sortDir.title);
+  __expect(c.filterState.done === 'show', 'filter chip from URL, got ' + c.filterState.done);
+  location.search = '';
+  return 'ok';})()
+)js");
+        CHECK_MESSAGE(out == "ok", "url-restore: ", out);
     }
 }

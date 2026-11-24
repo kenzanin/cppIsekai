@@ -197,12 +197,8 @@
               if (this.dup) this.sort = 'dup'; // restored chip keeps cluster order
               this.rescan();
               this.updatePerPage();
-              const p = new URLSearchParams(location.search).get('plugin');
-              if (p) this.plugin = p;
-              // library-search 1.1: the header input is the single search entry —
-              // bound here (grid scope owns `q`), synced once from ?q= / saved prefs.
-              const qs = new URLSearchParams(location.search).get('q');
-              if (qs !== null) this.q = qs;
+              // shareable URL beats saved prefs (same state the reader puts in the address bar)
+              this.fromUrl();
               const inp = document.getElementById('lib-q');
               if (inp) {
                 if (this.q) inp.value = this.q;
@@ -229,6 +225,37 @@
               this.hasStats = this.cards.some(c => (+c.dataset.total || 0) > 0);
             },
             save() { try { localStorage.setItem('grid_prefs', JSON.stringify({ v: 2, q: this.q, plugin: this.plugin, sort: this.sort, sortDir: this.sortDir, dup: this.dup, filterState: this.filterState })); } catch (_) {} },
+            fromUrl() { // shareable grid state: ?q&plugin&sort&dir&dup&f=new:show,done:hide&page
+              const sp = new URLSearchParams(location.search);
+              if (sp.has('q')) this.q = sp.get('q');
+              const plug = sp.get('plugin'); if (plug) this.plugin = plug;
+              const s = sp.get('sort');
+              if (['added', 'title', 'progress', 'read', 'update', 'dup'].includes(s)) {
+                this.sort = s; this.sortDir[s] = sp.get('dir') === 'desc' ? 'desc' : 'asc';
+                if (s === 'dup') this.dup = true;
+              }
+              if (sp.get('dup') === '1') { this.dup = true; if (this.sort === 'read') this.sort = 'dup'; }
+              const f = sp.get('f');
+              if (f) for (const kv of f.split(',')) {
+                const [k, v] = kv.split(':');
+                if (k in this.filterState && (v === 'show' || v === 'hide')) this.filterState[k] = v;
+              }
+              const n = parseInt(sp.get('page'), 10);
+              if (n > 1) this.page = n;
+            },
+            sync() { // replaceState like the reader: URL always shareable, no history spam
+              const p = {};
+              if (this.q) p.q = this.q;
+              if (this.plugin) p.plugin = this.plugin;
+              if (this.sort !== 'read' || (this.sortDir.read || 'desc') !== 'desc') { p.sort = this.sort; p.dir = this.sortDir[this.sort] || 'asc'; }
+              if (this.dup) p.dup = '1';
+              const f = Object.keys(this.filterState).filter(k => this.filterState[k] && this.filterState[k] !== 'off').map(k => k + ':' + this.filterState[k]);
+              if (f.length) p.f = f.join(',');
+              if (this.page > 1) p.page = this.page;
+              const u = new URL(location); u.search = '';
+              for (const [k, v] of Object.entries(p)) u.searchParams.set(k, v);
+              history.replaceState({}, '', u);
+            },
             toggleBadge(kind) { // 3-state per badge: off -> show -> hide -> off
               const st = this.filterState;
               const cur = st[kind] || 'off';
@@ -335,6 +362,7 @@
               for (const c of lib) c.style.display = shown.has(c) ? '' : 'none';
               this.syncSidebar();
               this.save();
+              this.sync(); // URL mirrors the visible state so any grid view can be shared
             },
           };
         }
