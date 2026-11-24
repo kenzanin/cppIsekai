@@ -3,7 +3,7 @@ type: Decision
 title: "Assets: optional in-memory zip/folder root with read-only ini knob"
 description: "[assets] path loads templates/static/icon from a zip or folder into RAM at boot; empty path keeps disk layout; knob is read-only in UI and HTTP."
 tags: [http, static-assets, config, architecture, offline-first]
-generated: { by: agent/mcp, at: "2026-11-23T14:45:15Z" }
+generated: { by: agent/mcp, at: "2026-11-24T01:55:54Z" }
 status: stable
 ---
 
@@ -31,3 +31,8 @@ Single archive for offline distribution, no CDN/runtime; in-memory reads avoid p
 ## Curation update (2026-11-23)
 
 `xmake pack-assets` packs only the brotli bodies actually served — `app.css.br`, `htmx.min.js.br`, `alpine.min.js.br`, `detail.js.br`, `reader.js.br` — plus `templates/` and `assets/tray.png` (looked up as `assets/tray.png` as well as `icon/tray.png`). Plain `.js`/`.css` build sources and the /about-only `marked`/`mermaid` libs are dropped: 1.3 MB -> 90 KB. Routes whose key is absent from the memory map fall back to disk normally, so /about still works. Verified live: 30 entries loaded, `/static/app.css` 200 with 6309 B brotli from memory, `/static/marked.min.js` 200 from disk fallback, detail + about 200. Archive is rebuilt with `zip -qr -FS` then `zip -qd` so stale entries never accumulate.
+
+
+## Favicon (2026-11-24)
+
+`/favicon.ico` and `/favicon.png` both serve the **same PNG as the systray** (`assets/tray.png`), looked up from the memory map first (`icon/tray.png` or `assets/tray.png`) then disk fallback. All three head templates emit `<link rel="icon" type="image/png" href="/favicon.png">`. Verified byte-identical MD5 (5790 B) in both zip and disk mode.

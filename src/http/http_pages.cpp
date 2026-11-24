@@ -9,6 +9,7 @@
 #include <utility>
 
 #include <fstream>
+#include <iterator>
 #include <sstream>
 
 #include <spdlog/spdlog.h>
@@ -392,9 +393,36 @@ void br_asset(const crow::request& req, crow::response& res, const char* path, c
     res.set_header("Cache-Control", cache);
     res.end();
 }
+
+crow::response favicon_response() {
+    crow::response res;
+    const std::string* mem = assets::read("icon/tray.png");
+    if (mem == nullptr) {
+        mem = assets::read("assets/tray.png"); // pack-assets keeps the repo path
+    }
+    std::string body;
+    if (mem != nullptr) {
+        body = *mem;
+    } else {
+        std::ifstream f("assets/tray.png", std::ios::binary);
+        if (!f) {
+            res.code = 404;
+            return res;
+        }
+        body.assign(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
+    }
+    res.body = std::move(body);
+    res.set_header("Content-Type", "image/png");
+    res.set_header("Cache-Control", "public, max-age=86400");
+    return res;
+}
 } // namespace
 
 void http::register_static(crow::SimpleApp& app) {
+    // The browser tab icon is the same PNG the system tray uses, so the two
+    // identities never drift. Both names are served for old bookmarks.
+    CROW_ROUTE(app, "/favicon.png")([] { return favicon_response(); });
+    CROW_ROUTE(app, "/favicon.ico")([] { return favicon_response(); });
     CROW_ROUTE(app, "/static/htmx.min.js")([](const crow::request& req, crow::response& res) {
         br_asset(req, res, "static/htmx.min.js", "application/javascript");
     });
