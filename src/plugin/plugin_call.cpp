@@ -108,7 +108,7 @@ std::string Host::call(const std::string& id, const std::string& method, const s
         h.error = std::move(err);
         h.at = std::time(nullptr);
     };
-    const auto fail = [&](std::string msg) {
+    const auto fail = [&](const std::string& msg) {
         record(false, std::move(msg));
         return err_json(std::move(msg));
     };

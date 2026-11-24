@@ -141,7 +141,7 @@ std::mutex& mutex() {
     return m;
 }
 
-void configure(std::string command, std::string args, std::string headless) {
+void configure(std::string command, std::string args, const std::string& headless) {
     std::lock_guard lock(mutex());
     s_command = std::move(command);
     s_args = std::move(args);

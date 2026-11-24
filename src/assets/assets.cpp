@@ -100,7 +100,7 @@ void init(const std::string& path) {
     // Crow resolves partials through the same loader, so overriding it covers
     // both top-level templates and {{>partial}} includes without a temp dir.
     g_prev_loader = crow::mustache::detail::get_loader_ref();
-    crow::mustache::detail::get_loader_ref() = [](std::string name) -> std::string {
+    crow::mustache::detail::get_loader_ref() = [](const std::string& name) -> std::string {
         if (const auto* bytes = assets::read("templates/" + name)) {
             return *bytes;
         }

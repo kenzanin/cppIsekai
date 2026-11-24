@@ -82,7 +82,7 @@ void register_library_write(Ctx& c) {
                 return json && json.has(k) && json[k].t() == crow::json::type::String ? std::string{json[k].s()}
                                                                                       : std::string{};
             };
-            const auto bad = [](std::string msg) {
+            const auto bad = [](const std::string& msg) {
                 crow::json::wvalue out;
                 out["ok"] = false;
                 out["error"] = std::move(msg);

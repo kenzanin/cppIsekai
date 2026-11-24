@@ -74,7 +74,7 @@ std::string url_host(std::string_view u) {
 }
 
 // Same registrable site: exact, or one is a subdomain of the other.
-bool same_site(std::string a, std::string b) {
+bool same_site(const std::string& a, const std::string& b) {
     if (a.empty() || b.empty()) return false;
     if (a == b) return true;
     if (a.size() > b.size() && a.ends_with("." + b)) return true;

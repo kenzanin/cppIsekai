@@ -16,7 +16,7 @@ void bind_text_codecs(lua_State*, sol::table, const HostCtx&);
 void bind_re2(lua_State*, sol::table, const HostCtx&);
 void bind_crypto_html(lua_State*, sol::table, const HostCtx&);
 
-void bind_rest(lua_State* L, sol::table host, const HostCtx& ctx) {
+void bind_rest(lua_State* L, const sol::table& host, const HostCtx& ctx) {
     bind_text_codecs(L, host, ctx);
     bind_re2(L, host, ctx);
     bind_crypto_html(L, host, ctx);

@@ -55,7 +55,7 @@ HttpOpts parse_http_opts(const sol::optional<sol::table>& opts, long timeout_ms,
             o.cookie = v.as<bool>();
         }
         if (sol::object v = (*opts)["headers"]; v.get_type() == sol::type::table) {
-            v.as<sol::table>().for_each([&](sol::object k, sol::object val) {
+            v.as<sol::table>().for_each([&](const sol::object& k, const sol::object& val) {
                 if (k.get_type() == sol::type::string && val.get_type() == sol::type::string) {
                     o.headers.emplace_back(k.as<std::string>(), val.as<std::string>());
                 }
@@ -166,7 +166,7 @@ void bind_http(lua_State* L, const HostCtx& ctx) {
         o.profile = o.live_default;
         bool has_known = false;
         if (opts) {
-            opts->for_each([&](sol::object k, sol::object) {
+            opts->for_each([&](const sol::object& k, const sol::object&) {
                 if (k.get_type() == sol::type::string) {
                     const std::string key = k.as<std::string>();
                     if (key == "timeout_ms" || key == "profile" || key == "method" || key == "body" ||
@@ -179,7 +179,7 @@ void bind_http(lua_State* L, const HostCtx& ctx) {
         if (opts && has_known) {
             o = parse_http_opts(opts, timeout_ms, *live);
         } else if (opts) { // legacy: flat string->string map == headers
-            opts->for_each([&](sol::object k, sol::object v) {
+            opts->for_each([&](const sol::object& k, const sol::object& v) {
                 if (k.get_type() == sol::type::string && v.get_type() == sol::type::string) {
                     o.headers.emplace_back(k.as<std::string>(), v.as<std::string>());
                 }
@@ -199,7 +199,7 @@ void bind_http(lua_State* L, const HostCtx& ctx) {
         }
         o.profile = o.live_default;
         if (headers) {
-            headers->for_each([&](sol::object k, sol::object v) {
+            headers->for_each([&](const sol::object& k, const sol::object& v) {
                 if (k.get_type() == sol::type::string && v.get_type() == sol::type::string) {
                     o.headers.emplace_back(k.as<std::string>(), v.as<std::string>());
                 }
