@@ -1,4 +1,6 @@
 ## 2026-11-24
+* **Update**: Linked `architecture/extension-source-four-ports.md` to `references/plugin-porting-matrix-goIsekai.md` (four new ports from extension-source, not examples/plugins).
+* **Creation**: Documented concept `architecture/extension-source-four-ports.md` (Four extension-source ports: Asmodeus, Bbato, Dynasty, MangaForFree).
 * **Update**: Updated concept `decisions/db-read-parallel.md`.
 * **Update**: Linked `architecture/mangak-mangagoku-plugins.md` to `decisions/image-referer-domain-match.md` (mangak.io and mangagoku.com image CDNs use manifest image_referer / same-site referer).
 * **Update**: Linked `architecture/mangak-mangagoku-plugins.md` to `architecture/plugin-system.md` (new Lua ports following the folder/manifest/JSON-text ABI).
