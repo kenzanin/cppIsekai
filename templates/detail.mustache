@@ -77,21 +77,32 @@
            title="Migrate" aria-label="Migrate">
           <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h14l-3-3M20 16H6l3 3"/></svg>
         </a>
+        <!-- enrichment (detail-enrichment-fields): icon-only actions, same row as migrate. force moves into each wizard. -->
+        <button x-show="inLibrary" x-cloak @click="openEnrich('detail', false)" :disabled="enrichBusy"
+                class="icon-action relative p-2 border border-zinc-700 text-zinc-300 hover:bg-zinc-800 rounded-md disabled:opacity-40"
+                title="Fetch detail — enrich title, synopsis, authors, artists and tags from the enrichment sources"
+                aria-label="Fetch detail">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M10 11h5M10 15h5"/></svg>
+        </button>
+        <button x-show="inLibrary" x-cloak @click="openEnrich('covers', false)" :disabled="enrichBusy"
+                class="icon-action relative p-2 border border-zinc-700 text-zinc-300 hover:bg-zinc-800 rounded-md disabled:opacity-40"
+                title="Fetch covers — candidate covers from the enrichment sources"
+                aria-label="Fetch covers">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="m3 16 5-4 4 3 3-2 6 5"/></svg>
+        </button>
+        <button x-show="inLibrary" x-cloak @click="resetDetail()" :disabled="enrichBusy"
+                class="icon-action relative p-2 border border-zinc-800 text-zinc-400 hover:bg-zinc-800 rounded-md disabled:opacity-40"
+                title="Reset detail — clear chosen title, synopsis, authors, artists and tags (cover is kept)"
+                aria-label="Reset detail">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h11a5 5 0 0 1 0 10H9"/><path d="m8 5-4 4 4 4"/></svg>
+        </button>
+        <span class="text-[11px] text-zinc-400" x-show="inLibrary && enrichLastFetched" x-text="'last fetched ' + fmtEnrichDate(enrichLastFetched)"></span>
+        <span class="text-[11px] text-zinc-400" x-show="inLibrary && enrichBusy">fetching…</span>
       </div>
       <p class="text-xs text-amber-300 mt-2" x-show="detail.is_novel" x-cloak>
         Novel entry — this source has no page images. Read it on the <a :href="detail.url || '#'" target="_blank" rel="noopener" class="underline">original site</a> instead.
       </p>
       <p class="text-xs text-red-400 mt-2" x-show="err" x-text="err" x-cloak></p>
-      <!-- enrichment (detail-enrichment-fields): fetch detail/covers, picker, reset. Saved-manga library gate is enforced server-side (not in library = 404). -->
-      <div class="mt-4 flex flex-wrap items-center gap-2" x-show="inLibrary" x-cloak>
-        <button @click="openEnrich('detail', false)" :disabled="enrichBusy" class="px-3 py-1.5 text-xs border border-zinc-700 rounded-md text-zinc-300 hover:bg-zinc-800 disabled:opacity-40">Fetch detail</button>
-        <button @click="openEnrich('detail', true)" :disabled="enrichBusy" class="px-3 py-1.5 text-xs border border-zinc-800 rounded-md text-zinc-500 hover:bg-zinc-800 disabled:opacity-40" title="always refetch, overwrite stored candidates">⟳ force</button>
-        <button @click="openEnrich('covers', false)" :disabled="enrichBusy" class="px-3 py-1.5 text-xs border border-zinc-700 rounded-md text-zinc-300 hover:bg-zinc-800 disabled:opacity-40">Fetch covers</button>
-        <button @click="openEnrich('covers', true)" :disabled="enrichBusy" class="px-3 py-1.5 text-xs border border-zinc-800 rounded-md text-zinc-500 hover:bg-zinc-800 disabled:opacity-40" title="always refetch candidate covers">⟳ force</button>
-        <button @click="resetDetail()" :disabled="enrichBusy" class="px-3 py-1.5 text-xs border border-zinc-800 rounded-md text-zinc-500 hover:bg-zinc-800 disabled:opacity-40" title="clear chosen title/synopsis/artist/author/tags (keeps cover)">Reset detail</button>
-        <span class="text-[11px] text-zinc-400" x-show="enrichLastFetched" x-text="'last fetched ' + fmtEnrichDate(enrichLastFetched)"></span>
-        <span class="text-[11px] text-zinc-400" x-show="enrichBusy">fetching…</span>
-      </div>
       <!-- picker panel: candidates grouped per source, user picks; nothing auto-applied -->
       <div :class="enrichKind === 'covers' ? 'fixed inset-0 z-50 bg-black/80 backdrop-blur-sm overflow-y-auto p-6' : 'mt-3 border border-zinc-800 rounded-lg p-3 text-sm'" x-show="enrichOpen" x-cloak @keydown.escape.window="enrichOpen = false">
         <div :class="enrichKind === 'covers' ? 'max-w-4xl mx-auto bg-zinc-950 border border-zinc-800 rounded-xl p-4 text-sm' : ''">
@@ -103,16 +114,22 @@
           <span class="text-xs text-red-400" x-show="enrichErr" x-text="enrichErr"></span>
         </div>
         <p class="text-xs text-zinc-300 mb-2">Pick per field; nothing is applied until you choose it. Tags can be toggled; the detail page hides any tag in “hidden tags”.</p>
-        <!-- website defaults: drop a chosen override so the field goes back to what the scraper plugin/website emits -->
+        <!-- wizard-scoped tools: covers = force refetch + reset cover; detail = force refetch + per-field restore -->
         <div class="flex flex-wrap items-center gap-1 mb-2 text-[10px] text-zinc-400">
-          <span class="uppercase tracking-wide mr-1">restore site:</span>
-          <button @click="restoreSource('title')" class="px-1.5 py-0.5 rounded border border-zinc-700 hover:text-emerald-300">title</button>
-          <button @click="restoreSource('synopsis')" class="px-1.5 py-0.5 rounded border border-zinc-700 hover:text-emerald-300">synopsis</button>
-          <button @click="restoreSource('author')" class="px-1.5 py-0.5 rounded border border-zinc-700 hover:text-emerald-300">authors</button>
-          <button @click="restoreSource('artist')" class="px-1.5 py-0.5 rounded border border-zinc-700 hover:text-emerald-300">artists</button>
-          <button @click="restoreSource('tags')" class="px-1.5 py-0.5 rounded border border-zinc-700 hover:text-emerald-300">tags</button>
-          <button @click="restoreSource('cover')" class="px-1.5 py-0.5 rounded border border-zinc-700 hover:text-emerald-300">cover</button>
-          <span x-show="sourceDetail" class="ml-1 text-emerald-500" x-cloak>SRC available</span>
+          <span class="flex items-center gap-1" x-show="enrichKind === 'covers'">
+            <button @click="openEnrich('covers', true)" :disabled="enrichBusy" class="px-1.5 py-0.5 rounded border border-zinc-800 hover:text-emerald-300 disabled:opacity-40" title="refetch candidate covers, ignoring the stored cache">⟳ force fetch</button>
+            <button @click="resetCover()" :disabled="enrichBusy" class="px-1.5 py-0.5 rounded border border-zinc-700 hover:text-amber-300 disabled:opacity-40" title="drop the chosen cover so the site's own cover comes back">reset cover</button>
+          </span>
+          <span class="flex items-center gap-1 flex-wrap" x-show="enrichKind !== 'covers'">
+            <button @click="openEnrich('detail', true)" :disabled="enrichBusy" class="px-1.5 py-0.5 rounded border border-zinc-800 hover:text-emerald-300 disabled:opacity-40" title="refetch detail candidates, ignoring the stored cache">⟳ force fetch</button>
+            <span class="uppercase tracking-wide ml-1">restore site:</span>
+            <button @click="restoreSource('title')" class="px-1.5 py-0.5 rounded border border-zinc-700 hover:text-emerald-300">title</button>
+            <button @click="restoreSource('synopsis')" class="px-1.5 py-0.5 rounded border border-zinc-700 hover:text-emerald-300">synopsis</button>
+            <button @click="restoreSource('author')" class="px-1.5 py-0.5 rounded border border-zinc-700 hover:text-emerald-300">authors</button>
+            <button @click="restoreSource('artist')" class="px-1.5 py-0.5 rounded border border-zinc-700 hover:text-emerald-300">artists</button>
+            <button @click="restoreSource('tags')" class="px-1.5 py-0.5 rounded border border-zinc-700 hover:text-emerald-300">tags</button>
+            <span x-show="sourceDetail" class="ml-1 text-emerald-500" x-cloak>SRC available</span>
+          </span>
         </div>
 <!-- combined detail candidates from BOTH enrichment sources; normalized dedupe, MangaDex wins; one block, md/mu badges -->
         <div class="space-y-1" x-show="enrichKind !== 'covers' && (candFor('mangadex-enrichment', 'detail') || candFor('mangaupdates-enrichment', 'detail'))">

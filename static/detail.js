@@ -270,6 +270,12 @@ function detailPage() {
         if (!r.ok) { window.toast('error', 'reset failed'); return; }
         await this.load(); window.toast('success', 'Cover reset'); } catch (e) { window.toast('error', String(e)); }
     },
+    async resetCover() { // drop chosen.cover -> read-first cover falls back to the site's own
+      try { const r = await fetch('/api/enrichment/reset', {method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ plugin: this.plugin, slug: this.slug, mode: 'cover' })});
+        if (!r.ok) { window.toast('error', 'reset cover failed'); return; }
+        await this.load(); window.toast('success', 'Cover reset'); } catch (e) { window.toast('error', String(e)); }
+    },
     async resetDetail() { // clears non-tag choseD fields, keeps chosen.cover (task 4.3)
       try { const r = await fetch('/api/enrichment/reset', {method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ plugin: this.plugin, slug: this.slug, mode: 'detail' })});
