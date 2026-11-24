@@ -100,7 +100,10 @@ local function cxx_bin(name, cfg)
         if cfg.defs then add_defines(table.unpack(cfg.defs)) end
         if cfg.ldflags then add_ldflags(table.unpack(cfg.ldflags), {force = true}) end
         if cfg.rpath then add_rpathdirs(cfg.rpath) end
-        if cfg.test then add_tests("default") end
+        if cfg.test then
+            add_tests("default")
+            set_rundir("tmp/tests") -- test DBs/logs are relative names: keep them out of the repo root
+        end
         on_load(function(t) -- mold for fast links like the cmake build (import needs script scope)
             import("lib.detect.find_program")
             if find_program("mold") then
