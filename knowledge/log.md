@@ -1,4 +1,6 @@
 ## 2026-11-25
+* **Update**: Linked `findings/plugin-script-module-split-2026-11-25.md` to `decisions/source-layout-policy.md`.
+* **Creation**: Documented concept `findings/plugin-script-module-split-2026-11-25.md` (All Lua/JS plugin scripts split into per-action modules; helper duplication census).
 * **Update**: Updated concept `findings/offline-cached-chapter-2026-11-25.md`.
 * **Update**: Linked `findings/offline-cached-chapter-2026-11-25.md` to `architecture/chapter-state-flags.md`.
 * **Creation**: Documented concept `findings/offline-cached-chapter-2026-11-25.md` (Offline cached chapters: /api/pages must fall back to chapter rows, not the plugin envelope).
