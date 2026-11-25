@@ -57,14 +57,22 @@ return function(ctx)
     local sp1, sp2 = math.ceil(first / SITE_PAGE), math.ceil(last / SITE_PAGE)
 
     local out, seen, total = {}, {}, nil
-    for sp = sp1, sp2 do
-      local url = q ~= ""
+    local function site_url(sp)
+      return q ~= ""
         and (ctx.BASE .. "/search?q=" .. host.url_encode(q) .. qs .. "&page=" .. sp)
         or (ctx.BASE .. "/series?page=" .. sp .. qs)
-      local body, err = ctx.get(url)
+    end
+    for sp = sp1, sp2 do
+      local body, err = ctx.get(site_url(sp))
       if not body then
         if err and err:find("404", 1, true) then
-          break -- past the last site page: report the empty tail, not an error
+          -- past the last site page: report the empty tail, not an error; page 1
+          -- still has to be read once for the total (the 404 carries no count)
+          if sp == sp1 and sp1 > 1 then
+            local head = ctx.get(site_url(1))
+            total = head and total_of(head) or nil
+          end
+          break
         end
         return { ok = false, error = err }
       end
@@ -75,6 +83,9 @@ return function(ctx)
       end
     end
 
+    -- ponytail: offsets assume the site keeps exactly SITE_PAGE cards per page
+    -- (a short page mid-list would shift the slice). Observed stable; if the site
+    -- ever varies it, drop slicing and make the site page size the host page size.
     local start = first - (sp1 - 1) * SITE_PAGE
     local slice = {}
     for i = start, math.min(start + limit - 1, #out) do

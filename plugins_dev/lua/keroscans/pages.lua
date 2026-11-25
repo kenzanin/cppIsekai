@@ -22,6 +22,9 @@ return function(ctx)
       out[#out + 1] = ctx.BASE .. m[2]
     end
     if #out == 0 then
+      if body:find("ks-reader-locked", 1, true) then
+        return { ok = false, error = "keroscans: chapter locked (paid) " .. id }
+      end
       return { ok = false, error = "keroscans: no pages for " .. id }
     end
     host.log.info("keroscans: " .. tostring(#out) .. " pages for " .. id)

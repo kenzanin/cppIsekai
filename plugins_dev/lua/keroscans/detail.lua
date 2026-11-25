@@ -21,7 +21,12 @@ return function(ctx)
 
     local name = host.text.trim(host.text.unescape(body:match('property="og:title" content="([^"]*)"') or ""))
     local cover = body:match('property="og:image" content="([^"]*)"') or ""
-    local description = host.text.trim(host.text.unescape(body:match('property="og:description" content="([^"]*)"') or ""))
+    -- og:description is truncated with "..."; the synopsis <p> holds the full text.
+    local syn = body:match([[<p[^>]*class="[^"]*ks%-sp__clamp[^"]*"[^>]*>(.-)</p>]])
+    local description = syn and host.text.trim(host.text.unescape((syn:gsub("<[^>]+>", " ")))) or ""
+    if description == "" then
+      description = host.text.trim(host.text.unescape(body:match('property="og:description" content="([^"]*)"') or ""))
+    end
 
     local tags = {}
     local ld = body:match('"genre":%[([^%]]*)%]')
