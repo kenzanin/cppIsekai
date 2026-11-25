@@ -1,4 +1,5 @@
 ## 2026-11-25
+* **Update**: Updated concept `architecture/keroscans-plugin.md`.
 * **Update**: Linked `architecture/keroscans-plugin.md` to `architecture/plugin-system.md` (keroscans plugin instance of the folder/manifest/ABI contract).
 * **Creation**: Documented concept `architecture/keroscans-plugin.md` (keroscans plugin: endpoints + decimal-subchapter gotcha).
 * **Update**: Linked `decisions/enrich-module-location.md` to `architecture/detail-page.md` (enrich module implements the detail-page enrichment flow moved out of http/).
