@@ -1,4 +1,6 @@
 ## 2026-11-25
+* **Update**: Linked `findings/plugin-seo-tag-pills-2026-11-25.md` to `architecture/manhwato-plugin.md`.
+* **Creation**: Documented concept `findings/plugin-seo-tag-pills-2026-11-25.md` (Site SEO tag farms must not become detail tags; use JSON-LD genres).
 * **Update**: Updated concept `decisions/image-referer-domain-match.md`.
 * **Update**: Linked `findings/plugin-script-module-split-2026-11-25.md` to `decisions/source-layout-policy.md`.
 * **Creation**: Documented concept `findings/plugin-script-module-split-2026-11-25.md` (All Lua/JS plugin scripts split into per-action modules; helper duplication census).
