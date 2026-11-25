@@ -1,0 +1,14 @@
+{
+  "name": "KeroScans",
+  "id": "keroscans",
+  "version": "1.0.0",
+  "website": "https://keroscans.net",
+  "image_referer": "https://keroscans.net/",
+  "runtime": "lua",
+  "paginates": false,
+  "capabilities": ["search", "detail", "chapters", "pages"],
+  "params": {
+    "site_url": "https://keroscans.net"
+  },
+  "api": 1
+}
