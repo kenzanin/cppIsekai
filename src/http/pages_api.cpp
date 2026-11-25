@@ -33,6 +33,29 @@ std::string url_encode(const std::string& s) {
 
 } // namespace
 
+std::string chapters_envelope_from_rows(const std::vector<std::pair<double, std::string>>& rows) {
+    crow::json::wvalue list(crow::json::type::List);
+    for (std::size_t i = 0; i < rows.size(); ++i) {
+        list[i]["id"] = rows[i].second;
+        list[i]["number"] = rows[i].first;
+    }
+    crow::json::wvalue env;
+    env["ok"] = true;
+    env["data"] = std::move(list);
+    return env.dump();
+}
+
+std::string pages_envelope_from_urls(const std::vector<std::string>& urls) {
+    crow::json::wvalue list(crow::json::type::List);
+    for (std::size_t i = 0; i < urls.size(); ++i) {
+        list[i] = urls[i];
+    }
+    crow::json::wvalue env;
+    env["ok"] = true;
+    env["data"] = std::move(list);
+    return env.dump();
+}
+
 std::optional<std::string> build_pages_response(const std::string& chs_env, const std::string& pages_env,
                                                 const PagesCtx& ctx) {
     // Plugin order is not trusted (mangafreak emits newest-first), so the

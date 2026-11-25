@@ -11,6 +11,8 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <utility>
+#include <vector>
 
 /** Path context of one /api/pages request. */
 struct PagesCtx {
@@ -20,6 +22,13 @@ struct PagesCtx {
     std::string ch_id{}; // resolved chapter id: the route prefers a `ch_id` query param, else the first entry with `ch`
     std::set<std::string> hidden{}; // chapter ids flagged skip: never offered as prev/next
 };
+
+/** Offline envelopes: the route rebuilds these from `chapters` and
+ *  `chapter_pages` rows when a live plugin fetch is unavailable. Tests feed
+ *  the same shapes to build_pages_response without any HTTP or store.
+ */
+std::string chapters_envelope_from_rows(const std::vector<std::pair<double, std::string>>& rows);
+std::string pages_envelope_from_urls(const std::vector<std::string>& urls);
 
 /** Reader page-list JSON from the chapters envelope and the target chapter's
  *  pages envelope. nullopt = unknown chapter or unusable envelope (the route

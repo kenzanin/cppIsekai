@@ -64,15 +64,12 @@ void register_content(Ctx& c) {
             std::string chapter_id = resolve_chapter_id(chapter_list_env, want_id, chd);
             if (chapter_id.empty()) {
                 const auto seeds = store.chapters_list(plugin, slug);
-                crow::json::wvalue list(crow::json::type::List);
-                for (std::size_t i = 0; i < seeds.size(); ++i) {
-                    list[i]["id"] = seeds[i].chapter_id;
-                    list[i]["number"] = seeds[i].number;
+                std::vector<std::pair<double, std::string>> rows;
+                rows.reserve(seeds.size());
+                for (const auto& s : seeds) {
+                    rows.emplace_back(s.number, s.chapter_id);
                 }
-                crow::json::wvalue envelope;
-                envelope["ok"] = true;
-                envelope["data"] = std::move(list);
-                chapter_list_env = envelope.dump();
+                chapter_list_env = chapters_envelope_from_rows(rows);
                 chapter_id = resolve_chapter_id(chapter_list_env, want_id, chd);
             }
             if (chapter_id.empty()) {
@@ -111,14 +108,7 @@ void register_content(Ctx& c) {
                 // chapter_pages, so serve those instead of the failed fetch.
                 const auto stored = store.chapter_pages_urls(plugin, slug, cand);
                 if (!stored.empty()) {
-                    crow::json::wvalue urls(crow::json::type::List);
-                    for (std::size_t i = 0; i < stored.size(); ++i) {
-                        urls[i] = stored[i];
-                    }
-                    crow::json::wvalue envelope;
-                    envelope["ok"] = true;
-                    envelope["data"] = std::move(urls);
-                    pages_env = envelope.dump();
+                pages_env = pages_envelope_from_urls(stored);
                     pages_id = cand;
                     pages_error.clear();
                     break;

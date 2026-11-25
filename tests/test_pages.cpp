@@ -38,6 +38,22 @@ TEST_CASE("pages: ordered host-rendered urls with prev/next neighbors") {
     CHECK(has(body, R"("chapter":2)"));
 }
 
+TEST_CASE("pages: offline envelopes rebuilt from stored rows keep a cached chapter readable") {
+    // With no network, the route rebuilds these two envelopes from chapters /
+    // chapter_pages rows; the same shapes must compose into a normal response.
+    const auto stored_chs = chapters_envelope_from_rows({{1, "a1"}, {2, "a2"}, {3, "a3"}});
+    const auto stored_pages = pages_envelope_from_urls({"https://cdn/a/1.jpg", "https://cdn/a/2.jpg"});
+    const auto out = build_pages_response(stored_chs, stored_pages, {"m", "s", 2});
+    REQUIRE(out);
+    CHECK(has(*out, R"("ch_id":"a2")"));
+    CHECK(has(*out, R"("prev_ch":1)"));
+    CHECK(has(*out, R"("next_ch":3)"));
+    CHECK(has(*out, "url=https%3A%2F%2Fcdn%2Fa%2F1.jpg"));
+    CHECK(has(*out, "&page=2"));
+    // No stored rows and a failed fetch still means unknown chapter.
+    CHECK_FALSE(build_pages_response(stored_chs, R"({"ok":false,"error":"offline"})", {"m", "s", 2}));
+}
+
 TEST_CASE("pages: descending plugin order still yields nearest neighbors") {
     // mangafreak emits newest-first; walking the array used to make 36/1 win for every chapter.
     const std::string desc = R"({"ok":true,"data":[)"
