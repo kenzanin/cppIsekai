@@ -8,7 +8,9 @@ return function(ctx)
 
   return function()
     local body = ctx.get(ctx.BASE .. "/search")
-    if not body then return { ok = true, data = {} } end
+    if not body then
+      return { ok = true, data = {} }
+    end
     local names, seen = {}, {}
     for slug, name in string.gmatch(t.decomment(body), 'genre/([%w%-]+)"[^>]*>([^<]+)<') do
       local label = t.normalize_tag(t.unesc(name))

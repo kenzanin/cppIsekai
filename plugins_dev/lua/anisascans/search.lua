@@ -14,7 +14,9 @@ return function(params)
   local genres = params.tags or params.genres or {}
   if type(genres) == "string" then
     local list = {}
-    for name in genres:gmatch("[^,]+") do list[#list + 1] = trim(name) end
+    for name in genres:gmatch("[^,]+") do
+      list[#list + 1] = trim(name)
+    end
     genres = list
   end
 
@@ -23,14 +25,18 @@ return function(params)
     -- Madara genre archives live under /manga-genre/<slug>/; ?page=N is not
     -- supported by this theme, so page 2+ uses /page/N/.
     url = BASE .. "/manga-genre/" .. host.url_encode(genres[1]) .. "/"
-    if page > 1 then url = url .. "page/" .. tostring(page) .. "/" end
+    if page > 1 then
+      url = url .. "page/" .. tostring(page) .. "/"
+    end
   else
     -- Madara GET search: admin-ajax.php answers 0 bytes, use server-rendered GET.
     url = BASE .. "/?s=" .. host.url_encode(q) .. "&post_type=wp-manga"
   end
 
   local body, err = http_req(url)
-  if err ~= nil then return { ok = false, error = err } end
+  if err ~= nil then
+    return { ok = false, error = err }
+  end
 
   local items, seen = {}, {}
   -- one card per c-tabs-item__content block: cover <img> first, then post-title
@@ -43,8 +49,7 @@ return function(params)
       local slug = find1(href, [[/manga/([^/]+)/]]) or find1(href, [[/manga/([^/]+)$]])
       if slug and not seen[slug] then
         seen[slug] = true
-        local cover = find1(card, [[data-src="[\t\n\s]*(https?://[^"]+)"]])
-          or find1(card, [[\ssrc="(https?://[^"]+)"]])
+        local cover = find1(card, [[data-src="[\t\n\s]*(https?://[^"]+)"]]) or find1(card, [[\ssrc="(https?://[^"]+)"]])
         items[#items + 1] = { id = slug, name = unescape(title or ""), cover = trim(cover or "") }
       end
     end

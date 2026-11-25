@@ -10,8 +10,14 @@ local BASE = "https://weebcentral.com"
 local UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 local LIMIT = 32
 
-local STATUS = { complete = "completed", ongoing = "ongoing", hiatus = "hiatus", cancelled = "dropped", dropped = "dropped", upcoming = "upcoming" }
-
+local STATUS = {
+  complete = "completed",
+  ongoing = "ongoing",
+  hiatus = "hiatus",
+  cancelled = "dropped",
+  dropped = "dropped",
+  upcoming = "upcoming",
+}
 
 -- Card = one top-level '<article class="bg-base-300' block; the desktop anchor
 -- inside it carries ULID + slug + title, Year/Status/Tags live in the trailing
@@ -19,17 +25,17 @@ local STATUS = { complete = "completed", ongoing = "ongoing", hiatus = "hiatus",
 -- site HTML carries entities like &#39; / &amp; / &#x27; — decode once so they
 -- never reach the UI as literal text (the digits in &#39; read as "a number").
 
-
-
-
-
-
-
-
 local function get(path)
-  local res, err = host.http.fetch(BASE .. path, { headers = { ["User-Agent"] = UA, ["Accept"] = "text/html,*/*" }, timeout_ms = 30000 })
-  if err ~= nil then return nil, err end
-  if res.status ~= 200 then return nil, "weebcentral: upstream status " .. tostring(res.status) end
+  local res, err = host.http.fetch(
+    BASE .. path,
+    { headers = { ["User-Agent"] = UA, ["Accept"] = "text/html,*/*" }, timeout_ms = 30000 }
+  )
+  if err ~= nil then
+    return nil, err
+  end
+  if res.status ~= 200 then
+    return nil, "weebcentral: upstream status " .. tostring(res.status)
+  end
   return res.body, nil
 end
 
@@ -39,12 +45,16 @@ end
 
 local function cards(body)
   local out = {}
-  if type(body) ~= "string" then return out end
+  if type(body) ~= "string" then
+    return out
+  end
   -- sentinel offsets for every top-level card
   local sentinels, s = {}, 1
   while true do
     local n = body:find('<article class="bg-base-300', s, true)
-    if not n then break end
+    if not n then
+      break
+    end
     sentinels[#sentinels + 1] = n
     s = n + 1
   end
@@ -56,13 +66,17 @@ local function cards(body)
       local year = scope:match("<strong>Year:</strong>%s*<span>(%d+)</span>")
       local status = scope:match("<strong>Status:</strong>%s*<span>([^<]+)</span>")
       local authors = {}
-      for name in scope:gmatch('search%?author=[^"]*"[^>]*>([^<]+)</a>') do authors[#authors + 1] = txt(name) end
+      for name in scope:gmatch('search%?author=[^"]*"[^>]*>([^<]+)</a>') do
+        authors[#authors + 1] = txt(name)
+      end
       local tags = {}
       local tblock = scope:match("<strong>Tag%(s%):%s*</strong>(.-)</div>")
       if tblock then
         for t in tblock:gmatch("<span>([^<]+)</span>") do
           local tag = txt(t:gsub(",%s*$", ""))
-          if tag ~= "" then tags[#tags + 1] = tag end
+          if tag ~= "" then
+            tags[#tags + 1] = tag
+          end
         end
       end
       out[#out + 1] = {
@@ -80,4 +94,4 @@ local function cards(body)
   return out
 end
 
-return { BASE=BASE, UA=UA, LIMIT=LIMIT, STATUS=STATUS, get=get, txt=txt, cards=cards }
+return { BASE = BASE, UA = UA, LIMIT = LIMIT, STATUS = STATUS, get = get, txt = txt, cards = cards }

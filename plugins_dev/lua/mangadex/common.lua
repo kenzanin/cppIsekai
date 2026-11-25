@@ -30,9 +30,13 @@ end
 -- POST the token endpoint (form-encoded). Returns token table or nil, err.
 local function token_post(fields)
   local pairs_ = {}
-  for k, v in pairs(fields) do pairs_[#pairs_ + 1] = k .. "=" .. tostring(v):gsub("[^%w%.%-~_]", function(c)
-    return string.format("%%%02X", c:byte())
-  end) end
+  for k, v in pairs(fields) do
+    pairs_[#pairs_ + 1] = k
+      .. "="
+      .. tostring(v):gsub("[^%w%.%-~_]", function(c)
+        return string.format("%%%02X", c:byte())
+      end)
+  end
   local res, err = host.http.fetch(AUTH, {
     method = "POST",
     body = table.concat(pairs_, "&"),
@@ -40,30 +44,48 @@ local function token_post(fields)
     accept = "application/json",
     user_agent = "cppIsekai/0.1",
   })
-  if err ~= nil then return nil, err end
-  if res.status ~= 200 then return nil, "auth status " .. res.status .. ": " .. res.body:sub(1, 80) end
+  if err ~= nil then
+    return nil, err
+  end
+  if res.status ~= 200 then
+    return nil, "auth status " .. res.status .. ": " .. res.body:sub(1, 80)
+  end
   local ok, body = pcall(json.decode, res.body)
-  if not ok or not body.access_token then return nil, "auth: malformed token response" end
+  if not ok or not body.access_token then
+    return nil, "auth: malformed token response"
+  end
   return body
 end
 
 -- Valid cached access_token, refreshing via stored refresh_token when past
 -- expires_at. force=true skips the freshness check (401 path).
 local function access_token(force)
-  if not have_creds() then return nil end
+  if not have_creds() then
+    return nil
+  end
   local tok = host.storage.get("access_token")
   local exp = tonumber(host.storage.get("expires_at")) or 0
   local refresh = host.storage.get("refresh_token")
-  if tok ~= nil and not force and host.now() < exp - 30 then return tok end
+  if tok ~= nil and not force and host.now() < exp - 30 then
+    return tok
+  end
   local body
   if refresh ~= nil then
-    body = token_post({ grant_type = "refresh_token", refresh_token = refresh, client_id = cid, client_secret = csecret })
+    body =
+      token_post({ grant_type = "refresh_token", refresh_token = refresh, client_id = cid, client_secret = csecret })
   end
   if body == nil then -- no refresh token yet, or refresh rejected: full login
     local err
-    body, err = token_post({ grant_type = "password", username = cuser, password = cpass, client_id = cid,
-      client_secret = csecret })
-    if body == nil then return nil, err end
+    body, err = token_post({
+      grant_type = "password",
+      username = cuser,
+      password = cpass,
+      client_id = cid,
+      client_secret = csecret,
+    })
+    if body == nil then
+      return nil, err
+    end
   end
   host.storage.set("access_token", body.access_token)
   host.storage.set("refresh_token", body.refresh_token or "")
@@ -92,12 +114,16 @@ local function get(path, query)
   local opts = { accept = "application/json", user_agent = "cppIsekai/0.1" }
   if have_creds() then
     local at = access_token(false)
-    if at ~= nil then opts.headers = { Authorization = "Bearer " .. at } end
+    if at ~= nil then
+      opts.headers = { Authorization = "Bearer " .. at }
+    end
   end
   -- MangaDex serves the bot-challenge page to browser UAs on API endpoints;
   -- an app UA gets clean JSON. accept=json keeps content negotiation honest.
   local res, err = host.http.fetch(url, opts)
-  if err ~= nil then return nil, err end
+  if err ~= nil then
+    return nil, err
+  end
   local ct = (res.headers and res.headers["content-type"]) or "?"
   host.log.info("GET " .. url .. " -> " .. res.status .. " len=" .. #res.body .. " ct=" .. ct)
   if res.status == 401 and have_creds() then
@@ -106,26 +132,36 @@ local function get(path, query)
     if at ~= nil then
       opts.headers = { Authorization = "Bearer " .. at }
       res, err = host.http.fetch(url, opts)
-      if err ~= nil then return nil, err end
+      if err ~= nil then
+        return nil, err
+      end
       host.log.info("GET(retry) " .. url .. " -> " .. res.status)
     end
   end
-  if res.status ~= 200 then return nil, "upstream status " .. res.status .. ": " .. res.body:sub(1, 80) end
+  if res.status ~= 200 then
+    return nil, "upstream status " .. res.status .. ": " .. res.body:sub(1, 80)
+  end
   local body = json.decode(res.body)
-  if body.result ~= "ok" then return nil, "upstream result " .. tostring(body.result) end
+  if body.result ~= "ok" then
+    return nil, "upstream result " .. tostring(body.result)
+  end
   return body
 end
 
 local function canonical_manga(m)
   local attrs = m.attributes or {}
   local tags = {}
-  for _, t in ipairs(attrs.tags or {}) do tags[#tags + 1] = t.attributes.name.en end
+  for _, t in ipairs(attrs.tags or {}) do
+    tags[#tags + 1] = t.attributes.name.en
+  end
   local title = attrs.title or {}
   local name = title.en or title["ja-ro"] or title.ja or "untitled"
   if name == "untitled" then -- title-less works carry names in altTitles
     for _, alt in ipairs(attrs.altTitles or {}) do
       name = alt.en or alt["ja-ro"] or alt.ja
-      if name then break end
+      if name then
+        break
+      end
     end
   end
   local cover = ""
@@ -141,8 +177,11 @@ local function canonical_manga(m)
     if (rel.type == "author" or rel.type == "artist") and rel.attributes then
       local nm = rel.attributes.name
       if nm then
-        if rel.type == "author" then authors[#authors + 1] = nm
-        else artists[#artists + 1] = nm end
+        if rel.type == "author" then
+          authors[#authors + 1] = nm
+        else
+          artists[#artists + 1] = nm
+        end
       end
     end
   end
@@ -160,19 +199,35 @@ local function canonical_manga(m)
   }
 end
 
-
 -- Tag name -> uuid map (genres source too); fetched once per plugin load.
 local tag_map
 local function tag_ids()
-  if tag_map then return tag_map end
+  if tag_map then
+    return tag_map
+  end
   local body, err = get("/manga/tag", { limit = 100 })
-  if err ~= nil then return nil, err end
+  if err ~= nil then
+    return nil, err
+  end
   local map = {}
   for _, t in ipairs(body.data or {}) do
     local name = t.attributes and t.attributes.name and t.attributes.name.en
-    if name then map[name] = t.id end
+    if name then
+      map[name] = t.id
+    end
   end
   tag_map = map
   return map
 end
-return { normalize_status=normalize_status, API=API, AUTH=AUTH, have_creds=have_creds, epoch=epoch, token_post=token_post, access_token=access_token, get=get, canonical_manga=canonical_manga, tag_ids=tag_ids }
+return {
+  normalize_status = normalize_status,
+  API = API,
+  AUTH = AUTH,
+  have_creds = have_creds,
+  epoch = epoch,
+  token_post = token_post,
+  access_token = access_token,
+  get = get,
+  canonical_manga = canonical_manga,
+  tag_ids = tag_ids,
+}

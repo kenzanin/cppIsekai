@@ -10,8 +10,6 @@ local trim = host.text.trim
 -- re2.find returns {} (truthy) on no-match; take the capture so `or` chains
 -- and nil-check behave like goIsekai's find.
 
-
-
 -- ── search ─────────────────────────────────────────────────────────────────
 -- bsx cards: <div class="bsx"><a href=".../comics/<slug>/">...<img>...<div class="tt">Title</div>
 
@@ -36,7 +34,9 @@ end
 
 local function http_body(url)
   local b = host.http.fetch_body(url)
-  if b == nil or b == "" then return nil end
+  if b == nil or b == "" then
+    return nil
+  end
   return b
 end
 
@@ -49,4 +49,4 @@ local function fetch_detail_body(slug)
   return http_body(BASE .. "/" .. slug .. "/") or body
 end
 
-return { BASE=BASE, trim=trim, cap=cap, http_body=http_body, fetch_detail_body=fetch_detail_body }
+return { BASE = BASE, trim = trim, cap = cap, http_body = http_body, fetch_detail_body = fetch_detail_body }

@@ -10,9 +10,13 @@ local ensure_genres = c.ensure_genres
 local slug_of = c.slug_of
 return function(params)
   local id = slug_of(params.id or "")
-  if id == "" then return { ok = true, data = {} } end
+  if id == "" then
+    return { ok = true, data = {} }
+  end
   local data, err = get_json("/titles/" .. host.url_encode(id) .. "/chapters")
-  if not data then return { ok = false, error = err } end
+  if not data then
+    return { ok = false, error = err }
+  end
   local out = {}
   for _, c in ipairs(data.chapters or {}) do
     if c.id and c.id ~= "" then
@@ -26,6 +30,8 @@ return function(params)
       }
     end
   end
-  table.sort(out, function(a, b) return a.number < b.number end)
+  table.sort(out, function(a, b)
+    return a.number < b.number
+  end)
   return { ok = true, data = out }
 end

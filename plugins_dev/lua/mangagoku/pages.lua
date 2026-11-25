@@ -15,9 +15,13 @@ local book_description = c.book_description
 return function(params)
   local composite = tostring(params.id or "")
   local id, chapter = composite:match("^([^:]+):(.+)$")
-  if not id or not chapter then return { ok = true, data = {} } end
+  if not id or not chapter then
+    return { ok = true, data = {} }
+  end
   local body, err = http_req("/manga/" .. host.url_encode(id) .. "/" .. host.url_encode(chapter))
-  if not body or body == "" then return { ok = false, error = err } end
+  if not body or body == "" then
+    return { ok = false, error = err }
+  end
   -- Reader images are 2xstorage URLs with a trailing /<n>.webp index; the CDN
   -- host varies per title (img-r1/img-r2/imgs-2), so match any subdomain. Thumb
   -- images live under /thumb/ and never carry that numeric tail.
@@ -28,7 +32,7 @@ return function(params)
   -- The same page appears on several CDN mirrors; keep one URL per index.
   local by_index, order = {}, {}
   for _, url in ipairs(found) do
-    local idx = tonumber(url:match('/([0-9]+)%.webp$'))
+    local idx = tonumber(url:match("/([0-9]+)%.webp$"))
     if idx and not by_index[idx] then
       by_index[idx] = url
       order[#order + 1] = idx
@@ -36,6 +40,8 @@ return function(params)
   end
   table.sort(order)
   local out = {}
-  for _, idx in ipairs(order) do out[#out + 1] = by_index[idx] end
+  for _, idx in ipairs(order) do
+    out[#out + 1] = by_index[idx]
+  end
   return { ok = true, data = out }
 end

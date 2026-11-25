@@ -12,7 +12,6 @@ local http_req = host.http.fetch_body -- (body, err); nil unless 200 (plugin-hos
 
 -- first capture group of the first match; nil when no match (host re2.capture).
 
-
 -- First decoded ld+json block whose "@type" is "Book", or nil. The page
 -- carries several ld+json blocks; the lazy match stays inside one tag because
 -- JSON-LD never contains "</script>".
@@ -22,18 +21,13 @@ local http_req = host.http.fetch_body -- (body, err); nil unless 200 (plugin-hos
 -- (goIsekai bounded this to a 600-char window via find_index; first-match-after
 -- is equivalent in practice and needs no second primitive.)
 
-
 -- ── search ─────────────────────────────────────────────────────────────────
-
 
 -- ── detail ─────────────────────────────────────────────────────────────────
 
-
 -- ── chapters ───────────────────────────────────────────────────────────────
 
-
 -- ── pages ──────────────────────────────────────────────────────────────────
-
 
 local function find1(s, pattern)
   return host.re2.capture(pattern, tostring(s or ""))
@@ -44,20 +38,32 @@ local function is_abs_url(s)
 end
 
 local function jsonld_book(html)
-  for _, m in ipairs(host.re2.find_all(
-    [[(?s)<script type="application/ld\+json">(.*?)</script>]], html)) do
+  for _, m in ipairs(host.re2.find_all([[(?s)<script type="application/ld\+json">(.*?)</script>]], html)) do
     local ok, obj = pcall(json.decode, m[2])
-    if ok and type(obj) == "table" and obj["@type"] == "Book" then return obj end
+    if ok and type(obj) == "table" and obj["@type"] == "Book" then
+      return obj
+    end
   end
   return nil
 end
 
 local function flight_status(html, cover_path)
-  if not cover_path or cover_path == "" then return "" end
+  if not cover_path or cover_path == "" then
+    return ""
+  end
   local pat = '(?s)\\"coverImage\\":\\"' .. host.re2.quote(cover_path) .. '.*?\\"status\\":\\"([A-Z_]+)\\"'
   local m = host.re2.find(pat, html)
-  if #m >= 2 then return m[2] end
+  if #m >= 2 then
+    return m[2]
+  end
   return ""
 end
 
-return { BASE=BASE, http_req=http_req, find1=find1, is_abs_url=is_abs_url, jsonld_book=jsonld_book, flight_status=flight_status }
+return {
+  BASE = BASE,
+  http_req = http_req,
+  find1 = find1,
+  is_abs_url = is_abs_url,
+  jsonld_book = jsonld_book,
+  flight_status = flight_status,
+}

@@ -11,7 +11,8 @@ local canonical_manga = c.canonical_manga
 local tag_ids = c.tag_ids
 return function(params)
   local body, err = get("/manga/" .. (params.id or ""), { ["includes[]"] = { "cover_art", "author", "artist" } })
-  if err ~= nil then return { ok = false, error = err } end
+  if err ~= nil then
+    return { ok = false, error = err }
+  end
   return { ok = true, data = canonical_manga(body.data) }
 end
-

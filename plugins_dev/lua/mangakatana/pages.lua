@@ -9,9 +9,13 @@ local chapter_url = c.chapter_url
 local page_urls = c.page_urls
 return function(params)
   local body, err = http_req(chapter_url(params.id or ""))
-  if err ~= nil then return { ok = false, error = err } end
+  if err ~= nil then
+    return { ok = false, error = err }
+  end
 
   local urls = page_urls(body)
-  if #urls == 0 then return { ok = false, error = "mangakatana: no pages for " .. tostring(params.id) } end
+  if #urls == 0 then
+    return { ok = false, error = "mangakatana: no pages for " .. tostring(params.id) }
+  end
   return { ok = true, data = urls }
 end

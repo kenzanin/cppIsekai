@@ -13,7 +13,9 @@ local MANGA_PATH = "/title/"
 -- missing, the POST reply sets it in the per-plugin jar.
 local auth_done = false
 local function warm_auth()
-  if auth_done then return end
+  if auth_done then
+    return
+  end
   auth_done = true
   host.http.fetch(AJAX, {
     method = "POST",
@@ -31,7 +33,11 @@ end
 local function http_req(url, opts)
   warm_auth()
   local o = {}
-  if opts then for k, v in pairs(opts) do o[k] = v end end
+  if opts then
+    for k, v in pairs(opts) do
+      o[k] = v
+    end
+  end
   o.cookie = true
   return host.http.fetch_body(url, o)
 end
@@ -43,7 +49,9 @@ end
 
 -- abs_url: host.url_abs anchored at BASE (D6, this plugin's variant is the
 -- canonical semantics).
-local abs_url = function(raw) return host.url_abs(BASE, raw) end
+local abs_url = function(raw)
+  return host.url_abs(BASE, raw)
+end
 
 local function manga_url(slug)
   return BASE .. MANGA_PATH .. host.url_encode(slug) .. "/"
@@ -51,7 +59,9 @@ end
 
 -- Lazy attributes win over src, in the order Madara emits them.
 local function img_src(fragment)
-  if not fragment or fragment == "" then return "" end
+  if not fragment or fragment == "" then
+    return ""
+  end
   local v = find1(fragment, [[data-src="\s*(https?://[^"]+)]])
     or find1(fragment, [[data-src="\s*(/[^"]+)]])
     or find1(fragment, [[data-lazy-src="\s*(https?://[^"]+)]])
@@ -59,16 +69,27 @@ local function img_src(fragment)
     or find1(fragment, [[data-manga-src="\s*(https?://[^"]+)]])
     or find1(fragment, [[src="\s*(https?://[^"]+)]])
     or find1(fragment, [[src="\s*(/[^"]+)]])
-  if v then return abs_url(host.text.trim(v)) end
+  if v then
+    return abs_url(host.text.trim(v))
+  end
   return ""
 end
-
 
 -- name -> slug map filled by methods.genres; search resolves UI genre names.
 local genre_map = nil
 
 -- ── search ─────────────────────────────────────────────────────────────────
 
-
-
-return { BASE=BASE, AJAX=AJAX, MANGA_PATH=MANGA_PATH, auth_done=auth_done, warm_auth=warm_auth, http_req=http_req, find1=find1, abs_url=abs_url, manga_url=manga_url, img_src=img_src, genre_map=genre_map }
+return {
+  BASE = BASE,
+  AJAX = AJAX,
+  MANGA_PATH = MANGA_PATH,
+  auth_done = auth_done,
+  warm_auth = warm_auth,
+  http_req = http_req,
+  find1 = find1,
+  abs_url = abs_url,
+  manga_url = manga_url,
+  img_src = img_src,
+  genre_map = genre_map,
+}

@@ -12,7 +12,9 @@ local parse_cards = c.parse_cards
 return function(params)
   local slug = slug_of(params.id or "")
   local body, err = http_req(BASE .. "/get-chapter-list?slug=" .. host.url_encode(slug), XHR)
-  if not body or body == "" then return { ok = false, error = err } end
+  if not body or body == "" then
+    return { ok = false, error = err }
+  end
   local ok, doc = pcall(json.decode, body)
   if not ok or type(doc) ~= "table" or doc.success ~= true then
     return { ok = false, error = "bbato: bad chapters envelope" }
@@ -29,6 +31,8 @@ return function(params)
       }
     end
   end
-  table.sort(out, function(a, b) return a.number < b.number end)
+  table.sort(out, function(a, b)
+    return a.number < b.number
+  end)
   return { ok = true, data = out }
 end

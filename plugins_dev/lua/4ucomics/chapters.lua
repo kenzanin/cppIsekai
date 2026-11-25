@@ -7,9 +7,13 @@ local get_json = c.get_json
 local number_of = c.number_of
 return function(params)
   local slug = params.id or ""
-  if slug == "" then return { ok = true, data = {} } end
+  if slug == "" then
+    return { ok = true, data = {} }
+  end
   local d, err = get_json("/manga/" .. slug)
-  if err then return { ok = false, error = err } end
+  if err then
+    return { ok = false, error = err }
+  end
   local m = d.manga or {}
   local out = {}
   for _, c in ipairs(m.chapters or {}) do

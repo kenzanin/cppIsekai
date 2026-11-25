@@ -13,12 +13,10 @@ local opts = { -- static theme wants a browser-ish UA on every request
 
 -- ── helpers ────────────────────────────────────────────────────────────────
 
-
 -- first capture group of the first match; nil when no match (host re2.capture).
 
 -- "https://mangakatana.com/manga/naruto.1205" and "/manga/naruto.1205" both
 -- reduce to "naruto.1205"; ids paste straight into host URL paths.
-
 
 -- "naruto.1205:c700" -> the chapter's absolute URL.
 
@@ -28,21 +26,15 @@ local opts = { -- static theme wants a browser-ish UA on every request
 -- array — the longest one on the page wins, which keeps a rename of the
 -- obfuscated variable from breaking us.
 
-
 -- ── search ─────────────────────────────────────────────────────────────────
-
 
 -- ── detail ─────────────────────────────────────────────────────────────────
 
-
 -- ── chapters ───────────────────────────────────────────────────────────────
-
 
 -- ── pages ──────────────────────────────────────────────────────────────────
 
-
 -- ── genres ─────────────────────────────────────────────────────────────────
-
 
 local function http_req(url)
   return host.http.fetch_body(url, opts) -- (body, err); UA kept: static theme wants a browser-ish UA (plugin-host-promotion).
@@ -57,27 +49,44 @@ local function slug_of(id)
 end
 
 local function url_for(kind, id)
-  if #host.re2.find("^https?://", id) > 0 then return id end
+  if #host.re2.find("^https?://", id) > 0 then
+    return id
+  end
   return BASE .. "/" .. kind .. "/" .. id
 end
 
 local function chapter_url(id)
-  if #host.re2.find("^https?://", id) > 0 then return id end
+  if #host.re2.find("^https?://", id) > 0 then
+    return id
+  end
   local slug, tail = id:match("^([^:]+):(.+)$")
-  if not slug then return id end
+  if not slug then
+    return id
+  end
   return url_for("manga", slug) .. "/" .. tail
 end
 
 local function page_urls(html)
-    local best = {}
-    for _, m in ipairs(host.re2.find_all([=[(?s)\[(.*?)\]]=], html)) do
-        local urls = {}
-        for _, u in ipairs(host.re2.find_all("'(https?://[^']+)'", m[2])) do
-            urls[#urls + 1] = u[2]
-        end
-        if #urls > #best then best = urls end
+  local best = {}
+  for _, m in ipairs(host.re2.find_all([=[(?s)\[(.*?)\]]=], html)) do
+    local urls = {}
+    for _, u in ipairs(host.re2.find_all("'(https?://[^']+)'", m[2])) do
+      urls[#urls + 1] = u[2]
     end
-    return best
+    if #urls > #best then
+      best = urls
+    end
+  end
+  return best
 end
 
-return { BASE=BASE, opts=opts, http_req=http_req, find1=find1, slug_of=slug_of, url_for=url_for, chapter_url=chapter_url, page_urls=page_urls }
+return {
+  BASE = BASE,
+  opts = opts,
+  http_req = http_req,
+  find1 = find1,
+  slug_of = slug_of,
+  url_for = url_for,
+  chapter_url = chapter_url,
+  page_urls = page_urls,
+}

@@ -16,13 +16,9 @@ local MAX_RESULT_PAGES = 5
 -- http request -> (body, err). 200-or-nothing, the anisascans http_req shape.
 local http_req = host.http.fetch_body -- (body, err); nil unless 200 (plugin-host-promotion).
 
-
 -- ── search ─────────────────────────────────────────────────────────────────
 
-
 -- ── detail / chapters ──────────────────────────────────────────────────────
-
-
 
 -- ── pages ──────────────────────────────────────────────────────────────────
 -- Chapter id "slug:chapter-N" -> /manga/slug/chapter-N; that page carries
@@ -30,10 +26,6 @@ local http_req = host.http.fetch_body -- (body, err); nil unless 200 (plugin-hos
 -- needs the chapter Referer; returned pages are plain URL strings (per-page
 -- image headers are a host-side concern, see the site-origin Referer fallback).
 
-
 -- ── genres ─────────────────────────────────────────────────────────────────
 
-
-
-
-return { BASE=BASE, genres=genres, util=util, MAX_RESULT_PAGES=MAX_RESULT_PAGES, http_req=http_req }
+return { BASE = BASE, genres = genres, util = util, MAX_RESULT_PAGES = MAX_RESULT_PAGES, http_req = http_req }

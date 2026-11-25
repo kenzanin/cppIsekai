@@ -32,11 +32,15 @@ end
 
 -- base64url (unpadded, MangaHub blob/key convention) -> lowercase hex.
 local function b64url_hex(s)
-  if type(s) ~= "string" or s == "" then return nil end
+  if type(s) ~= "string" or s == "" then
+    return nil
+  end
   local b = s:gsub("%-", "+"):gsub("_", "/")
   b = b .. string.rep("=", (4 - #b % 4) % 4)
   local raw = host.codecs.base64_decode(b)
-  if not raw then return nil end
+  if not raw then
+    return nil
+  end
   return host.codecs.hex_encode(raw)
 end
 
@@ -46,8 +50,7 @@ end
 -- triggers the re-issue. Each key carries four chapters of quota; an explicit
 -- Cookie header overrides whatever the host cookie jar holds.
 local function fetch_access_key()
-  local url = SITE_URL .. "/chapter/martial-peak/chapter-"
-    .. tostring(1000 + math.random(0, 1999)) .. "?reloadKey=1"
+  local url = SITE_URL .. "/chapter/martial-peak/chapter-" .. tostring(1000 + math.random(0, 1999)) .. "?reloadKey=1"
   local res, err = host.http.fetch(url, {
     headers = {
       ["Referer"] = SITE_URL .. "/manga/martial-peak",
@@ -59,11 +62,15 @@ local function fetch_access_key()
       ["Cookie"] = "mhub_access=0000000000000000000000000000cafe",
     },
   })
-  if err ~= nil or not res then return nil end
+  if err ~= nil or not res then
+    return nil
+  end
   -- cppIsekai lowercases response header names.
   local cookie = (res.headers and res.headers["set-cookie"]) or ""
   local key = find1(cookie, [[mhub_access=([^;]+)]])
-  if not key or key == "" then return nil end
+  if not key or key == "" then
+    return nil
+  end
   return key
 end
 
@@ -83,9 +90,13 @@ local function encrypted_page_list(blob, slug, number)
     local key = cachedKey
     if not key then
       key = fetch_access_key()
-      if key then cachedKey = key end
+      if key then
+        cachedKey = key
+      end
     end
-    if not key then return nil, "upstream_auth_failed" end
+    if not key then
+      return nil, "upstream_auth_failed"
+    end
     -- This endpoint authenticates on the cookie, not the x-mhub-access
     -- header the GraphQL call uses: the header alone answers 403.
     local res, err = host.http.fetch(SITE_URL .. "/api/chapter-crypto", {
@@ -96,8 +107,7 @@ local function encrypted_page_list(blob, slug, number)
       },
     })
     if err ~= nil or not res or res.status ~= 200 then
-      return nil, "upstream_auth_failed: crypto endpoint status "
-        .. tostring(err or (res and res.status) or 0)
+      return nil, "upstream_auth_failed: crypto endpoint status " .. tostring(err or (res and res.status) or 0)
     end
     local ok, parsed = pcall(json.decode, res.body)
     if not ok or type(parsed) ~= "table" or not parsed.key or not parsed.keyId then
@@ -169,7 +179,9 @@ local function graphql_query(query)
     local key = cachedKey
     if not key then
       key = fetch_access_key()
-      if key then cachedKey = key end
+      if key then
+        cachedKey = key
+      end
     end
     if not key then
       host.log.error("mangahub: no mhub_access key available")
@@ -228,7 +240,9 @@ methods.search = function(params)
   -- The API takes every selected genre as one comma-separated list of slugs,
   -- ANDed together, and expects the literal "all" when none is selected.
   local genres = params.genres
-  if genres == nil then genres = params.tags end
+  if genres == nil then
+    genres = params.tags
+  end
   if type(genres) ~= "table" or #genres == 0 then
     local one = type(genres) == "string" and genres or ""
     genres = one ~= "" and { one } or {}
@@ -239,8 +253,7 @@ methods.search = function(params)
     -- keeps old cached URLs working when the map is cold).
     local slugs = {}
     for i, name in ipairs(genres) do
-      slugs[i] = (genre_slugs and genre_slugs[name])
-        or name:lower():gsub("%s+", "-")
+      slugs[i] = (genre_slugs and genre_slugs[name]) or name:lower():gsub("%s+", "-")
     end
     genre = table.concat(slugs, ",")
   end
@@ -250,9 +263,15 @@ methods.search = function(params)
   -- hideNSFW:false is the site's "show NSFW content" setting, which the browser
   -- carries as the showNSFW cookie; count:true makes the pager real instead of
   -- showing one page. Both verified against the 2026-11 HAR.
-  local gql = '{search(x: ' .. SOURCE_ID .. ', q: "' .. escape_gql(query)
-    .. '", genre: "' .. escape_gql(genre) .. '", mod: POPULAR, hideNSFW: false, count: true, offset: '
-    .. tostring(offset) .. ') {rows {title, slug, image}, count}}'
+  local gql = "{search(x: "
+    .. SOURCE_ID
+    .. ', q: "'
+    .. escape_gql(query)
+    .. '", genre: "'
+    .. escape_gql(genre)
+    .. '", mod: POPULAR, hideNSFW: false, count: true, offset: '
+    .. tostring(offset)
+    .. ") {rows {title, slug, image}, count}}"
 
   local data = graphql_query(gql)
   local rows, total = {}, 0
@@ -274,9 +293,12 @@ methods.search = function(params)
     }
   end
 
-  host.log.info("mangahub search: found " .. tostring(#items) .. " results for q=" .. query
-    .. " (total " .. tostring(total) .. ")")
-  if total < #items then total = #items end
+  host.log.info(
+    "mangahub search: found " .. tostring(#items) .. " results for q=" .. query .. " (total " .. tostring(total) .. ")"
+  )
+  if total < #items then
+    total = #items
+  end
   return { ok = true, data = { items = items, total = total, pages = math.max(1, math.ceil(total / PAGE_SIZE)) } }
 end
 
@@ -284,18 +306,35 @@ end
 
 methods.detail = function(params)
   local slug = params.id or ""
-  local empty = { id = slug, name = "", cover = "", status = "unknown", tags = {}, release_at = 0,
-    authors = {}, artists = {}, description = "", url = SITE_URL .. "/manga/" .. slug }
-  if slug == "" then return { ok = true, data = empty } end
+  local empty = {
+    id = slug,
+    name = "",
+    cover = "",
+    status = "unknown",
+    tags = {},
+    release_at = 0,
+    authors = {},
+    artists = {},
+    description = "",
+    url = SITE_URL .. "/manga/" .. slug,
+  }
+  if slug == "" then
+    return { ok = true, data = empty }
+  end
 
   host.log.info("mangahub detail: slug=" .. slug)
 
-  local gql = '{manga(x: ' .. SOURCE_ID .. ', slug: "' .. escape_gql(slug)
+  local gql = "{manga(x: "
+    .. SOURCE_ID
+    .. ', slug: "'
+    .. escape_gql(slug)
     .. '") {title, slug, status, image, author, artist, genres, description, alternativeTitle}}'
 
   local data = graphql_query(gql)
   local m = data and data.data and data.data.manga
-  if not m then return { ok = true, data = empty } end
+  if not m then
+    return { ok = true, data = empty }
+  end
 
   local cover = m.image or ""
   if cover ~= "" and cover:sub(1, 4) ~= "http" then
@@ -305,17 +344,25 @@ methods.detail = function(params)
   -- status may arrive as an enum string or a numeric code; the host wants a
   -- canonical string either way.
   local status = m.status
-  if status == nil then status = "" else status = tostring(status) end
+  if status == nil then
+    status = ""
+  else
+    status = tostring(status)
+  end
 
   -- genres arrives as one comma-separated string; the ABI wants a list.
   local tags = {}
   if type(m.genres) == "string" then
     for part in host.re2.gmatch("[^,]+", m.genres) do
       local name = host.text.trim(part[1] or "")
-      if name ~= "" then tags[#tags + 1] = name end
+      if name ~= "" then
+        tags[#tags + 1] = name
+      end
     end
   elseif type(m.genres) == "table" then
-    for _, g in ipairs(m.genres) do tags[#tags + 1] = tostring(g) end
+    for _, g in ipairs(m.genres) do
+      tags[#tags + 1] = tostring(g)
+    end
   end
 
   local d = {
@@ -337,11 +384,13 @@ end
 
 methods.chapters = function(params)
   local slug = params.id or ""
-  if slug == "" then return { ok = true, data = {} } end
+  if slug == "" then
+    return { ok = true, data = {} }
+  end
 
   host.log.info("mangahub chapters: slug=" .. slug)
 
-  local gql = '{manga(x: ' .. SOURCE_ID .. ', slug: "' .. escape_gql(slug) .. '") {chapters {number, title, date}}}'
+  local gql = "{manga(x: " .. SOURCE_ID .. ', slug: "' .. escape_gql(slug) .. '") {chapters {number, title, date}}}'
 
   local data = graphql_query(gql)
   local raw = {}
@@ -364,7 +413,9 @@ methods.chapters = function(params)
     -- An absent title arrives as an empty string, not nil, so it has to be
     -- tested for emptiness: "" is truthy in Lua.
     local title = ch.title
-    if not title or title == "" then title = "Chapter " .. tostring(number) end
+    if not title or title == "" then
+      title = "Chapter " .. tostring(number)
+    end
     local item = {
       id = slug .. ":chapter-" .. number,
       number = tonumber(ch.number) or 0,
@@ -376,13 +427,17 @@ methods.chapters = function(params)
     -- normalizes all three. Unparseable leaves the zero so the decode keeps.
     if ch.date ~= nil then
       local iso = host.text.date_to_iso(tostring(ch.date))
-      if iso then item.release_at = iso end
+      if iso then
+        item.release_at = iso
+      end
     end
     out[#out + 1] = item
   end
 
   -- GraphQL returns ascending; the ABI wants newest-first.
-  table.sort(out, function(a, b) return a.number > b.number end)
+  table.sort(out, function(a, b)
+    return a.number > b.number
+  end)
 
   host.log.info("mangahub chapters: found " .. tostring(#out) .. " chapters for " .. slug)
   return { ok = true, data = out }
@@ -394,15 +449,24 @@ methods.pages = function(params)
   local chapterID = params.id or ""
   -- Split on the first ":" -- the slug cannot contain one, the tail can.
   local m = host.re2.find("^([^:]+):chapter-(.+)$", chapterID)
-  if #m < 3 then return { ok = true, data = {} } end
+  if #m < 3 then
+    return { ok = true, data = {} }
+  end
   local slug, number = m[2], m[3]
   -- Chapter ids minted before the float fix look like "1.0"; the GraphQL
   -- number argument wants the integer form.
-  if number:sub(-2) == ".0" then number = number:sub(1, -3) end
+  if number:sub(-2) == ".0" then
+    number = number:sub(1, -3)
+  end
   host.log.info("mangahub pages: slug=" .. slug .. " ch=" .. number)
 
-  local gql = '{chapter(x: ' .. SOURCE_ID .. ', slug: "' .. escape_gql(slug)
-    .. '", number: ' .. number .. ') {pages, mangaID, number}}'
+  local gql = "{chapter(x: "
+    .. SOURCE_ID
+    .. ', slug: "'
+    .. escape_gql(slug)
+    .. '", number: '
+    .. number
+    .. ") {pages, mangaID, number}}"
 
   local data = graphql_query(gql)
   local chapter = data and data.data and data.data.chapter
@@ -459,7 +523,9 @@ end
 local genres_cache = nil
 
 methods.genres = function()
-  if genre_cache then return { ok = true, data = genre_cache } end
+  if genre_cache then
+    return { ok = true, data = genre_cache }
+  end
 
   -- The GraphQL schema exposes the slugs directly; scraping the /search page
   -- for /genre/ links broke silently every time the frontend markup moved.
@@ -489,6 +555,8 @@ end
 
 function handle(req)
   local fn = methods[req.method]
-  if fn == nil then return { ok = false, error = "unknown method " .. tostring(req.method) } end
+  if fn == nil then
+    return { ok = false, error = "unknown method " .. tostring(req.method) }
+  end
   return fn(req.params or {})
 end

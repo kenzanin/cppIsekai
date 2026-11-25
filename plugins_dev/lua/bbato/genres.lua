@@ -14,7 +14,10 @@ return function()
   local out, seen = {}, {}
   for _, g in ipairs(host.html.select(body, ".mt-genre-chip, .genre-list a") or {}) do
     g = clean(g)
-    if g ~= "" and not seen[g] and not g:match("^%d+$") then seen[g] = true; out[#out + 1] = g end
+    if g ~= "" and not seen[g] and not g:match("^%d+$") then
+      seen[g] = true
+      out[#out + 1] = g
+    end
   end
   return { ok = true, data = out }
 end

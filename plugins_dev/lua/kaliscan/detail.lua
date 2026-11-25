@@ -7,6 +7,8 @@ local http_req = c.http_req
 return function(params)
   local id = tostring(params.id or "")
   local body, err = http_req(BASE .. "/manga/" .. id)
-  if err ~= nil then return { ok = false, error = err } end
+  if err ~= nil then
+    return { ok = false, error = err }
+  end
   return { ok = true, data = util.parse_manga_detail(body, id, BASE) }
 end

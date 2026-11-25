@@ -13,7 +13,9 @@ return function(params)
   local genres = params.tags or params.genres or {}
   if type(genres) == "string" then
     local list = {}
-    for name in genres:gmatch("[^,]+") do list[#list + 1] = host.text.trim(name) end
+    for name in genres:gmatch("[^,]+") do
+      list[#list + 1] = host.text.trim(name)
+    end
     genres = list
   end
 
@@ -23,7 +25,9 @@ return function(params)
     -- archive reuses the search card layout, so one parser serves both.
     local slug = require("genres").map[genres[1]] or genres[1]
     url = BASE .. "/genre/" .. host.url_encode(slug)
-    if page > 1 then url = url .. "/page/" .. page end
+    if page > 1 then
+      url = url .. "/page/" .. page
+    end
   else
     -- Page 1 is the bare query string; later pages /page/N?...
     url = BASE .. "/?search=" .. host.url_encode(q) .. "&search_by=book_name"
@@ -33,7 +37,9 @@ return function(params)
   end
 
   local body, err = http_req(url)
-  if err ~= nil then return { ok = false, error = err } end
+  if err ~= nil then
+    return { ok = false, error = err }
+  end
 
   -- Every card carries a title link and one cover <img> (results without a
   -- cover use /imgs/no-cover.png), so the lists stay index-aligned.

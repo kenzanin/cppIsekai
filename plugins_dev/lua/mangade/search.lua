@@ -14,11 +14,17 @@ return function(params)
   local q = clean(params.title or params.query or params.q)
   local page = math.max(1, tonumber(params.page) or 1)
   local path = "/comics?page=" .. page .. "&size=20&sort=newest"
-  if q ~= "" then path = path .. "&name=" .. host.url_encode(q) end
+  if q ~= "" then
+    path = path .. "&name=" .. host.url_encode(q)
+  end
   local ids = genre_ids(params.tags or params.genres)
-  for i, id in ipairs(ids) do path = path .. "&genres%5B" .. (i - 1) .. "%5D=" .. host.url_encode(id) end
+  for i, id in ipairs(ids) do
+    path = path .. "&genres%5B" .. (i - 1) .. "%5D=" .. host.url_encode(id)
+  end
   local data, err = get_json(path)
-  if not data then return { ok = false, error = err } end
+  if not data then
+    return { ok = false, error = err }
+  end
 
   local items = {}
   for _, it in ipairs(data.list or {}) do
@@ -32,9 +38,12 @@ return function(params)
       }
     end
   end
-  return { ok = true, data = {
-    items = items,
-    total = tonumber(data.totalCount) or #items,
-    pages = tonumber(data.totalPage) or 1,
-  } }
+  return {
+    ok = true,
+    data = {
+      items = items,
+      total = tonumber(data.totalCount) or #items,
+      pages = tonumber(data.totalPage) or 1,
+    },
+  }
 end

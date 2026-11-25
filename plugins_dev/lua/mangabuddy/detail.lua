@@ -9,7 +9,9 @@ local epoch = c.epoch
 return function(params)
   local id = tostring(params.id or "")
   local html = helpers.http_get(BASE .. "/series/" .. id)
-  if not html then return { ok = false, error = "mangabuddy: detail fetch failed" } end
+  if not html then
+    return { ok = false, error = "mangabuddy: detail fetch failed" }
+  end
 
   local title = find1(html, [[<meta property="og:title" content="([^"]*)"]]) or ""
   title = title:gsub("^Read%s+", "")
@@ -28,7 +30,9 @@ return function(params)
 
   local status = label_value(html, "Status", "/series?status=")
   local author = label_value(html, "Author", "/author/")
-  if author == "Unknown" then author = "" end
+  if author == "Unknown" then
+    author = ""
+  end
 
   -- genre chips: href="/genre/{slug}"; the label is slug-cased, so retitle
   -- each word (re2.replace has no function replacement)
@@ -38,20 +42,25 @@ return function(params)
     if g and g ~= "" and not seen_g[g] then
       seen_g[g] = true
       local label = g:gsub("%-", " ")
-      label = label:gsub("(%a)([%w']*)", function(a, b) return a:upper() .. b end)
+      label = label:gsub("(%a)([%w']*)", function(a, b)
+        return a:upper() .. b
+      end)
       tags[#tags + 1] = label
     end
   end
 
-  return { ok = true, data = {
-    id = id,
-    name = title,
-    cover = cover,
-    status = helpers.normalizeStatus(status),
-    tags = tags,
-    release_at = 0, -- the page carries no machine-readable series date
-    description = desc,
-    authors = author ~= "" and { author } or {},
-    url = BASE .. "/series/" .. id,
-  } }
+  return {
+    ok = true,
+    data = {
+      id = id,
+      name = title,
+      cover = cover,
+      status = helpers.normalizeStatus(status),
+      tags = tags,
+      release_at = 0, -- the page carries no machine-readable series date
+      description = desc,
+      authors = author ~= "" and { author } or {},
+      url = BASE .. "/series/" .. id,
+    },
+  }
 end

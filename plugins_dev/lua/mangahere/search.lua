@@ -13,7 +13,9 @@ return function(params)
   local tags = params.tags or params.genres or {}
   if type(tags) == "string" then -- UI joins checked genres with commas
     local list = {}
-    for name in tags:gmatch("[^,]+") do list[#list + 1] = name:match("^%s*(.-)%s*$") end
+    for name in tags:gmatch("[^,]+") do
+      list[#list + 1] = name:match("^%s*(.-)%s*$")
+    end
     tags = list
   end
 
@@ -29,15 +31,21 @@ return function(params)
   else
     return { ok = true, data = { items = {}, total = 0 } }
   end
-  if page > 1 then url = url .. "&page=" .. tostring(page) end
+  if page > 1 then
+    url = url .. "&page=" .. tostring(page)
+  end
 
   local html = http_body(url)
-  if not html or html == "" then return { ok = false, error = "mangahere: search failed" } end
+  if not html or html == "" then
+    return { ok = false, error = "mangahere: search failed" }
+  end
   local items = util.parse_search(html)
   local maxp = pager_pages(html)
   -- the windowed pager marks the current (last) page as a bare span, so a
   -- request for the true last page reports maxp-1; restore it from page
-  if #items > 0 and page == maxp + 1 then maxp = page end
+  if #items > 0 and page == maxp + 1 then
+    maxp = page
+  end
 
   local total = total_memo[key]
   if total == nil then

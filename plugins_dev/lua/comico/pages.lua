@@ -22,8 +22,10 @@ return function(params)
     return { ok = false, error = "comico: no access token for " .. chapter_id }
   end
 
-  local body = http_post_json(API .. "/reader/chapters/" .. host.url_encode(chapter_id)
-    .. "/open?d=" .. host.url_encode(tostring(access.token)), '{"proxyMethod":"all"}')
+  local body = http_post_json(
+    API .. "/reader/chapters/" .. host.url_encode(chapter_id) .. "/open?d=" .. host.url_encode(tostring(access.token)),
+    '{"proxyMethod":"all"}'
+  )
   if not body then
     return { ok = false, error = "comico: reader open failed for " .. chapter_id }
   end

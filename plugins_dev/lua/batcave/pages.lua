@@ -13,25 +13,33 @@ local pager_pages = c.pager_pages
 local remember = c.remember
 local load_genres = c.load_genres
 return function(params)
-    local reader = params.id or ""
-    if reader == "" then return { ok = true, data = {} } end
-    local body = site_get(reader)
-    if not body or body == "" then
-        return { ok = false, error = "batcave: reader fetch failed: " .. reader }
+  local reader = params.id or ""
+  if reader == "" then
+    return { ok = true, data = {} }
+  end
+  local body = site_get(reader)
+  if not body or body == "" then
+    return { ok = false, error = "batcave: reader fetch failed: " .. reader }
+  end
+  local data = json_data(body)
+  if not data then
+    return { ok = false, error = "batcave: no __DATA__ in reader: " .. reader }
+  end
+  local images = data.images or {}
+  local pages = tonumber(data.pages) or #images
+  if pages > #images then
+    pages = #images
+  end
+  local out = {}
+  for i = 1, pages do
+    if images[i] then
+      out[#out + 1] = images[i]
     end
-    local data = json_data(body)
-    if not data then
-        return { ok = false, error = "batcave: no __DATA__ in reader: " .. reader }
-    end
-    local images = data.images or {}
-    local pages = tonumber(data.pages) or #images
-    if pages > #images then pages = #images end
-    local out = {}
-    for i = 1, pages do
-        if images[i] then out[#out + 1] = images[i] end
-    end
-    if #out == 0 then return { ok = false, error = "batcave: no pages for " .. reader } end
-    return { ok = true, data = out }
+  end
+  if #out == 0 then
+    return { ok = false, error = "batcave: no pages for " .. reader }
+  end
+  return { ok = true, data = out }
 end
 
 -- ── genres ─────────────────────────────────────────────────────────────────

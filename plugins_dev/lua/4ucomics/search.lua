@@ -7,9 +7,13 @@ local get_json = c.get_json
 local number_of = c.number_of
 return function(params)
   local q = params.title or params.query or params.q or ""
-  if q == "" then return { ok = false, error = "4ucomics: empty query" } end
+  if q == "" then
+    return { ok = false, error = "4ucomics: empty query" }
+  end
   local d, err = get_json("/search/" .. host.url_encode(q) .. "?adult=1")
-  if err then return { ok = false, error = err } end
+  if err then
+    return { ok = false, error = err }
+  end
   local out = {}
   for _, h in ipairs(d.hits or {}) do
     out[#out + 1] = {

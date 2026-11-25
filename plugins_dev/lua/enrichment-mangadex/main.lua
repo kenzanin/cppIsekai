@@ -21,12 +21,20 @@ function handle(req)
   local p = req.params or {}
   local title = tostring(p.title or "")
   local kind = tostring(p.kind or "detail")
-  if title == "" then return { ok = false, error = "missing title" } end
-  if kind ~= "detail" and kind ~= "covers" and kind ~= "recommendations" then return { ok = false, error = "kind must be detail|covers|recommendations" } end
-  if #title > 512 then return { ok = false, error = "title too long" } end
+  if title == "" then
+    return { ok = false, error = "missing title" }
+  end
+  if kind ~= "detail" and kind ~= "covers" and kind ~= "recommendations" then
+    return { ok = false, error = "kind must be detail|covers|recommendations" }
+  end
+  if #title > 512 then
+    return { ok = false, error = "title too long" }
+  end
 
   local rec = best_record(title)
-  if not rec then return { ok = false, error = "no match found" } end
+  if not rec then
+    return { ok = false, error = "no match found" }
+  end
 
   if kind == "recommendations" then
     return build_recommendations(rec)

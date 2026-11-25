@@ -10,7 +10,8 @@ local initial_data, relative_to_iso = c.initial_data, c.relative_to_iso
 -- own JS: goto, then ONE evaluate whose promise scrolls every .rpage-page
 -- slot and collects the img src it materialized (lightpanda awaits promises;
 -- verified: 6/6 urls, ~0.9s, image/webp without Referer).
-local HARVEST = '(function(){return new Promise(function(res){var t0=Date.now();function urls(){return Array.prototype.slice.call(document.querySelectorAll(".rpage-page img")).map(function(im){return im.getAttribute("src");}).filter(Boolean);}function done(){res(JSON.stringify(urls()));}function scroll(slots,i){if(i<slots.length){slots[i].scrollIntoView();setTimeout(function(){scroll(slots,i+1);},150);}else{done();}}function wait(){var slots=document.querySelectorAll(".rpage-page");if(slots.length)return scroll(slots,0);if(Date.now()-t0>8000)return done();setTimeout(wait,100);}wait();});})()'
+local HARVEST =
+  '(function(){return new Promise(function(res){var t0=Date.now();function urls(){return Array.prototype.slice.call(document.querySelectorAll(".rpage-page img")).map(function(im){return im.getAttribute("src");}).filter(Boolean);}function done(){res(JSON.stringify(urls()));}function scroll(slots,i){if(i<slots.length){slots[i].scrollIntoView();setTimeout(function(){scroll(slots,i+1);},150);}else{done();}}function wait(){var slots=document.querySelectorAll(".rpage-page");if(slots.length)return scroll(slots,0);if(Date.now()-t0>8000)return done();setTimeout(wait,100);}wait();});})()'
 
 return function(params)
   local composite = params.id or ""
@@ -18,10 +19,17 @@ return function(params)
   if not slug or not chid or slug == "" then
     return { ok = false, error = "comix: chapter id must be slug:chapterId, got " .. tostring(composite) }
   end
-  local _, gerr = host.browser.call("goto", { url = BASE .. "/title/" .. host.url_encode(slug) .. "/" .. host.url_encode(chid), timeout_ms = 60000 })
-  if gerr ~= nil then return { ok = false, error = "comix: goto failed: " .. gerr } end
+  local _, gerr = host.browser.call(
+    "goto",
+    { url = BASE .. "/title/" .. host.url_encode(slug) .. "/" .. host.url_encode(chid), timeout_ms = 60000 }
+  )
+  if gerr ~= nil then
+    return { ok = false, error = "comix: goto failed: " .. gerr }
+  end
   local out, eerr = host.browser.call("evaluate", { script = HARVEST, timeout_ms = 60000 })
-  if eerr ~= nil then return { ok = false, error = "comix: harvest failed: " .. eerr } end
+  if eerr ~= nil then
+    return { ok = false, error = "comix: harvest failed: " .. eerr }
+  end
   local ok, urls = pcall(json.decode, out or "")
   if not ok or type(urls) ~= "table" then
     return { ok = false, error = "comix: unexpected harvest payload for " .. composite }

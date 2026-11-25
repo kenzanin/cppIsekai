@@ -1,1 +1,3 @@
-function handle() return {ok=true} end
+function handle()
+  return { ok = true }
+end

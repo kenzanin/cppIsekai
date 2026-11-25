@@ -28,15 +28,24 @@ return function(params)
     local sid = type(src) == "table" and src.sourceId or nil
     local readable = type(src) == "table" and tonumber(src.readableChapterCount) or nil
     if sid and (readable == nil or readable > 0) then
-      local langs = http_get(API .. "/manga/" .. host.url_encode(manga_id)
-        .. "/languages?source=" .. host.url_encode(sid))
-      if type(langs) ~= "table" then langs = {} end
+      local langs =
+        http_get(API .. "/manga/" .. host.url_encode(manga_id) .. "/languages?source=" .. host.url_encode(sid))
+      if type(langs) ~= "table" then
+        langs = {}
+      end
       for _, lang in ipairs(langs) do
         if type(lang) == "string" then
-          chapter_pages(API .. "/manga/" .. host.url_encode(manga_id)
-            .. "/chapters?order=desc&sort=number&limit=100"
-            .. "&source=" .. host.url_encode(sid)
-            .. "&language=" .. host.url_encode(lang), chapters)
+          chapter_pages(
+            API
+              .. "/manga/"
+              .. host.url_encode(manga_id)
+              .. "/chapters?order=desc&sort=number&limit=100"
+              .. "&source="
+              .. host.url_encode(sid)
+              .. "&language="
+              .. host.url_encode(lang),
+            chapters
+          )
         end
       end
     end

@@ -15,7 +15,6 @@ for _, g in ipairs(genres.list) do
   name_to_slug[string.lower(g.name)] = g.slug
 end
 
-
 -- ── search ─────────────────────────────────────────────────────────────────
 -- Desktop site only. Genre filter takes comma-separated numeric ids; the
 -- genre browse passes an empty title, so an empty query is only rejected
@@ -24,8 +23,6 @@ end
 -- ── detail / chapters ──────────────────────────────────────────────────────
 -- Both parse the mobile detail page: name, cover, status, genres, summary
 -- and the full chapter list live there.
-
-
 
 -- ── pages ──────────────────────────────────────────────────────────────────
 -- Chapter ids marshal with ":" between slug and chapter; the URL path
@@ -36,8 +33,17 @@ end
 -- search?genres= consumes (batcave precedent).
 
 local function manga_html(manga_id)
-  if manga_id == "" then return nil end
+  if manga_id == "" then
+    return nil
+  end
   return util.http_body(MOBILE .. "/manga/" .. manga_id .. "/")
 end
 
-return { DESKTOP=DESKTOP, MOBILE=MOBILE, util=util, genres=genres, name_to_slug=name_to_slug, manga_html=manga_html }
+return {
+  DESKTOP = DESKTOP,
+  MOBILE = MOBILE,
+  util = util,
+  genres = genres,
+  name_to_slug = name_to_slug,
+  manga_html = manga_html,
+}

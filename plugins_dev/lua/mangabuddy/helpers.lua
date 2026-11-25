@@ -18,24 +18,38 @@ function M.http_get(url, opts)
     ["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     ["Accept-Language"] = "en-US,en;q=0.9",
   }
-  if o.json then headers["Accept"] = "application/json" end
+  if o.json then
+    headers["Accept"] = "application/json"
+  end
   if o.referer ~= false then
     local ref = o.referer
-    if ref == nil then ref = BASE .. "/" end
-    if ref ~= "" then headers["Referer"] = ref end
+    if ref == nil then
+      ref = BASE .. "/"
+    end
+    if ref ~= "" then
+      headers["Referer"] = ref
+    end
   end
   if type(o.headers) == "table" then
-    for k, v in pairs(o.headers) do headers[k] = v end
+    for k, v in pairs(o.headers) do
+      headers[k] = v
+    end
   end
   local res, err = host.http.fetch(url, { headers = headers })
-  if err ~= nil then return nil end
-  if res.status ~= 200 then return nil end
+  if err ~= nil then
+    return nil
+  end
+  if res.status ~= 200 then
+    return nil
+  end
   return res.body
 end
 
 -- ""/nil -> "unknown", else the host canonicaliser
 function M.normalizeStatus(s)
-  if not s or s == "" then return "unknown" end
+  if not s or s == "" then
+    return "unknown"
+  end
   return host.text.normalize_status(s)
 end
 

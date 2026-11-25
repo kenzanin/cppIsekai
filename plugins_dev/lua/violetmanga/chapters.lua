@@ -4,9 +4,13 @@ local http_req = c.http_req
 local sel1 = c.sel1
 return function(params)
   local slug = params.id or ""
-  if slug == "" then return { ok = true, data = {} } end
+  if slug == "" then
+    return { ok = true, data = {} }
+  end
   local body, err = http_req(BASE .. "/comics/" .. slug .. "/")
-  if err ~= nil then return { ok = false, error = err } end
+  if err ~= nil then
+    return { ok = false, error = err }
+  end
 
   -- detail-page SSR list; locked (coin-gated) anchors carry no href and are
   -- skipped by the attribute query. ids stay site-relative paths.

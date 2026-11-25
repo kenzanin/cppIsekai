@@ -12,7 +12,9 @@ local normalize_status = c.normalize_status
 local genre_map = c.genre_map
 return function(params)
   local reader = tostring(params.id or "")
-  if reader == "" then return { ok = true, data = {} } end
+  if reader == "" then
+    return { ok = true, data = {} }
+  end
   -- chapters rows cached before the num_str fix carry the float ids
   -- (/reader/15840.0/991476.0); normalize so those sessions still resolve.
   reader = reader:gsub("%.0$", ""):gsub("%.0/", "/")
@@ -20,10 +22,14 @@ return function(params)
   local data = dle.json_data(body, "window.__DATA__ = ")
   local images = data and type(data.images) == "table" and data.images or {}
   local count = tonumber(data and data.pages) or #images
-  if count > #images then count = #images end
+  if count > #images then
+    count = #images
+  end
   local out = {}
   for i = 1, count do
-    if type(images[i]) == "string" and images[i] ~= "" then out[#out + 1] = images[i] end
+    if type(images[i]) == "string" and images[i] ~= "" then
+      out[#out + 1] = images[i]
+    end
   end
   return { ok = true, data = out }
 end

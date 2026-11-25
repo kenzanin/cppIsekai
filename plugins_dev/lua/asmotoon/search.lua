@@ -13,9 +13,13 @@ return function(params)
   local limit = 20
   local url = BASE .. "/?_ajax=search&q=" .. host.url_encode(q) .. "&offset=" .. ((page - 1) * limit)
   local body, err = http_req(url)
-  if not body or body == "" then return { ok = false, error = err } end
+  if not body or body == "" then
+    return { ok = false, error = err }
+  end
   local ok, doc = pcall(json.decode, body)
-  if not ok or type(doc) ~= "table" then return { ok = false, error = "asmodeus: bad search envelope" } end
+  if not ok or type(doc) ~= "table" then
+    return { ok = false, error = "asmodeus: bad search envelope" }
+  end
   local html = doc.html or ""
   local hrefs = host.html.attr(html, "a.group[href]", "href") or {}
   local names = host.html.select(html, "a.group[href] h2") or {}
@@ -32,6 +36,12 @@ return function(params)
       }
     end
   end
-  return { ok = true, data = { items = items, total = #items + (doc.has_more and limit or 0),
-                               pages = page + (doc.has_more and 1 or 0) } }
+  return {
+    ok = true,
+    data = {
+      items = items,
+      total = #items + (doc.has_more and limit or 0),
+      pages = page + (doc.has_more and 1 or 0),
+    },
+  }
 end

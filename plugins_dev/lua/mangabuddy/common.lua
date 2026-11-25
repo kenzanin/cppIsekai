@@ -20,17 +20,13 @@ local genres = require("genres")
 -- RFC3339 timestamps -> unix seconds via host.text.date_epoch (D7); 0 when
 -- absent/unparseable, the house zero-time contract.
 
-
 -- ── search ─────────────────────────────────────────────────────────────────
 
-
 -- ── detail ─────────────────────────────────────────────────────────────────
-
 
 -- ── chapters ───────────────────────────────────────────────────────────────
 -- /get-chapter-list?slug=<bare> -> {success, data:[{chapter_slug,chapter_num,
 -- chapter_name,updated_at}]}, newest-first; sorted ascending for the reader.
-
 
 -- ── pages ──────────────────────────────────────────────────────────────────
 -- Chapter id "slug.ZID:chapter_slug" -> /series/slug.ZID/chapter_slug; page
@@ -38,9 +34,7 @@ local genres = require("genres")
 -- has moved before); cover/ad images lack the slug/ch/page shape. Pages are
 -- bare URL strings — the CDN 403s without a Referer, a host-side concern.
 
-
 -- ── genres ─────────────────────────────────────────────────────────────────
-
 
 local function find1(s, pattern)
   return host.re2.capture(pattern, tostring(s or ""))
@@ -52,12 +46,18 @@ end
 
 local function label_value(html, label, href_prefix)
   local m = host.re2.find(label .. [[\s*</h1>]], html)
-  if not m or #m == 0 then return "" end
+  if not m or #m == 0 then
+    return ""
+  end
   local fin = html:find(m[1], 1, true)
-  if not fin then return "" end
+  if not fin then
+    return ""
+  end
   local seg = html:sub(fin + #m[1], fin + #m[1] + 400)
   local at = seg:find('href="' .. href_prefix, 1, true)
-  if not at then return "" end
+  if not at then
+    return ""
+  end
   return seg:match('([^"]+)', at + 6 + #href_prefix) or ""
 end
 
@@ -65,4 +65,12 @@ local function epoch(s)
   return host.text.date_epoch(tostring(s or "")) or 0
 end
 
-return { BASE=BASE, helpers=helpers, genres=genres, find1=find1, bare_slug=bare_slug, label_value=label_value, epoch=epoch }
+return {
+  BASE = BASE,
+  helpers = helpers,
+  genres = genres,
+  find1 = find1,
+  bare_slug = bare_slug,
+  label_value = label_value,
+  epoch = epoch,
+}

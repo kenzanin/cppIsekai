@@ -12,9 +12,13 @@ local img_src = c.img_src
 local genre_map = c.genre_map
 return function(params)
   local slug = host.text.trim(tostring(params.id or ""))
-  if slug == "" then return { ok = true, data = {} } end
+  if slug == "" then
+    return { ok = true, data = {} }
+  end
   local body, err = http_req(manga_url(slug))
-  if err ~= nil then return { ok = false, error = err } end
+  if err ~= nil then
+    return { ok = false, error = err }
+  end
 
   local tblock = find1(body, [[(?s)class="post-title[^"]*">(.*?)</div>]]) or ""
   local name = host.text.unescape(host.text.strip_html(find1(tblock, [[(?s)<h[1-6][^>]*>(.*?)</h[1-6]>]]) or ""))
@@ -28,24 +32,33 @@ return function(params)
   desc = host.text.unescape(host.text.trim(host.text.strip_html(desc))):gsub("%s+", " ")
 
   local tags = {}
-  for _, g in ipairs(host.re2.find_all([[<a[^>]*>([^<]+)</a>]], find1(body, [[(?s)class="genres-content">(.*?)</div>]]))) do
+  for _, g in
+    ipairs(host.re2.find_all([[<a[^>]*>([^<]+)</a>]], find1(body, [[(?s)class="genres-content">(.*?)</div>]])))
+  do
     local label = host.text.unescape(host.text.trim(g[2] or ""))
-    if label ~= "" then tags[#tags + 1] = label end
+    if label ~= "" then
+      tags[#tags + 1] = label
+    end
   end
 
   local status = ""
   local sblock = find1(body, [[(?s)Status\s*</h5>.*?class="summary-content">\s*([^<]+)]])
-  if sblock then status = host.text.normalize_status(host.text.trim(sblock)) end
+  if sblock then
+    status = host.text.normalize_status(host.text.trim(sblock))
+  end
 
-  return { ok = true, data = {
-    id = slug,
-    name = name,
-    cover = cover,
-    status = status,
-    tags = tags,
-    release_at = 0, -- Madara dates are human strings; no machine date here
-    description = desc,
-    authors = author ~= "" and { author } or {},
-    url = manga_url(slug),
-  } }
+  return {
+    ok = true,
+    data = {
+      id = slug,
+      name = name,
+      cover = cover,
+      status = status,
+      tags = tags,
+      release_at = 0, -- Madara dates are human strings; no machine date here
+      description = desc,
+      authors = author ~= "" and { author } or {},
+      url = manga_url(slug),
+    },
+  }
 end

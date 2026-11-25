@@ -6,9 +6,13 @@ local http_body = c.http_body
 local date_epoch = c.date_epoch
 return function(params)
   local id = tostring(params.id or "")
-  if id == "" then return { ok = true, data = {} } end
+  if id == "" then
+    return { ok = true, data = {} }
+  end
   local body = http_body(BASE .. "/manga/" .. id)
-  if not body or body == "" then return { ok = false, error = "upstream_unavailable" } end
+  if not body or body == "" then
+    return { ok = false, error = "upstream_unavailable" }
+  end
 
   local out = {}
   local pos = body:find('/c%d+"', 1, false)
@@ -36,6 +40,8 @@ return function(params)
     end
   end
 
-  if #out == 0 then return { ok = false, error = "no_chapters" } end
+  if #out == 0 then
+    return { ok = false, error = "no_chapters" }
+  end
   return { ok = true, data = out }
 end

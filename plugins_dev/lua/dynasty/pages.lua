@@ -16,10 +16,14 @@ return function(params)
     dir = "chapters"
   end
   local doc, err = get_json(json_url(dir, permalink))
-  if not doc then return { ok = false, error = err } end
+  if not doc then
+    return { ok = false, error = err }
+  end
   local out = {}
   for _, p in ipairs(doc.pages or {}) do
-    if p.url and p.url ~= "" then out[#out + 1] = host.url_abs(BASE, clean(p.url)) end
+    if p.url and p.url ~= "" then
+      out[#out + 1] = host.url_abs(BASE, clean(p.url))
+    end
   end
   return { ok = true, data = out }
 end

@@ -6,9 +6,13 @@ return function(params)
   local q = params.title or params.query or params.q or ""
   local page = math.max(1, tonumber(params.page) or 1)
   local url = BASE .. "/?s=" .. host.url_encode(q)
-  if page > 1 then url = url .. "&paged=" .. page end
+  if page > 1 then
+    url = url .. "&paged=" .. page
+  end
   local body, err = http_req(url)
-  if err ~= nil then return { ok = false, error = err } end
+  if err ~= nil then
+    return { ok = false, error = err }
+  end
 
   -- bixbox card: .bsx > a (href /comics/slug/) + .tt title + img[src]; the
   -- three queries are index-aligned per card, as in the source.

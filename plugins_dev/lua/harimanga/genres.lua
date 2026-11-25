@@ -7,7 +7,9 @@ return function()
   -- Scraped from the site's own nav (source's choice: a hardcoded list rots
   -- when the theme reorganises). Names for the UI; slugs memoized for search.
   local body, err = http_req(BASE .. "/")
-  if err ~= nil then return { ok = false, error = err } end
+  if err ~= nil then
+    return { ok = false, error = err }
+  end
   local seen, names = {}, {}
   local map = {}
   for _, m in ipairs(host.re2.find_all([[href="[^"]*harimanga\.cc/manga-genre/([a-z0-9-]+)/"[^>]*>([^<]+)</]], body)) do

@@ -10,7 +10,9 @@ return function(params)
   local out = {}
   for _, p in ipairs((data and data.pages) or {}) do
     local url = absolute(p.url)
-    if url ~= "" then out[#out + 1] = url end
+    if url ~= "" then
+      out[#out + 1] = url
+    end
   end
   if #out == 0 then
     return { ok = false, error = "dynastyscan: no pages for " .. permalink }

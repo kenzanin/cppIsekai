@@ -10,17 +10,25 @@ return function(params)
     return { ok = false, error = "mangaread: chapter id must be slug:chapterId, got " .. tostring(params.id) }
   end
   local body, err = http_req(BASE .. "/manga/" .. slug .. "/" .. cid .. "/")
-  if err ~= nil then return { ok = false, error = err } end
+  if err ~= nil then
+    return { ok = false, error = err }
+  end
 
   -- Madara page images carry class wp-manga-chapter-img; lazy themes put the
   -- URL in data-src, eager ones in src.
   local out = {}
   local srcs = host.html.attr(body, "img.wp-manga-chapter-img", "data-src")
-  if #srcs == 0 then srcs = host.html.attr(body, "img.wp-manga-chapter-img", "src") end
+  if #srcs == 0 then
+    srcs = host.html.attr(body, "img.wp-manga-chapter-img", "src")
+  end
   for _, s in ipairs(srcs) do
     local url = host.text.trim(s)
-    if url ~= "" then out[#out + 1] = url end
+    if url ~= "" then
+      out[#out + 1] = url
+    end
   end
-  if #out == 0 then return { ok = false, error = "mangaread: no pages for " .. composite } end
+  if #out == 0 then
+    return { ok = false, error = "mangaread: no pages for " .. composite }
+  end
   return { ok = true, data = out }
 end

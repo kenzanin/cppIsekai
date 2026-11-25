@@ -11,10 +11,13 @@ local canonical_manga = c.canonical_manga
 local tag_ids = c.tag_ids
 return function()
   local map, err = tag_ids()
-  if err ~= nil then return { ok = false, error = err } end
+  if err ~= nil then
+    return { ok = false, error = err }
+  end
   local names = {}
-  for name in pairs(map) do names[#names + 1] = name end
+  for name in pairs(map) do
+    names[#names + 1] = name
+  end
   table.sort(names)
   return { ok = true, data = names }
 end
-

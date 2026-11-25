@@ -18,19 +18,31 @@ local GENRE_IDS = c.GENRE_IDS
 local cover_of = c.cover_of
 return function(params)
   local hid = params.id or ""
-  if hid == "" then return { ok = true, data = {} } end
+  if hid == "" then
+    return { ok = true, data = {} }
+  end
   local out, page = {}, 1
   -- up to 3 pages (200/page), newest-first upstream; sort ascending like mangadex
   -- (host routes pages/CBZ by chapter number and expects reading order)
   while page <= 3 do
     local url, verr = vrf_url("/titles/" .. hid .. "/chapters", {
-      language = "en", limit = "200", order = "desc", page = tostring(page), sort = "number",
+      language = "en",
+      limit = "200",
+      order = "desc",
+      page = tostring(page),
+      sort = "number",
     })
-    if verr ~= nil then return { ok = false, error = verr } end
+    if verr ~= nil then
+      return { ok = false, error = verr }
+    end
     local body, err = http_get(url)
-    if err ~= nil then return { ok = false, error = err } end
+    if err ~= nil then
+      return { ok = false, error = err }
+    end
     local items = body.items or {}
-    if #items == 0 then break end
+    if #items == 0 then
+      break
+    end
     for _, c in ipairs(items) do
       if type(c) == "table" and c.id then
         -- upstream sends number=0 for entries that only carry a numeric name
@@ -54,9 +66,13 @@ return function(params)
     local meta = body.meta or {}
     local has_next = meta.hasNext or meta.has_next
     local last_page = tonumber(meta.lastPage or meta.last_page) or 1
-    if not has_next or page >= last_page then break end
+    if not has_next or page >= last_page then
+      break
+    end
     page = page + 1
   end
-  table.sort(out, function(a, b) return (a.number or 0) < (b.number or 0) end)
+  table.sort(out, function(a, b)
+    return (a.number or 0) < (b.number or 0)
+  end)
   return { ok = true, data = out }
 end

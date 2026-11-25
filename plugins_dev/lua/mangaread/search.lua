@@ -9,23 +9,31 @@ return function(params)
   local genres = params.tags or params.genres or {}
   if type(genres) == "string" then
     local list = {}
-    for name in genres:gmatch("[^,]+") do list[#list + 1] = host.text.trim(name) end
+    for name in genres:gmatch("[^,]+") do
+      list[#list + 1] = host.text.trim(name)
+    end
     genres = list
   end
 
   local enc_q = host.url_encode(q)
   local genre_slug
-  if type(genres) == "table" and #genres > 0 then genre_slug = require("genres").map[genres[1]] or genres[1] end
+  if type(genres) == "table" and #genres > 0 then
+    genre_slug = require("genres").map[genres[1]] or genres[1]
+  end
 
   -- Madara page 2+ is /page/N/ (?page=N is not supported) and admin-ajax.php
   -- answers 0 bytes, so both branches use the server-rendered GET.
   local function mkurl(p)
     if genre_slug then
       local u = BASE .. GENRE_PATH .. host.url_encode(genre_slug) .. "/"
-      if p > 1 then return u .. "page/" .. tostring(p) .. "/" end
+      if p > 1 then
+        return u .. "page/" .. tostring(p) .. "/"
+      end
       return u
     end
-    if p > 1 then return BASE .. "/page/" .. tostring(p) .. "/?s=" .. enc_q .. "&post_type=wp-manga" end
+    if p > 1 then
+      return BASE .. "/page/" .. tostring(p) .. "/?s=" .. enc_q .. "&post_type=wp-manga"
+    end
     return BASE .. "/?s=" .. enc_q .. "&post_type=wp-manga"
   end
 
@@ -57,8 +65,7 @@ return function(params)
       local slug = find1(href, [[/manga/([^/]+)/]]) or find1(href, [[/manga/([^/]+)$]])
       if slug and not seen[slug] then
         seen[slug] = true
-        local cover = find1(card, [[data-src="[\t\n\s]*(https?://[^"]+)"]])
-          or find1(card, [[\ssrc="(https?://[^"]+)"]])
+        local cover = find1(card, [[data-src="[\t\n\s]*(https?://[^"]+)"]]) or find1(card, [[\ssrc="(https?://[^"]+)"]])
         items[#items + 1] = { id = slug, name = host.text.unescape(title or ""), cover = host.text.trim(cover or "") }
       end
     end

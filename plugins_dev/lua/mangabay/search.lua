@@ -16,7 +16,9 @@ return function(params)
   local tags = params.tags or params.genres or {}
   if type(tags) == "string" then -- UI joins checked genres with commas
     local list = {}
-    for name in tags:gmatch("[^,]+") do list[#list + 1] = name:match("^%s*(.-)%s*$") end
+    for name in tags:gmatch("[^,]+") do
+      list[#list + 1] = name:match("^%s*(.-)%s*$")
+    end
     tags = list
   end
 
@@ -26,13 +28,19 @@ return function(params)
     -- the DLE genre number (genres map resolves UI names, digits pass through).
     local g = tostring(tags[1] or "")
     local gid = (genre_map and genre_map[g]) or g:match("(%d+)")
-    if not gid then return { ok = true, data = { items = {}, total = 0 } } end
+    if not gid then
+      return { ok = true, data = { items = {}, total = 0 } }
+    end
     local url = "/ComicList/g=" .. tostring(gid)
-    if page > 1 then url = url .. "/page/" .. tostring(page) .. "/" end
+    if page > 1 then
+      url = url .. "/page/" .. tostring(page) .. "/"
+    end
     body = site_get(url .. "/")
   elseif q ~= "" then
     local url = "/search/" .. host.url_encode(q)
-    if page > 1 then url = url .. "/page/" .. tostring(page) end
+    if page > 1 then
+      url = url .. "/page/" .. tostring(page)
+    end
     body = site_get(url)
   else
     return { ok = true, data = { items = {}, total = 0 } }

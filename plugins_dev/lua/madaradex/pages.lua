@@ -13,16 +13,22 @@ local genre_map = c.genre_map
 return function(params)
   local id = tostring(params.id or "")
   local slug, cslug = id:match("^(.-):(.+)$")
-  if not slug or slug == "" or not cslug or cslug == "" then return { ok = true, data = {} } end
+  if not slug or slug == "" or not cslug or cslug == "" then
+    return { ok = true, data = {} }
+  end
 
   local url = manga_url(slug) .. host.url_encode(cslug) .. "/"
   local body, err = http_req(url)
-  if err ~= nil then return { ok = false, error = err } end
+  if err ~= nil then
+    return { ok = false, error = err }
+  end
 
   -- the paged reader carries one image; the list layout has them all
   if body:find('id="single-pager"', 1, true) then
     local listed, lerr = http_req(url .. "?style=list")
-    if lerr == nil and listed and listed ~= "" then body = listed end
+    if lerr == nil and listed and listed ~= "" then
+      body = listed
+    end
   end
 
   -- tag-at-a-time scan (host.re2.find_index has no start-offset argument).
@@ -32,13 +38,19 @@ return function(params)
   local pages, scanned, pos = {}, 0, 1
   while true do
     local s = block:find("<img", pos, true)
-    if not s then break end
+    if not s then
+      break
+    end
     local e = block:find(">", s, true)
-    if not e then break end
+    if not e then
+      break
+    end
     local tag = block:sub(s, e)
     scanned = scanned + 1
     local src = img_src(tag)
-    if src ~= "" then pages[#pages + 1] = src end -- cdn host 403s without Referer; host sends site origin
+    if src ~= "" then
+      pages[#pages + 1] = src
+    end -- cdn host 403s without Referer; host sends site origin
     pos = e + 1
   end
 

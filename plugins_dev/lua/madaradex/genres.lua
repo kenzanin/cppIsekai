@@ -12,7 +12,9 @@ local img_src = c.img_src
 local genre_map = c.genre_map
 return function()
   local body, err = http_req(BASE .. MANGA_PATH)
-  if err ~= nil then return { ok = false, error = err } end
+  if err ~= nil then
+    return { ok = false, error = err }
+  end
   local seen, names, map = {}, {}, {}
   -- the label is not always bare text (sometimes span-wrapped): capture to </a>
   for _, m in ipairs(host.re2.find_all([[href="[^"]*/genre/([a-z0-9_-]+)/?"[^>]*>(.*?)</a>]], body)) do

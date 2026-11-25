@@ -12,7 +12,9 @@ return function(params)
   local tags = params.tags or params.genres or {}
   if type(tags) == "string" then -- UI joins checked genres with commas
     local list = {}
-    for name in tags:gmatch("[^,]+") do list[#list + 1] = name:match("^%s*(.-)%s*$") end
+    for name in tags:gmatch("[^,]+") do
+      list[#list + 1] = name:match("^%s*(.-)%s*$")
+    end
     tags = list
   end
 
@@ -22,13 +24,18 @@ return function(params)
     local slug = tostring(tags[1] or "")
     slug = genres.map[slug] or slug
     local url = BASE .. "/series?genres=" .. host.url_encode(slug)
-    if page > 1 then url = url .. "&page=" .. tostring(page) end
+    if page > 1 then
+      url = url .. "&page=" .. tostring(page)
+    end
     local body = helpers.http_get(url)
-    if not body then return { ok = false, error = "mangabuddy: genre browse failed" } end
+    if not body then
+      return { ok = false, error = "mangabuddy: genre browse failed" }
+    end
     -- <a href="/series/{id}"> ... <img alt="Cover of {title}" data-src="{cover}">
     local rows = host.re2.find_all(
       [[(?s)<a[^>]*href="/series/([^/?"]+)"[^>]*>.*?<img[^>]*alt="Cover of ([^"]+)"[^>]*data-src="([^"]+)"]],
-      body)
+      body
+    )
     for _, r in ipairs(rows) do
       if r[2] and r[2] ~= "" then
         items[#items + 1] = { id = r[2], name = host.text.unescape(r[3] or ""), cover = host.text.trim(r[4] or "") }
@@ -37,9 +44,13 @@ return function(params)
   else
     -- Text search: /api/search?search=Q&page=N -> {comics:[...]} (API paginates)
     local url = BASE .. "/api/search?search=" .. host.url_encode(q)
-    if page > 1 then url = url .. "&page=" .. tostring(page) end
+    if page > 1 then
+      url = url .. "&page=" .. tostring(page)
+    end
     local raw = helpers.http_get(url, { json = true })
-    if not raw then return { ok = false, error = "mangabuddy: search failed" } end
+    if not raw then
+      return { ok = false, error = "mangabuddy: search failed" }
+    end
     local ok, data = pcall(json.decode, raw)
     if ok and type(data) == "table" and type(data.comics) == "table" then
       for _, c in ipairs(data.comics) do

@@ -29,7 +29,9 @@ return function(params)
         }
       end
     end
-    table.sort(out, function(a, b) return a.number < b.number end)
+    table.sort(out, function(a, b)
+      return a.number < b.number
+    end)
   end
   return { ok = true, data = out }
 end

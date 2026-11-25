@@ -19,19 +19,18 @@ local GENRE_SLUGS = require("genres").map
 
 -- allChapters createdAt is epoch milliseconds (int64) -> unix seconds.
 
-
 local normalize_status = host.text.normalize_status
 
-
-
-
-
-
-
 local function image_url(path)
-  if path == nil or path == "" then return "" end
-  if path:match("^https?://") then return path end
-  if path:sub(1, 2) == "//" then return "https:" .. path end
+  if path == nil or path == "" then
+    return ""
+  end
+  if path:match("^https?://") then
+    return path
+  end
+  if path:sub(1, 2) == "//" then
+    return "https:" .. path
+  end
   path = path:gsub("^/static/", ""):gsub("^static/", "")
   return CDN .. "/static/" .. path
 end
@@ -48,4 +47,14 @@ local function strip_html(s)
   return (host.text.strip_html(tostring(s or "")):gsub("%s+", " "))
 end
 
-return { BASE=BASE, CDN=CDN, HEADERS=HEADERS, GENRE_SLUGS=GENRE_SLUGS, normalize_status=normalize_status, image_url=image_url, get_json=get_json, epoch_ms=epoch_ms, strip_html=strip_html }
+return {
+  BASE = BASE,
+  CDN = CDN,
+  HEADERS = HEADERS,
+  GENRE_SLUGS = GENRE_SLUGS,
+  normalize_status = normalize_status,
+  image_url = image_url,
+  get_json = get_json,
+  epoch_ms = epoch_ms,
+  strip_html = strip_html,
+}

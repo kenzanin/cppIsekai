@@ -11,20 +11,28 @@ local strip_html = c.strip_html
 return function(params)
   local id = params.id or ""
   local data, err = get_json(BASE .. "/api/manga/page?id=" .. host.url_encode(id))
-  if err ~= nil then return { ok = false, error = err } end
+  if err ~= nil then
+    return { ok = false, error = err }
+  end
   local page = type(data) == "table" and data.mangaPage
   if type(page) ~= "table" then
     return { ok = false, error = "atsumaru: no mangaPage for " .. tostring(id) }
   end
   local poster = page.poster
-  if type(poster) == "table" then poster = poster.image or poster.id end
+  if type(poster) == "table" then
+    poster = poster.image or poster.id
+  end
   local authors = {}
   for _, a in ipairs(page.authors or {}) do
-    if type(a) == "table" and a.name then authors[#authors + 1] = a.name end
+    if type(a) == "table" and a.name then
+      authors[#authors + 1] = a.name
+    end
   end
   local genres = {}
   for _, g in ipairs(page.genres or {}) do
-    if type(g) == "table" and g.name then genres[#genres + 1] = g.name end
+    if type(g) == "table" and g.name then
+      genres[#genres + 1] = g.name
+    end
   end
   -- Discriminator is `medium` ("Comic" vs "Novel"), NOT `hasUploads`:
   -- the latter is false even on manga with real uploaded pages (e.g. 5QVaH, 31 pages).

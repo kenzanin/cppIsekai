@@ -15,7 +15,9 @@ return function(params)
   local tags = params.tags or params.genres or {}
   if type(tags) == "string" then
     local list = {}
-    for name in tags:gmatch("[^,]+") do list[#list + 1] = host.text.trim(name) end
+    for name in tags:gmatch("[^,]+") do
+      list[#list + 1] = host.text.trim(name)
+    end
     tags = list
   end
   local path = "/titles/search?q=" .. host.url_encode(q) .. "&limit=" .. limit .. "&page=" .. page
@@ -24,7 +26,9 @@ return function(params)
     path = path .. "&genres=" .. host.url_encode(slug)
   end
   local data, err = get_json(path)
-  if not data then return { ok = false, error = err } end
+  if not data then
+    return { ok = false, error = err }
+  end
 
   local items = {}
   for _, it in ipairs(data.items or {}) do
@@ -39,6 +43,12 @@ return function(params)
     end
   end
   local pg = data.pagination or {}
-  return { ok = true, data = { items = items, total = tonumber(pg.total) or #items,
-                               pages = tonumber(pg.total_pages) or 1 } }
+  return {
+    ok = true,
+    data = {
+      items = items,
+      total = tonumber(pg.total) or #items,
+      pages = tonumber(pg.total_pages) or 1,
+    },
+  }
 end

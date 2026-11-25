@@ -22,18 +22,24 @@ return function(params)
   local req = { limit = "50", page = tostring(page) }
   -- keyword has to be left out entirely when nothing was typed: an empty value
   -- changes the parameter set the VRF signature is checked against and the API 403s.
-  if q ~= "" then req.keyword = q end
+  if q ~= "" then
+    req.keyword = q
+  end
   local tags = params.tags or {}
   if type(tags) == "string" then
     local list = {}
-    for name in tags:gmatch("[^,]+") do list[#list + 1] = (name:gsub("^%s+", ""):gsub("%s+$", "")) end
+    for name in tags:gmatch("[^,]+") do
+      list[#list + 1] = (name:gsub("^%s+", ""):gsub("%s+$", ""))
+    end
     tags = list
   end
   if type(tags) == "table" and #tags > 0 then
     local ids = {}
     for _, name in ipairs(tags) do
       local id = GENRE_IDS[name]
-      if id then ids[#ids + 1] = id end
+      if id then
+        ids[#ids + 1] = id
+      end
     end
     if #ids > 0 then
       req["genres_in[]"] = ids
@@ -41,9 +47,13 @@ return function(params)
     end
   end
   local url, verr = vrf_url("/titles", req)
-  if verr ~= nil then return { ok = false, error = verr } end
+  if verr ~= nil then
+    return { ok = false, error = verr }
+  end
   local body, err = http_get(url)
-  if err ~= nil then return { ok = false, error = err } end
+  if err ~= nil then
+    return { ok = false, error = err }
+  end
   local items = {}
   for _, it in ipairs(body.items or {}) do
     if type(it) == "table" and it.hid then

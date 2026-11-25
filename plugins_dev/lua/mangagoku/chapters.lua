@@ -14,9 +14,13 @@ local book_genres = c.book_genres
 local book_description = c.book_description
 return function(params)
   local id = slug_of(params.id or "")
-  if id == "" then return { ok = true, data = {} } end
+  if id == "" then
+    return { ok = true, data = {} }
+  end
   local doc, err = get_json("/api/manga/" .. host.url_encode(id) .. "/chapters?limit=-1")
-  if not doc then return { ok = false, error = err } end
+  if not doc then
+    return { ok = false, error = err }
+  end
   local out = {}
   for _, c in ipairs((doc.data or {}).chapters or {}) do
     if c.chapter_slug and c.chapter_slug ~= "" then
@@ -29,6 +33,8 @@ return function(params)
       }
     end
   end
-  table.sort(out, function(a, b) return a.number < b.number end)
+  table.sort(out, function(a, b)
+    return a.number < b.number
+  end)
   return { ok = true, data = out }
 end

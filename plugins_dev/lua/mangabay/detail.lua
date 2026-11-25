@@ -13,10 +13,13 @@ local genre_map = c.genre_map
 return function(params)
   local id = tostring(params.id or "")
   local body = site_get(path_of(id))
-  if body == "" then return { ok = false, error = "mangabay: detail fetch failed" } end
+  if body == "" then
+    return { ok = false, error = "mangabay: detail fetch failed" }
+  end
 
   local title = find1(body, [[<header class="page__header">\s*<h1>([^<]+)</h1>]])
-    or find1(body, [[<title>([^<]+)</title>]]) or ""
+    or find1(body, [[<title>([^<]+)</title>]])
+    or ""
   title = host.text.trim((host.text.unescape(title):gsub("%s*Manga%-?Bay.*$", "")))
 
   local alt_titles = find1(body, [[<p class="page__alt">(.*?)</p>]]) or ""
@@ -31,7 +34,9 @@ return function(params)
 
   local author = find1(body, [[<dt>Author</dt><dd>([^<]+)</dd>]]) or ""
   local artist = find1(body, [[<dt>Artist</dt><dd>([^<]+)</dd>]]) or ""
-  if author == "" then author = artist end
+  if author == "" then
+    author = artist
+  end
 
   local status = normalize_status(find1(body, [[<dt>Status</dt><dd>([^<]+)</dd>]]))
 
@@ -39,14 +44,18 @@ return function(params)
   local genre_row = find1(body, [[<dt>Genres</dt><dd>(.*?)</dd>]]) or ""
   for _, r in ipairs(host.re2.find_all([[<a[^>]*>([^<]+)</a>]], genre_row)) do
     local label = host.text.trim(r[2] or "")
-    if label ~= "" then genres[#genres + 1] = label end
+    if label ~= "" then
+      genres[#genres + 1] = label
+    end
   end
   if #genres == 0 then -- JSON-LD ComicSeries fallback
     local ld = dle.comic_series(body)
     if ld and type(ld.genre) == "string" then
       for graw in ld.genre:gmatch("([^,]+)") do
         local g = host.text.trim(graw)
-        if g ~= "" then genres[#genres + 1] = g end
+        if g ~= "" then
+          genres[#genres + 1] = g
+        end
       end
     end
   end
@@ -54,17 +63,22 @@ return function(params)
   -- the alt-title line is the only place the other names live; keep it as a
   -- description tail (the ABI has one description field)
   alt_titles = host.text.trim(host.text.unescape(alt_titles))
-  if alt_titles ~= "" then desc = desc .. "\n\nAlternative titles: " .. alt_titles end
+  if alt_titles ~= "" then
+    desc = desc .. "\n\nAlternative titles: " .. alt_titles
+  end
 
-  return { ok = true, data = {
-    id = id,
-    name = title,
-    cover = cover,
-    status = status,
-    tags = genres,
-    release_at = 0, -- detail markup has no machine-readable series date
-    description = desc,
-    authors = author ~= "" and { author } or {},
-    url = BASE .. path_of(id),
-  } }
+  return {
+    ok = true,
+    data = {
+      id = id,
+      name = title,
+      cover = cover,
+      status = status,
+      tags = genres,
+      release_at = 0, -- detail markup has no machine-readable series date
+      description = desc,
+      authors = author ~= "" and { author } or {},
+      url = BASE .. path_of(id),
+    },
+  }
 end

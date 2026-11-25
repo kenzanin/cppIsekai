@@ -9,9 +9,13 @@ local epoch = c.epoch
 return function(params)
   local manga_id = tostring(params.id or "")
   local slug = bare_slug(manga_id)
-  if not slug or slug == "" then return { ok = true, data = {} } end
+  if not slug or slug == "" then
+    return { ok = true, data = {} }
+  end
   local raw = helpers.http_get(BASE .. "/get-chapter-list?slug=" .. host.url_encode(slug), { json = true })
-  if not raw then return { ok = false, error = "mangabuddy: chapter list fetch failed" } end
+  if not raw then
+    return { ok = false, error = "mangabuddy: chapter list fetch failed" }
+  end
   local ok, body = pcall(json.decode, raw)
   if not ok or type(body) ~= "table" or not body.success or type(body.data) ~= "table" then
     return { ok = false, error = "mangabuddy: bad chapter payload for " .. slug }
@@ -32,6 +36,8 @@ return function(params)
       }
     end
   end
-  table.sort(out, function(a, b) return a.number < b.number end)
+  table.sort(out, function(a, b)
+    return a.number < b.number
+  end)
   return { ok = true, data = out }
 end

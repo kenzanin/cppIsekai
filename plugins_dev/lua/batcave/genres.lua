@@ -13,7 +13,9 @@ local pager_pages = c.pager_pages
 local remember = c.remember
 local load_genres = c.load_genres
 return function()
-    local list = load_genres()
-    if #list == 0 then return { ok = true, data = {} } end
-    return { ok = true, data = list }
+  local list = load_genres()
+  if #list == 0 then
+    return { ok = true, data = {} }
+  end
+  return { ok = true, data = list }
 end

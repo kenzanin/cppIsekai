@@ -5,14 +5,18 @@ local http_req = c.http_req
 local find1 = c.find1
 return function(params)
   local slug = params.id or ""
-  if slug == "" then return { ok = true, data = {} } end
+  if slug == "" then
+    return { ok = true, data = {} }
+  end
   -- Madara chapters via POST /manga/<slug>/ajax/chapters/.
   local body, err = http_req(BASE .. "/manga/" .. slug .. "/ajax/chapters/", {
     method = "POST",
     body = "",
     headers = { ["X-Requested-With"] = "xmlhttprequest", ["Content-Type"] = "application/x-www-form-urlencoded" },
   })
-  if err ~= nil then return { ok = false, error = err } end
+  if err ~= nil then
+    return { ok = false, error = err }
+  end
 
   local out, seen = {}, {}
   for _, m in ipairs(host.re2.find_all([[(?s)<li[^>]*class="wp-manga-chapter[^"]*"[^>]*>(.*?)</li>]], body)) do
@@ -41,12 +45,19 @@ return function(params)
       local cid = find1(href, [[/([^/]+)/?$]])
       if cid and not seen[cid] then
         seen[cid] = true
-        out[#out + 1] = { id = slug .. ":" .. cid, number = host.text.chapter_num(label) or 0,
-          title = host.text.trim(label), release_at = 0, pages = 0 }
+        out[#out + 1] = {
+          id = slug .. ":" .. cid,
+          number = host.text.chapter_num(label) or 0,
+          title = host.text.trim(label),
+          release_at = 0,
+          pages = 0,
+        }
       end
     end
   end
 
-  table.sort(out, function(a, b) return (a.number or 0) < (b.number or 0) end)
+  table.sort(out, function(a, b)
+    return (a.number or 0) < (b.number or 0)
+  end)
   return { ok = true, data = out }
 end

@@ -18,7 +18,9 @@ local XHR = { ["X-Requested-With"] = "XMLHttpRequest", ["Referer"] = BASE .. "ma
 local function http_req(url, extra)
   local opts = { headers = {} }
   if extra then
-    for k, v in pairs(extra) do opts.headers[k] = v end
+    for k, v in pairs(extra) do
+      opts.headers[k] = v
+    end
   end
   return host.http.fetch_body(url, opts)
 end
@@ -33,7 +35,9 @@ local function search_json(query)
 end
 
 local function cover_from(r)
-  if not r.image_original or r.image_original == "" then return "" end
+  if not r.image_original or r.image_original == "" then
+    return ""
+  end
   return CDN_COVER .. r.image_original
 end
 
@@ -41,13 +45,21 @@ end
 -- author per slug, so one slug-matched lookup recovers it. Any failure
 -- degrades to "" (host enrichment fills it when available).
 local function lookup_author(slug, title)
-  if title == "" then return "" end
+  if title == "" then
+    return ""
+  end
   local body = search_json(title)
-  if not body then return "" end
+  if not body then
+    return ""
+  end
   local ok, decoded = pcall(json.decode, body)
-  if not ok or type(decoded) ~= "table" then return "" end
+  if not ok or type(decoded) ~= "table" then
+    return ""
+  end
   for _, r in ipairs(decoded.data or {}) do
-    if r.slug == slug then return host.text.unescape(r.author or "") end
+    if r.slug == slug then
+      return host.text.unescape(r.author or "")
+    end
   end
   return ""
 end
@@ -55,8 +67,9 @@ end
 -- Genre archives are server-rendered with page-listing-item cards.
 local function parse_genre_cards(body)
   local items, seen = {}, {}
-  for _, m in ipairs(host.re2.find_all(
-    [[(?s)<div[^>]*class="[^"]*page-listing-item[^"]*".*?post-title.*?</h[23]>]], body)) do
+  for _, m in
+    ipairs(host.re2.find_all([[(?s)<div[^>]*class="[^"]*page-listing-item[^"]*".*?post-title.*?</h[23]>]], body))
+  do
     local card = m[1]
     local slug = find1(card, [[href="[^"]*/manhua/([a-z0-9-]+)"]])
     if slug and slug ~= "" and not seen[slug] then
@@ -74,7 +87,6 @@ local function parse_genre_cards(body)
   return items
 end
 
-
 -- ── search ─────────────────────────────────────────────────────────────────
 -- ── genres ─────────────────────────────────────────────────────────────────
 
@@ -83,7 +95,9 @@ local genre_cache = nil -- { list = {{name,slug}}, by_name = {[name]=slug} }
 -- global (not local): methods.search above references it before its
 -- definition point, which would otherwise compile to a nil global lookup
 function genres_scrape()
-  if genre_cache then return genre_cache end
+  if genre_cache then
+    return genre_cache
+  end
   local list, seen, by_name = {}, {}, {}
   local body, err = http_req(BASE .. "manhua")
   if body then
@@ -100,4 +114,16 @@ function genres_scrape()
   return genre_cache
 end
 
-return { BASE=BASE, CDN_COVER=CDN_COVER, XHR=XHR, http_req=http_req, find1=find1, search_json=search_json, cover_from=cover_from, lookup_author=lookup_author, parse_genre_cards=parse_genre_cards, genre_cache=genre_cache, genres_scrape=genres_scrape }
+return {
+  BASE = BASE,
+  CDN_COVER = CDN_COVER,
+  XHR = XHR,
+  http_req = http_req,
+  find1 = find1,
+  search_json = search_json,
+  cover_from = cover_from,
+  lookup_author = lookup_author,
+  parse_genre_cards = parse_genre_cards,
+  genre_cache = genre_cache,
+  genres_scrape = genres_scrape,
+}

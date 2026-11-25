@@ -11,10 +11,14 @@ return function(ctx)
 
   return function(params)
     local slug = params.id or ""
-    if slug == "" then return { ok = true, data = {} } end
+    if slug == "" then
+      return { ok = true, data = {} }
+    end
 
     local body, err = ctx.get(ctx.BASE .. "/manga/" .. host.url_encode(slug))
-    if not body then return { ok = false, error = err } end
+    if not body then
+      return { ok = false, error = err }
+    end
 
     -- RE2 here, not Lua patterns: the slug carries '-' (a Lua lazy quantifier)
     -- and the display number sits behind an HTML comment ("#<!-- -->3862").

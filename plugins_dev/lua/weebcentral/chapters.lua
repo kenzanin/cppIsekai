@@ -8,14 +8,20 @@ local txt = c.txt
 local cards = c.cards
 return function(params)
   local id = params.id or ""
-  if id == "" then return { ok = true, data = {} } end
+  if id == "" then
+    return { ok = true, data = {} }
+  end
   local body, err = get("/series/" .. host.url_encode(id) .. "/full-chapter-list")
-  if err then return { ok = false, error = err } end
+  if err then
+    return { ok = false, error = err }
+  end
   local out = {}
   local pos = 1
   while true do
     local a, b, ch_id, chunk = body:find('href="/chapters/([A-Z0-9]+)"[^>]*>(.-)</a>', pos)
-    if not a then break end
+    if not a then
+      break
+    end
     if #ch_id == 26 then
       local label = chunk:match('<span class="">([^<]+)</span>') or chunk:match("<span[^>]*>([^<]+)</span>")
       local dt = chunk:match('datetime="([^"]+)"')

@@ -18,18 +18,30 @@ local GENRE_IDS = c.GENRE_IDS
 local cover_of = c.cover_of
 return function(params)
   local chapter_id = params.id or ""
-  if chapter_id == "" then return { ok = false, error = "mangafire: missing id" } end
+  if chapter_id == "" then
+    return { ok = false, error = "mangafire: missing id" }
+  end
   local url, verr = vrf_url("/chapters/" .. chapter_id, nil)
-  if verr ~= nil then return { ok = false, error = verr } end
+  if verr ~= nil then
+    return { ok = false, error = verr }
+  end
   local body, err = http_get(url)
-  if err ~= nil then return { ok = false, error = err } end
+  if err ~= nil then
+    return { ok = false, error = err }
+  end
   local raw = type(body) == "table" and type(body.data) == "table" and body.data.pages
-  if type(raw) ~= "table" or #raw == 0 then return { ok = false, error = "mangafire: no pages for chapter " .. chapter_id } end
+  if type(raw) ~= "table" or #raw == 0 then
+    return { ok = false, error = "mangafire: no pages for chapter " .. chapter_id }
+  end
   local out = {}
   for _, p in ipairs(raw) do
     local u = type(p) == "table" and p.url
-    if type(u) == "string" and u ~= "" then out[#out + 1] = u end
+    if type(u) == "string" and u ~= "" then
+      out[#out + 1] = u
+    end
   end
-  if #out == 0 then return { ok = false, error = "mangafire: no usable page urls" } end
+  if #out == 0 then
+    return { ok = false, error = "mangafire: no usable page urls" }
+  end
   return { ok = true, data = out }
 end

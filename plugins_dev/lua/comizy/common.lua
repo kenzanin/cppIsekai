@@ -16,16 +16,22 @@ end
 local cached_build_id = nil
 local cached_genres, name_to_slug = nil, {}
 local function build_id()
-  if cached_build_id then return cached_build_id end
+  if cached_build_id then
+    return cached_build_id
+  end
   local v = get_json(WEB .. "/api/version")
-  if v and v.buildId then cached_build_id = v.buildId end
+  if v and v.buildId then
+    cached_build_id = v.buildId
+  end
   return cached_build_id
 end
 
 local function split_id(id)
   id = tostring(id or "")
   local sep = id:find(".", 1, true)
-  if not sep then return nil, nil end
+  if not sep then
+    return nil, nil
+  end
   return id:sub(1, sep - 1), id:sub(sep + 1)
 end
 
@@ -36,7 +42,6 @@ local function comizy_chapter_num(title)
   local t = (tostring(title or ""):gsub("^(%s*[Cc]hapter%s+%d+)%s*%-%s*(%d+)%s*$", "%1.%2"))
   return host.text.chapter_num(t)
 end
-
 
 -- [{id,slug,name,cover,...}] -> canonical search items, id packed.
 local function items_from(raw)
@@ -58,6 +63,15 @@ end
 -- the slug — neither derives the other. Genre mode browses the SSR JSON
 -- (the REST search silently ignores genre params); query is ignored there.
 
-
-
-return { API=API, WEB=WEB, get_json=get_json, cached_build_id=cached_build_id, cached_genres=cached_genres, name_to_slug=name_to_slug, build_id=build_id, split_id=split_id, comizy_chapter_num=comizy_chapter_num, items_from=items_from }
+return {
+  API = API,
+  WEB = WEB,
+  get_json = get_json,
+  cached_build_id = cached_build_id,
+  cached_genres = cached_genres,
+  name_to_slug = name_to_slug,
+  build_id = build_id,
+  split_id = split_id,
+  comizy_chapter_num = comizy_chapter_num,
+  items_from = items_from,
+}

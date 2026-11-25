@@ -18,7 +18,9 @@ return function(params)
     if href and not cap([[lockedChapterModal]], li, 1) then
       local label = trim(cap([[(?s)chapternum[^>]*>\s*([^<]+)]], li) or "")
       label = trim(host.re2.replace([[\s+]], " ", label))
-      if label == "" then label = "Chapter " .. num end
+      if label == "" then
+        label = "Chapter " .. num
+      end
       local date = trim(cap([[(?s)chapterdate[^>]*>\s*([^<]+)]], li) or "")
       local cid = cap([[/([^/]+)/?$]], href)
       if cid and not seen[cid] then

@@ -8,11 +8,21 @@ return function(params)
   local data = get_json(BASE .. "/series/" .. host.url_encode(slug) .. ".json")
   if not data then
     -- keep the id so an unreachable source still reads as a series, not {}
-    return { ok = true, data = {
-      id = slug, name = "", cover = "", status = "unknown", tags = {},
-      release_at = 0, description = "", authors = {}, artists = {},
-      url = BASE .. "/series/" .. slug,
-    } }
+    return {
+      ok = true,
+      data = {
+        id = slug,
+        name = "",
+        cover = "",
+        status = "unknown",
+        tags = {},
+        release_at = 0,
+        description = "",
+        authors = {},
+        artists = {},
+        url = BASE .. "/series/" .. slug,
+      },
+    }
   end
 
   -- Tag types: Author / General (genres) / Status. The top-level "type" is
@@ -30,17 +40,20 @@ return function(params)
 
   local description = host.text.strip_html(data.description or "")
   description = host.re2.replace([[\s+]], " ", description) -- collapse runs of whitespace
-  return { ok = true, data = {
-    id = slug,
-    name = data.name or "",
-    cover = absolute(data.cover),
-    status = status,
-    tags = tags,
-    -- the series JSON carries no release date
-    release_at = 0,
-    description = description,
-    authors = authors,
-    artists = {},
-    url = BASE .. "/series/" .. slug,
-  } }
+  return {
+    ok = true,
+    data = {
+      id = slug,
+      name = data.name or "",
+      cover = absolute(data.cover),
+      status = status,
+      tags = tags,
+      -- the series JSON carries no release date
+      release_at = 0,
+      description = description,
+      authors = authors,
+      artists = {},
+      url = BASE .. "/series/" .. slug,
+    },
+  }
 end

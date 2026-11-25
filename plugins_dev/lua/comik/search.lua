@@ -15,9 +15,13 @@ return function(params)
   end
   local page = math.max(1, tonumber(params.page) or 1)
   local items, err = fetch_search(query, page)
-  if not items then return { ok = false, error = err or "comik: search failed" } end
+  if not items then
+    return { ok = false, error = err or "comik: search failed" }
+  end
   local info = page_info(query, #items)
   return { ok = true, data = {
-    items = items, total = info.total, pages = info.pages,
+    items = items,
+    total = info.total,
+    pages = info.pages,
   } }
 end

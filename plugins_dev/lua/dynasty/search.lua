@@ -12,11 +12,16 @@ local tags_of = c.tags_of
 return function(params)
   local q = clean(params.title or params.query or params.q or "")
   local page = math.max(1, tonumber(params.page) or 1)
-  local path = "/search?q=" .. host.url_encode(q) ..
-               "&sort=best&classes%5B%5D=Series&classes%5B%5D=Chapter&classes%5B%5D=Doujin"
-  if page > 1 then path = path .. "&page=" .. page end
+  local path = "/search?q="
+    .. host.url_encode(q)
+    .. "&sort=best&classes%5B%5D=Series&classes%5B%5D=Chapter&classes%5B%5D=Doujin"
+  if page > 1 then
+    path = path .. "&page=" .. page
+  end
   local body, err = http_req(path)
-  if not body or body == "" then return { ok = false, error = err } end
+  if not body or body == "" then
+    return { ok = false, error = err }
+  end
   local hrefs = host.html.attr(body, ".chapter-list a.name[href]", "href") or {}
   local names = host.html.select(body, ".chapter-list a.name[href]") or {}
   local items, seen = {}, {}

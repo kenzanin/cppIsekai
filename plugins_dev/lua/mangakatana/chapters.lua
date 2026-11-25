@@ -9,10 +9,14 @@ local chapter_url = c.chapter_url
 local page_urls = c.page_urls
 return function(params)
   local manga_id = slug_of(params.id or "")
-  if manga_id == "" then return { ok = true, data = {} } end
+  if manga_id == "" then
+    return { ok = true, data = {} }
+  end
 
   local body, err = http_req(url_for("manga", manga_id))
-  if err ~= nil then return { ok = false, error = err } end
+  if err ~= nil then
+    return { ok = false, error = err }
+  end
 
   local selector = "div.chapters table tbody tr td div.chapter a"
   local urls = host.html.attr(body, selector, "href")

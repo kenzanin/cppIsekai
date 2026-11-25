@@ -20,8 +20,7 @@ return function(params)
   if not bid then
     return { ok = false, error = "comizy: version backend unreachable" }
   end
-  local res = get_json(WEB .. "/_next/data/" .. bid .. "/" .. slug
-    .. ".json?slug=" .. host.url_encode(slug))
+  local res = get_json(WEB .. "/_next/data/" .. bid .. "/" .. slug .. ".json?slug=" .. host.url_encode(slug))
   local m = res and (res.pageProps or {}).initialManga
   if not m then
     return { ok = true, data = { id = manga_id } }
@@ -36,17 +35,20 @@ return function(params)
     authors[#authors + 1] = m.authors[1].name
   end
 
-  return { ok = true, data = {
-    id = manga_id,
-    name = m.name or "",
-    cover = m.cover or "",
-    status = host.text.normalize_status(m.status or ""),
-    tags = genres,
-    -- no machine date on the SSR payload
-    release_at = 0,
-    description = m.summary or "",
-    authors = authors,
-    artists = {},
-    url = WEB .. "/" .. slug,
-  } }
+  return {
+    ok = true,
+    data = {
+      id = manga_id,
+      name = m.name or "",
+      cover = m.cover or "",
+      status = host.text.normalize_status(m.status or ""),
+      tags = genres,
+      -- no machine date on the SSR payload
+      release_at = 0,
+      description = m.summary or "",
+      authors = authors,
+      artists = {},
+      url = WEB .. "/" .. slug,
+    },
+  }
 end

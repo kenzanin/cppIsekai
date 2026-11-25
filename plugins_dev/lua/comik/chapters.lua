@@ -33,12 +33,14 @@ return function(params)
   local function harvest(pagebody)
     local pos = pagebody:find('href="/chapter/', 1, true)
     while pos do
-      local cid = pagebody:match('/chapter/([a-z0-9]+)', pos + 15)
-      local close = pagebody:find('</a>', pos, true)
-      if not cid or not close then break end
+      local cid = pagebody:match("/chapter/([a-z0-9]+)", pos + 15)
+      local close = pagebody:find("</a>", pos, true)
+      if not cid or not close then
+        break
+      end
       local window = pagebody:sub(pos, close + 400)
       local ms = window:match('data%-time="(%d+)"') or window:match('data-time="(%d+)"')
-      local label = window:match('>([^<]+)</a>')
+      local label = window:match(">([^<]+)</a>")
       if ms then
         local secs = epoch_ms_to_secs(ms)
         local prev = bynum[cid]
@@ -67,13 +69,17 @@ return function(params)
   harvest(body) -- latest on the title page first (single-source titles)
   for _, sid in ipairs(srcs) do
     local sb = http_req(BASE .. "/source/" .. sid)
-    if sb then harvest(sb) end
+    if sb then
+      harvest(sb)
+    end
   end
 
   if #out == 0 then
     return { ok = false, error = "comik: no chapters for " .. id }
   end
   -- newest first (sources render newest-first; the title page mixes)
-  table.sort(out, function(a, b) return (a.number or 0) > (b.number or 0) end)
+  table.sort(out, function(a, b)
+    return (a.number or 0) > (b.number or 0)
+  end)
   return { ok = true, data = out }
 end

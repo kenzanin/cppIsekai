@@ -11,10 +11,15 @@ local parse_cards = c.parse_cards
 return function(params)
   local id = find1(params.id or "", [[/manga/([^/]+)]]) or tostring(params.id or "")
   local detail, err = http_req(manga_url(id))
-  if not detail or detail == "" then return { ok = false, error = err } end
+  if not detail or detail == "" then
+    return { ok = false, error = err }
+  end
   local post_id = find1(detail, [["manga_id":"([0-9]+)"]])
-  if not post_id then return { ok = true, data = {} } end
-  local body = http_req(AJAX, { method = "POST",
+  if not post_id then
+    return { ok = true, data = {} }
+  end
+  local body = http_req(AJAX, {
+    method = "POST",
     body = "action=manga_get_chapters&manga=" .. post_id,
     headers = { ["Content-Type"] = "application/x-www-form-urlencoded", ["X-Requested-With"] = "XMLHttpRequest" },
   }) or ""
@@ -38,6 +43,8 @@ return function(params)
       end
     end
   end
-  table.sort(out, function(a, b) return a.number < b.number end)
+  table.sort(out, function(a, b)
+    return a.number < b.number
+  end)
   return { ok = true, data = out }
 end

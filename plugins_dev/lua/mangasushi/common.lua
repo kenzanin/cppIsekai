@@ -13,24 +13,18 @@ local http_req = host.http.fetch_body -- (body, err); nil unless 200 (plugin-hos
 
 -- first capture group of the first match; nil when no match (host re2.capture).
 
-
 -- ── search ─────────────────────────────────────────────────────────────────
-
 
 -- ── detail ─────────────────────────────────────────────────────────────────
 
-
 -- ── chapters ───────────────────────────────────────────────────────────────
-
 
 -- ── pages ──────────────────────────────────────────────────────────────────
 
-
 -- ── genres ─────────────────────────────────────────────────────────────────
-
 
 local function find1(s, pattern)
   return host.re2.capture(pattern, tostring(s or ""))
 end
 
-return { BASE=BASE, GENRE_PATH=GENRE_PATH, http_req=http_req, find1=find1 }
+return { BASE = BASE, GENRE_PATH = GENRE_PATH, http_req = http_req, find1 = find1 }

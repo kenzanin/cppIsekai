@@ -10,11 +10,13 @@ local split_id = c.split_id
 local comizy_chapter_num = c.comizy_chapter_num
 local items_from = c.items_from
 return function()
-  if cached_genres then return { ok = true, data = cached_genres } end
+  if cached_genres then
+    return { ok = true, data = cached_genres }
+  end
   local names = {}
   local res = get_json(API .. "/genres")
   if res then
-    for _, g in ipairs(((res.data or {}).items) or {}) do
+    for _, g in ipairs((res.data or {}).items or {}) do
       if g.slug and g.name then
         names[#names + 1] = tostring(g.name)
         name_to_slug[string.lower(tostring(g.name))] = tostring(g.slug)

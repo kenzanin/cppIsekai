@@ -21,7 +21,9 @@ function util.parse_search(html)
   local results, seen = {}, {}
 
   local function add(slug, title, cover)
-    if not slug or slug == "" or seen[slug] then return end
+    if not slug or slug == "" or seen[slug] then
+      return
+    end
     seen[slug] = true
     results[#results + 1] = {
       id = slug,
@@ -30,12 +32,19 @@ function util.parse_search(html)
     }
   end
 
-  for _, r in ipairs(host.re2.find_all(
-    [[<a href="(/manga/[^"/]+/)" title="([^"]+)"><img class="manga-list-4-cover" src="([^"]+)"]], html)) do
+  for _, r in
+    ipairs(
+      host.re2.find_all(
+        [[<a href="(/manga/[^"/]+/)" title="([^"]+)"><img class="manga-list-4-cover" src="([^"]+)"]],
+        html
+      )
+    )
+  do
     add(find1(r[2], [[^/manga/([^/]+)/]]), r[3], r[4])
   end
-  for _, r in ipairs(host.re2.find_all(
-    [[<p class="manga-list-4-item-title"><a href="(/manga/[^"/]+/)" title="([^"]+)"]], html)) do
+  for _, r in
+    ipairs(host.re2.find_all([[<p class="manga-list-4-item-title"><a href="(/manga/[^"/]+/)" title="([^"]+)"]], html))
+  do
     add(find1(r[2], [[^/manga/([^/]+)/]]), r[3], nil)
   end
 
@@ -56,7 +65,9 @@ function util.parse_manga_detail(html, manga_id)
   local genre_block = find1(html, [[(?s)detail-info-right-tag-list">(.*?)</p>]]) or ""
   for _, r in ipairs(host.re2.find_all([[title="[^"]*">(.*?)</a>]], genre_block)) do
     local name = host.text.strip_html(r[2] or "")
-    if name ~= "" then genres[#genres + 1] = name end
+    if name ~= "" then
+      genres[#genres + 1] = name
+    end
   end
 
   local author = host.text.strip_html(find1(html, [[detail-info-right-say">Author:\s*<a[^>]*>(.*?)</a>]]) or "")
@@ -91,8 +102,7 @@ function util.parse_chapter_list(html, manga_id)
 
   -- capture only the chapter slug (c021.5), not the /1.html tail, so the num
   -- extraction anchors at the end of the string
-  local pattern =
-    [[(?s)<a href="/manga/]] .. manga_id .. [[/(c[0-9.]+)/1\.html"[^>]*>.*?<p class="title2">([^<]+)</p>]]
+  local pattern = [[(?s)<a href="/manga/]] .. manga_id .. [[/(c[0-9.]+)/1\.html"[^>]*>.*?<p class="title2">([^<]+)</p>]]
   for _, r in ipairs(host.re2.find_all(pattern, html)) do
     local path, raw_date = r[2], r[3]
     local num = tonumber(path:match("c([0-9][0-9.]*)$"))
@@ -109,7 +119,9 @@ function util.parse_chapter_list(html, manga_id)
   end
 
   -- ascending for the reader (the source shipped newest-first)
-  table.sort(chapters, function(a, b) return a.number < b.number end)
+  table.sort(chapters, function(a, b)
+    return a.number < b.number
+  end)
   return chapters
 end
 
@@ -118,7 +130,9 @@ end
 
 local function unpack_packer(js)
   local m = host.re2.find([[(?s)\}\('(.*)',(\d+),\d+,'(.*)'\.split\('\|'\),0,\{\}\)]], js)
-  if not m or #m < 4 then return nil end
+  if not m or #m < 4 then
+    return nil
+  end
   local payload, base, words = m[2], m[3], m[4]
   local n = tonumber(base)
   local list = {}
@@ -146,12 +160,16 @@ local function unpack_packer(js)
       end
       digits = c .. digits
       x = math.floor(x / n)
-      if x == 0 then break end
+      if x == 0 then
+        break
+      end
     end
     return digits
   end
   local dict = {}
-  for i, w in ipairs(list) do dict[enc(i - 1)] = w end
+  for i, w in ipairs(list) do
+    dict[enc(i - 1)] = w
+  end
   return payload:gsub("%w+", dict)
 end
 
@@ -167,7 +185,9 @@ end
 local function chapter_num_suffix(chapter_id)
   local num = find1(chapter_id, [[c([0-9][0-9.]*)$]]) or ""
   local frac = find1(num, [[\.([0-9]+)$]])
-  if frac then return frac end
+  if frac then
+    return frac
+  end
   return "0"
 end
 
@@ -176,11 +196,17 @@ end
 function util.get_page_urls(get_body, chapter_id)
   local base = BASE .. "/manga/" .. chapter_id .. "/"
   local first = get_body(base .. "1.html")
-  if not first or first == "" then return nil end
+  if not first or first == "" then
+    return nil
+  end
   local cid = find1(first, [[var chapterid\s*=\s*([0-9]+);]])
   local total = tonumber(find1(first, [[var imagecount\s*=\s*(\d+);]]))
-  if not cid then return nil end
-  if not total or total < 1 then total = 1000 end
+  if not cid then
+    return nil
+  end
+  if not total or total < 1 then
+    total = 1000
+  end
 
   local suffix = chapter_num_suffix(chapter_id)
   local seen, urls = {}, {}
@@ -188,10 +214,15 @@ function util.get_page_urls(get_body, chapter_id)
   while #urls < total and k <= total do
     local packed = get_body(
       BASE .. "/manga/" .. chapter_id .. "/chapterfun.ashx?cid=" .. cid .. "&page=" .. tostring(k) .. "&key=",
-      { headers = { Referer = base .. tostring(math.ceil(k / 2)) .. ".html" } })
-    if not packed or packed == "" then break end
+      { headers = { Referer = base .. tostring(math.ceil(k / 2)) .. ".html" } }
+    )
+    if not packed or packed == "" then
+      break
+    end
     local js = unpack_packer(packed)
-    if not js then break end
+    if not js then
+      break
+    end
     -- re-insert the decimal suffix into the folder ("007." -> "007.5/")
     local pix = find1(js, [[pix="([^"]+)"]]) or ""
     pix = (pix:gsub("([0-9])%./", "%1." .. suffix .. "/", 1))

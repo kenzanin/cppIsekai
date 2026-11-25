@@ -9,8 +9,12 @@ local methods = {
 
 function handle(req)
   local fn = methods[req.method]
-  if not fn then return { ok = false, error = "asmodeus: unknown method " .. tostring(req.method) } end
+  if not fn then
+    return { ok = false, error = "asmodeus: unknown method " .. tostring(req.method) }
+  end
   local ok, res = pcall(fn, req.params or {})
-  if not ok then return { ok = false, error = "asmodeus: " .. tostring(res) } end
+  if not ok then
+    return { ok = false, error = "asmodeus: " .. tostring(res) }
+  end
   return res
 end

@@ -10,23 +10,15 @@ local OPTS = {
   headers = { Referer = SITE .. "/" },
 }
 
-
-
-
-
 local genre_map
-
 
 methods = {}
 
-
-
-
-
-
 local function get_json(path)
   local body, err = host.http.fetch_body(API .. path, OPTS)
-  if not body or body == "" then return nil, err end
+  if not body or body == "" then
+    return nil, err
+  end
   local ok, doc = pcall(json.decode, body)
   if not ok or type(doc) ~= "table" or doc.success ~= true then
     return nil, "mangak: bad envelope"
@@ -40,10 +32,14 @@ end
 
 local function names(list)
   local out = {}
-  if type(list) ~= "table" then return out end
+  if type(list) ~= "table" then
+    return out
+  end
   for _, v in ipairs(list) do
     local name = type(v) == "table" and (v.name or v.title) or v
-    if type(name) == "string" and name ~= "" then out[#out + 1] = host.text.unescape(name) end
+    if type(name) == "string" and name ~= "" then
+      out[#out + 1] = host.text.unescape(name)
+    end
   end
   return out
 end
@@ -53,7 +49,9 @@ local function epoch(v)
 end
 
 local function ensure_genres()
-  if genre_map then return genre_map end
+  if genre_map then
+    return genre_map
+  end
   genre_map = {}
   local data = get_json("/genres")
   if data and type(data.items) == "table" then
@@ -72,4 +70,14 @@ local function slug_of(id)
   return find1(id, [[/([^/?#]+)]]) or id
 end
 
-return { API=API, SITE=SITE, OPTS=OPTS, get_json=get_json, find1=find1, names=names, epoch=epoch, ensure_genres=ensure_genres, slug_of=slug_of }
+return {
+  API = API,
+  SITE = SITE,
+  OPTS = OPTS,
+  get_json = get_json,
+  find1 = find1,
+  names = names,
+  epoch = epoch,
+  ensure_genres = ensure_genres,
+  slug_of = slug_of,
+}

@@ -12,9 +12,13 @@ local comic_id = c.comic_id
 local genre_ids = c.genre_ids
 return function(params)
   local id = comic_id(params.id)
-  if id == "" then return { ok = true, data = {} } end
+  if id == "" then
+    return { ok = true, data = {} }
+  end
   local d, err = get_json("/comics/" .. host.url_encode(id) .. "/view")
-  if not d then return { ok = false, error = err } end
+  if not d then
+    return { ok = false, error = err }
+  end
   local out = {}
   for _, c in ipairs(d.news_chapters or {}) do
     if c.id then
@@ -28,6 +32,8 @@ return function(params)
       }
     end
   end
-  table.sort(out, function(a, b) return a.number < b.number end)
+  table.sort(out, function(a, b)
+    return a.number < b.number
+  end)
   return { ok = true, data = out }
 end

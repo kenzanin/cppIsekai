@@ -14,7 +14,9 @@ return function(params)
   local tags = params.tags or {}
   if type(tags) == "string" then
     local list = {}
-    for name in tags:gmatch("[^,]+") do list[#list + 1] = name end
+    for name in tags:gmatch("[^,]+") do
+      list[#list + 1] = name
+    end
     tags = list
   end
   local filter = ""
@@ -22,20 +24,28 @@ return function(params)
     local slugs = {}
     for _, name in ipairs(tags) do
       local slug = GENRE_SLUGS[name]
-      if slug then slugs[#slugs + 1] = slug end
+      if slug then
+        slugs[#slugs + 1] = slug
+      end
     end
     if #slugs > 0 then
       filter = " && genreIds:=[" .. table.concat(slugs, ",") .. "]"
     end
   end
-  local url = BASE .. "/collections/manga/documents/search?q="
+  local url = BASE
+    .. "/collections/manga/documents/search?q="
     .. host.url_encode(q ~= "" and q or "*")
-    .. "&filter_by=" .. host.url_encode(filter)
-    .. "&query_by=" .. host.url_encode("title,englishTitle,otherNames,authors")
-    .. "&page=" .. tostring(page)
+    .. "&filter_by="
+    .. host.url_encode(filter)
+    .. "&query_by="
+    .. host.url_encode("title,englishTitle,otherNames,authors")
+    .. "&page="
+    .. tostring(page)
     .. "&per_page=20"
   local data, err = get_json(url)
-  if err ~= nil then return { ok = false, error = err } end
+  if err ~= nil then
+    return { ok = false, error = err }
+  end
   local items = {}
   if type(data.hits) == "table" then
     for _, hit in ipairs(data.hits) do

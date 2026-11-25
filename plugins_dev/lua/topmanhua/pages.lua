@@ -17,7 +17,9 @@ return function(params)
   end
 
   local body, err = http_req(BASE .. "manhua/" .. host.url_encode(slug) .. "/" .. host.url_encode(cslug))
-  if err ~= nil then return { ok = false, error = err } end
+  if err ~= nil then
+    return { ok = false, error = err }
+  end
 
   -- attributes are single-quoted on this site; src == data-src and data-backup
   -- points at the second CDN. The images also need Referer: BASE (site root) —
@@ -25,12 +27,20 @@ return function(params)
   -- the reader's own referer handling covers it (host-gap, see report).
   local out = {}
   local srcs = host.html.attr(body, "img.wp-manga-chapter-img", "src")
-  if #srcs == 0 then srcs = host.html.attr(body, "img.wp-manga-chapter-img", "data-src") end
-  if #srcs == 0 then srcs = host.html.attr(body, "img.wp-manga-chapter-img", "data-backup") end
+  if #srcs == 0 then
+    srcs = host.html.attr(body, "img.wp-manga-chapter-img", "data-src")
+  end
+  if #srcs == 0 then
+    srcs = host.html.attr(body, "img.wp-manga-chapter-img", "data-backup")
+  end
   for _, s in ipairs(srcs) do
     local url = host.text.trim(s)
-    if url ~= "" then out[#out + 1] = url end
+    if url ~= "" then
+      out[#out + 1] = url
+    end
   end
-  if #out == 0 then return { ok = false, error = "topmanhua: no pages for " .. composite } end
+  if #out == 0 then
+    return { ok = false, error = "topmanhua: no pages for " .. composite }
+  end
   return { ok = true, data = out }
 end

@@ -10,9 +10,13 @@ local series_url = c.series_url
 return function(params)
   local slug = find1(params.id or "", [[^/([^/]+)]]) or tostring(params.id or "")
   local body, err = http_req(BASE .. "/?_chapters_html=1&series_slug=" .. host.url_encode(slug))
-  if not body or body == "" then return { ok = false, error = err } end
+  if not body or body == "" then
+    return { ok = false, error = err }
+  end
   local ok, doc = pcall(json.decode, body)
-  if not ok or type(doc) ~= "table" then return { ok = false, error = "asmodeus: bad chapters envelope" } end
+  if not ok or type(doc) ~= "table" then
+    return { ok = false, error = "asmodeus: bad chapters envelope" }
+  end
   local html = doc.rows_html or ""
   local hrefs = host.html.attr(html, "a.chapter-row[href]", "href") or {}
   local titles = host.html.attr(html, "a.chapter-row[href]", "data-title") or {}
@@ -28,6 +32,8 @@ return function(params)
       url = BASE .. href,
     }
   end
-  table.sort(out, function(a, b) return a.number < b.number end)
+  table.sort(out, function(a, b)
+    return a.number < b.number
+  end)
   return { ok = true, data = out }
 end

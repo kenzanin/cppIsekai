@@ -6,12 +6,26 @@ local initial_data, relative_to_iso = c.initial_data, c.relative_to_iso
 
 return function(params)
   local slug = params.id or ""
-  local empty = { id = slug, name = "", cover = "", status = "unknown", tags = {}, release_at = 0,
-    authors = {}, artists = {}, description = "", url = BASE .. "/title/" .. slug }
-  if slug == "" then return { ok = true, data = empty } end
+  local empty = {
+    id = slug,
+    name = "",
+    cover = "",
+    status = "unknown",
+    tags = {},
+    release_at = 0,
+    authors = {},
+    artists = {},
+    description = "",
+    url = BASE .. "/title/" .. slug,
+  }
+  if slug == "" then
+    return { ok = true, data = empty }
+  end
 
   local body, err = render(BASE .. "/title/" .. host.url_encode(slug))
-  if err ~= nil then return { ok = false, error = err } end
+  if err ~= nil then
+    return { ok = false, error = err }
+  end
 
   local raw = initial_data(body)
   if not raw then
@@ -30,7 +44,9 @@ return function(params)
         for _, g in ipairs(v.genres) do
           if type(g) == "table" then
             local name = g.title or g.slug or g.name
-            if type(name) == "string" then genres[#genres + 1] = name end
+            if type(name) == "string" then
+              genres[#genres + 1] = name
+            end
           elseif type(g) == "string" then
             genres[#genres + 1] = g
           end
@@ -44,8 +60,11 @@ return function(params)
       elseif type(v.poster) == "string" then
         cover = v.poster
       elseif type(v.poster) == "table" then
-        if type(v.poster.large) == "string" then cover = v.poster.large
-        elseif type(v.poster.medium) == "string" then cover = v.poster.medium end
+        if type(v.poster.large) == "string" then
+          cover = v.poster.large
+        elseif type(v.poster.medium) == "string" then
+          cover = v.poster.medium
+        end
       end
       local d = {
         id = slug,

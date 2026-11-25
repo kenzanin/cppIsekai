@@ -13,12 +13,15 @@ local search_url = c.search_url
 local parse_search = c.parse_search
 return function(params)
   local id = clean(params.id or params.slug or "")
-  if id == "" then return { ok = true, data = {} } end
+  if id == "" then
+    return { ok = true, data = {} }
+  end
   local html, err = get("/comic/" .. host.url_encode(id))
-  if not html then return { ok = false, error = "readcomiconline: chapters failed" .. (err and (": " .. err) or "") } end
+  if not html then
+    return { ok = false, error = "readcomiconline: chapters failed" .. (err and (": " .. err) or "") }
+  end
 
-  local pat = [[(?s)<a href="https://readcomicsonline\.ru/comic/]] .. id ..
-              [[/([0-9]+(?:\.[0-9]+)?)"[^>]*>(.*?)</a>]]
+  local pat = [[(?s)<a href="https://readcomicsonline\.ru/comic/]] .. id .. [[/([0-9]+(?:\.[0-9]+)?)"[^>]*>(.*?)</a>]]
   local out, seen = {}, {}
   for _, m in ipairs(all(html, pat)) do
     local num = tonumber(m[2])
@@ -34,6 +37,8 @@ return function(params)
       }
     end
   end
-  table.sort(out, function(a, b) return a.number < b.number end)
+  table.sort(out, function(a, b)
+    return a.number < b.number
+  end)
   return { ok = true, data = out }
 end

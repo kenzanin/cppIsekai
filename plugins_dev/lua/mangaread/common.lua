@@ -16,9 +16,6 @@ local function find1(s, pattern)
   return host.re2.capture(pattern, tostring(s or ""))
 end
 
-
 -- ── search ─────────────────────────────────────────────────────────────────
 
-
-
-return { BASE=BASE, GENRE_PATH=GENRE_PATH, http_req=http_req, find1=find1 }
+return { BASE = BASE, GENRE_PATH = GENRE_PATH, http_req = http_req, find1 = find1 }

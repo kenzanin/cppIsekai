@@ -16,7 +16,6 @@ local http_req = host.http.fetch_body -- (body, err); nil unless 200 (plugin-hos
 -- UTC midnight epoch for "YYYY-MM-DD" (Howard Hinnant's days-from-civil; the
 -- sandbox has no os lib). 0 when nothing parses.
 
-
 -- ── search ─────────────────────────────────────────────────────────────────
 
 -- The site has NO server-side search: /comics?search= ignores the param (the
@@ -25,18 +24,16 @@ local http_req = host.http.fetch_body -- (body, err); nil unless 200 (plugin-hos
 -- api.sanascans.com/api/query?searchTerm=&perPage=4), which also paginates.
 local API = "https://api.sanascans.com"
 
-
 -- ── detail ─────────────────────────────────────────────────────────────────
-
 
 -- ── chapters ───────────────────────────────────────────────────────────────
 
-
 -- ── pages ──────────────────────────────────────────────────────────────────
 
-
 local function slug_of(path)
-  if not path then return nil end
+  if not path then
+    return nil
+  end
   local s = string.match(path, "/series/([^/]+)") or path
   return string.match(s, "([^/?#]+)")
 end
@@ -47,7 +44,9 @@ end
 
 local function epoch_date(s)
   local y, m, d = tostring(s or ""):match("(%d%d%d%d)-(%d%d)-(%d%d)")
-  if not y then return 0 end
+  if not y then
+    return 0
+  end
   y, m, d = tonumber(y), tonumber(m), tonumber(d)
   local yy = y - (m <= 2 and 1 or 0)
   local era = math.floor(yy / 400)
@@ -57,4 +56,4 @@ local function epoch_date(s)
   return (era * 146097 + doe - 719468) * 86400
 end
 
-return { BASE=BASE, http_req=http_req, API=API, slug_of=slug_of, first_iso=first_iso, epoch_date=epoch_date }
+return { BASE = BASE, http_req = http_req, API = API, slug_of = slug_of, first_iso = first_iso, epoch_date = epoch_date }

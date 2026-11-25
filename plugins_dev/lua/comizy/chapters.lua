@@ -21,7 +21,7 @@ return function(params)
     return { ok = false, error = "comizy: chapters failed" }
   end
   local out = {}
-  for _, c in ipairs(((res.data or {}).chapters) or {}) do
+  for _, c in ipairs((res.data or {}).chapters or {}) do
     if c.slug then
       local title = c.name or c.slug
       out[#out + 1] = {

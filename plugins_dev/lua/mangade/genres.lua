@@ -12,6 +12,8 @@ local comic_id = c.comic_id
 local genre_ids = c.genre_ids
 return function()
   local data, err = get_json("/genres?size=500")
-  if not data then return { ok = false, error = err } end
+  if not data then
+    return { ok = false, error = err }
+  end
   return { ok = true, data = names(data.genres) }
 end

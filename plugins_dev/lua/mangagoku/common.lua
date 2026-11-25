@@ -19,9 +19,13 @@ end
 
 local function get_json(path)
   local body, err = http_req(path)
-  if not body or body == "" then return nil, err end
+  if not body or body == "" then
+    return nil, err
+  end
   local ok, doc = pcall(json.decode, body)
-  if not ok or type(doc) ~= "table" then return nil, "mangagoku: bad json" end
+  if not ok or type(doc) ~= "table" then
+    return nil, "mangagoku: bad json"
+  end
   return doc
 end
 
@@ -44,7 +48,9 @@ end
 
 local function search_page(q, page)
   local doc = get_json("/home/search/json?searchword=" .. host.url_encode(q) .. "&page=" .. page)
-  if type(doc) ~= "table" then return nil end
+  if type(doc) ~= "table" then
+    return nil
+  end
   return doc
 end
 
@@ -53,7 +59,9 @@ end
 local page_memo = {}
 local function paging(q)
   local cached = page_memo[q]
-  if cached then return cached.total, cached.pages end
+  if cached then
+    return cached.total, cached.pages
+  end
   local lo, hi = 1, 2
   if search_page(q, hi) then
     while hi < 256 and search_page(q, hi) do
@@ -62,7 +70,11 @@ local function paging(q)
     end
     while lo + 1 < hi do
       local mid = math.floor((lo + hi) / 2)
-      if search_page(q, mid) then lo = mid else hi = mid end
+      if search_page(q, mid) then
+        lo = mid
+      else
+        hi = mid
+      end
     end
   else
     lo = 1
@@ -77,21 +89,27 @@ end
 local function book_genres(body)
   local raw = find1(body, [==[(?s)"@type":"Book".*?"genre":\[([^\]]*)\]]==]) or ""
   local out = {}
-  for name in raw:gmatch('"([^"]+)"') do out[#out + 1] = clean(name) end
+  for name in raw:gmatch('"([^"]+)"') do
+    out[#out + 1] = clean(name)
+  end
   return out
 end
 
 local function book_description(body)
   local bs = body:find('"@type":"Book"', 1, true)
-  if not bs then return "" end
+  if not bs then
+    return ""
+  end
   local rest = body:sub(bs)
   local at = rest:find('"description":"', 1, true)
-  if not at then return "" end
+  if not at then
+    return ""
+  end
   local start = at + #'"description":"'
   local out, k = {}, start
   while k <= #rest do
     local c = rest:sub(k, k)
-    if c == '\\' then
+    if c == "\\" then
       out[#out + 1] = rest:sub(k, k + 1)
       k = k + 2
     elseif c == '"' then
@@ -108,6 +126,18 @@ end
 
 methods = {}
 
-
-
-return { SITE=SITE, OPTS=OPTS, http_req=http_req, get_json=get_json, find1=find1, clean=clean, epoch=epoch, slug_of=slug_of, search_page=search_page, page_memo=page_memo, paging=paging, book_genres=book_genres, book_description=book_description }
+return {
+  SITE = SITE,
+  OPTS = OPTS,
+  http_req = http_req,
+  get_json = get_json,
+  find1 = find1,
+  clean = clean,
+  epoch = epoch,
+  slug_of = slug_of,
+  search_page = search_page,
+  page_memo = page_memo,
+  paging = paging,
+  book_genres = book_genres,
+  book_description = book_description,
+}

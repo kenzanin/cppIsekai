@@ -19,7 +19,9 @@ end
 -- host.http.fetch (headers = {...} for the chapterfun Referer).
 function util.http_body(url, opts)
   local b = host.http.fetch_body(url, opts)
-  if b == nil or b == "" then return nil end
+  if b == nil or b == "" then
+    return nil
+  end
   return b
 end
 
@@ -32,8 +34,12 @@ function util.parse_search(html)
 
   local function add(slug, title, cover)
     -- tonumber() rejects numeric redirect slugs like "10891".
-    if not slug or slug == "" or tonumber(slug) ~= nil then return end
-    if seen[slug] then return end
+    if not slug or slug == "" or tonumber(slug) ~= nil then
+      return
+    end
+    if seen[slug] then
+      return
+    end
     seen[slug] = true
     results[#results + 1] = {
       id = slug,
@@ -42,8 +48,7 @@ function util.parse_search(html)
     }
   end
 
-  for _, m in ipairs(host.re2.find_all(
-    [[href="(/manga/[^"/]+/)" title="([^"]+)">\s*<img[^>]*src="([^"]+)"]], html)) do
+  for _, m in ipairs(host.re2.find_all([[href="(/manga/[^"/]+/)" title="([^"]+)">\s*<img[^>]*src="([^"]+)"]], html)) do
     add(cap([[^/manga/([^/]+)/]], m[2]), m[3], m[4])
   end
   for _, m in ipairs(host.re2.find_all([[href="(/manga/[^"/]+/)" title="([^"]+)"]], html)) do
@@ -65,22 +70,24 @@ function util.parse_manga_detail(html, manga_id)
   -- the protocol-relative URL.
   local cover = cap([[<img src="([^"]+)"[^>]*class="detail-cover"]], html) or ""
   cover = host.text.unescape(cover)
-  if cover:sub(1, 2) == "//" then cover = "https:" .. cover end
+  if cover:sub(1, 2) == "//" then
+    cover = "https:" .. cover
+  end
 
   -- Author(s) share a <p> with Artist(s): cut at <br or end of paragraph.
-  local author = host.text.strip_html(
-    cap([[Author\(s\):\s*(.-)(?:<br|</p>)]], html) or "")
+  local author = host.text.strip_html(cap([[Author\(s\):\s*(.-)(?:<br|</p>)]], html) or "")
 
   local status = host.text.normalize_status(cap([[Status:\s*([^<]+)<]], html) or "")
 
-  local description = host.text.strip_html(
-    cap([[(?s)<div class="manga-summary">(.*?)</div>]], html) or "")
+  local description = host.text.strip_html(cap([[(?s)<div class="manga-summary">(.*?)</div>]], html) or "")
 
   local genres = {}
   local genre_block = cap([[(?s)<div class="manga-genres">(.*?)</div>]], html) or ""
   for _, m in ipairs(host.re2.find_all([[<a[^>]*>(.*?)</a>]], genre_block)) do
     local fname = host.text.strip_html(m[2])
-    if fname ~= "" then genres[#genres + 1] = fname end
+    if fname ~= "" then
+      genres[#genres + 1] = fname
+    end
   end
 
   return {
@@ -123,7 +130,9 @@ function util.parse_chapter_list(html, manga_id)
   end
 
   -- newest-first house order regardless of DOM order
-  table.sort(chapters, function(a, b) return a.number > b.number end)
+  table.sort(chapters, function(a, b)
+    return a.number > b.number
+  end)
   return chapters
 end
 
@@ -138,7 +147,9 @@ local function unpack_packer(js)
   -- }('PAYLOAD',BASE,COUNT,'w|w'.split('|'),0,{})
   local m = host.re2.find([[(?s)\}\('(.*)',(\d+),\d+,'(.*)'\.split\('\|'\),0,\{\}\)]], js)
   local payload, base, words = m[2], m[3], m[4]
-  if payload == nil then return nil end
+  if payload == nil then
+    return nil
+  end
   local n = tonumber(base)
   local list, start = {}, 1
   while true do
@@ -164,12 +175,16 @@ local function unpack_packer(js)
       end
       digits = c .. digits
       x = math.floor(x / n)
-      if x == 0 then break end
+      if x == 0 then
+        break
+      end
     end
     return digits
   end
   local dict = {}
-  for i, w in ipairs(list) do dict[enc(i - 1)] = w end
+  for i, w in ipairs(list) do
+    dict[enc(i - 1)] = w
+  end
   return payload:gsub("%w+", dict)
 end
 
@@ -189,26 +204,36 @@ end
 function util.get_page_urls(chapter_id)
   local base = "https://fanfox.net/manga/" .. chapter_id .. "/"
   local first = util.http_body(base .. "1.html")
-  if not first then return nil end
+  if not first then
+    return nil
+  end
 
   local cid = cap([[var chapterid\s*=\s*([0-9]+);]], first)
   local total = tonumber(cap([[var imagecount\s*=\s*(\d+);]], first))
-  if cid == nil then return nil end
-  if total == nil or total < 1 then total = 1000 end
+  if cid == nil then
+    return nil
+  end
+  if total == nil or total < 1 then
+    total = 1000
+  end
 
   local suffix = chapter_num_suffix(chapter_id)
   local seen, urls, k = {}, {}, 1
   while #urls < total and k <= total do
     local packed = util.http_body(
       "https://fanfox.net/chapterfun.ashx?cid=" .. cid .. "&page=" .. tostring(k) .. "&key=",
-      { headers = { Referer = base .. tostring(math.ceil(k / 2)) .. ".html" } })
-    if not packed then break end
+      { headers = { Referer = base .. tostring(math.ceil(k / 2)) .. ".html" } }
+    )
+    if not packed then
+      break
+    end
     local js = unpack_packer(packed)
-    if js == nil then break end
+    if js == nil then
+      break
+    end
     -- re-insert the truncated decimal into the folder ("02-008." ->
     -- "02-008.5"); the /compressed tail stays after it
-    local pix = (cap([[pix="([^"]+)"]], js) or "")
-      :gsub("([0-9])%./", "%1." .. suffix .. "/", 1)
+    local pix = (cap([[pix="([^"]+)"]], js) or ""):gsub("([0-9])%./", "%1." .. suffix .. "/", 1)
     for _, fm in ipairs(host.re2.find_all([["(/[^"]+\.jpg[^"]*)"]], js)) do
       local fname = fm[2]
       if not seen[fname] then

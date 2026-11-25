@@ -18,19 +18,31 @@ local GENRE_IDS = c.GENRE_IDS
 local cover_of = c.cover_of
 return function(params)
   local hid = params.id or ""
-  if hid == "" then return { ok = false, error = "mangafire: missing id" } end
+  if hid == "" then
+    return { ok = false, error = "mangafire: missing id" }
+  end
   local url, verr = vrf_url("/titles/" .. hid, nil)
-  if verr ~= nil then return { ok = false, error = verr } end
+  if verr ~= nil then
+    return { ok = false, error = verr }
+  end
   local body, err = http_get(url)
-  if err ~= nil then return { ok = false, error = err } end
+  if err ~= nil then
+    return { ok = false, error = err }
+  end
   local d = type(body) == "table" and body.data
-  if type(d) ~= "table" then return { ok = false, error = "mangafire: no title data for " .. hid } end
+  if type(d) ~= "table" then
+    return { ok = false, error = "mangafire: no title data for " .. hid }
+  end
   local genre_names, authors = {}, {}
   for _, g in ipairs(d.genres or {}) do
-    if type(g) == "table" and g.title then genre_names[#genre_names + 1] = g.title end
+    if type(g) == "table" and g.title then
+      genre_names[#genre_names + 1] = g.title
+    end
   end
   for _, a in ipairs(d.authors or {}) do
-    if type(a) == "table" and a.title then authors[#authors + 1] = a.title end
+    if type(a) == "table" and a.title then
+      authors[#authors + 1] = a.title
+    end
   end
   return {
     ok = true,

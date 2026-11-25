@@ -13,17 +13,24 @@ local search_url = c.search_url
 local parse_search = c.parse_search
 return function(params)
   local id = clean(params.id or params.slug or "")
-  if id == "" then return { ok = true, data = {} } end
+  if id == "" then
+    return { ok = true, data = {} }
+  end
   local html, err = get("/comic/" .. host.url_encode(id))
-  if not html then return { ok = false, error = "readcomiconline: detail failed" .. (err and (": " .. err) or "") } end
+  if not html then
+    return { ok = false, error = "readcomiconline: detail failed" .. (err and (": " .. err) or "") }
+  end
 
   local raw_name = find1(html, [[(?s)<h1[^>]*>([^<]+)</h1>]]) or ""
   local tags = {}
-  for _, m in ipairs(all(html, [[<a href="https://readcomicsonline\.ru/comic-list/category/[^"]+"[^>]*>([^<]+)</a>]]) ) do
+  for _, m in ipairs(all(html, [[<a href="https://readcomicsonline\.ru/comic-list/category/[^"]+"[^>]*>([^<]+)</a>]])) do
     local name = clean(m[2])
-    if name ~= "" then tags[#tags + 1] = name end
+    if name ~= "" then
+      tags[#tags + 1] = name
+    end
   end
-  local synopsis = find1(html, [[(?s)Synopsis</h3>.*?<p class="text-sm leading-relaxed text-slate-300">(.*?)</p>]]) or ""
+  local synopsis = find1(html, [[(?s)Synopsis</h3>.*?<p class="text-sm leading-relaxed text-slate-300">(.*?)</p>]])
+    or ""
 
   return {
     ok = true,

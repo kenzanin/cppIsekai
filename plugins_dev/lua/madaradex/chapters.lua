@@ -12,9 +12,13 @@ local img_src = c.img_src
 local genre_map = c.genre_map
 return function(params)
   local slug = host.text.trim(tostring(params.id or ""))
-  if slug == "" then return { ok = true, data = {} } end
+  if slug == "" then
+    return { ok = true, data = {} }
+  end
   local body, err = http_req(manga_url(slug))
-  if err ~= nil then return { ok = false, error = err } end
+  if err ~= nil then
+    return { ok = false, error = err }
+  end
 
   local chapters, seen = {}, {}
   for _, m in ipairs(host.re2.find_all([[(?s)<li[^>]*class="wp-manga-chapter[^"]*"[^>]*>(.*?)</li>]], body)) do
@@ -33,6 +37,8 @@ return function(params)
       }
     end
   end
-  table.sort(chapters, function(a, b) return (a.number or 0) < (b.number or 0) end)
+  table.sort(chapters, function(a, b)
+    return (a.number or 0) < (b.number or 0)
+  end)
   return { ok = true, data = chapters }
 end

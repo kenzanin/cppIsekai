@@ -17,11 +17,15 @@ local gqlError = nil
 
 -- base64url (unpadded, MangaHub blob/key convention) -> lowercase hex.
 local function b64url_hex(s)
-  if type(s) ~= "string" or s == "" then return nil end
+  if type(s) ~= "string" or s == "" then
+    return nil
+  end
   local b = s:gsub("%-", "+"):gsub("_", "/")
   b = b .. string.rep("=", (4 - #b % 4) % 4)
   local raw = host.codecs.base64_decode(b)
-  if not raw then return nil end
+  if not raw then
+    return nil
+  end
   return host.codecs.hex_encode(raw)
 end
 
@@ -37,10 +41,14 @@ local function fetch_access_key(ctx, slug, chid)
       ["Cookie"] = "mhub_access=0000000000000000000000000000cafe",
     },
   })
-  if err ~= nil or not res then return nil end
+  if err ~= nil or not res then
+    return nil
+  end
   local cookie = (res.headers and res.headers["set-cookie"]) or ""
   local key = host.re2.capture([[mhub_access=([^;]+)]], cookie)
-  if not key or key == "" then return nil end
+  if not key or key == "" then
+    return nil
+  end
   return key
 end
 
@@ -58,9 +66,13 @@ local function encrypted_page_list(ctx, blob, slug, chid)
     local key = cachedKey
     if not key then
       key = fetch_access_key(ctx, slug, chid)
-      if key then cachedKey = key end
+      if key then
+        cachedKey = key
+      end
     end
-    if not key then return nil, "upstream_auth_failed" end
+    if not key then
+      return nil, "upstream_auth_failed"
+    end
     local res, err = host.http.fetch(ctx.BASE .. "/api/chapter-crypto", {
       headers = {
         ["Cookie"] = "mhub_access=" .. key,
@@ -69,8 +81,7 @@ local function encrypted_page_list(ctx, blob, slug, chid)
       },
     })
     if err ~= nil or not res or res.status ~= 200 then
-      return nil, "upstream_auth_failed: crypto endpoint status "
-        .. tostring(err or (res and res.status) or 0)
+      return nil, "upstream_auth_failed: crypto endpoint status " .. tostring(err or (res and res.status) or 0)
     end
     local ok, parsed = pcall(json.decode, res.body)
     if not ok or type(parsed) ~= "table" or not parsed.key or not parsed.keyId then
@@ -93,16 +104,24 @@ local function encrypted_page_list(ctx, blob, slug, chid)
     cachedKey = nil
     mat, why = material()
   end
-  if not mat then return nil, tostring(why or "upstream_auth_failed") end
-  if mat.keyId ~= keyId then return nil, "decrypt_key_mismatch" end
+  if not mat then
+    return nil, tostring(why or "upstream_auth_failed")
+  end
+  if mat.keyId ~= keyId then
+    return nil, "decrypt_key_mismatch"
+  end
 
   local iv_h = b64url_hex(iv)
   local ct_h = b64url_hex(ciphertext)
   local tag_h = b64url_hex(tag)
   local key_h = b64url_hex(tostring(mat.key))
-  if not iv_h or not ct_h or not tag_h or not key_h then return nil, "decrypt_failed" end
+  if not iv_h or not ct_h or not tag_h or not key_h then
+    return nil, "decrypt_failed"
+  end
   local plain = host.crypto.aes_gcm_decrypt(iv_h, ct_h, tag_h, key_h)
-  if not plain then return nil, "decrypt_failed" end
+  if not plain then
+    return nil, "decrypt_failed"
+  end
   local ok, decoded = pcall(json.decode, plain)
   if not ok or type(decoded) ~= "table" or type(decoded.p) ~= "string" or type(decoded.i) ~= "table" then
     return nil, "decrypt_failed"
@@ -126,7 +145,9 @@ local function graphql(ctx, gql, slug, chid)
     local key = cachedKey
     if not key then
       key = fetch_access_key(ctx, slug, chid)
-      if key then cachedKey = key end
+      if key then
+        cachedKey = key
+      end
     end
     if not key then
       host.log.error("1manga: no mhub_access key available")
@@ -185,9 +206,12 @@ return function(ctx)
     -- The GraphQL number argument is numeric: normalize "07" -> 7, keep 12.5.
     local num = tostring(tonumber(string.match(chid, "chapter%-(.+)$")) or 0)
 
-    local chapter = graphql(ctx,
-      '{chapter(x: ' .. SOURCE .. ', slug: "' .. escape_gql(slug) .. '", number: ' .. num .. ') {pages}}',
-      slug, chid)
+    local chapter = graphql(
+      ctx,
+      "{chapter(x: " .. SOURCE .. ', slug: "' .. escape_gql(slug) .. '", number: ' .. num .. ") {pages}}",
+      slug,
+      chid
+    )
     if not chapter then
       -- A refusal must fail loudly: an empty list renders a blank chapter.
       if gqlError then

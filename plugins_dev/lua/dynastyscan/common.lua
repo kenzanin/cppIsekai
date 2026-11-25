@@ -7,9 +7,6 @@ local BASE = "https://dynasty-scans.com" -- single-domain; main.json param kept 
 -- host.text.trim: utf8-aware, case-preserving (plugin-host-promotion).
 local trim = host.text.trim
 
-
-
-
 -- ── search ─────────────────────────────────────────────────────────────────
 -- No /search.json: search (and genre browse) scrape HTML. Tag archives need
 -- view=groupings or only /chapters links appear and the series match finds
@@ -32,10 +29,14 @@ local function get_json(url)
 end
 
 local function absolute(path)
-  if path == nil or path == "" then return "" end
+  if path == nil or path == "" then
+    return ""
+  end
   local p = tostring(path)
-  if p:match("^https?://") then return p end
+  if p:match("^https?://") then
+    return p
+  end
   return BASE .. p
 end
 
-return { BASE=BASE, trim=trim, get_json=get_json, absolute=absolute }
+return { BASE = BASE, trim = trim, get_json = get_json, absolute = absolute }

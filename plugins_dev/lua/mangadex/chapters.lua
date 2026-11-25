@@ -11,9 +11,13 @@ local canonical_manga = c.canonical_manga
 local tag_ids = c.tag_ids
 return function(params)
   -- MangaDex wants array-style params: translatedLanguage[]=en, order[chapter]=asc.
-  local body, err = get("/manga/" .. (params.id or "") .. "/feed",
-    { ["translatedLanguage[]"] = params.lang or "en", limit = params.limit or 100, ["order[chapter]"] = "asc" })
-  if err ~= nil then return { ok = false, error = err } end
+  local body, err = get(
+    "/manga/" .. (params.id or "") .. "/feed",
+    { ["translatedLanguage[]"] = params.lang or "en", limit = params.limit or 100, ["order[chapter]"] = "asc" }
+  )
+  if err ~= nil then
+    return { ok = false, error = err }
+  end
   local out = {}
   for _, c in ipairs(body.data or {}) do
     local attrs = c.attributes or {}

@@ -15,7 +15,9 @@ return function(params)
   local genres = params.tags or params.genres or {}
   if type(genres) == "string" then
     local list = {}
-    for name in genres:gmatch("[^,]+") do list[#list + 1] = host.text.trim(name) end
+    for name in genres:gmatch("[^,]+") do
+      list[#list + 1] = host.text.trim(name)
+    end
     genres = list
   end
 
@@ -29,15 +31,21 @@ return function(params)
       gurl = BASE .. "manhua-genre/" .. gslug .. "/page/" .. page .. "/?orderby=latest"
     end
     local body, err = http_req(gurl)
-    if err ~= nil then return { ok = false, error = err } end
+    if err ~= nil then
+      return { ok = false, error = err }
+    end
     local items = parse_genre_cards(body)
     return { ok = true, data = { items = items, total = #items } }
   end
 
   local body, err = search_json(q)
-  if err ~= nil then return { ok = false, error = err } end
+  if err ~= nil then
+    return { ok = false, error = err }
+  end
   local ok, decoded = pcall(json.decode, body)
-  if not ok or type(decoded) ~= "table" then return { ok = true, data = { items = {}, total = 0 } } end
+  if not ok or type(decoded) ~= "table" then
+    return { ok = true, data = { items = {}, total = 0 } }
+  end
 
   -- max 6 hits; the page param is ignored by the endpoint (the host paginates).
   local items = {}
@@ -51,4 +59,3 @@ return function(params)
 end
 
 -- ── detail ─────────────────────────────────────────────────────────────────
-

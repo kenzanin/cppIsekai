@@ -21,28 +21,26 @@ local http_req = host.http.fetch_body
 
 -- first capture group of the first match; nil when the pattern does not match.
 
-
 -- ── search ─────────────────────────────────────────────────────────────────
-
 
 -- ── detail ─────────────────────────────────────────────────────────────────
 
-
 -- ── chapters ───────────────────────────────────────────────────────────────
-
 
 -- ── pages ──────────────────────────────────────────────────────────────────
 
-
 -- ── genres ─────────────────────────────────────────────────────────────────
-
 
 local function chapter_num(s)
   s = tostring(s or "")
   local n = s:match("(%d+%.?%d*)%s*$")
-  if n then return tonumber(n) end
+  if n then
+    return tonumber(n)
+  end
   n = s:match("[Cc]hapter%s+(%d+%.?%d*)")
-  if n then return tonumber(n) end
+  if n then
+    return tonumber(n)
+  end
   return 0
 end
 
@@ -54,4 +52,14 @@ local function find1(s, pattern)
   return host.re2.capture(pattern, tostring(s or ""))
 end
 
-return { BASE=BASE, trim=trim, unescape=unescape, strip_html=strip_html, normalize_status=normalize_status, http_req=http_req, chapter_num=chapter_num, find_all=find_all, find1=find1 }
+return {
+  BASE = BASE,
+  trim = trim,
+  unescape = unescape,
+  strip_html = strip_html,
+  normalize_status = normalize_status,
+  http_req = http_req,
+  chapter_num = chapter_num,
+  find_all = find_all,
+  find1 = find1,
+}

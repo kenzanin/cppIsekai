@@ -18,5 +18,18 @@ local GENRES = {
   { name = "Tragedy", slug = "5" },
 }
 local GENRE_MAP = {}
-for _, g in ipairs(GENRES) do GENRE_MAP[g.name] = g.slug end
-return { list = GENRES, map = GENRE_MAP, names = (function() local n = {} for _, g in ipairs(GENRES) do n[#n+1] = g.name end table.sort(n) return n end)() }
+for _, g in ipairs(GENRES) do
+  GENRE_MAP[g.name] = g.slug
+end
+return {
+  list = GENRES,
+  map = GENRE_MAP,
+  names = (function()
+    local n = {}
+    for _, g in ipairs(GENRES) do
+      n[#n + 1] = g.name
+    end
+    table.sort(n)
+    return n
+  end)(),
+}

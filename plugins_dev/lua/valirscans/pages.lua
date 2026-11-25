@@ -12,13 +12,13 @@ return function(params)
     return { ok = false, error = "valirscans: chapter id must be slug:N, got " .. composite }
   end
   local html, err = http_req(BASE .. "/series/comic/" .. manga_id .. "/chapter/" .. num)
-  if err ~= nil then return { ok = false, error = err } end
+  if err ~= nil then
+    return { ok = false, error = err }
+  end
 
   -- Page images are direct media.valirscans.org URLs in reading order; dedupe
   -- keeps order (a chapter cover can repeat via srcset).
-  local pat = [[(https://media\.valirscans\.org/series/]]
-    .. host.re2.quote(manga_id)
-    .. [[/\d+/p-[^"\\]+\.webp)]]
+  local pat = [[(https://media\.valirscans\.org/series/]] .. host.re2.quote(manga_id) .. [[/\d+/p-[^"\\]+\.webp)]]
   local out, seen = {}, {}
   for _, m in ipairs(host.re2.find_all(pat, html)) do
     if m[1] ~= "" and not seen[m[1]] then
@@ -26,6 +26,8 @@ return function(params)
       out[#out + 1] = m[1]
     end
   end
-  if #out == 0 then return { ok = false, error = "valirscans: no pages for " .. composite } end
+  if #out == 0 then
+    return { ok = false, error = "valirscans: no pages for " .. composite }
+  end
   return { ok = true, data = out }
 end

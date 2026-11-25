@@ -11,29 +11,21 @@ local BASE = "https://readcomicsonline.ru"
 local UA = config.get("user_agent") or ""
 local COOKIE = config.get("cookie") or ""
 local OPTS = { timeout_ms = 60000, user_agent = UA }
-if COOKIE ~= "" then OPTS.headers = { Cookie = COOKIE } end
-
-
-
-
-
+if COOKIE ~= "" then
+  OPTS.headers = { Cookie = COOKIE }
+end
 
 -- Category options are publishers, not story genres. Keep the site's own
 -- name->id map so a UI tag selection can build the numeric ?category= filter.
 local cat_map, cat_names
 
-
-
 methods = {}
-
-
-
-
-
 
 local function get(path)
   local body, err = host.http.fetch_body(BASE .. path, OPTS)
-  if not body or body == "" then return nil, err end
+  if not body or body == "" then
+    return nil, err
+  end
   if body:find("Just a moment", 1, true) then
     return nil, "Cloudflare challenge — run scripts/refresh-rco-cookie.py"
   end
@@ -57,10 +49,12 @@ local function epoch(s)
 end
 
 local function categories(html)
-  if cat_map then return cat_map, cat_names end
+  if cat_map then
+    return cat_map, cat_names
+  end
   cat_map, cat_names = {}, {}
   local block = find1(html, [[(?s)<select name="category"[^>]*>(.*?)</select>]]) or ""
-  for _, m in ipairs(all(block, [[<option value="([0-9]+)"[^>]*>([^<]+)</option>]]) ) do
+  for _, m in ipairs(all(block, [[<option value="([0-9]+)"[^>]*>([^<]+)</option>]])) do
     local id, name = m[2], clean(m[3])
     if id ~= "" and name ~= "" then
       cat_map[name] = id
@@ -75,7 +69,9 @@ local function search_url(q, tags)
   local category = ""
   if type(tags) == "string" then
     local list = {}
-    for name in tags:gmatch("[^,]+") do list[#list + 1] = clean(name) end
+    for name in tags:gmatch("[^,]+") do
+      list[#list + 1] = clean(name)
+    end
     tags = list
   end
   if type(tags) == "table" and #tags > 0 then
@@ -83,13 +79,13 @@ local function search_url(q, tags)
     local map = categories(form)
     category = map[tags[1]] or map[tostring(tags[1]):lower()] or ""
   end
-  return "/advanced-search?name=" .. host.url_encode(q) ..
-         "&status_id=&type_id=&category=" .. host.url_encode(category)
+  return "/advanced-search?name=" .. host.url_encode(q) .. "&status_id=&type_id=&category=" .. host.url_encode(category)
 end
 
 local function parse_search(html)
   local items = {}
-  local pat = [[(?s)<a href="https://readcomicsonline\.ru/comic/([^"]+)" class="group">.*?<div class="rc-cover"><img[^>]+src="([^"]+)".*?<p[^>]*>([^<]+)</p>]]
+  local pat =
+    [[(?s)<a href="https://readcomicsonline\.ru/comic/([^"]+)" class="group">.*?<div class="rc-cover"><img[^>]+src="([^"]+)".*?<p[^>]*>([^<]+)</p>]]
   for _, m in ipairs(all(html, pat)) do
     local slug, cover, name = m[2], m[3], clean(m[4])
     if slug ~= "" and name ~= "" then
@@ -104,4 +100,17 @@ local function parse_search(html)
   return items
 end
 
-return { BASE=BASE, UA=UA, COOKIE=COOKIE, OPTS=OPTS, get=get, find1=find1, all=all, clean=clean, epoch=epoch, categories=categories, search_url=search_url, parse_search=parse_search }
+return {
+  BASE = BASE,
+  UA = UA,
+  COOKIE = COOKIE,
+  OPTS = OPTS,
+  get = get,
+  find1 = find1,
+  all = all,
+  clean = clean,
+  epoch = epoch,
+  categories = categories,
+  search_url = search_url,
+  parse_search = parse_search,
+}

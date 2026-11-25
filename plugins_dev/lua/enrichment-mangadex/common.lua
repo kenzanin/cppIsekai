@@ -11,33 +11,30 @@ local SITE = "https://mangadex.org"
 
 local PREFERRED = { "en", "ja-ro", "ko-ro", "ja", "ko" }
 
-
-
 -- strip markdown/link soup from synopsis (simple: drop URLs, collapse space)
 
 -- find a single candidate record by title: search ranking is not trusted, so
 -- score by normalized exact/substring match on main + alt titles.
-
-
-
-
 
 -- recommendations: reuse the source plugin's approach on the matched record:
 -- MangaDex recommendation endpoint gives scored pairs; the OTHER manga is the candidate.
 
 -- main title + localized alTitles, one {title, lang} entry each; no de-dupe here (host merges)
 
-
-
-
 local function pick(map)
-  if type(map) ~= "table" then return "" end
+  if type(map) ~= "table" then
+    return ""
+  end
   for _, lang in ipairs(PREFERRED) do
     local v = map[lang]
-    if type(v) == "string" and v ~= "" then return v end
+    if type(v) == "string" and v ~= "" then
+      return v
+    end
   end
   for _, v in pairs(map) do
-    if type(v) == "string" and v ~= "" then return v end
+    if type(v) == "string" and v ~= "" then
+      return v
+    end
   end
   return ""
 end
@@ -53,9 +50,13 @@ local function get(url)
   end
   local ct = (res.headers and res.headers["content-type"]) or "?"
   host.log.debug("GET " .. url .. " -> " .. tostring(res.status) .. " len=" .. #(res.body or "") .. " ct=" .. ct)
-  if not res or res.status ~= 200 then return nil end
+  if not res or res.status ~= 200 then
+    return nil
+  end
   local ok, body = pcall(json.decode, res.body)
-  if not ok or type(body) ~= "table" then return nil end
+  if not ok or type(body) ~= "table" then
+    return nil
+  end
   return body
 end
 
@@ -74,32 +75,46 @@ end
 
 local function best_record(query)
   local q = normalize(query)
-  if q == "" then return nil end
-  local enc = query:gsub("([^%w%-%._~])", function(c) return string.format("%%%02X", c:byte()) end)
+  if q == "" then
+    return nil
+  end
+  local enc = query:gsub("([^%w%-%._~])", function(c)
+    return string.format("%%%02X", c:byte())
+  end)
   -- brackets/includes must be percent-encoded or the MangaDex API returns an empty collection
   local url = string.format(
     "%s/manga?limit=10&order%%5Brelevance%%5D=desc&title=%s&includes%%5B%%5D=author&includes%%5B%%5D=artist&includes%%5B%%5D=tag&includes%%5B%%5D=cover_art",
-    API, enc
+    API,
+    enc
   )
   local body = get(url)
-  if not body or type(body.data) ~= "table" then return nil end
+  if not body or type(body.data) ~= "table" then
+    return nil
+  end
   local best, bestScore
   for _, rec in ipairs(body.data) do
     local attrs = rec.attributes or {}
     local candidates = { pick(attrs.title) }
-    for _, alt in ipairs(attrs.altTitles or {}) do candidates[#candidates + 1] = pick(alt) end
+    for _, alt in ipairs(attrs.altTitles or {}) do
+      candidates[#candidates + 1] = pick(alt)
+    end
     for _, c in ipairs(candidates) do
       local n = normalize(c)
       if n ~= "" then
         local score
-        if n == q then score = 100
-        elseif n:find(q, 1, true) then score = 60
-        elseif q:find(n, 1, true) then score = 40
+        if n == q then
+          score = 100
+        elseif n:find(q, 1, true) then
+          score = 60
+        elseif q:find(n, 1, true) then
+          score = 40
         end
         if score then
           local lenPenalty = math.abs(#q - #n)
           score = score - lenPenalty * 0.05
-          if bestScore == nil or score > bestScore then best, bestScore = rec, score end
+          if bestScore == nil or score > bestScore then
+            best, bestScore = rec, score
+          end
         end
       end
     end
@@ -118,7 +133,10 @@ local function extract_tags(rec)
     local grp = attrs.group
     if grp == "genre" or grp == "theme" or grp == "format" then
       local name = pick(attrs.name)
-      if name ~= "" and not seen[name] then seen[name] = true; out[#out + 1] = name end
+      if name ~= "" and not seen[name] then
+        seen[name] = true
+        out[#out + 1] = name
+      end
     end
   end
   return out
@@ -129,7 +147,10 @@ local function extract_names(rec, want)
   for _, rel in ipairs(rec.relationships or {}) do
     if rel.type == want then
       local name = rel.attributes and rel.attributes.name or ""
-      if name ~= "" and not seen[name] then seen[name] = true; out[#out + 1] = name end
+      if name ~= "" and not seen[name] then
+        seen[name] = true
+        out[#out + 1] = name
+      end
     end
   end
   return out
@@ -137,14 +158,19 @@ end
 
 local function cover_urls(rec)
   local id = rec.id
-  if not id then return {} end
+  if not id then
+    return {}
+  end
   local out, seen = {}, {}
   -- primary cover from relationships (if included inline)
   for _, rel in ipairs(rec.relationships or {}) do
     if rel.type == "cover_art" and rel.attributes and rel.attributes.fileName then
       local f = rel.attributes.fileName
       local url = string.format("%s/covers/%s/%s", CDN, id, f)
-      if not seen[url] then seen[url] = true; out[#out + 1] = url end
+      if not seen[url] then
+        seen[url] = true
+        out[#out + 1] = url
+      end
     end
   end
   -- full cover catalogue (all editions) — no client-side cap: fetch the whole catalogue
@@ -160,15 +186,25 @@ local function cover_urls(rec)
         if not seen[url] then
           seen[url] = true
           local loc = attrs.locale or ""
-          if loc == "en" then en[#en + 1] = url
-          elseif loc == "ja" then ja[#ja + 1] = url
-          else rest[#rest + 1] = url end
+          if loc == "en" then
+            en[#en + 1] = url
+          elseif loc == "ja" then
+            ja[#ja + 1] = url
+          else
+            rest[#rest + 1] = url
+          end
         end
       end
     end
-    for _, u in ipairs(en) do out[#out + 1] = u end
-    for _, u in ipairs(ja) do out[#out + 1] = u end
-    for _, u in ipairs(rest) do out[#out + 1] = u end
+    for _, u in ipairs(en) do
+      out[#out + 1] = u
+    end
+    for _, u in ipairs(ja) do
+      out[#out + 1] = u
+    end
+    for _, u in ipairs(rest) do
+      out[#out + 1] = u
+    end
   end
   return out
 end
@@ -189,16 +225,24 @@ local function build_recommendations(rec)
       end
     end
   end
-  table.sort(scored, function(a, b) return a.score > b.score end)
+  table.sort(scored, function(a, b)
+    return a.score > b.score
+  end)
   -- no cap: return every recommended manga, highest score first
-  if #scored == 0 then return { ok = true, data = { items = {} } } end
+  if #scored == 0 then
+    return { ok = true, data = { items = {} } }
+  end
   local ids = {}
-  for _, s in ipairs(scored) do ids[#ids + 1] = s.id end
+  for _, s in ipairs(scored) do
+    ids[#ids + 1] = s.id
+  end
   local ids_q = table.concat(ids, "&ids[]=")
   local bbody = get(string.format("%s/manga?limit=100&ids[]=%s&includes[]=cover_art", API, ids_q))
   local by_id = {}
   if bbody and type(bbody.data) == "table" then
-    for _, m in ipairs(bbody.data) do by_id[m.id] = m end
+    for _, m in ipairs(bbody.data) do
+      by_id[m.id] = m
+    end
   end
   local items = {}
   for _, s in ipairs(scored) do
@@ -219,12 +263,16 @@ local function alt_titles(rec)
   local main = attrs.title or {}
   if type(main) == "table" then
     for lang, v in pairs(main) do
-      if type(v) == "string" and v ~= "" then out[#out + 1] = { title = v, lang = tostring(lang), main = true } end
+      if type(v) == "string" and v ~= "" then
+        out[#out + 1] = { title = v, lang = tostring(lang), main = true }
+      end
     end
   end
   for _, m in ipairs(attrs.altTitles or {}) do
     for lang, v in pairs(m) do
-      if type(v) == "string" and v ~= "" then out[#out + 1] = { title = v, lang = tostring(lang), main = false } end
+      if type(v) == "string" and v ~= "" then
+        out[#out + 1] = { title = v, lang = tostring(lang), main = false }
+      end
     end
   end
   return out
@@ -252,4 +300,22 @@ local function build_covers(rec)
   }
 end
 
-return { API=API, normalize_status=normalize_status, CDN=CDN, SITE=SITE, PREFERRED=PREFERRED, pick=pick, get=get, clean_text=clean_text, normalize=normalize, best_record=best_record, extract_tags=extract_tags, extract_names=extract_names, cover_urls=cover_urls, build_recommendations=build_recommendations, alt_titles=alt_titles, build_detail=build_detail, build_covers=build_covers }
+return {
+  API = API,
+  normalize_status = normalize_status,
+  CDN = CDN,
+  SITE = SITE,
+  PREFERRED = PREFERRED,
+  pick = pick,
+  get = get,
+  clean_text = clean_text,
+  normalize = normalize,
+  best_record = best_record,
+  extract_tags = extract_tags,
+  extract_names = extract_names,
+  cover_urls = cover_urls,
+  build_recommendations = build_recommendations,
+  alt_titles = alt_titles,
+  build_detail = build_detail,
+  build_covers = build_covers,
+}

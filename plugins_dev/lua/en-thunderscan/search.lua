@@ -7,13 +7,14 @@ local fetch_detail_body = c.fetch_detail_body
 return function(params)
   local query = tostring(params.title or params.query or params.q or "")
   local page = tonumber(params.page) or 1
-  local genres = type(params.tags) == "table" and params.tags
-    or type(params.genres) == "table" and params.genres or {}
+  local genres = type(params.tags) == "table" and params.tags or type(params.genres) == "table" and params.genres or {}
 
   local url
   if #genres > 0 then
     local g = genres[1]
-    if type(g) == "table" then g = g.slug or g.name end
+    if type(g) == "table" then
+      g = g.slug or g.name
+    end
     -- the host echoes the genres() name back; browse routes key on the slug
     local gslug = tostring(g):lower():gsub("%s+", "-")
     url = BASE .. "/genres/" .. host.url_encode(gslug) .. "/"
@@ -40,8 +41,7 @@ return function(params)
       local slug = cap([[/comics/([^/]+)/]], href) or cap([[/([^/]+)/?$]], href)
       if slug and not seen[slug] then
         seen[slug] = true
-        local cover = cap([[data-src="[\t\n\s]*(https?://[^"]+)"]], card)
-          or cap([[\ssrc="(https?://[^"]+)"]], card, 2)
+        local cover = cap([[data-src="[\t\n\s]*(https?://[^"]+)"]], card) or cap([[\ssrc="(https?://[^"]+)"]], card, 2)
         items[#items + 1] = {
           id = slug,
           name = host.text.unescape(trim(title)),

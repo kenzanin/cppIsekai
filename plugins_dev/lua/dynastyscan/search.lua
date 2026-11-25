@@ -6,19 +6,24 @@ local absolute = c.absolute
 return function(params)
   local query = tostring(params.title or params.query or params.q or "")
   local page = tonumber(params.page) or 1
-  local genres = type(params.tags) == "table" and params.tags
-    or type(params.genres) == "table" and params.genres or {}
+  local genres = type(params.tags) == "table" and params.tags or type(params.genres) == "table" and params.genres or {}
   local genre_mode = #genres > 0
 
   local url
   if genre_mode then
     local g = genres[1]
-    if type(g) == "table" then g = g.slug or g.name end
+    if type(g) == "table" then
+      g = g.slug or g.name
+    end
     url = BASE .. "/tags/" .. host.url_encode(tostring(g)) .. "?view=groupings"
-    if page > 1 then url = url .. "&page=" .. tostring(page) end
+    if page > 1 then
+      url = url .. "&page=" .. tostring(page)
+    end
   else
     url = BASE .. "/search?q=" .. host.url_encode(query)
-    if page > 1 then url = url .. "&page=" .. tostring(page) end
+    if page > 1 then
+      url = url .. "&page=" .. tostring(page)
+    end
   end
 
   local res, err = host.http.fetch(url)
@@ -59,7 +64,9 @@ return function(params)
         seen[slug] = true
         local cover = ""
         local series = get_json(BASE .. "/series/" .. host.url_encode(slug) .. ".json")
-        if series and series.cover then cover = absolute(series.cover) end
+        if series and series.cover then
+          cover = absolute(series.cover)
+        end
         items[#items + 1] = {
           id = slug,
           name = host.text.unescape(trim(title)),

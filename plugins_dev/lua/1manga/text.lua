@@ -19,7 +19,9 @@ end
 -- "12-08-2025" (M-D-Y, the site's chapter date) -> "2025-12-08".
 function M.iso_date(raw)
   local mo, d, y = string.match(tostring(raw or ""), "^(%d%d?)-(%d%d?)-(%d%d%d%d)$")
-  if not mo then return "" end
+  if not mo then
+    return ""
+  end
   return string.format("%04d-%02d-%02d", tonumber(y), tonumber(mo), tonumber(d))
 end
 
@@ -28,12 +30,24 @@ end
 -- tags are lowercase trimmed/collapsed/deduped. Same shape the store folds.
 function M.normalize_status(s)
   s = tostring(s or ""):lower():gsub("[^a-z0-9]", "")
-  if s == "" then return "unknown" end
-  if s == "ongoing" or s == "ongoin" or s == "releasing" or s == "publishing" then return "ongoing" end
-  if s == "completed" or s == "finished" then return "completed" end
-  if s == "hiatus" or s == "onhaiatus" then return "hiatus" end
-  if s == "dropped" or s == "cancelled" or s == "canceled" then return "dropped" end
-  if s == "upcoming" or s == "notyetreleased" then return "upcoming" end
+  if s == "" then
+    return "unknown"
+  end
+  if s == "ongoing" or s == "ongoin" or s == "releasing" or s == "publishing" then
+    return "ongoing"
+  end
+  if s == "completed" or s == "finished" then
+    return "completed"
+  end
+  if s == "hiatus" or s == "onhaiatus" then
+    return "hiatus"
+  end
+  if s == "dropped" or s == "cancelled" or s == "canceled" then
+    return "dropped"
+  end
+  if s == "upcoming" or s == "notyetreleased" then
+    return "upcoming"
+  end
   return s
 end
 
@@ -47,9 +61,15 @@ end
 -- Site chapter labels include scrape noise: "CHapter 3860" and "3854-eng-li".
 -- Drop those (the host renders the number itself); keep real titles verbatim.
 function M.clean_title(s)
-  if s == "" then return "" end
-  if string.match(s, "^%a+apter%s*[%d%.]+$") then return "" end
-  if string.match(s, "^[%d%.]+%-%a+%-%a+$") then return "" end
+  if s == "" then
+    return ""
+  end
+  if string.match(s, "^%a+apter%s*[%d%.]+$") then
+    return ""
+  end
+  if string.match(s, "^[%d%.]+%-%a+%-%a+$") then
+    return ""
+  end
   return s
 end
 
@@ -60,7 +80,9 @@ function M.longest_paragraph(html)
   for body in string.gmatch(html or "", "<p[^>]->(.-)</p>") do
     if not body:find("<a ", 1, true) then
       local text = M.strip_tags(body)
-      if #text > #best then best = text end
+      if #text > #best then
+        best = text
+      end
     end
   end
   return (#best >= 60) and best or ""

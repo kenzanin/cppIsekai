@@ -8,7 +8,9 @@ local methods = {
 }
 
 function handle(req)
-    local fn = methods[req.method]
-    if fn == nil then return { ok = false, error = "unknown method " .. tostring(req.method) } end
-    return fn(req.params or {})
-    end
+  local fn = methods[req.method]
+  if fn == nil then
+    return { ok = false, error = "unknown method " .. tostring(req.method) }
+  end
+  return fn(req.params or {})
+end

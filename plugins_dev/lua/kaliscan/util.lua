@@ -7,8 +7,12 @@ local util = {}
 -- first capture group of the first match; nil when the pattern does not match.
 function util.find1(s, pattern)
   local m = host.re2.find(pattern, tostring(s or ""))
-  if #m >= 2 then return m[2] end
-  if #m == 1 then return m[1] end
+  if #m >= 2 then
+    return m[2]
+  end
+  if #m == 1 then
+    return m[1]
+  end
   return nil
 end
 
@@ -22,8 +26,8 @@ end
 -- uses single quotes, the fragment card's src carries the URL directly.
 function util.parse_search(html)
   local results, seen = {}, {}
-  local rows = host.re2.find_all(
-    [[(?s)<a\s+title="([^"]*?)"[^>]*href="/manga/([^"]*?)"[^>]*>\s*<img[^>]*?src="([^"]*?)"]], html)
+  local rows =
+    host.re2.find_all([[(?s)<a\s+title="([^"]*?)"[^>]*href="/manga/([^"]*?)"[^>]*>\s*<img[^>]*?src="([^"]*?)"]], html)
   for _, r in ipairs(rows) do
     local title, slug, cover = r[2], r[3], r[4]
     if slug ~= "" and not seen[slug] then
@@ -45,14 +49,17 @@ function util.parse_manga_detail(html, manga_id, base)
   local tags = {}
   for _, r in ipairs(host.re2.find_all([[href="/genres/([^/"]+)/"[^>]*>\s*([^<]+)\s*]], html)) do
     local name = r[3]:gsub("[%s,]+$", "")
-    if name ~= "" then tags[#tags + 1] = name end
+    if name ~= "" then
+      tags[#tags + 1] = name
+    end
   end
   return {
     id = manga_id,
     name = util.find1(html, [[<h1>([^<]+)</h1>]]) or "",
     cover = util.find1(html, [[(?s)class="[^"]*cover[^"]*"[^>]*>.*?<img[^>]*data-src="([^"]*?)"]]) or "",
     status = host.text.normalize_status(
-      util.find1(html, [[Status[^<]*</strong>\s*\n?\s*<a[^>]*>\s*<span>([^<]+)</span>]]) or ""),
+      util.find1(html, [[Status[^<]*</strong>\s*\n?\s*<a[^>]*>\s*<span>([^<]+)</span>]]) or ""
+    ),
     tags = tags,
     release_at = 0, -- the page carries no machine dates
     description = host.text.strip_html(util.find1(html, [[(?s)<p class="content"[^>]*>(.*?)</p>]]) or ""),

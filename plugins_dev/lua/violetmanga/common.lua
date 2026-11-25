@@ -11,18 +11,13 @@ local http_req = host.http.fetch_body -- (body, err); nil unless 200 (plugin-hos
 
 -- first text node of a selector; "" when absent
 
-
 -- ── search ─────────────────────────────────────────────────────────────────
-
 
 -- ── detail ─────────────────────────────────────────────────────────────────
 
-
 -- ── chapters ───────────────────────────────────────────────────────────────
 
-
 -- ── pages ──────────────────────────────────────────────────────────────────
-
 
 -- ── dispatch ───────────────────────────────────────────────────────────────
 
@@ -31,4 +26,4 @@ local function sel1(html, css)
   return r and r[1] or ""
 end
 
-return { BASE=BASE, http_req=http_req, sel1=sel1 }
+return { BASE = BASE, http_req = http_req, sel1 = sel1 }

@@ -12,7 +12,9 @@ return function(params)
     return { ok = false, error = "sanascans: chapter id must be slug:chapterId, got " .. composite }
   end
   local body, err = http_req(BASE .. "/series/" .. host.url_encode(slug) .. "/" .. chid)
-  if err ~= nil then return { ok = false, error = err } end
+  if err ~= nil then
+    return { ok = false, error = err }
+  end
 
   -- Reader pages are SSR <img src> in a scroll container; the site emits a
   -- double slash after the host, so scan with plain substring finds (a re2
@@ -23,7 +25,9 @@ return function(params)
   while pos do
     local ustart = pos + #anchor
     local close = string.find(body, '"', ustart, true)
-    if not close then break end
+    if not close then
+      break
+    end
     local path = string.sub(body, ustart, close - 1)
     if string.find(path, "upload/series/", 1, true) then
       local u = string.gsub("https://media.sanascans.com/" .. path, "(https://[^/]+)/+", "%1/")
@@ -31,6 +35,8 @@ return function(params)
     end
     pos = string.find(body, anchor, close, true)
   end
-  if #out == 0 then return { ok = false, error = "sanascans: no pages for " .. composite } end
+  if #out == 0 then
+    return { ok = false, error = "sanascans: no pages for " .. composite }
+  end
   return { ok = true, data = out }
 end

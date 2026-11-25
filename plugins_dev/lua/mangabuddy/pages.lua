@@ -13,7 +13,9 @@ return function(params)
     return { ok = true, data = {} }
   end
   local html = helpers.http_get(BASE .. "/series/" .. manga_id .. "/" .. chslug)
-  if not html then return { ok = false, error = "mangabuddy: page fetch failed" } end
+  if not html then
+    return { ok = false, error = "mangabuddy: page fetch failed" }
+  end
 
   local out, seen = {}, {}
   for _, r in ipairs(host.re2.find_all([[data-src="(https://[^"/]+/[^"]*?/[\d.]+/\d+\.webp)"]], html)) do

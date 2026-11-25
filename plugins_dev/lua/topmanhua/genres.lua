@@ -12,8 +12,9 @@ local genres_scrape = c.genres_scrape
 return function()
   local g = genres_scrape()
   local names = {}
-  for _, g2 in ipairs(g.list) do names[#names + 1] = g2.name end
+  for _, g2 in ipairs(g.list) do
+    names[#names + 1] = g2.name
+  end
   table.sort(names)
   return { ok = true, data = names }
 end
-

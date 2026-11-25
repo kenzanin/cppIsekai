@@ -15,9 +15,13 @@ local book_description = c.book_description
 return function(params)
   local q = clean(params.title or params.query or params.q or "")
   local page = math.max(1, tonumber(params.page) or 1)
-  if q == "" then return { ok = true, data = { items = {}, total = 0, pages = 1 } } end
+  if q == "" then
+    return { ok = true, data = { items = {}, total = 0, pages = 1 } }
+  end
   local items_doc = search_page(q, page)
-  if not items_doc then return { ok = false, error = "mangagoku: search failed" } end
+  if not items_doc then
+    return { ok = false, error = "mangagoku: search failed" }
+  end
   local items = {}
   for _, it in ipairs(items_doc) do
     if it.slug and it.slug ~= "" then

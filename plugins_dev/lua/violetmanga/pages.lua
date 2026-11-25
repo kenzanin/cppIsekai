@@ -5,9 +5,13 @@ local sel1 = c.sel1
 return function(params)
   local id = params.id or ""
   local url = tostring(id)
-  if not url:match("^https?://") then url = BASE .. id end
+  if not url:match("^https?://") then
+    url = BASE .. id
+  end
   local body, err = http_req(url)
-  if err ~= nil then return { ok = false, error = err } end
+  if err ~= nil then
+    return { ok = false, error = err }
+  end
 
   -- ts_reader.run({..., "sources": [{..., "images": [...]}]}): scan inline
   -- scripts for the "images" array; slashes may be JSON-escaped (\/).

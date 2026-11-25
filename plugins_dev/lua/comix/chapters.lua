@@ -10,64 +10,97 @@ local initial_data, relative_to_iso = c.initial_data, c.relative_to_iso
 -- rows. State lives in window.__chx; dedupe by href; cap 40 pages.
 local CH_RESET = 'window.__chx={all:{},order:[]};"1"'
 
-local CH_ABSORB = [[(function(){var s=window.__chx||(window.__chx={all:{},order:[]});Array.prototype.slice.call(document.querySelectorAll("a.mchap-row__primary")).forEach(function(a){var r=a.closest(".mchap-row")||a.parentElement;var c=r&&r.querySelector(".mchap-row__ch");var t=r&&r.querySelector(".mchap-row__time");var h=a.getAttribute("href")||"";if(h&&!(h in s.all)){s.all[h]=1;s.order.push({h:h,c:c?c.textContent.trim():"",t:t?t.textContent.trim():""});}});var q=document.querySelector(".mchap-foot__hint");return JSON.stringify({n:s.order.length,q:q?q.textContent.replace(/\\s+/g," "):""});})()]]
+local CH_ABSORB =
+  [[(function(){var s=window.__chx||(window.__chx={all:{},order:[]});Array.prototype.slice.call(document.querySelectorAll("a.mchap-row__primary")).forEach(function(a){var r=a.closest(".mchap-row")||a.parentElement;var c=r&&r.querySelector(".mchap-row__ch");var t=r&&r.querySelector(".mchap-row__time");var h=a.getAttribute("href")||"";if(h&&!(h in s.all)){s.all[h]=1;s.order.push({h:h,c:c?c.textContent.trim():"",t:t?t.textContent.trim():""});}});var q=document.querySelector(".mchap-foot__hint");return JSON.stringify({n:s.order.length,q:q?q.textContent.replace(/\\s+/g," "):""});})()]]
 
 local function ch_eval(js, tmo)
   local out, err = host.browser.call("evaluate", { script = js, timeout_ms = tmo or 15000 })
-  if err ~= nil or out == nil or out == "" then return nil end
+  if err ~= nil or out == nil or out == "" then
+    return nil
+  end
   return out
 end
 
 local function ch_absorb()
   local out = ch_eval(CH_ABSORB)
-  if not out then return nil end
+  if not out then
+    return nil
+  end
   local ok, t = pcall(json.decode, out)
-  if not ok or type(t) ~= "table" then return nil end
+  if not ok or type(t) ~= "table" then
+    return nil
+  end
   return t
 end
 
 local function ch_click(n)
-  local out = ch_eval('(function(){var bs=document.querySelectorAll(".npager__num");for(var i=0;i<bs.length;i++){if(bs[i].textContent.trim()===String(' .. n .. ')){bs[i].click();return "1";}}return "";})()')
+  local out = ch_eval(
+    '(function(){var bs=document.querySelectorAll(".npager__num");for(var i=0;i<bs.length;i++){if(bs[i].textContent.trim()===String('
+      .. n
+      .. ')){bs[i].click();return "1";}}return "";})()'
+  )
   return out == "1"
 end
 
 local function ch_wait_count(want, tmo)
   -- poll with a side effect: every tick absorbs visible rows, then requires
   -- the running count -- the wait IS the collector, no settle/race afterwards
-  local _, err = host.browser.call("wait", { timeout_ms = tmo or 8000, expression =
-    '(function(){var s=window.__chx||(window.__chx={all:{},order:[]});Array.prototype.slice.call(document.querySelectorAll("a.mchap-row__primary")).forEach(function(a){var r=a.closest(".mchap-row")||a.parentElement;var c=r&&r.querySelector(".mchap-row__ch");var t=r&&r.querySelector(".mchap-row__time");var h=a.getAttribute("href")||"";if(h&&!(h in s.all)){s.all[h]=1;s.order.push({h:h,c:c?c.textContent.trim():"",t:t?t.textContent.trim():""});}});return s.order.length>=' .. want .. ';})()' })
+  local _, err = host.browser.call("wait", {
+    timeout_ms = tmo or 8000,
+    expression = '(function(){var s=window.__chx||(window.__chx={all:{},order:[]});Array.prototype.slice.call(document.querySelectorAll("a.mchap-row__primary")).forEach(function(a){var r=a.closest(".mchap-row")||a.parentElement;var c=r&&r.querySelector(".mchap-row__ch");var t=r&&r.querySelector(".mchap-row__time");var h=a.getAttribute("href")||"";if(h&&!(h in s.all)){s.all[h]=1;s.order.push({h:h,c:c?c.textContent.trim():"",t:t?t.textContent.trim():""});}});return s.order.length>='
+      .. want
+      .. ";})()",
+  })
   return err == nil
 end
 
 local function ch_final()
-  local out = ch_eval('JSON.stringify(window.__chx&&window.__chx.order||[])')
-  if not out then return nil end
+  local out = ch_eval("JSON.stringify(window.__chx&&window.__chx.order||[])")
+  if not out then
+    return nil
+  end
   local ok, rows = pcall(json.decode, out)
-  if ok and type(rows) == "table" then return rows end
+  if ok and type(rows) == "table" then
+    return rows
+  end
   return nil
 end
 
 -- One pass; nil on any host/parse failure (caller retries once via fresh goto).
 local function ch_harvest()
-  local _, eerr = host.browser.call("wait",
-    { expression = 'document.querySelector("a.mchap-row__primary")!==null', timeout_ms = 15000 })
-  if eerr ~= nil then return nil end
-  if ch_eval(CH_RESET) == nil then return nil end
+  local _, eerr = host.browser.call(
+    "wait",
+    { expression = 'document.querySelector("a.mchap-row__primary")!==null', timeout_ms = 15000 }
+  )
+  if eerr ~= nil then
+    return nil
+  end
+  if ch_eval(CH_RESET) == nil then
+    return nil
+  end
   local t = ch_absorb()
-  if not t then return nil end
+  if not t then
+    return nil
+  end
   local total = tonumber(t.q and t.q:match("of%s+(%d+)")) or 0
   local pp = tonumber(t.q and t.q:match("to%s+(%d+)%s+of")) or 0
   if pp > 0 then
     for n = 2, 40 do
-      if total > 0 and t.n >= total then break end
-      if not ch_click(n) then break end
+      if total > 0 and t.n >= total then
+        break
+      end
+      if not ch_click(n) then
+        break
+      end
       local want = math.min(total > 0 and total or n * pp, n * pp)
       if not ch_wait_count(want) then
         ch_click(n) -- one belt click, re-wait, absorb whatever rendered
         ch_wait_count(want, 4000)
       end
       local t2 = ch_absorb()
-      if not t2 then return nil end
+      if not t2 then
+        return nil
+      end
       t = t2
     end
   end
@@ -76,10 +109,14 @@ end
 
 return function(params)
   local slug = params.id or ""
-  if slug == "" then return { ok = true, data = {} } end
+  if slug == "" then
+    return { ok = true, data = {} }
+  end
 
   local _, gerr = host.browser.call("goto", { url = BASE .. "/title/" .. host.url_encode(slug), timeout_ms = 60000 })
-  if gerr ~= nil then return { ok = false, error = "comix: goto failed: " .. gerr } end
+  if gerr ~= nil then
+    return { ok = false, error = "comix: goto failed: " .. gerr }
+  end
   local rows = ch_harvest()
   if rows == nil then
     return { ok = false, error = "comix: harvest failed for " .. slug }
@@ -109,7 +146,9 @@ return function(params)
         pages = 0,
       }
       local iso = relative_to_iso(when)
-      if iso ~= "" then item.release_at = iso end
+      if iso ~= "" then
+        item.release_at = iso
+      end
       out[#out + 1] = item
     end
   end

@@ -20,9 +20,19 @@ return function(params)
   if not bid then
     return { ok = false, error = "comizy: version backend unreachable" }
   end
-  local res = get_json(WEB .. "/_next/data/" .. bid .. "/" .. mslug .. "/"
-    .. cslug .. ".json?slug=" .. host.url_encode(mslug)
-    .. "&chapter-slug=" .. host.url_encode(cslug))
+  local res = get_json(
+    WEB
+      .. "/_next/data/"
+      .. bid
+      .. "/"
+      .. mslug
+      .. "/"
+      .. cslug
+      .. ".json?slug="
+      .. host.url_encode(mslug)
+      .. "&chapter-slug="
+      .. host.url_encode(cslug)
+  )
   local ch = res and (res.pageProps or {}).initialChapter
   local imgs = ch and ch.images or {}
   if #imgs == 0 then

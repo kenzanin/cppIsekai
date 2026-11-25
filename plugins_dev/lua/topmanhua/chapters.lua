@@ -11,12 +11,16 @@ local parse_genre_cards = c.parse_genre_cards
 local genres_scrape = c.genres_scrape
 return function(params)
   local slug = host.text.trim(tostring(params.id or ""))
-  if slug == "" then return { ok = true, data = {} } end
+  if slug == "" then
+    return { ok = true, data = {} }
+  end
 
   -- Chapter rows come from the ComicService JSON API; comicId lives only in
   -- the detail page's inline script.
   local body, err = http_req(BASE .. "manhua/" .. host.url_encode(slug))
-  if err ~= nil then return { ok = false, error = err } end
+  if err ~= nil then
+    return { ok = false, error = err }
+  end
   -- RE2 syntax, not Lua patterns: \s / \d, never %s / %d.
   local comic_id = find1(body, [[var comicId\s*=\s*(\d+)]]) or find1(body, [[id="comic_id"\s+value="(\d+)"]])
   if not comic_id then
@@ -25,8 +29,11 @@ return function(params)
 
   local api, aerr = http_req(
     BASE .. "Comic/Services/ComicService.asmx/ProcessChapterList?comicId=" .. comic_id,
-    { ["Referer"] = BASE .. "manhua/" .. slug })
-  if aerr ~= nil then return { ok = false, error = aerr } end
+    { ["Referer"] = BASE .. "manhua/" .. slug }
+  )
+  if aerr ~= nil then
+    return { ok = false, error = aerr }
+  end
   local ok, decoded = pcall(json.decode, api)
   if not ok or type(decoded) ~= "table" then
     return { ok = false, error = "topmanhua: malformed chapter list for " .. slug }
@@ -52,4 +59,3 @@ return function(params)
 end
 
 -- ── pages ──────────────────────────────────────────────────────────────────
-

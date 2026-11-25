@@ -7,12 +7,26 @@ local jsonld_book = c.jsonld_book
 local flight_status = c.flight_status
 return function(params)
   local manga_id = params.id or ""
-  local empty = { id = manga_id, name = "", cover = "", status = "unknown", tags = {}, release_at = 0,
-    description = "", authors = {}, artists = {}, url = BASE .. "/series/comic/" .. manga_id }
-  if manga_id == "" then return { ok = true, data = empty } end
+  local empty = {
+    id = manga_id,
+    name = "",
+    cover = "",
+    status = "unknown",
+    tags = {},
+    release_at = 0,
+    description = "",
+    authors = {},
+    artists = {},
+    url = BASE .. "/series/comic/" .. manga_id,
+  }
+  if manga_id == "" then
+    return { ok = true, data = empty }
+  end
 
   local html, err = http_req(BASE .. "/series/comic/" .. manga_id)
-  if err ~= nil then return { ok = false, error = err } end
+  if err ~= nil then
+    return { ok = false, error = err }
+  end
 
   local data = empty
   local book = jsonld_book(html)
@@ -29,11 +43,15 @@ return function(params)
       data.cover = is_abs_url(img) and img or BASE .. img
       -- status: anchor on the cover path (relative) in the flight payload
       local status = flight_status(html, img)
-      if status ~= "" then data.status = host.text.normalize_status(status) end
+      if status ~= "" then
+        data.status = host.text.normalize_status(status)
+      end
     end
     if type(book.genre) == "table" then
       local gs = {}
-      for _, g in ipairs(book.genre) do gs[#gs + 1] = g end
+      for _, g in ipairs(book.genre) do
+        gs[#gs + 1] = g
+      end
       data.tags = gs
     end
   end
@@ -49,7 +67,9 @@ return function(params)
     -- retry the flight payload with whatever origin the cover URL carries
     local origin = find1(data.cover, [[(https?://[^/]+)?(/uploads/series/[^"]+)]]) or data.cover
     local st = flight_status(html, origin)
-    if st ~= "" then data.status = host.text.normalize_status(st) end
+    if st ~= "" then
+      data.status = host.text.normalize_status(st)
+    end
   end
   return { ok = true, data = data }
 end

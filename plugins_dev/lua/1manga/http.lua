@@ -6,8 +6,12 @@ local UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Geck
 
 function M.get(url)
   local res, err = host.http.fetch(url, { headers = { ["User-Agent"] = UA }, timeout_ms = 30000 })
-  if err ~= nil then return nil, err end
-  if res.status ~= 200 then return nil, "1manga: upstream status " .. tostring(res.status) end
+  if err ~= nil then
+    return nil, err
+  end
+  if res.status ~= 200 then
+    return nil, "1manga: upstream status " .. tostring(res.status)
+  end
   return res.body, nil
 end
 
