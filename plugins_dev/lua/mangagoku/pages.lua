@@ -22,17 +22,20 @@ return function(params)
   if not body or body == "" then
     return { ok = false, error = err }
   end
-  -- Reader images are 2xstorage URLs with a trailing /<n>.webp index; the CDN
-  -- host varies per title (img-r1/img-r2/imgs-2), so match any subdomain. Thumb
-  -- images live under /thumb/ and never carry that numeric tail.
+  -- Reader images carry a trailing /<n>.<ext> index; thumbs live under
+  -- /thumb/ and never do. Two CDNs, partial migration (2026-11): 2xstorage
+  -- /*.webp (older chapters, any subdomain) and storage.waitst.com/*.jpg (newer).
   local found = {}
   for url in body:gmatch([[https://[%w%-]+%.2xstorage%.com/[^"\\%s]+/%d+%.webp]]) do
+    found[#found + 1] = url
+  end
+  for url in body:gmatch([[https://storage%.waitst%.com/[^"\\%s]+/%d+%.jpg]]) do
     found[#found + 1] = url
   end
   -- The same page appears on several CDN mirrors; keep one URL per index.
   local by_index, order = {}, {}
   for _, url in ipairs(found) do
-    local idx = tonumber(url:match("/([0-9]+)%.webp$"))
+    local idx = tonumber(url:match("/([0-9]+)%.[%w]+$"))
     if idx and not by_index[idx] then
       by_index[idx] = url
       order[#order + 1] = idx
