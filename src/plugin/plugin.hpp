@@ -51,7 +51,7 @@ struct Config {
 };
 
 struct PluginInfo {
-    std::string id, name, version, runtime, entry, website, image_referer, image_engine;
+    std::string id, name, version, runtime, entry, website, image_referer, image_engine, image_ua;
     std::vector<std::string> capabilities;
     std::map<std::string, std::int64_t> cache_ttl; // per-method api_cache TTL override (seconds; absent = host default)
     int api{};
@@ -141,6 +141,11 @@ public:
      *  = legacy plain curl (stock TLS). CF-fronted image CDNs opt in
      *  (image-engine-profile). */
     [[nodiscard]] std::string image_engine(const std::string& id) const;
+
+    /** \brief UA for this plugin's image fetches: manifest `image_ua` override.
+     *  CF binds cf_clearance to the UA token it was minted under, so jar-fed
+     *  image fetches must echo the browser that solved the challenge. */
+    [[nodiscard]] std::string image_ua(const std::string& id) const;
 
     /** \brief Manifest `cache_ttl` override for one api_cache method, in
      *  seconds; 0 when absent (host per-method default applies). For sites

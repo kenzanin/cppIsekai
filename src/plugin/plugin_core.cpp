@@ -110,6 +110,12 @@ std::string Host::image_engine(const std::string& id) const {
     return it != impl_->plugins.end() ? it->second->info.image_engine : std::string{};
 }
 
+std::string Host::image_ua(const std::string& id) const {
+    const std::scoped_lock lock(impl_->mu);
+    const auto it = impl_->plugins.find(id);
+    return it != impl_->plugins.end() ? it->second->info.image_ua : std::string{};
+}
+
 std::int64_t Host::cache_ttl_seconds(const std::string& id, const std::string& method) const {
     const std::scoped_lock lock(impl_->mu);
     const auto it = impl_->plugins.find(id);

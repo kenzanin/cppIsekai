@@ -8,14 +8,30 @@ return function(params)
   if slug == "" then
     return { ok = true, data = {} }
   end
-  -- Madara chapters via POST /manga/<slug>/ajax/chapters/.
-  local body, err = http_req(BASE .. "/manga/" .. slug .. "/ajax/chapters/", {
-    method = "POST",
-    body = "",
-    headers = { ["X-Requested-With"] = "xmlhttprequest", ["Content-Type"] = "application/x-www-form-urlencoded" },
-  })
-  if err ~= nil then
-    return { ok = false, error = err }
+  -- Madara chapters via POST /manga/<slug>/ajax/chapters/. CF eats curl POSTs
+  -- too: goto the title page (challenge solves itself), then same-origin XHR
+  -- with the session cookies, no jar minting (comix pattern).
+  local _, gerr = host.browser.call("goto", { url = BASE .. "/manga/" .. slug .. "/", timeout_ms = 60000 })
+  if gerr ~= nil then
+    return { ok = false, error = "harimanga: goto failed: " .. gerr }
+  end
+  local out, eerr = host.browser.call(
+    "evaluate",
+    {
+      script = [[(function(){var x=new XMLHttpRequest();x.open("POST","/manga/]]
+        .. slug
+        .. [[/ajax/chapters/",false);x.setRequestHeader("X-Requested-With","xmlhttprequest");x.setRequestHeader("Content-Type","application/x-www-form-urlencoded");x.send("");return JSON.stringify({s:x.status,b:x.responseText});})()]],
+      timeout_ms = 30000,
+    }
+  )
+  if eerr ~= nil or out == nil or out == "" then
+    return { ok = false, error = "harimanga: ajax chapters failed: " .. tostring(eerr) }
+  end
+  local ok, env = pcall(json.decode, out or "")
+  local status = ok and type(env) == "table" and tonumber(env.s) or nil
+  local body = ok and type(env) == "table" and env.b or nil
+  if status ~= 200 or not body or body == "" then
+    return { ok = false, error = "harimanga: ajax chapters status " .. tostring(status) }
   end
 
   local out, seen = {}, {}

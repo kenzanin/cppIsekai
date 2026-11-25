@@ -1,5 +1,7 @@
 {
   "verify_url": "https://www.harimanga.cc",
+  "website": "https://www.harimanga.cc",
+  "image_referer": "https://www.harimanga.cc/",
   "thumb_ratio": 0.703,
   "name": "HariManga",
   "site_url": "https://www.harimanga.cc",
@@ -9,6 +11,8 @@
     "site_url": "https://www.harimanga.cc"
   },
   "runtime": "lua",
-  "version": "1.0.0",
+  "version": "1.0.1",
+  "image_engine": "chrome116",
+  "image_ua": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/158.0.0.0 Safari/537.36",
   "api": 1
 }
