@@ -173,6 +173,43 @@ std::vector<ChapterSeed> Store::chapters_list(const std::string& plugin, const s
     return out;
 }
 
+std::vector<std::string> Store::chapter_pages_urls(const std::string& plugin, const std::string& slug,
+                                                   const std::string& chapter_id) {
+    const store_detail::OpTrace _op{"chapter_pages_urls"};
+    if (plugin.empty() || slug.empty() || chapter_id.empty()) {
+        return {};
+    }
+    if (!saved_exists(plugin, slug)) {
+        auto* e = ephem_find(plugin, slug);
+        if (e == nullptr) {
+            return {};
+        }
+        auto it = e->chapters.find(chapter_id);
+        if (it == e->chapters.end()) {
+            return {};
+        }
+        std::vector<std::string> out;
+        for (const auto& [idx, url] : it->second.pages) {
+            if (static_cast<int>(out.size()) <= idx) {
+                out.resize(static_cast<std::size_t>(idx) + 1);
+            }
+            out[static_cast<std::size_t>(idx)] = url;
+        }
+        return out;
+    }
+    auto rows = impl_->storage.get_all<store_detail::ChapterPageEntity>(
+        where(c(&store_detail::ChapterPageEntity::plugin) == plugin &&
+              c(&store_detail::ChapterPageEntity::slug) == slug &&
+              c(&store_detail::ChapterPageEntity::chapter_id) == chapter_id),
+        order_by(&store_detail::ChapterPageEntity::idx));
+    std::vector<std::string> out;
+    out.reserve(rows.size());
+    for (auto& r : rows) {
+        out.push_back(std::move(r.url));
+    }
+    return out;
+}
+
 void Store::chapter_pages_replace(const std::string& plugin, const std::string& slug, const std::string& chapter_id,
                                   const std::vector<std::string>& urls) {
     const store_detail::OpTrace _op{"chapter_pages_replace"};

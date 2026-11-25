@@ -1,3 +1,7 @@
+## 2026-11-25
+* **Update**: Linked `findings/offline-cached-chapter-2026-11-25.md` to `architecture/chapter-state-flags.md`.
+* **Creation**: Documented concept `findings/offline-cached-chapter-2026-11-25.md` (Offline cached chapters: /api/pages must fall back to chapter rows, not the plugin envelope).
+
 ## 2026-11-24
 * **Update**: Linked `architecture/manhwato-plugin.md` to `architecture/plugin-system.md`.
 * **Creation**: Documented concept `architecture/manhwato-plugin.md` (Manhwato Lua plugin: SSR HTML via the daemon's Chrome bridge).

@@ -57,13 +57,30 @@ void register_content(Ctx& c) {
             // targets the right one even when the plugin's list is stale.
             // A `ch_id` query param wins when it matches an entry; otherwise
             // the first number match is used (design D1/D2).
-            const std::string chapter_id = resolve_chapter_id(chs_env, want_id, chd);
+            // Offline: when the plugin envelope could not be fetched, rebuild
+            // it from the chapter rows (the metadata hub) so a cached chapter
+            // stays navigable with no network at all.
+            std::string chapter_list_env = chs_env;
+            std::string chapter_id = resolve_chapter_id(chapter_list_env, want_id, chd);
+            if (chapter_id.empty()) {
+                const auto seeds = store.chapters_list(plugin, slug);
+                crow::json::wvalue list(crow::json::type::List);
+                for (std::size_t i = 0; i < seeds.size(); ++i) {
+                    list[i]["id"] = seeds[i].chapter_id;
+                    list[i]["number"] = seeds[i].number;
+                }
+                crow::json::wvalue envelope;
+                envelope["ok"] = true;
+                envelope["data"] = std::move(list);
+                chapter_list_env = envelope.dump();
+                chapter_id = resolve_chapter_id(chapter_list_env, want_id, chd);
+            }
             if (chapter_id.empty()) {
                 return std::string{};
             }
             // Walk the primary id then same-number siblings; first release
             // whose pages parse wins (per-entry upstream flakes, comico 502s).
-            std::vector<std::string> candidates = sibling_ids(chs_env, chd, chapter_id);
+            std::vector<std::string> candidates = sibling_ids(chapter_list_env, chd, chapter_id);
             candidates.insert(candidates.begin(), chapter_id);
             std::string pages_id = chapter_id;
             std::string pages_env;
@@ -90,8 +107,24 @@ void register_content(Ctx& c) {
                 if (std::string e = envelope_error(pages_env); !e.empty()) {
                     pages_error = std::move(e); // keep the real upstream reason for the 404 body
                 }
+                // Offline: a previously parsed chapter has its page URLs in
+                // chapter_pages, so serve those instead of the failed fetch.
+                const auto stored = store.chapter_pages_urls(plugin, slug, cand);
+                if (!stored.empty()) {
+                    crow::json::wvalue urls(crow::json::type::List);
+                    for (std::size_t i = 0; i < stored.size(); ++i) {
+                        urls[i] = stored[i];
+                    }
+                    crow::json::wvalue envelope;
+                    envelope["ok"] = true;
+                    envelope["data"] = std::move(urls);
+                    pages_env = envelope.dump();
+                    pages_id = cand;
+                    pages_error.clear();
+                    break;
+                }
             }
-            return build_pages_response(chs_env, pages_env,
+            return build_pages_response(chapter_list_env, pages_env,
                                         PagesCtx{.plugin = plugin,
                                                  .slug = slug,
                                                  .ch = chd,

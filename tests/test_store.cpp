@@ -906,9 +906,12 @@ TEST_CASE("Store: chapter flags bitfield (chapter-state 1.3-1.6)") {
         store.chapters_upsert(plugin, slug, {seed("a1", 1)});
         store.chapter_pages_replace(plugin, slug, "a1", {"p1", "p2", "p3"});
         CHECK(store.chapter_pages_count(plugin, slug, "a1") == 3);
+        CHECK(store.chapter_pages_urls(plugin, slug, "a1") == std::vector<std::string>{"p1", "p2", "p3"});
         store.chapter_pages_replace(plugin, slug, "a1", {"x1"});
         CHECK(store.chapter_pages_count(plugin, slug, "a1") == 1); // old rows gone
+        CHECK(store.chapter_pages_urls(plugin, slug, "a1") == std::vector<std::string>{"x1"});
         CHECK(store.chapter_pages_count(plugin, slug, "zz") == 0);
+        CHECK(store.chapter_pages_urls(plugin, slug, "zz").empty());
     }
 
     SUBCASE("list returns every row of the manga only") {

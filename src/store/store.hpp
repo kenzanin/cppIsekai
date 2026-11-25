@@ -234,8 +234,12 @@ public:
      *  chapter row is absent. */
     int chapter_read_max_bump(const std::string& plugin, const std::string& slug, const std::string& chapter_id,
                               int page);
-    /** \brief Stored page-url count (completion threshold); 0 when unparsed. */
+    /** rief Stored page-url count (completion threshold); 0 when unparsed. */
     int chapter_pages_count(const std::string& plugin, const std::string& slug, const std::string& chapter_id);
+    /** \brief Page urls of one chapter in reading order (offline serve path).
+     *  Empty when the chapter was never parsed; covers saved and ephemeral pairs. */
+    std::vector<std::string> chapter_pages_urls(const std::string& plugin, const std::string& slug,
+                                                const std::string& chapter_id);
 
     /** \brief Upsert the last-read position of one manga; updated_at is
      *  stamped here, any nonzero value in \p pos is ignored. */
