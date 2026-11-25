@@ -1,4 +1,7 @@
 ## 2026-11-25
+* **Update**: Linked `decisions/plugin-show-off-deferred.md` to `architecture/plugin-system.md` (visibility flag would extend the plugin manifest/host surface; deferred by this decision).
+* **Update**: Updated concept `decisions/plugin-show-off-deferred.md`.
+* **Creation**: Documented concept `decisions/plugin-show-off-deferred.md` (plugin show/hide ditunda: toggle enabled cukup).
 * **Update**: Updated concept `architecture/keroscans-plugin.md`.
 * **Update**: Linked `architecture/keroscans-plugin.md` to `architecture/plugin-system.md` (keroscans plugin instance of the folder/manifest/ABI contract).
 * **Creation**: Documented concept `architecture/keroscans-plugin.md` (keroscans plugin: endpoints + decimal-subchapter gotcha).
