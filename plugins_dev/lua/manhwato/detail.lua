@@ -20,6 +20,16 @@ return function(params)
   if not body then
     return { ok = false, error = err or "manhwato: detail failed" }
   end
+  -- The "Tags" pills on this site are SEO link farms (title + "english",
+  -- "online free", "download ... eng", ...), not genres. Real genres live
+  -- in the Book JSON-LD "genre" array; use those as the canonical tags.
+  local genres = (function()
+    local out = {}
+    for name in tostring(find1(body, '(?s)"genre":\\s*\\[(.*?)\\]') or ""):gmatch('"([^"]+)"') do
+      out[#out + 1] = clean(name)
+    end
+    return out
+  end)()
   return {
     ok = true,
     data = {
@@ -29,21 +39,8 @@ return function(params)
       description = clean(find1(body, [[(?s)<div class="about">(.*?)</div>]])),
       status = host.text.normalize_status(clean(find1(body, [[<dt>Status</dt><dd><span[^>]*></span>([^<]+)]]) or "")),
       authors = { clean(find1(body, [[<dt>Author</dt><dd><a[^>]*>([^<]+)]]) or "") },
-      tags = (function()
-        local out = {}
-        local block = find1(body, [[(?s)<ul class="mt-pills mt-pills--muted">(.*?)</ul>]]) or ""
-        for _, m in ipairs(find_all(block, [[<a[^>]*>([^<]+)</a>]])) do
-          out[#out + 1] = clean(m[2])
-        end
-        return out
-      end)(),
-      genres = (function()
-        local out = {}
-        for name in tostring(find1(body, '(?s)"genre":\\s*\\[(.*?)\\]') or ""):gmatch('"([^"]+)"') do
-          out[#out + 1] = clean(name)
-        end
-        return out
-      end)(),
+      tags = genres,
+      genres = genres,
       url = SITE .. "/manhwa/" .. slug,
     },
   }
