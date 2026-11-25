@@ -111,7 +111,7 @@ std::string apply_chosen(Store& store, BS::thread_pool<>& db, const std::string&
 // manga-detail-table D2: refresh_title (below) materializes through the enrichment
 // helpers; placed after the decls above because enrich_internal re-opens this
 // namespace and needs valid_title_pair visible (pragma-once makes the cycle benign).
-#include "enrich_internal.hpp"
+#include "enrich/enrich_internal.hpp"
 
 // --- saved-manga stats sync (library-grid-stats 2.x) ---
 namespace detail {

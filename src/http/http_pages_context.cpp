@@ -1,4 +1,4 @@
-#include "enrich_internal.hpp"
+#include "enrich/enrich_internal.hpp"
 #include "http_routes.hpp"
 
 #include "plugin/url_codec.hpp"
