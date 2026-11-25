@@ -15,6 +15,10 @@ local methods = {
   detail = require("detail")(ctx),
   chapters = require("chapters")(ctx),
   pages = require("pages")(ctx),
+  genres = function()
+    local g = require("genres").load(ctx)
+    return { ok = true, data = g.names }
+  end,
 }
 
 function handle(req)
