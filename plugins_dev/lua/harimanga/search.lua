@@ -28,9 +28,15 @@ return function(params)
     url = BASE .. "/?s=" .. host.url_encode(q) .. "&post_type=wp-manga"
   end
 
-  local body, err = http_req(url)
-  if err ~= nil then
-    return { ok = false, error = err }
+  -- CF challenge zone: plain/chrome116 curl eats 403 -> render via host browser
+  -- (comix pattern; goto solves the challenge, then grab outerHTML).
+  local _, gerr = host.browser.call("goto", { url = url, timeout_ms = 60000 })
+  if gerr ~= nil then
+    return { ok = false, error = "harimanga: goto failed: " .. gerr }
+  end
+  local body, eerr = host.browser.call("evaluate", { script = "document.documentElement.outerHTML", timeout_ms = 30000 })
+  if eerr ~= nil or body == nil or body == "" then
+    return { ok = false, error = "harimanga: search render failed: " .. tostring(eerr) }
   end
 
   local items, seen = {}, {}

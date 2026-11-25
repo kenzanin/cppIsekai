@@ -12,7 +12,7 @@ return function()
   end
   local seen, names = {}, {}
   local map = {}
-  for _, m in ipairs(host.re2.find_all([[href="[^"]*harimanga\.cc/manga-genre/([a-z0-9-]+)/"[^>]*>([^<]+)</]], body)) do
+  for _, m in ipairs(host.re2.find_all([[href="[^"]*/manga-genre/([a-z0-9-]+)/?"[^>]*>([^<]+)<]], body)) do
     local slug, label = m[2], host.text.unescape(host.text.trim(m[3]))
     if label ~= "" and not seen[slug] then
       seen[slug] = true

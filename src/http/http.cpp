@@ -6,6 +6,7 @@
 #include "reader/worker.hpp"
 
 #include <cstdio>
+#include <filesystem>
 #include <optional>
 #include <string>
 #include <utility>
@@ -25,6 +26,17 @@ cache::Fetcher makeCurlFetcher(const std::string& proxy, const plugin::Host& plu
             fetch::Request rq;
             rq.url = url;
             rq.profile = engine; // timeout_ms defaults to 30 s
+            // CF challenge zones mint httpOnly cookies in the host browser;
+            // the image fetch is curl-side, so feed it the plugin jar when one
+            // exists (seeded by the plugin's cookie=true calls / harvest).
+            const std::string jar = "data/plugin-state/" + plugin + ".cookies.txt";
+            if (std::error_code ec; std::filesystem::exists(jar, ec) && !ec) {
+                rq.cookie_jar = jar;
+            }
+            // cf_clearance is bound to the UA that solved the challenge; echo it
+            if (const std::string ua = plugins.image_ua(plugin); !ua.empty()) {
+                rq.ua_header = ua;
+            }
             if (const std::string referer = plugins.image_referer_for_url(url, plugin);
                 !referer.empty() && referer != "none") { // "none": sentinel, no header (D-sentinel)
                 rq.headers = {{"Referer", referer}};

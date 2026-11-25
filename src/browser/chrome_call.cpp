@@ -71,6 +71,53 @@ std::string call(const std::string& tool, const std::string& args_json, std::str
                     std::this_thread::sleep_for(std::chrono::milliseconds(150));
                 }
             }
+            if (tool == "cookies") {
+                // Netscape jar line for the page's origin cookies. httpOnly
+                // values included (CDP-level, not document.cookie). Feeds the
+                // plugin cookie-jar bridge: cf_challenge zones mint here,
+                // curl-side fetches consume via opts.cookie (jar 2.1).
+                const std::string domain = arg_str(args, "domain");
+                const std::string all = page()->getAllCookies();
+                if (all.empty()) {
+                    return fail("cookies: none");
+                }
+                if (domain.empty()) {
+                    return all;
+                }
+                std::string out;
+                size_t pos = 0;
+                while ((pos = all.find("{", pos)) != std::string::npos) {
+                    const size_t end = all.find("}", pos);
+                    if (end == std::string::npos) {
+                        break;
+                    }
+                    const std::string obj = all.substr(pos, end - pos + 1);
+                    pos = end;
+                    const auto field = [&obj](const char* k) {
+                        std::string key = "\"";
+                        key += k;
+                        key += "\":";
+                        const auto p = obj.find(key);
+                        if (p == std::string::npos) {
+                            return std::string {};
+                        }
+                        const auto v = obj.find('"', p + key.size());
+                        if (v == std::string::npos) {
+                            return std::string {};
+                        }
+                        return obj.substr(v + 1, obj.find('"', v + 1) - v - 1);
+                    };
+                    const std::string dom = field("domain");
+                    if (dom.empty() || dom.find(domain) == std::string::npos) {
+                        continue;
+                    }
+                    // Netscape: domain TAB flag path secure expiry name value
+                    out += dom + "\tTRUE\t" + field("path") + "\t" +
+                           (field("secure") == "true" ? "TRUE" : "FALSE") + "\t2147483647\t" +
+                           field("name") + "\t" + field("value") + "\n";
+                }
+                return out;
+            }
             if (tool == "evaluate") {
                 const std::string script = arg_str(args, "script");
                 if (script.empty()) {

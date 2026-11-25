@@ -5,8 +5,19 @@
 -- canonical manga fields per the mangadex plugin.
 local BASE = "https://www.harimanga.cc" -- single origin; manifest site_url kept verbatim in main.json
 
--- http request -> (body, err). 200-or-nothing, the anisascans http_req shape.
-local http_req = host.http.fetch_body -- (body, err); nil unless 200 (plugin-host-promotion).
+-- http request -> (body, err) via the host browser (CF challenge zone:
+-- chrome116 curl eats 403; goto solves it, then read outerHTML -- comix pattern).
+local function http_req(url)
+  local _, gerr = host.browser.call("goto", { url = url, timeout_ms = 60000 })
+  if gerr ~= nil then
+    return nil, "harimanga: goto failed: " .. gerr
+  end
+  local body, eerr = host.browser.call("evaluate", { script = "document.documentElement.outerHTML", timeout_ms = 30000 })
+  if eerr ~= nil or body == nil or body == "" then
+    return nil, "harimanga: render failed: " .. tostring(eerr)
+  end
+  return body, nil
+end
 
 -- first capture group of the first match; nil when no match (host re2.capture).
 
