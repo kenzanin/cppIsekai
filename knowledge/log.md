@@ -1,4 +1,6 @@
 ## 2026-11-25
+* **Update**: Linked `decisions/enrich-module-location.md` to `architecture/detail-page.md` (enrich module implements the detail-page enrichment flow moved out of http/).
+* **Creation**: Documented concept `decisions/enrich-module-location.md` (enrich module lives in src/enrich/, http/ = routes + shaping).
 * **Creation**: Documented concept `findings/mangagoku-cdn-partial-migration-2026-11-25.md` (mangagoku partial CDN migration: reader images split 2xstorage webp / waitst jpg).
 * **Update**: Linked `findings/plugin-seo-tag-pills-2026-11-25.md` to `architecture/manhwato-plugin.md`.
 * **Creation**: Documented concept `findings/plugin-seo-tag-pills-2026-11-25.md` (Site SEO tag farms must not become detail tags; use JSON-LD genres).

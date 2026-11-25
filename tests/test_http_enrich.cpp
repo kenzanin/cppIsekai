@@ -9,7 +9,7 @@
 #include <filesystem>
 #include <string>
 
-#include "http/enrich_internal.hpp"
+#include "enrich/enrich_internal.hpp"
 #include "http/http_routes.hpp"
 #include "http/stale.hpp"
 #include "store/store.hpp"

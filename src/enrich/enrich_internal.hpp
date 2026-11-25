@@ -4,7 +4,7 @@
  *  \brief Declarations for the enrichment helpers; definitions live in
  *  enrich_source.cpp / enrich_chosen.cpp / enrich_detail.cpp. Not public API. */
 
-#include "api_ctx.hpp"
+#include "http/api_ctx.hpp"
 
 #include <algorithm>
 #include <string>
