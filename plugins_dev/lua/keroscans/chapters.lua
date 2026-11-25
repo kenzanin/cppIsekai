@@ -55,6 +55,9 @@ return function(ctx)
       local part
       part, err = ctx.get(ctx.BASE .. "/series/comic/" .. slug .. "?page=" .. page .. "&partial=chapters")
       if not part then
+        if not (err and err:find("404", 1, true)) then
+          host.log.error("keroscans: chapters truncated at page " .. page .. " for " .. slug .. ": " .. tostring(err))
+        end
         break
       end
       if harvest(part) == 0 then

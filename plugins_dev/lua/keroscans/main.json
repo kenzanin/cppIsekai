@@ -1,11 +1,10 @@
 {
   "name": "KeroScans",
   "id": "keroscans",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "website": "https://keroscans.net",
   "image_referer": "https://keroscans.net/",
   "runtime": "lua",
-  "paginates": true,
   "capabilities": [
     "search",
     "detail",
