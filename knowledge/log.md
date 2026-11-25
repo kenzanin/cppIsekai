@@ -1,4 +1,5 @@
 ## 2026-11-25
+* **Update**: Updated concept `decisions/image-referer-domain-match.md`.
 * **Update**: Linked `findings/plugin-script-module-split-2026-11-25.md` to `decisions/source-layout-policy.md`.
 * **Creation**: Documented concept `findings/plugin-script-module-split-2026-11-25.md` (All Lua/JS plugin scripts split into per-action modules; helper duplication census).
 * **Update**: Updated concept `findings/offline-cached-chapter-2026-11-25.md`.

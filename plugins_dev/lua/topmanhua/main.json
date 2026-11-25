@@ -3,6 +3,7 @@
   "thumb_ratio": 0.694,
   "name": "TopManhua",
   "site_url": "https://www.topmanhua.fan/",
+  "image_referer": "https://www.topmanhua.fan/",
   "logo": "logo.png",
   "contract_version": 1,
   "params": {

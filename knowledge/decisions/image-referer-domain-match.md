@@ -3,7 +3,7 @@ type: Decision
 title: "Image referer follows the URL's own site domain"
 description: "Host picks the image Referer by matching the image URL host against registered plugins' website/referer domains (subdomains count), with the title plugin as fallback."
 tags: [image, referer, enrichment, host]
-generated: { by: agent/mcp, at: "2026-11-21T08:24:50Z" }
+generated: { by: agent/mcp, at: "2026-11-25T07:05:23Z" }
 status: stable
 ---
 
