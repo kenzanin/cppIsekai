@@ -1,4 +1,5 @@
 ## 2026-11-25
+* **Update**: Updated concept `findings/offline-cached-chapter-2026-11-25.md`.
 * **Update**: Linked `findings/offline-cached-chapter-2026-11-25.md` to `architecture/chapter-state-flags.md`.
 * **Creation**: Documented concept `findings/offline-cached-chapter-2026-11-25.md` (Offline cached chapters: /api/pages must fall back to chapter rows, not the plugin envelope).
 

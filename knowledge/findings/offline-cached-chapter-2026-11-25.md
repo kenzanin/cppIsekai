@@ -1,9 +1,9 @@
 ---
 type: Finding
 title: "Offline cached chapters: /api/pages must fall back to chapter rows, not the plugin envelope"
-description: "Verified by setting [server] proxy=http://127.0.0.1:9 (all live plugin fetches -> 'Couldn't connect to server'): /api/pages/mangafire/w5r76/31 still returned 16 pages, prev 30/next 32, /cache/img served the cached jxl (200, 191 KB), and the real reader rendered 16/16 images with no errors. Before the fix the route resolved the chapter solely from call_cached('chapters') and call_cached('pages'), so an expired/missing envelope returned 'unknown chapter' offline even though chapters + chapter_pages rows and image files were all on disk. Fix: rebuild a chapters envelope from Store::chapters_list when resolution fails, and feed stored chapter_pages URLs (new Store::chapter_pages_urls, OpTrace-serialized) into build_pages_response when the pages call fails. Proxy was restored afterwards; live fetch green again."
+description: "With [server] proxy=http://127.0.0.1:9 (all plugin fetches fail) /api/pages/mangafire/w5r76/31 still returned 16 pages, prev 30/next 32, /cache/img 200 jxl, reader 16/16 images. Root cause: /api/pages resolved chapters+page URLs only from call_cached('chapters')/'pages', so an expired envelope gave 'unknown chapter' offline despite DB rows and jxl files. Fix: rebuild chapters envelope from Store::chapters_list; use stored chapter_pages URLs via new Store::chapter_pages_urls (OpTrace). Proxy restored. Offline envelope shapes are now shared pages_api.hpp helpers used by route and tests; test_pages asserts ch_id/prev/next/encoded URLs + negative case, test_store asserts the getter. Suite 22/22. Route-level fallback selection is live-proven (dead proxy), not unit-tested."
 tags: [offline, cache, chapter-pages, store, reader, fixed]
-generated: { by: agent/mcp, at: "2026-11-25T01:41:08Z" }
+generated: { by: agent/mcp, at: "2026-11-25T02:18:05Z" }
 status: stable
 ---
 
