@@ -13,6 +13,13 @@ return function(params)
   if gerr ~= nil then
     return { ok = false, error = "harimanga: goto failed: " .. gerr }
   end
+  local _, werr = host.browser.call(
+    "wait",
+    { expression = "document.title.indexOf('Just a moment')===-1", timeout_ms = 20000 }
+  )
+  if werr ~= nil then
+    return { ok = false, error = "harimanga: challenge stuck on manga/" .. slug }
+  end
   local out, eerr = host.browser.call(
     "evaluate",
     {
