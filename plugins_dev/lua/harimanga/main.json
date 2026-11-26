@@ -11,7 +11,8 @@
     "site_url": "https://www.harimanga.cc"
   },
   "runtime": "lua",
-  "version": "1.0.1",
+  "version": "1.0.2",
+  "capabilities": ["search", "detail", "chapters", "pages", "genres"],
   "image_engine": "chrome116",
   "image_ua": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/158.0.0.0 Safari/537.36",
   "api": 1
