@@ -1,7 +1,5 @@
 local c = require("common")
 local BASE = c.BASE
-local http_req = c.http_req
-local genre_map = c.genre_map
 local find1 = c.find1
 return function(params)
   local slug = params.id or ""
@@ -34,7 +32,7 @@ return function(params)
     return { ok = false, error = "harimanga: ajax chapters status " .. tostring(status) }
   end
 
-  local out, seen = {}, {}
+  local rows, seen = {}, {}
   for _, m in ipairs(host.re2.find_all([[(?s)<li[^>]*class="wp-manga-chapter[^"]*"[^>]*>(.*?)</li>]], body)) do
     local li = m[1]
     local href = find1(li, [[href="([^"]+)"]])
@@ -43,7 +41,7 @@ return function(params)
       local cid = find1(href, [[/manga/[^/]+/([^/]+)/?$]]) or find1(href, [[/([^/]+)/?$]])
       if cid and not seen[cid] then
         seen[cid] = true
-        out[#out + 1] = {
+        rows[#rows + 1] = {
           id = slug .. ":" .. cid, -- composite slug:chapterId; pages needs both
           number = host.text.chapter_num(label) or 0,
           title = label,
@@ -55,13 +53,13 @@ return function(params)
   end
 
   -- fallback: chapter links in the page body (theme variants without the li)
-  if #out == 0 then
+  if #rows == 0 then
     for _, m in ipairs(host.re2.find_all([[<a[^>]*href="([^"]*chapter-[^"]+)"[^>]*>\s*([^<]+)\s*</a>]], body)) do
       local href, label = m[2], m[3]
       local cid = href and find1(href, [[/([^/]+)/?$]])
       if cid and not seen[cid] then
         seen[cid] = true
-        out[#out + 1] = {
+        rows[#rows + 1] = {
           id = slug .. ":" .. cid,
           number = host.text.chapter_num(label) or 0,
           title = host.text.trim(label or ""),
@@ -72,8 +70,8 @@ return function(params)
     end
   end
 
-  table.sort(out, function(a, b)
+  table.sort(rows, function(a, b)
     return (a.number or 0) < (b.number or 0)
   end)
-  return { ok = true, data = out }
+  return { ok = true, data = rows }
 end

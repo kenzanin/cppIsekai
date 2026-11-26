@@ -20,22 +20,12 @@ local function http_req(url)
 end
 
 -- first capture group of the first match; nil when no match (host re2.capture).
-
--- name -> slug map filled by methods.genres; search resolves UI genre names.
-local genre_map = nil
-
--- ── search ─────────────────────────────────────────────────────────────────
-
--- ── detail ─────────────────────────────────────────────────────────────────
-
--- ── chapters ───────────────────────────────────────────────────────────────
-
--- ── pages ──────────────────────────────────────────────────────────────────
-
--- ── genres ─────────────────────────────────────────────────────────────────
-
 local function find1(s, pattern)
   return host.re2.capture(pattern, tostring(s or ""))
 end
+
+-- label -> url-slug map, filled by methods.genres; search resolves UI names.
+-- Shared table on purpose: genres.lua mutates this same reference.
+local genre_map = {}
 
 return { BASE = BASE, http_req = http_req, genre_map = genre_map, find1 = find1 }
