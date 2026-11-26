@@ -18,6 +18,8 @@
 
 #include <cstdint>
 #include <optional>
+#include <tuple>
+#include <utility>
 
 namespace http::api {
 
