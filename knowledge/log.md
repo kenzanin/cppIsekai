@@ -1,4 +1,5 @@
 ## 2026-11-26
+* **Update** [2026-11-26T11:51:34Z]: Updated concept `findings/harimanga-cf-challenge-2026-11-26.md`. — seed-jar is in-band (script eksternal dihapus); cookie_jar_path jadi satu pemilik; image_fetch accessor tunggal; restart form
 * **Relate** [2026-11-26T07:10:48Z]: Linked `decisions/titlestate-split.md` to `decisions/store-raw-handle-reuse.md` (consumer of the moved refresh_title driver).
 * **Relate** [2026-11-26T07:10:48Z]: Linked `decisions/titlestate-split.md` to `decisions/enrich-module-location.md` (extends the same layering rule to the title-state domain).
 * **Creation** [2026-11-26T07:10:44Z]: Documented concept `decisions/titlestate-split.md` (titlestate: domain layer split out of src/http).
