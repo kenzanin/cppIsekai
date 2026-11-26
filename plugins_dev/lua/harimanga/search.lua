@@ -27,8 +27,14 @@ return function(params)
       url = url .. "page/" .. tostring(page) .. "/"
     end
   else
-    -- Madara GET search: admin-ajax.php answers 0 bytes, use server-rendered GET.
-    url = BASE .. "/?s=" .. host.url_encode(q) .. "&post_type=wp-manga"
+    -- Madara GET search: admin-ajax.php answers 0 bytes, use server-rendered
+    -- GET. Page N is PATH style (site's own pager): /page/N/?s=...; the
+    -- &page=N query variant is ignored by the theme (same-content trap).
+    if page > 1 then
+      url = BASE .. "/page/" .. page .. "/?s=" .. host.url_encode(q) .. "&post_type=wp-manga"
+    else
+      url = BASE .. "/?s=" .. host.url_encode(q) .. "&post_type=wp-manga"
+    end
   end
 
   -- CF challenge zone: render via the shared browser fetch (goto+outerHTML).
