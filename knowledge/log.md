@@ -1,4 +1,6 @@
 ## 2026-11-25
+* **Update**: Linked `findings/harimanga-cf-challenge-2026-11-26.md` to `architecture/plugin-system.md` (cookies tool + image_ua extend the host surface used by the plugin system).
+* **Update**: Linked `findings/harimanga-cf-challenge-2026-11-26.md` to `findings/browser-session-waf-2026-11-17.md` (harimanga repeats the comix WAF pattern with the app-local chrome; adds cookie/UA bridge for image path).
 * **Creation**: Documented concept `findings/harimanga-cf-challenge-2026-11-26.md` (harimanga CF challenge: browser fetch + jar/UA bridge).
 * **Update**: Linked `decisions/plugin-show-off-deferred.md` to `architecture/plugin-system.md` (visibility flag would extend the plugin manifest/host surface; deferred by this decision).
 * **Update**: Updated concept `decisions/plugin-show-off-deferred.md`.

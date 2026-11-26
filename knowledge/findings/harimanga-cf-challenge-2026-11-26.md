@@ -3,7 +3,7 @@ type: Finding
 title: "harimanga CF challenge: browser fetch + jar/UA bridge"
 description: "harimanga.cc CF managed challenge: browser-path fetch + cookies tool + image_ua jar bridge; cf_clearance bound to UA."
 tags: [harimanga, cloudflare, waf, browser-host, cookies]
-generated: { by: agent/mcp, at: "2026-11-25T18:20:18Z" }
+generated: { by: agent/mcp, at: "2026-11-25T18:20:26Z" }
 status: stable
 ---
 
@@ -24,3 +24,7 @@ status: stable
 - Restart daemon after host rebuild: `pkill -f release/cppIsekai` + relaunch `setsid ... &` (nohup dalam subshell kadang mati saat sesi shell close).
 
 generated: { by: "kit-agent", at: "2026-11-26" }
+
+# Related Concepts
+- [comix WAF turnstile unsolvable in lightpanda headless; session ops notes](browser-session-waf-2026-11-17.md): harimanga repeats the comix WAF pattern with the app-local chrome; adds cookie/UA bridge for image path
+- [Plugin system: folder packaging, manifest, multi-runtime data-contract ABI](../architecture/plugin-system.md): cookies tool + image_ua extend the host surface used by the plugin system
