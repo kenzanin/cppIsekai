@@ -12,6 +12,15 @@ local function http_req(url)
   if gerr ~= nil then
     return nil, "harimanga: goto failed: " .. gerr
   end
+  -- the challenge page answers navigation instantly; wait it out or we
+  -- evaluate "Just a moment..." and parse zero items silently
+  local _, werr = host.browser.call(
+    "wait",
+    { expression = "document.title.indexOf('Just a moment')===-1", timeout_ms = 20000 }
+  )
+  if werr ~= nil then
+    return nil, "harimanga: challenge stuck on " .. url
+  end
   local body, eerr = host.browser.call("evaluate", { script = "document.documentElement.outerHTML", timeout_ms = 30000 })
   if eerr ~= nil or body == nil or body == "" then
     return nil, "harimanga: render failed: " .. tostring(eerr)
