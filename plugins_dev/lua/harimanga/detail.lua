@@ -58,6 +58,12 @@ return function(params)
   end
   local description = host.text.strip_html(dblock):gsub("%s+", " ")
 
+  if name == "" then
+    -- Empty parse = wrong or blank document (boot race / challenge). Error, not
+    -- a 200: a cached empty envelope would be served for the whole 24 h TTL.
+    return { ok = false, error = "harimanga: no title on page for " .. slug }
+  end
+
   local data = empty
   data.name = name
   data.cover = cover

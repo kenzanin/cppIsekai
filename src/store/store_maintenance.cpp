@@ -99,14 +99,10 @@ std::string Store::maintenance_vacuum_backup(const std::string& backup_dir, int 
 std::size_t Store::cache_prune_expired() {
     const store_detail::OpTrace _op{"cache_prune_expired"};
     const std::int64_t horizon = static_cast<std::int64_t>(std::time(nullptr)) - 7 * 86400;
-    sqlite3* db = nullptr;
-    if (sqlite3_open(impl_->path.c_str(), &db) != SQLITE_OK) {
-        if (db) {
-            sqlite3_close(db);
-        }
+    sqlite3* db = impl_->raw_db();
+    if (db == nullptr) {
         return 0;
     }
-    store_detail::attach_busy(db);
     sqlite3_stmt* stmt = nullptr;
     bool ok = sqlite3_prepare_v2(db, "DELETE FROM api_cache WHERE fetched_at + ttl_s < ?", -1, &stmt, nullptr) == SQLITE_OK;
     std::size_t n = 0;
@@ -116,7 +112,6 @@ std::size_t Store::cache_prune_expired() {
     }
     const std::string msg = ok ? "" : sqlite3_errmsg(db);
     sqlite3_finalize(stmt);
-    sqlite3_close(db);
     if (!ok) {
         spdlog::warn("[backup] cache prune failed: {}", msg);
     }

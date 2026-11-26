@@ -10,12 +10,12 @@ using namespace sqlite_orm;
 
 std::optional<ApiCacheRow> Store::api_cache_get(const std::string& plugin_id, const std::string& query_hash) {
     const store_detail::OpTrace _op{"api_cache_get"};
-    // Raw connection: payload is JSONB binary — sqlite_orm has no mapping for it.
-    sqlite3* db = nullptr;
-    if (sqlite3_open(impl_->path.c_str(), &db) != SQLITE_OK) {
+    // Raw (JSONB) handle: opened once per process, guarded by OpTrace's
+    // raw_db_mutex -- sqlite_orm has no mapping for the binary payload.
+    sqlite3* db = impl_->raw_db();
+    if (db == nullptr) {
         return std::nullopt;
     }
-    store_detail::attach_busy(db);
     sqlite3_stmt* stmt = nullptr;
     std::optional<ApiCacheRow> row;
     const char* sql = "SELECT params_json, json(payload), fetched_at, ttl_s FROM api_cache "
@@ -41,18 +41,16 @@ std::optional<ApiCacheRow> Store::api_cache_get(const std::string& plugin_id, co
         }
         sqlite3_finalize(stmt);
     }
-    sqlite3_close(db);
     return row;
 }
 
 void Store::api_cache_put(const std::string& plugin_id, const std::string& query_hash, const std::string& params_json,
                           const std::string& payload, std::int64_t fetched_at, std::int64_t ttl_s) {
     const store_detail::OpTrace _op{"api_cache_put"};
-    sqlite3* db = nullptr;
-    if (sqlite3_open(impl_->path.c_str(), &db) != SQLITE_OK) {
+    sqlite3* db = impl_->raw_db();
+    if (db == nullptr) {
         return;
     }
-    store_detail::attach_busy(db);
     sqlite3_stmt* stmt = nullptr;
     // jsonb(?) rejects malformed JSON -> the write fails loudly, never stores garbage.
     const char* sql = "INSERT INTO api_cache(plugin_id, query_hash, params_json, fetched_at, ttl_s, payload) "
@@ -70,17 +68,15 @@ void Store::api_cache_put(const std::string& plugin_id, const std::string& query
         sqlite3_step(stmt); // fire-and-forget write; failure = cache miss next time
         sqlite3_finalize(stmt);
     }
-    sqlite3_close(db);
 }
 
 int Store::api_cache_clear(const std::string& plugin_id) {
     const store_detail::OpTrace _op{"api_cache_clear"};
     // Empty id clears every plugin; else just that plugin's envelopes.
-    sqlite3* db = nullptr;
-    if (sqlite3_open(impl_->path.c_str(), &db) != SQLITE_OK) {
+    sqlite3* db = impl_->raw_db();
+    if (db == nullptr) {
         return -1;
     }
-    store_detail::attach_busy(db);
     sqlite3_stmt* stmt = nullptr;
     const char* sql = plugin_id.empty() ? "DELETE FROM api_cache" : "DELETE FROM api_cache WHERE plugin_id = ?";
     int changes = -1;
@@ -92,7 +88,6 @@ int Store::api_cache_clear(const std::string& plugin_id) {
         changes = sqlite3_changes(db);
         sqlite3_finalize(stmt);
     }
-    sqlite3_close(db);
     return changes;
 }
 
