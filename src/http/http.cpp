@@ -2,6 +2,7 @@
 #include "http_routes.hpp"
 
 #include "fetch/fetch.hpp"
+#include "plugin/http_client.hpp" // cookie_jar_path: one owner for the plugin jar path
 #include "reader/cover_worker.hpp"
 #include "reader/worker.hpp"
 
@@ -22,21 +23,20 @@ cache::Fetcher makeCurlFetcher(const std::string& proxy, const plugin::Host& plu
     return [&plugins, proxy](const std::string& url, const std::string& plugin) -> std::optional<std::string> {
         // Manifest `image_engine` opt-in: CF-fronted image CDNs need the
         // chrome impersonation fingerprint; stock curl eats a 403 challenge.
-        if (const std::string engine = plugins.image_engine(plugin); !engine.empty()) {
+        const plugin::Host::ImageFetch ifx = plugins.image_fetch(plugin);
+        if (!ifx.engine.empty()) {
             fetch::Request rq;
             rq.url = url;
-            rq.profile = engine; // timeout_ms defaults to 30 s
+            rq.profile = ifx.engine; // timeout_ms defaults to 30 s
             // CF challenge zones mint httpOnly cookies in the host browser;
             // the image fetch is curl-side, so feed it the plugin jar when one
             // exists (seeded by the plugin's cookie=true calls / harvest).
-            const std::string jar = "data/plugin-state/" + plugin + ".cookies.txt";
+            const std::string jar = plugin::cookie_jar_path(plugin);
             if (std::error_code ec; std::filesystem::exists(jar, ec) && !ec) {
                 rq.cookie_jar = jar;
             }
             // cf_clearance is bound to the UA that solved the challenge; echo it
-            if (const std::string ua = plugins.image_ua(plugin); !ua.empty()) {
-                rq.ua_header = ua;
-            }
+            rq.ua_header = ifx.ua;
             if (const std::string referer = plugins.image_referer_for_url(url, plugin);
                 !referer.empty() && referer != "none") { // "none": sentinel, no header (D-sentinel)
                 rq.headers = {{"Referer", referer}};

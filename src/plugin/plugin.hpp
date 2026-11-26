@@ -137,15 +137,15 @@ public:
      *  Falls back to `image_referer(fallback_id)` when no site matches. */
     [[nodiscard]] std::string image_referer_for_url(const std::string& url, const std::string& fallback_id) const;
 
-    /** \brief curl-impersonate profile for this plugin's image fetches; empty
-     *  = legacy plain curl (stock TLS). CF-fronted image CDNs opt in
-     *  (image-engine-profile). */
-    [[nodiscard]] std::string image_engine(const std::string& id) const;
-
-    /** \brief UA for this plugin's image fetches: manifest `image_ua` override.
-     *  CF binds cf_clearance to the UA token it was minted under, so jar-fed
-     *  image fetches must echo the browser that solved the challenge. */
-    [[nodiscard]] std::string image_ua(const std::string& id) const;
+    /** \brief Manifest image-fetch knobs for one plugin: curl-impersonate
+     *  profile (empty = legacy plain curl, stock TLS) and the UA to echo.
+     *  CF-fronted image CDNs opt in via image_engine; CF also binds
+     *  cf_clearance to the UA that solved the challenge, so a jar-fed image
+     *  fetch must echo the browser UA (image_ua). */
+    struct ImageFetch {
+        std::string engine, ua;
+    };
+    [[nodiscard]] ImageFetch image_fetch(const std::string& id) const;
 
     /** \brief Manifest `cache_ttl` override for one api_cache method, in
      *  seconds; 0 when absent (host per-method default applies). For sites

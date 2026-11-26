@@ -104,16 +104,14 @@ std::string Host::image_referer_for_url(const std::string& url, const std::strin
     return image_referer(fallback_id);
 }
 
-std::string Host::image_engine(const std::string& id) const {
+Host::ImageFetch Host::image_fetch(const std::string& id) const {
     const std::scoped_lock lock(impl_->mu);
     const auto it = impl_->plugins.find(id);
-    return it != impl_->plugins.end() ? it->second->info.image_engine : std::string{};
-}
-
-std::string Host::image_ua(const std::string& id) const {
-    const std::scoped_lock lock(impl_->mu);
-    const auto it = impl_->plugins.find(id);
-    return it != impl_->plugins.end() ? it->second->info.image_ua : std::string{};
+    if (it == impl_->plugins.end()) {
+        return {};
+    }
+    const auto& info = it->second->info;
+    return {.engine = info.image_engine, .ua = info.image_ua};
 }
 
 std::int64_t Host::cache_ttl_seconds(const std::string& id, const std::string& method) const {

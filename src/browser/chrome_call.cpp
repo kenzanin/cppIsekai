@@ -1,6 +1,7 @@
 #include "browser/chrome.hpp"
 
 #include "cdp/CDP.hpp"
+#include "plugin/http_client.hpp" // cookie_jar_path: one owner for the plugin jar path
 
 #include "spdlog/spdlog.h"
 
@@ -129,10 +130,8 @@ std::string call(const std::string& tool, const std::string& args_json, std::str
                 if (out.empty()) {
                     return fail("seed-jar: no cookies for domain");
                 }
-                const std::string dir = "data/plugin-state";
-                std::error_code ec;
-                std::filesystem::create_directories(dir, ec);
-                std::ofstream f(dir + "/" + plugin + ".cookies.txt", std::ios::trunc);
+                // cookie_jar_path owns the layout + creates the state dir.
+                std::ofstream f(plugin::cookie_jar_path(plugin), std::ios::trunc);
                 if (!f) {
                     return fail("seed-jar: cannot write jar");
                 }
