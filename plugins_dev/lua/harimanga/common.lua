@@ -7,6 +7,18 @@ local BASE = "https://www.harimanga.cc" -- single origin; manifest site_url kept
 
 -- http request -> (body, err) via the host browser (CF challenge zone:
 -- chrome116 curl eats 403; goto solves it, then read outerHTML -- comix pattern).
+local seeded = false
+
+local function seed_jar()
+  if seeded then
+    return
+  end
+  seeded = true
+  -- cf_clearance is bound to the browser session: after any solved goto, pour
+  -- this session's cookies into the plugin jar so curl-side image fetches pass.
+  host.browser.call("seed-jar", { plugin = "harimanga", domain = "harimanga" })
+end
+
 local function http_req(url)
   local _, gerr = host.browser.call("goto", { url = url, timeout_ms = 60000 })
   if gerr ~= nil then
@@ -21,6 +33,7 @@ local function http_req(url)
   if werr ~= nil then
     return nil, "harimanga: challenge stuck on " .. url
   end
+  seed_jar()
   local body, eerr = host.browser.call("evaluate", { script = "document.documentElement.outerHTML", timeout_ms = 30000 })
   if eerr ~= nil or body == nil or body == "" then
     return nil, "harimanga: render failed: " .. tostring(eerr)
@@ -37,4 +50,4 @@ end
 -- Shared table on purpose: genres.lua mutates this same reference.
 local genre_map = {}
 
-return { BASE = BASE, http_req = http_req, genre_map = genre_map, find1 = find1 }
+return { BASE = BASE, http_req = http_req, genre_map = genre_map, seed_jar = seed_jar, find1 = find1 }

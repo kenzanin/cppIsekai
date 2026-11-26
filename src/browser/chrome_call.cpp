@@ -5,6 +5,8 @@
 #include "spdlog/spdlog.h"
 
 #include <chrono>
+#include <filesystem>
+#include <fstream>
 #include <glaze/glaze.hpp>
 #include <memory>
 #include <sstream>
@@ -77,6 +79,65 @@ std::string call(const std::string& tool, const std::string& args_json, std::str
                     return fail("evaluate: no script");
                 }
                 return page()->evalString(script); // value-serialized; objects => JSON
+            }
+            if (tool == "seed-jar") {
+                // Persist the live session's cookies (httpOnly cf_clearance
+                // included) as the plugin's Netscape jar: cf challenge zones
+                // mint in the browser, curl-side image fetches consume. One
+                // call per plugin process right after a solved goto; stale
+                // jars after daemon restarts heal on the next data fetch.
+                const std::string plugin = arg_str(args, "plugin");
+                const std::string domain = arg_str(args, "domain");
+                const std::string all = page()->getAllCookies();
+                if (all.empty() || plugin.empty() || domain.empty()) {
+                    return fail("seed-jar: no cookies or bad args");
+                }
+                glz::generic parsed{};
+                if (auto ec = glz::read_json(parsed, all); ec != glz::error_code{} || !parsed.is_array()) {
+                    return fail("seed-jar: unparsable cookie blob");
+                }
+                std::string out;
+                for (const auto& c : parsed.get_array()) {
+                    if (!c.is_object()) {
+                        continue;
+                    }
+                    const auto& o = c.get_object();
+                    const auto str = [&o](const char* k) {
+                        const auto it = o.find(k);
+                        return it != o.end() && it->second.is_string()
+                                   ? std::string{std::get<std::string>(it->second.data)}
+                                   : std::string{};
+                    };
+                    const std::string dom = str("domain");
+                    if (dom.find(domain) == std::string::npos) {
+                        continue;
+                    }
+                    double exp = 0;
+                    if (const auto it = o.find("expires"); it != o.end() && it->second.is_number()) {
+                        exp = it->second.get_number();
+                    }
+                    bool secure = false;
+                    if (const auto it = o.find("secure"); it != o.end() && it->second.is_boolean()) {
+                        secure = it->second.get<bool>();
+                    }
+                    // Netscape: domain TAB flag path secure expiry name value
+                    out += dom + "\tTRUE\t" + (str("path").empty() ? "/" : str("path")) + "\t" +
+                           (secure ? "TRUE" : "FALSE") + "\t" +
+                           std::to_string(exp > 0 ? static_cast<long long>(exp) : 2147483647LL) + "\t" +
+                           str("name") + "\t" + str("value") + "\n";
+                }
+                if (out.empty()) {
+                    return fail("seed-jar: no cookies for domain");
+                }
+                const std::string dir = "data/plugin-state";
+                std::error_code ec;
+                std::filesystem::create_directories(dir, ec);
+                std::ofstream f(dir + "/" + plugin + ".cookies.txt", std::ios::trunc);
+                if (!f) {
+                    return fail("seed-jar: cannot write jar");
+                }
+                f << "# Netscape HTTP Cookie File\n" << out;
+                return "ok";
             }
             return fail("browser: unknown tool '" + tool + "'");
         } catch (const std::exception& e) {

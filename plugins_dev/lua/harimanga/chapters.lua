@@ -1,5 +1,6 @@
 local c = require("common")
 local BASE = c.BASE
+local seed_jar = c.seed_jar
 local find1 = c.find1
 return function(params)
   local slug = params.id or ""
@@ -20,6 +21,7 @@ return function(params)
   if werr ~= nil then
     return { ok = false, error = "harimanga: challenge stuck on manga/" .. slug }
   end
+  seed_jar()
   local out, eerr = host.browser.call(
     "evaluate",
     {
