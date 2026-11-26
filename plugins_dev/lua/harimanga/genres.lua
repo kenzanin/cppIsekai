@@ -11,16 +11,14 @@ return function()
     return { ok = false, error = err }
   end
   local seen, names = {}, {}
-  local map = {}
   for _, m in ipairs(host.re2.find_all([[href="[^"]*/manga-genre/([a-z0-9-]+)/?"[^>]*>([^<]+)<]], body)) do
     local slug, label = m[2], host.text.unescape(host.text.trim(m[3]))
     if label ~= "" and not seen[slug] then
       seen[slug] = true
       names[#names + 1] = label
-      map[label] = slug
+      genre_map[label] = slug -- shared table; search resolves chips through it
     end
   end
   table.sort(names)
-  genre_map = map
   return { ok = true, data = names }
 end

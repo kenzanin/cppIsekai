@@ -17,8 +17,11 @@ return function(params)
 
   local url
   if type(genres) == "table" and #genres > 0 then
-    -- Madara genre archives: /manga-genre/<slug>/, page N as /page/N/.
-    local slug = (genre_map and genre_map[genres[1]]) or genres[1]
+    -- Madara genre archives: /manga-genre/<slug>/, page N as /page/N/. Chip
+    -- labels map to slugs via the shared genre_map; unknown names degrade to
+    -- the lower-hyphen guess.
+    local key = genres[1]
+    local slug = (genre_map and genre_map[key]) or key:lower():gsub("%s+", "-")
     url = BASE .. "/manga-genre/" .. host.url_encode(slug) .. "/"
     if page > 1 then
       url = url .. "page/" .. tostring(page) .. "/"
@@ -28,30 +31,31 @@ return function(params)
     url = BASE .. "/?s=" .. host.url_encode(q) .. "&post_type=wp-manga"
   end
 
-  -- CF challenge zone: plain/chrome116 curl eats 403 -> render via host browser
-  -- (comix pattern; goto solves the challenge, then grab outerHTML).
-  local _, gerr = host.browser.call("goto", { url = url, timeout_ms = 60000 })
-  if gerr ~= nil then
-    return { ok = false, error = "harimanga: goto failed: " .. gerr }
-  end
-  local body, eerr = host.browser.call("evaluate", { script = "document.documentElement.outerHTML", timeout_ms = 30000 })
-  if eerr ~= nil or body == nil or body == "" then
-    return { ok = false, error = "harimanga: search render failed: " .. tostring(eerr) }
+  -- CF challenge zone: render via the shared browser fetch (goto+outerHTML).
+  local body, err = http_req(url)
+  if err ~= nil then
+    return { ok = false, error = err }
   end
 
   local items, seen = {}, {}
-  -- one card per c-tabs-item__content block: cover <img> first, then post-title
-  -- link; capture up to the close so the cover stays in the same card.
+  -- Madara has two card shapes: search = .c-tabs-item__content, genre archives =
+  -- .page-item-detail (badge variant, title in h4). Parse both, dedupe by slug.
+  local blocks = {}
+  for _, m in ipairs(host.re2.find_all([[(?s)<div[^>]*class="[^"]*page-item-detail[^"]*".*?post-title.*?</h3>]], body)) do
+    blocks[#blocks + 1] = m[1]
+  end
   for _, m in ipairs(host.re2.find_all([[(?s)<div[^>]*class="[^"]*c-tabs-item__content.*?post-title.*?</h3>]], body)) do
-    local card = m[1]
+    blocks[#blocks + 1] = m[1]
+  end
+  for _, card in ipairs(blocks) do
     local href = find1(card, [[href="([^"]*/manga/[^"/]+/)]])
     if href then
       local slug = find1(href, [[/manga/([^/]+)/]]) or find1(href, [[/manga/([^/]+)$]])
       if slug and not seen[slug] then
         seen[slug] = true
         local cover = find1(card, [[data-src="[\t\n\s]*(https?://[^"]+)"]]) or find1(card, [[\ssrc="(https?://[^"]+)"]])
-        local title = find1(card, [[<h3[^>]*><a[^>]*>([^<]+)</a>]])
-        items[#items + 1] = { id = slug, name = host.text.unescape(title or ""), cover = host.text.trim(cover or "") }
+        local title = find1(card, [[<h[1-6][^>]*>\s*<a[^>]*>([^<]+)</a>]])
+        items[#items + 1] = { id = slug, name = host.text.unescape(host.text.trim(title or "")), cover = host.text.trim(cover or "") }
       end
     end
   end

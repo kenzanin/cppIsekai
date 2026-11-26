@@ -1,7 +1,6 @@
 local c = require("common")
 local BASE = c.BASE
 local http_req = c.http_req
-local genre_map = c.genre_map
 local find1 = c.find1
 return function(params)
   local slug = params.id or ""
