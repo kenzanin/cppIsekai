@@ -43,32 +43,6 @@ TEST_CASE("length cap 64, unicode boundary-safe") {
     CHECK((static_cast<unsigned char>(mixed.back()) & 0xC0) != 0x80); // ends on lead byte
 }
 
-TEST_CASE("suffix only when base slugs collide; never for a lone manga") {
-    const std::map<std::string, std::string> one{{"aaaa1111", "Solo Leveling"}};
-    CHECK(cache::manga_slug(one, "aaaa1111") == "solo-leveling");
-
-    const std::map<std::string, std::string> many{
-        {"11111111", "Solo Leveling"},
-        {"22222222", "Solo Leveling"},
-        {"x1234567890", "Solo Leveling"},
-        {"33333333", "Naruto"},
-    };
-    CHECK(cache::manga_slug(many, "33333333") == "naruto"); // no collision
-    CHECK(cache::manga_slug(many, "11111111") == "solo-leveling-11111111");
-    CHECK(cache::manga_slug(many, "22222222") == "solo-leveling-22222222");
-    CHECK(cache::manga_slug(many, "x1234567890") == "solo-leveling-34567890"); // last 8 only
-    CHECK(fs_safe(cache::manga_slug(many, "11111111")));
-    CHECK(cache::manga_slug(many, "missing").empty());
-}
-
-TEST_CASE("collision slug stays within the 64-char cap") {
-    const std::map<std::string, std::string> two{{"11111111", std::string(100, 'a')},
-                                                 {"22222222", std::string(100, 'a')}};
-    const auto s = cache::manga_slug(two, "22222222");
-    CHECK(s == std::string(55, 'a') + "-22222222");
-    CHECK(s.size() == cache::slug_max);
-}
-
 TEST_CASE("cache_ns: the display name keys the cache, the id is only the fallback") {
     // The point of the whole exercise: the on-disk directory follows the plugin
     // display NAME, so swapping the plugin id or its folder keeps the cached

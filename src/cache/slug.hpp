@@ -10,7 +10,6 @@
 
 #include <cctype>
 #include <cstddef>
-#include <map>
 #include <string>
 #include <string_view>
 
@@ -57,34 +56,6 @@ inline std::string slug_base(std::string_view title) {
     }
     s.resize(capped_len(s, slug_max));
     return s.empty() ? std::string("untitled") : s;
-}
-
-/** \brief Slug for \p id within the known manga set \p titles (id -> title):
- *  the base slug, plus the id suffix only on a base-slug collision with
- *  another id. */
-inline std::string manga_slug(const std::map<std::string, std::string>& titles, const std::string& id) {
-    const auto self = titles.find(id);
-    if (self == titles.end()) {
-        return {};
-    }
-    const std::string base = slug_base(self->second);
-    bool collide = false;
-    for (const auto& [oid, otitle] : titles) {
-        if (oid != id && slug_base(otitle) == base) {
-            collide = true;
-            break;
-        }
-    }
-    if (!collide || id.empty()) {
-        return base;
-    }
-    const std::string tail = id.size() <= 8 ? id : id.substr(id.size() - 8);
-    // ponytail: two same-titled ids sharing their last 8 chars still merge;
-    // upgrade path: lengthen the tail to the full id.
-    std::string slug = base.substr(0, capped_len(base, slug_max - tail.size() - 1));
-    slug += '-';
-    slug += tail;
-    return slug;
 }
 
 /** \brief On-disk directory component for a manga slug, uniform for every
