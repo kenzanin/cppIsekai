@@ -30,17 +30,6 @@
 
 namespace reader {
 
-/** \brief Placement context for one window batch: the reader knows plugin,
- *  slug (D5) and the chapter number the window belongs to; the page number is
- *  the 1-based position of the url within the batch -- or, when page_base is
- *  set, chapter-absolute (batch[0] is page_base), matching the /cache/img
- *  query-page convention so both paths land one file per slot. Empty fields
- *  mean the batch is dropped: there is no sha fallback to write it to. */
-struct WindowCtx {
-    std::string plugin;
-    std::string slug;
-};
-
 class Worker {
 public:
     explicit Worker(cache::Cache& images) : images_(images), thread_([this] { loop(); }) {}
