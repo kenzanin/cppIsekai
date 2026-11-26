@@ -1,4 +1,6 @@
 ## 2026-11-26
+* **Update**: Linked `findings/harimanga-cf-challenge-2026-11-26.md` to `architecture/plugin-system.md` (image_ua manifest field + jar bridge extend the host plugin surface).
+* **Update**: Linked `findings/harimanga-cf-challenge-2026-11-26.md` to `findings/browser-session-waf-2026-11-17.md` (harimanga repeats the comix WAF pattern; challenge-wait + external jar seed, no daemon cookies tool).
 * **Update**: Linked `findings/harimanga-cf-challenge-2026-11-26.md` to `architecture/plugin-system.md` (cookies tool + image_ua extend the host surface used by the plugin system).
 * **Update**: Linked `findings/harimanga-cf-challenge-2026-11-26.md` to `findings/browser-session-waf-2026-11-17.md` (harimanga repeats the comix WAF pattern with the app-local chrome; adds cookie/UA bridge for image path).
 * **Update**: Updated concept `findings/harimanga-cf-challenge-2026-11-26.md`.
