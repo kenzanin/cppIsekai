@@ -23,6 +23,7 @@ void Store::saved_stats_update(const std::string& plugin, const std::string& slu
     auto& e = rows[0];
     const int new_total = total_ch < 0 ? e.total_ch : total_ch; // <0 = unknown, keep stored
     const bool changed = (!status.empty() && e.status != status) || e.total_ch != new_total;
+    const int old_flags = e.status_flags;
     if (!status.empty()) {
         e.status = status;
     }
@@ -37,7 +38,12 @@ void Store::saved_stats_update(const std::string& plugin, const std::string& slu
         e.updated_at = now;
     }
     // FTS NOT re-synced here (library-dedup 1.4): stats path touches no indexed column (name/alt_titles/synopsis).
-    impl_->storage.replace(e);
+    // A row-served detail open runs this on every request, so write only when
+    // the row actually moved -- an unconditional replace cost a WAL frame per
+    // open for nothing.
+    if (changed || e.status_flags != old_flags) {
+        impl_->storage.replace(e);
+    }
 }
 
 void Store::saved_signal_update(const std::string& plugin, const std::string& slug, const std::string& synopsis,
@@ -74,6 +80,9 @@ void Store::saved_read_rollup(const std::string& plugin, const std::string& slug
         return;
     }
     auto& e = rows[0];
+    const int old_read = e.read_ch;
+    const int old_flags = e.status_flags;
+    const std::int64_t old_last = e.last_read_at;
     e.read_ch = read_ch;
     if (last_read_at > 0) {
         e.last_read_at = last_read_at;
@@ -83,7 +92,11 @@ void Store::saved_read_rollup(const std::string& plugin, const std::string& slug
     // set OR grew in this call" (the rollup never observes the chapter list).
     const int news = e.status_flags & static_cast<int>(std::to_underlying(StatusFlag::kNew));
     e.status_flags = compose_flags(e, "", news != 0);
-    impl_->storage.replace(e);
+    // Guarded like the stats path: a rollup that re-learns the same counts must
+    // not rewrite the row (every row-served detail open runs this).
+    if (e.read_ch != old_read || e.status_flags != old_flags || e.last_read_at != old_last) {
+        impl_->storage.replace(e);
+    }
 }
 
 void Store::saved_clear_update(const std::string& plugin, const std::string& slug) {

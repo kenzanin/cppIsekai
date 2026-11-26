@@ -75,7 +75,13 @@ namespace http::api {
  *  Empty string when the row cannot serve (absent or nothing materialized). */
  std::string saved_detail_response(Store& store, BS::thread_pool<>& db, const std::string& plugin,
                                          const std::string& slug) {
-    const auto saved = on_pool(db, [&] { return store.saved_get(plugin, slug); });
+    // One db round-trip for the whole snapshot: the detail route reaches this
+    // on every open, and each on_pool hop is a task dispatch + promise/future.
+    const auto snap = on_pool(db, [&] {
+        return std::tuple{store.saved_get(plugin, slug), store.pair_novel_get(plugin, slug),
+                          store.pair_detail_url_get(plugin, slug), store.title_meta_get(plugin, slug)};
+    });
+    const auto& saved = std::get<0>(snap);
     if (!saved.has_value() || !saved_has_detail(*saved)) {
         return {};
     }
@@ -100,23 +106,19 @@ namespace http::api {
     set_arr("alt_titles", saved->alt_titles); // source verbatim; chosen never touches it
     // Restore the extra plugin flags/kv captured at materialize time -- the
     // saved row only stores the canonical columns (no schema change needed).
-    const auto novel = on_pool(db, [&] {
-        return store.pair_novel_get(plugin, slug);
-    });
+    const auto& novel = std::get<1>(snap);
     d["is_novel"].data = novel.has_value() && *novel;
-    const auto url = on_pool(db, [&] {
-        return store.pair_detail_url_get(plugin, slug);
-    });
-    set_str("url", url);
+    set_str("url", std::get<2>(snap));
 
     root["ok"].data = true;
     root["data"] = std::move(data);
     root["cached"].data = true; // D8: the row IS the offline copy
 
     // D7: title_meta overlay so the picker hydrates exactly as on the live path
-    if (const auto row = on_pool(db, [&] { return store.title_meta_get(plugin, slug); }); row.has_value()) {
+    const auto& meta_row = std::get<3>(snap);
+    if (meta_row.has_value()) {
         glz::generic chosen;
-        if (!glz::read_json(chosen, row->chosen) && chosen.is_object()) {
+        if (!glz::read_json(chosen, meta_row->chosen) && chosen.is_object()) {
             const auto& cd = chosen.get_object();
             if (const auto* const it = cd.find("cover"); it != cd.end()) {
                 if (const auto* s = std::get_if<std::string>(&it->second.data); s != nullptr && !s->empty()) {
@@ -127,7 +129,7 @@ namespace http::api {
             }
             glz::generic enr;
             auto& e = enr.data.emplace<glz::generic::object_t>();
-            e["fetched_at"].data = static_cast<double>(row->fetched_at);
+            e["fetched_at"].data = static_cast<double>(meta_row->fetched_at);
             e["chosen"] = std::move(chosen);
             root["enrichment"] = std::move(enr);
         }

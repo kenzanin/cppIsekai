@@ -17,12 +17,15 @@ namespace {
 //   the top level for the Alpine picker. Corrupt/absent rows return the envelope untouched.
  std::string apply_chosen(Store& store, BS::thread_pool<>& db, const std::string& plugin, const std::string& slug,
                                 const std::string& envelope) {
-    const auto row = on_pool(db, [&] { return store.title_meta_get(plugin, slug); });
+    // One db round-trip for both rows (the chosen row and the name fallback):
+    const auto snap = on_pool(db, [&] { return std::pair{store.title_meta_get(plugin, slug), store.saved_get(plugin, slug)}; });
+    const auto& row = snap.first;
     // Display-title resolver, shared with the library grid (home_context): the detail
     // name must equal the card name -- chosen title, else saved library name, else the
     // scraper's own title. Also guarantees detail.name for enrichment-less plugins
     // (detail h1 reads it; raw envelopes carry `title` only).
-    const auto saved = on_pool(db, [&] { return store.saved_get(plugin, slug); });
+    const auto& saved = snap.second;
+    bool renamed = false;
     auto ensure_name = [&](glz::generic& env) {
         if (!env.is_object()) {
             return;
@@ -44,11 +47,13 @@ namespace {
                 // the title node -- assigning through *s then reads freed memory (empty name).
                 const std::string title = *s;
                 d["name"].data = title;
+                renamed = true;
                 return;
             }
         }
         if (saved && !saved->name.empty() && saved->name != slug) {
             d["name"].data = saved->name;
+            renamed = true;
         }
     };
     glz::generic env;
@@ -60,7 +65,9 @@ namespace {
     const bool have_chosen = row.has_value() && !glz::read_json(chosen, row->chosen) && chosen.is_object();
     if (!have_chosen) {
         ensure_name(env);
-        return glz::write_json(env).value_or(envelope);
+        // Unchanged envelope: hand the caller the original bytes instead of
+        // re-serializing what we just parsed (every detail open hits this).
+        return renamed ? glz::write_json(env).value_or(envelope) : envelope;
     }
     auto& obj = env.get_object();
     const auto& cd = chosen.get_object();
