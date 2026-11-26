@@ -1,4 +1,7 @@
 ## 2026-11-26
+* **Relate** [2026-11-26T06:02:29Z]: Linked `decisions/store-raw-handle-reuse.md` to `decisions/db-read-parallel.md` (keeps write path single-writer; read-parallel still deferred by this decision).
+* **Relate** [2026-11-26T06:02:29Z]: Linked `decisions/store-raw-handle-reuse.md` to `findings/store-serialized-ops.md` (refines the single-connection store: raw handle reuse for api_cache ops).
+* **Creation** [2026-11-26T06:02:25Z]: Documented concept `decisions/store-raw-handle-reuse.md` (Store: reuse one raw sqlite handle for api_cache (measured 0.4ms/call saved)).
 * **Update**: Linked `findings/harimanga-cf-challenge-2026-11-26.md` to `architecture/plugin-system.md` (image_ua manifest field + jar bridge extend the host plugin surface).
 * **Update**: Linked `findings/harimanga-cf-challenge-2026-11-26.md` to `findings/browser-session-waf-2026-11-17.md` (harimanga repeats the comix WAF pattern; challenge-wait + external jar seed, no daemon cookies tool).
 * **Update**: Linked `findings/harimanga-cf-challenge-2026-11-26.md` to `architecture/plugin-system.md` (cookies tool + image_ua extend the host surface used by the plugin system).
