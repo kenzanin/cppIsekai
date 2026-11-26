@@ -1,4 +1,7 @@
 ## 2026-11-26
+* **Relate** [2026-11-26T07:10:48Z]: Linked `decisions/titlestate-split.md` to `decisions/store-raw-handle-reuse.md` (consumer of the moved refresh_title driver).
+* **Relate** [2026-11-26T07:10:48Z]: Linked `decisions/titlestate-split.md` to `decisions/enrich-module-location.md` (extends the same layering rule to the title-state domain).
+* **Creation** [2026-11-26T07:10:44Z]: Documented concept `decisions/titlestate-split.md` (titlestate: domain layer split out of src/http).
 * **Update** [2026-11-26T06:30:31Z]: Updated concept `decisions/store-raw-handle-reuse.md`.
 * **Relate** [2026-11-26T06:02:29Z]: Linked `decisions/store-raw-handle-reuse.md` to `decisions/db-read-parallel.md` (keeps write path single-writer; read-parallel still deferred by this decision).
 * **Relate** [2026-11-26T06:02:29Z]: Linked `decisions/store-raw-handle-reuse.md` to `findings/store-serialized-ops.md` (refines the single-connection store: raw handle reuse for api_cache ops).
