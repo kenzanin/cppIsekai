@@ -1,9 +1,9 @@
 ---
 type: Decision
 title: "Store: reuse one raw sqlite handle for api_cache (measured 0.4ms/call saved)"
-description: "api_cache raw sqlite handle opened once per process instead of per call: 1.62ms -> 1.0ms cache-hit path, WAL 13.4MB -> 1.7MB."
+description: "api_cache raw handle reuse + enrich hot-path round-trip collapse + guarded stat writes; cache-hit 1.62->1.0ms, detail row-serve 2.5-3.9->2.1ms, WAL churn zero."
 tags: [store, sqlite, performance, api-cache]
-generated: { by: agent/mcp, at: "2026-11-26T06:02:29Z" }
+generated: { by: agent/mcp, at: "2026-11-26T06:30:31Z" }
 status: stable
 ---
 
@@ -11,24 +11,22 @@ status: stable
 - `sqlite3_open` + `close` per raw op: **0.394 ms**; same query on a reused handle: **0.006 ms** (~65x).
 - `api_cache_get` fires on **every** plugin call (`call_cached`), plus `api_cache_put` on each miss, `api_cache_clear`, `cache_prune_expired`.
 
-## Change
-`StoreImpl` holds one lazily-opened `sqlite3* raw` (`raw_db()`), busy-handler attached once, closed in `~StoreImpl`. Used by the three `api_cache_*` ops and `cache_prune_expired` — exactly the ops OpTrace already routes to `raw_db_mutex`, so the handle keeps the same single-owner invariant (no new locking). `maintenance_vacuum_backup` keeps its own short-lived handle (VACUUM is a long exclusive-ish txn; rare path).
+## Change 1: raw-handle reuse
+`StoreImpl` holds one lazily-opened `sqlite3* raw` (`raw_db()`), busy-handler attached once, closed in `~StoreImpl`. Used by the three `api_cache_*` ops and `cache_prune_expired` — exactly the ops OpTrace already routes to `raw_db_mutex`, so the single-owner invariant holds. `maintenance_vacuum_backup` keeps its own handle (VACUUM, rare).
+
+## Change 2: enrich hot path (same commit family)
+- `saved_detail_response`: 4 pooled reads -> **1** (tuple snapshot: saved + novel flag + detail_url + title_meta).
+- `apply_chosen`: 2 -> **1** (title_meta + saved together); and when nothing renamed, the original envelope bytes are returned instead of a re-serialization round-trip.
+- `saved_stats_update` / `saved_read_rollup`: **guarded writes** — both run on every row-served detail open; an unchanged row no longer emits a WAL frame per open.
 
 ## Result
-- Cache-hit plugin call: **1.62 ms -> ~1.0 ms** (avg of 20, two runs), i.e. ~35-40% off the hottest path.
-- `library.db-wal` dropped 13.4 MB -> 1.7 MB: the open/close churn was keeping the WAL from settling.
-- 22/22 tests; `overlapping access` warnings: 0.
+- detail (cached row, 20-run avg): **2.5-3.9 ms -> ~2.1 ms**; search cache-hit 1.62 -> ~1.0 ms (raw-handle change).
+- WAL after 30 detail opens: delta 0 bytes (writes now meaningful-only).
+- 22/22 tests; no new warnings.
 
 ## Not done (ceilings)
-- `orphan_list`, `update_candidates`, `plugin_prune_absent`, `saved_detail_meta` still open their own handle: they take `db_mutex` (not `raw_db_mutex`), so sharing the raw handle would need an OpTrace list change for a per-tick/per-save op. Low value.
-- No secondary indexes: library is 31 rows; `plugin(plugin_id)` is scanned by EXISTS but the table is ~45 rows. Add when a real library hits thousands.
-- Read-parallel (multi-connection) stays deferred per `decisions/db-read-parallel`.
-
-## Related bug found while verifying
-harimanga served a **cached empty envelope** (ok=true, name="") for a whole TTL: right after boot `goto` could land on `about:blank`, and the old guard "title != Just a moment" passes there. Fixed in the plugin: wait for `readyState==='complete' && host match && not challenge`, and detail now errors on an empty parse instead of returning 200.
+- `orphan_list` / `update_candidates` / `plugin_prune_absent` / saved_detail_meta raw ops keep their own handles (db_mutex family; sharing = OpTrace list change for per-tick ops).
+- No secondary indexes at 31 rows; read-parallel deferred (`decisions/db-read-parallel`).
+- harimanga empty-envelope cache poisoning fixed in the same pass (positive page-ready gate + error-not-200 on empty parse).
 
 generated: { by: "kit-agent", at: "2026-11-26" }
-
-# Related Concepts
-- [database is locked: concurrent store ops on the one shared connection](../findings/store-serialized-ops.md): refines the single-connection store: raw handle reuse for api_cache ops
-- [DB read-parallel deferred: keep single-writer db_pool; read-only scans on demand](db-read-parallel.md): keeps write path single-writer; read-parallel still deferred by this decision

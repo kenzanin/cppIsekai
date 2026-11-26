@@ -61,4 +61,4 @@
 * [Assets: optional in-memory zip/folder root with read-only ini knob](in-memory-assets-zip.md) - [assets] path loads templates/static/icon from a zip or folder into RAM at boot; empty path keeps disk layout; knob is read-only in UI and HTTP.
 * [enrich module lives in src/enrich/, http/ = routes + shaping](enrich-module-location.md) - Enrichment domain logic lives in src/enrich/, not src/http/; http/ keeps routes and response shaping only.
 * [plugin show/hide ditunda: toggle enabled cukup](plugin-show-off-deferred.md) - Hide-from-UI flag untuk plugin test ditunda; toggle enabled cukup, upgrade path 3 titik sudah dipetakan.
-* [Store: reuse one raw sqlite handle for api_cache (measured 0.4ms/call saved)](store-raw-handle-reuse.md) - api_cache raw sqlite handle opened once per process instead of per call: 1.62ms -> 1.0ms cache-hit path, WAL 13.4MB -> 1.7MB.
+* [Store: reuse one raw sqlite handle for api_cache (measured 0.4ms/call saved)](store-raw-handle-reuse.md) - api_cache raw handle reuse + enrich hot-path round-trip collapse + guarded stat writes; cache-hit 1.62->1.0ms, detail row-serve 2.5-3.9->2.1ms, WAL churn zero.

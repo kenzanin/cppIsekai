@@ -1,4 +1,5 @@
 ## 2026-11-26
+* **Update** [2026-11-26T06:30:31Z]: Updated concept `decisions/store-raw-handle-reuse.md`.
 * **Relate** [2026-11-26T06:02:29Z]: Linked `decisions/store-raw-handle-reuse.md` to `decisions/db-read-parallel.md` (keeps write path single-writer; read-parallel still deferred by this decision).
 * **Relate** [2026-11-26T06:02:29Z]: Linked `decisions/store-raw-handle-reuse.md` to `findings/store-serialized-ops.md` (refines the single-connection store: raw handle reuse for api_cache ops).
 * **Creation** [2026-11-26T06:02:25Z]: Documented concept `decisions/store-raw-handle-reuse.md` (Store: reuse one raw sqlite handle for api_cache (measured 0.4ms/call saved)).
