@@ -1,6 +1,7 @@
 local c = require("common")
 local BASE = c.BASE
 local seed_jar = c.seed_jar
+local wait_ready = c.wait_ready
 local find1 = c.find1
 return function(params)
   local slug = params.id or ""
@@ -14,12 +15,9 @@ return function(params)
   if gerr ~= nil then
     return { ok = false, error = "harimanga: goto failed: " .. gerr }
   end
-  local _, werr = host.browser.call(
-    "wait",
-    { expression = "document.title.indexOf('Just a moment')===-1", timeout_ms = 20000 }
-  )
+  local _, werr = wait_ready()
   if werr ~= nil then
-    return { ok = false, error = "harimanga: challenge stuck on manga/" .. slug }
+    return { ok = false, error = "harimanga: page not ready for manga/" .. slug }
   end
   seed_jar()
   local out, eerr = host.browser.call(

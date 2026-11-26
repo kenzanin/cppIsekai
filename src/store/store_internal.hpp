@@ -3,6 +3,7 @@
  *  \brief Storage entities + Impl plumbing shared by the store TUs.
  */
 #include "store.hpp"
+#include "store_busy.hpp"
 #include "store_ops.hpp"
 
 #include <algorithm>
@@ -245,6 +246,34 @@ struct StoreImpl {
     store_detail::StorageType storage;
     bool fts5_ok = false; // library-dedup 1.3: false when the amalgamation lacks FTS5 (dedup disabled)
     std::atomic<bool> dup_dirty{true}; // store-contention C1: first tick reclusters
+
+    /// One long-lived raw handle for the api_cache JSONB ops (sqlite_orm has no
+    /// JSONB mapping): sqlite3_open+close costs ~0.4 ms and api_cache_get fires
+    /// on every plugin call, so open once and keep it. Safe to share because
+    /// every caller is an OpTrace op that holds raw_db_mutex; open/close happen
+    /// under the same serialization. A dead handle is dropped and reopened.
+    sqlite3* raw = nullptr;
+
+    sqlite3* raw_db() {
+        if (raw != nullptr) {
+            return raw;
+        }
+        if (sqlite3_open(path.c_str(), &raw) != SQLITE_OK) {
+            if (raw != nullptr) {
+                sqlite3_close(raw);
+                raw = nullptr;
+            }
+            return nullptr;
+        }
+        store_detail::attach_busy(raw);
+        return raw;
+    }
+
+    ~StoreImpl() {
+        if (raw != nullptr) {
+            sqlite3_close(raw);
+        }
+    }
 
     std::map<std::pair<std::string, std::string>, store_detail::EphemPair> ephem;
     std::list<std::pair<std::string, std::string>> ephem_lru; // front = most recent

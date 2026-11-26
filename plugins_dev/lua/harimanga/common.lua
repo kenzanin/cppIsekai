@@ -9,6 +9,19 @@ local BASE = "https://www.harimanga.cc" -- single origin; manifest site_url kept
 -- chrome116 curl eats 403; goto solves it, then read outerHTML -- comix pattern).
 local seeded = false
 
+-- Positive readiness gate: readyState complete, right host, and not the CF
+-- interstitial. "title != Just a moment" alone passes on about:blank right
+-- after a boot, which parses an empty page and poisons the api_cache.
+local HOST = "harimanga.cc"
+local function wait_ready()
+  return host.browser.call("wait", {
+    expression = "document.readyState==='complete'&&location.href.indexOf('"
+      .. HOST
+      .. "')!==-1&&document.title.indexOf('Just a moment')===-1",
+    timeout_ms = 20000,
+  })
+end
+
 local function seed_jar()
   if seeded then
     return
@@ -26,12 +39,9 @@ local function http_req(url)
   end
   -- the challenge page answers navigation instantly; wait it out or we
   -- evaluate "Just a moment..." and parse zero items silently
-  local _, werr = host.browser.call(
-    "wait",
-    { expression = "document.title.indexOf('Just a moment')===-1", timeout_ms = 20000 }
-  )
+  local _, werr = wait_ready()
   if werr ~= nil then
-    return nil, "harimanga: challenge stuck on " .. url
+    return nil, "harimanga: page not ready for " .. url
   end
   seed_jar()
   local body, eerr = host.browser.call("evaluate", { script = "document.documentElement.outerHTML", timeout_ms = 30000 })
@@ -50,4 +60,4 @@ end
 -- Shared table on purpose: genres.lua mutates this same reference.
 local genre_map = {}
 
-return { BASE = BASE, http_req = http_req, genre_map = genre_map, seed_jar = seed_jar, find1 = find1 }
+return { BASE = BASE, http_req = http_req, genre_map = genre_map, seed_jar = seed_jar, wait_ready = wait_ready, find1 = find1 }
