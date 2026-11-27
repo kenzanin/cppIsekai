@@ -35,6 +35,6 @@ Measured smoke: with the plugin disabled, opening a fully cached chapter served 
 # Related Concepts
 - [Library promotion: api_cache is the staging store](library-promote-on-save.md): D6 kept `pages` in
   api_cache; this change reverses that for page lists only.
-- [Library reads are local-first](local-first-reads.md): the read model this extends to the reader.
+- [Local-first reads](../architecture/local-first-reads.md): the read model this extends to the reader.
 - [cppIsekai image-cache + offline-first pathway](../architecture/image-cache-offline.md): the disk
   layout the page-key rule depends on.
