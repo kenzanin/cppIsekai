@@ -312,7 +312,7 @@ cxx_bin("test_http_enrich", {
 })
 
 cxx_bin("test_pages", {
-    files = {"tests/test_pages.cpp", "src/http/pages_api.cpp"},
+    files = {"tests/test_pages.cpp", "src/http/pages_api.cpp", "src/http/pages_source.cpp"},
     incs = {"src"},
     reqs = {"crow", "glaze", "spdlog", "hash-library", "thread-pool"},
     test = true,

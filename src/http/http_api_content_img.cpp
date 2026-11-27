@@ -34,46 +34,4 @@ std::string pct_decode(const std::string& s) {
     return out;
 }
 
-// Duplicate-number releases can fail per-entry upstream (comico's CF origin
-// 502s only some releases' open call). Siblings of the primary id with the
-// same number, id-ascending, primary excluded, capped at three -- the pages
-// route falls back across them when the primary yields no pages.
-std::vector<std::string> sibling_ids(const std::string& chs_env, double chd, const std::string& primary) {
-    std::vector<std::string> out;
-    const auto chs = envelope_data(chs_env);
-    if (!chs) {
-        return out;
-    }
-    for (const auto& item : *chs) {
-        if (!item.is_object()) {
-            continue;
-        }
-        const auto& entry = item.get_object();
-        const auto* const num = entry.find("number");
-        if (num == entry.end()) {
-            continue;
-        }
-        const auto* d = std::get_if<double>(&num->second.data);
-        if (!d || *d != chd) {
-            continue;
-        }
-        const auto* const idf = entry.find("id");
-        if (idf == entry.end()) {
-            continue;
-        }
-        const auto* s = std::get_if<std::string>(&idf->second.data);
-        if (!s || s->empty() || *s == primary) {
-            continue;
-        }
-        const auto at = std::lower_bound(out.begin(), out.end(), *s);
-        if (at == out.end() || *at != *s) {
-            out.insert(at, *s);
-            if (out.size() > 3) {
-                out.pop_back();
-            }
-        }
-    }
-    return out;
-}
-
 } // namespace http::api

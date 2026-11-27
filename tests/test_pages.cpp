@@ -5,6 +5,7 @@
 #include <string_view>
 
 #include "http/pages_api.hpp"
+#include "http/pages_source.hpp"
 
 namespace {
 
@@ -52,6 +53,19 @@ TEST_CASE("pages: offline envelopes rebuilt from stored rows keep a cached chapt
     CHECK(has(*out, "&page=2"));
     // No stored rows and a failed fetch still means unknown chapter.
     CHECK_FALSE(build_pages_response(stored_chs, R"({"ok":false,"error":"offline"})", {"m", "s", 2}));
+}
+
+TEST_CASE("pages: stored rows and a parse render the same response") {
+    // pages-local-first D1: the route answers from chapter_pages rows instead of
+    // a plugin parse, so both envelopes must compose into one identical body.
+    const auto stored_chs = chapters_envelope_from_rows({{24, "c24a"}, {24, "c24b"}});
+    const std::vector<std::string> urls{"https://cdn/x/1.jpg", "https://cdn/x/2.jpg?a=b"};
+    const std::string parsed = R"({"ok":true,"data":["https://cdn/x/1.jpg","https://cdn/x/2.jpg?a=b"]})";
+    const auto from_rows = build_pages_response(stored_chs, pages_envelope_from_urls(urls), {"m", "s", 24, "c24b"});
+    const auto from_parse = build_pages_response(stored_chs, parsed, {"m", "s", 24, "c24b"});
+    REQUIRE(from_rows);
+    REQUIRE(from_parse);
+    CHECK(*from_rows == *from_parse);
 }
 
 TEST_CASE("pages: descending plugin order still yields nearest neighbors") {
@@ -194,4 +208,113 @@ TEST_CASE("pages: fractional chapter kept in out chapter and url") {
     CHECK(has(*out, "ch=1.5&page=1"));
     CHECK(has(*out, R"("prev_ch":1)"));
     CHECK(has(*out, R"("next_ch":2)"));
+}
+
+TEST_CASE("pages-local-first: opened chapter answers from rows, plugin untouched") {
+    std::vector<std::string> parsed;
+    const auto src = http::api::pick_pages_source(
+        chs_env, 2, "",
+        [](const std::string& id) {
+            return id == "c2" ? std::vector<std::string>{"https://cdn/2/p1.jpg", "https://cdn/2/p2.jpg"}
+                              : std::vector<std::string>{};
+        },
+        [&](const std::string& id) {
+            parsed.push_back(id);
+            return std::string{R"({"ok":true,"data":["live"]})"};
+        });
+    CHECK(src.id == "c2");
+    CHECK(src.from_rows);
+    CHECK(parsed.empty()); // D1: rows are the durable list, no plugin call
+    const auto page_urls = http::api::pages_urls(src.envelope);
+    REQUIRE(page_urls.size() == 2);
+    CHECK(page_urls[1] == "https://cdn/2/p2.jpg"); // parse order kept
+    const auto out = build_pages_response(chs_env, src.envelope, {"m", "s", 2, src.id});
+    REQUIRE(out);
+    CHECK(has(*out, R"("ch_id":"c2")"));
+    CHECK(has(*out, R"("next_ch":3)"));
+}
+
+TEST_CASE("pages-local-first: cold chapter parses once and reports no rows") {
+    std::vector<std::string> parsed;
+    const auto src = http::api::pick_pages_source(
+        chs_env, 2, "",
+        [](const std::string&) { return std::vector<std::string>{}; },
+        [&](const std::string& id) {
+            parsed.push_back(id);
+            return std::string{R"({"ok":true,"data":["live1"]})"};
+        });
+    CHECK(src.id == "c2");
+    CHECK_FALSE(src.from_rows); // the route writes these urls into chapter_pages
+    REQUIRE(parsed.size() == 1); // no rows -> one parse, siblings of 2 are none
+    CHECK(parsed[0] == "c2");
+    CHECK(http::api::pages_urls(src.envelope) == std::vector<std::string>{"live1"});
+}
+
+TEST_CASE("pages-local-first: a flaky release falls back to its same-number sibling") {
+    const std::string dup = R"({"ok":true,"data":[)"
+                            R"({"id":"c24a","number":24},)"
+                            R"({"id":"c24b","number":24},)"
+                            R"({"id":"c25","number":25}]})";
+    std::vector<std::string> parsed;
+    const auto src = http::api::pick_pages_source(
+        dup, 24, "",
+        [](const std::string&) { return std::vector<std::string>{}; },
+        [&](const std::string& id) {
+            parsed.push_back(id);
+            // comico's CF origin 502s only some releases' open call
+            return id == "c24a" ? std::string{R"({"ok":false,"error":"502"})"}
+                                : std::string{R"({"ok":true,"data":["b1"]})"};
+        });
+    CHECK(src.id == "c24b");
+    CHECK_FALSE(src.from_rows);
+    CHECK(parsed == std::vector<std::string>{"c24a", "c24b"}); // id-ascending walk
+    CHECK(http::api::envelope_error(R"({"ok":false,"error":"502"})") == "502"); // real reason for the 404
+}
+
+TEST_CASE("pages-local-first: ch_id picks the duplicate whose rows exist") {
+    const std::string dup = R"({"ok":true,"data":[)"
+                            R"({"id":"c24a","number":24},)"
+                            R"({"id":"c24b","number":24}]})";
+    std::vector<std::string> parsed;
+    const auto src = http::api::pick_pages_source(
+        dup, 24, "c24b", [](const std::string& id) {
+            return id == "c24b" ? std::vector<std::string>{"b-rows1"} : std::vector<std::string>{};
+        },
+        [&](const std::string& id) {
+            parsed.push_back(id);
+            return std::string{R"({"ok":true,"data":["a-live"]})"};
+        });
+    CHECK(src.id == "c24b");
+    CHECK(src.from_rows);
+    CHECK(parsed.empty()); // the named release had rows: nothing else is asked
+}
+
+TEST_CASE("pages-local-first: unknown chapter yields no source") {
+    int calls = 0;
+    const auto src = http::api::pick_pages_source(
+        chs_env, 9, "", [](const std::string&) { return std::vector<std::string>{}; },
+        [&](const std::string&) {
+            ++calls;
+            return std::string{R"({"ok":true,"data":["x"]})"};
+        });
+    CHECK(src.id.empty());
+    CHECK_FALSE(src.from_rows);
+    CHECK(calls == 0);
+    CHECK(http::api::pick_pages_source("not json", 1, "", [](const std::string&) { return std::vector<std::string>{}; },
+                                       [&](const std::string&) {
+                                           ++calls;
+                                           return std::string{R"({"ok":true,"data":["x"]})"};
+                                       })
+              .id.empty());
+    CHECK(calls == 0);
+}
+
+TEST_CASE("pages-local-first: sibling walk is id-order and capped at three") {
+    const std::string many = R"({"ok":true,"data":[)"
+                             R"({"id":"e","number":7},{"id":"d","number":7},)"
+                             R"({"id":"c","number":7},{"id":"b","number":7},)"
+                             R"({"id":"a","number":7},{"id":"z","number":8}]})";
+    const auto sibs = http::api::sibling_ids(many, 7, "c");
+    CHECK(sibs == std::vector<std::string>{"a", "b", "d"}); // primary skipped, c dropped by the cap
+    CHECK(http::api::sibling_ids(many, 8, "z").empty());
 }

@@ -4,17 +4,34 @@
 #include "export_cbz.hpp"
 #include "img.hpp"
 #include "pages_api.hpp"
+#include "pages_source.hpp"
 
 #include <filesystem>
+#include <mutex>
 #include <set>
 #include <string>
 #include <utility>
+
+#include <spdlog/spdlog.h>
 
 namespace fs = std::filesystem;
 
 #include "http_content_internal.hpp"
 
 namespace http::api {
+namespace {
+
+// pages-local-first D3: one silent page-list revalidation per release per
+// process. ponytail: process lifetime only -- a site that rotates URLs inside
+// one session is not covered; swap for a refreshed_at map with a TTL then.
+bool claim_page_refresh(const std::string& plugin, const std::string& slug, const std::string& chapter_id) {
+    static std::mutex mu;
+    static std::set<std::string> claimed;
+    const std::scoped_lock lock(mu);
+    return claimed.emplace(plugin + '|' + slug + '|' + chapter_id).second;
+}
+
+} // namespace
 
 // Content-serving routes: the reader page list, the pass-through image cache
 // and the CBZ export (split from the http_api monolith; bodies verbatim).
@@ -50,78 +67,100 @@ void register_content(Ctx& c) {
         const std::string chs_params = q.dump();
         // page-url rows carry the release's pages; no host-side total copy.
         std::string pages_error;
+        // pages-local-first D3: a locally served release is remembered so the
+        // revalidation below can tell whether its images are all on disk.
+        std::string served_id;
+        int served_pages = 0;
         const std::string body = on_pool(plugin_pool, [&] {
-            const std::string chs_env = call_cached(store, plugin, "chapters", chs_params,
-                                                    [&] { return plugins.call(plugin, "chapters", chs_params); }, &plugins);
-            // Pre-resolve the chapter id from the list so the pages call
-            // targets the right one even when the plugin's list is stale.
-            // A `ch_id` query param wins when it matches an entry; otherwise
-            // the first number match is used (design D1/D2).
-            // Offline: when the plugin envelope could not be fetched, rebuild
-            // it from the chapter rows (the metadata hub) so a cached chapter
-            // stays navigable with no network at all.
-            std::string chapter_list_env = chs_env;
-            std::string chapter_id = resolve_chapter_id(chapter_list_env, want_id, chd);
-            if (chapter_id.empty()) {
+            // pages-local-first D1: the chapter rows are the permanent list, so
+            // the release resolves locally and the plugin is only asked for a
+            // pair with no rows at all (never opened).
+            std::string chapter_list_env;
+            {
                 const auto seeds = store.chapters_list(plugin, slug);
                 std::vector<std::pair<double, std::string>> rows;
                 rows.reserve(seeds.size());
                 for (const auto& s : seeds) {
                     rows.emplace_back(s.number, s.chapter_id);
                 }
-                chapter_list_env = chapters_envelope_from_rows(rows);
-                chapter_id = resolve_chapter_id(chapter_list_env, want_id, chd);
+                if (!rows.empty()) {
+                    chapter_list_env = chapters_envelope_from_rows(rows);
+                }
             }
-            if (chapter_id.empty()) {
+            if (chapter_list_env.empty()) {
+                chapter_list_env = call_cached(store, plugin, "chapters", chs_params,
+                                               [&] { return plugins.call(plugin, "chapters", chs_params); }, &plugins);
+            }
+            // `ch_id` wins when it matches an entry; otherwise the first number
+            // match is the target (design D1/D2). The walk then prefers stored
+            // rows over a parse, and falls back across same-number siblings when
+            // a release's own parse yields nothing (per-entry upstream flakes,
+            // comico 502s -- see pages_source).
+            const PagesSource src = pick_pages_source(
+                chapter_list_env, chd, want_id,
+                [&](const std::string& id) { return store.chapter_pages_urls(plugin, slug, id); },
+                [&](const std::string& id) {
+                    crow::json::wvalue pages_q;
+                    pages_q["id"] = id;
+                    const std::string pages_params = pages_q.dump();
+                    std::string env = call_cached(store, plugin, "pages", pages_params,
+                                                  [&] { return plugins.call(plugin, "pages", pages_params); }, &plugins);
+                    if (std::string e = envelope_error(env); !e.empty()) {
+                        pages_error = std::move(e); // keep the real upstream reason for the 404 body
+                    }
+                    return env;
+                });
+            if (src.id.empty()) {
                 return std::string{};
             }
-            // Walk the primary id then same-number siblings; first release
-            // whose pages parse wins (per-entry upstream flakes, comico 502s).
-            std::vector<std::string> candidates = sibling_ids(chapter_list_env, chd, chapter_id);
-            candidates.insert(candidates.begin(), chapter_id);
-            std::string pages_id = chapter_id;
-            std::string pages_env;
-            for (const auto& cand : candidates) {
-                crow::json::wvalue pages_q;
-                pages_q["id"] = cand;
-                const std::string pages_params = pages_q.dump();
-                pages_env = call_cached(store, plugin, "pages", pages_params,
-                                        [&] { return plugins.call(plugin, "pages", pages_params); }, &plugins);
-                if (const auto pages = envelope_data(pages_env); pages && !pages->empty()) {
-                    pages_id = cand;
-                    // chapter-store 2.2: page-url rows ride every parse (D4
-                    // replace-all); the reader-visible list stays the same shape.
-                    std::vector<std::string> urls;
-                    urls.reserve(pages->size());
-                    for (const auto& el : *pages) {
-                        if (const auto* s = std::get_if<std::string>(&el.data)) {
-                            urls.emplace_back(*s);
-                        }
-                    }
-                    store.chapter_pages_replace(plugin, slug, pages_id, urls);
-                    break;
-                }
-                if (std::string e = envelope_error(pages_env); !e.empty()) {
-                    pages_error = std::move(e); // keep the real upstream reason for the 404 body
-                }
-                // Offline: a previously parsed chapter has its page URLs in
-                // chapter_pages, so serve those instead of the failed fetch.
-                const auto stored = store.chapter_pages_urls(plugin, slug, cand);
-                if (!stored.empty()) {
-                pages_env = pages_envelope_from_urls(stored);
-                    pages_id = cand;
-                    pages_error.clear();
-                    break;
-                }
+            if (src.from_rows) {
+                served_id = src.id;
+                served_pages = static_cast<int>(pages_urls(src.envelope).size());
+            } else {
+                // chapter-store 2.2: page-url rows ride every parse (D4
+                // replace-all); the reader-visible list stays the same shape.
+                store.chapter_pages_replace(plugin, slug, src.id, pages_urls(src.envelope));
             }
-            return build_pages_response(chapter_list_env, pages_env,
+            return build_pages_response(chapter_list_env, src.envelope,
                                         PagesCtx{.plugin = plugin,
                                                  .slug = slug,
                                                  .ch = chd,
-                                                 .ch_id = pages_id,
+                                                 .ch_id = src.id,
                                                  .hidden = hidden})
                 .value_or(std::string{});
         });
+
+        // pages-local-first D3: a local serve whose images are not all on disk
+        // schedules one silent re-parse of that release -- signed page URLs
+        // (comico `d=`, mangatown token/ttl) decay, and the next open should get
+        // fresh ones. Fire-and-forget on the plugin pool; claim_page_refresh
+        // admits one task per release per process.
+        if (!body.empty() && !served_id.empty() && store.plugin_enabled(plugin) &&
+            !chapter_cached(images.ns(plugin), slug, static_cast<int>(chd), served_pages) &&
+            claim_page_refresh(plugin, slug, served_id)) {
+            plugin_pool.detach_task([&store, &plugins, plugin, slug, served_id] {
+                crow::json::wvalue q;
+                q["id"] = served_id;
+                const std::string params = q.dump();
+                // call_cached, not plugins.call: `pages` is no longer opt-in, so
+                // the wrap is exactly the disabled/orphan gate (a disabled plugin
+                // must stay network-quiet) and nothing else.
+                const auto pages = envelope_data(call_cached(
+                    store, plugin, "pages", params, [&] { return plugins.call(plugin, "pages", params); }, &plugins));
+                if (!pages || pages->empty()) {
+                    return;
+                }
+                std::vector<std::string> urls;
+                urls.reserve(pages->size());
+                for (const auto& el : *pages) {
+                    if (const auto* s = std::get_if<std::string>(&el.data)) {
+                        urls.emplace_back(*s);
+                    }
+                }
+                store.chapter_pages_replace(plugin, slug, served_id, urls);
+                spdlog::debug("pages: revalidated {} {} {} ({} urls)", plugin, slug, served_id, urls.size());
+            });
+        }
         crow::response r;
         if (body.empty()) {
             r.code = 404;

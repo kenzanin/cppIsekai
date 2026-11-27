@@ -28,23 +28,38 @@ The reader at `GET /read/<plugin>/<slug>?ch=<n>` SHALL render chapter pages in t
 - **THEN** the reader opens in `paged` mode
 
 ### Requirement: Pages API serves host-owned image URLs
-`GET /api/pages/<plugin>/<slug>/<ch>` SHALL resolve the chapter entry, fetch its
-page list through the stale-serve wrapper, and return host-owned image URLs
-(`/cache/img?...`) built from that entry's chapter id. It SHALL accept an
-optional `ch_id` query parameter: when `ch_id` matches an entry in the chapter
-list, that entry SHALL be the target (its id is what the plugin is asked for,
-what the image URLs carry, and what the response identifies); when `ch_id` is
-absent or matches nothing, the target SHALL be the first entry whose `number`
-equals `<ch>`, as before. The response SHALL carry the chapter number in
-`chapter`, the page URLs in `pages[]`, and the adjacent chapters as both numbers
-(`prev_ch`, `next_ch`) and chapter ids (`prev_ch_id`, `next_ch_id`). Adjacent
-chapters SHALL be resolved by position in a stable number-ordered list, not by
-the plugin's emitted order, so duplicated chapter numbers yield one navigation
-stop per entry.
+`GET /api/pages/<plugin>/<slug>/<ch>` SHALL resolve the chapter entry and SHALL answer from the
+stored `chapter_pages` rows for that release whenever rows exist, without calling the plugin. Only a
+release with no stored page rows SHALL go through the cached-or-live wrapper, and a successful parse
+SHALL write the rows back. Locally served responses SHALL have the same shape as a parse: page URLs
+in `pages[]` as host-owned `/cache/img?...` entries carrying the chapter id, `chapter`, and the
+adjacent chapters as both numbers (`prev_ch`, `next_ch`) and chapter ids
+(`prev_ch_id`, `next_ch_id`), resolved by position in a stable number-ordered list rather than by the
+plugin's emitted order. The response SHALL accept an optional `ch_id` query parameter: when `ch_id`
+matches an entry in the chapter list, that entry SHALL be the target; when `ch_id` is absent or
+matches nothing, the target SHALL be the first entry whose `number` equals `<ch>`. Serving locally
+SHALL NOT require the chapter's images to be complete on disk.
 
 #### Scenario: Pages list in reading order
 - **WHEN** the plugin returns a page list for the resolved chapter id
 - **THEN** `pages[]` is emitted in plugin order, each entry a `/cache/img` URL carrying the chapter id
+
+#### Scenario: Opened chapter never calls the plugin
+- **WHEN** the target release has `chapter_pages` rows and the request is issued again
+- **THEN** the response is built from those rows and no plugin call or outbound request occurs
+
+#### Scenario: Partially cached chapter stays local
+- **WHEN** the target release has rows but only some of its page images are on disk
+- **THEN** the route still answers from the rows, and only the missing page images are fetched on demand
+
+#### Scenario: Cold chapter falls through to the plugin
+- **WHEN** the target release has no stored page rows
+- **THEN** the request goes through the cached-or-live plugin path and the rows are written on success
+
+#### Scenario: Local serve schedules one revalidation
+- **WHEN** a release is served from rows while the chapter is not fully on disk
+- **THEN** one background re-parse of that release's page list is scheduled for the pair, and a second
+  open of the same release in the same process schedules none
 
 #### Scenario: Unknown chapter is 404
 - **WHEN** no list entry matches the requested number and no `ch_id` matches
@@ -52,11 +67,11 @@ stop per entry.
 
 #### Scenario: Chapter id selects the exact duplicate
 - **WHEN** the chapter list holds two entries numbered 24 and the request carries the second entry's `ch_id`
-- **THEN** the plugin is asked for that id and the served pages are that entry's pages
+- **THEN** that entry's stored pages are served, and the plugin is asked for its id only when it has no rows
 
 #### Scenario: Number-only request keeps legacy behaviour
 - **WHEN** the request carries no `ch_id`
-- **THEN** the target is the first entry with that number and the response shape is unchanged plus the new id fields
+- **THEN** the target is the first entry with that number and the response shape is unchanged plus the id fields
 
 #### Scenario: Duplicate numbers are separate stops
 - **WHEN** the list holds two entries numbered 24 and the target is the first of them
@@ -139,3 +154,17 @@ as identity: identity is the plugin's chapter id.
 #### Scenario: Refresh keeps the release
 - **WHEN** the reader reloads the page while reading the second entry numbered 24
 - **THEN** the served pages are that same entry's pages, not the first entry's
+
+### Requirement: Reader prefetch resolves metadata locally
+The reader window composition (`reader_window`) SHALL build its chapter list from the stored
+`chapters` rows and each chapter's page list from the stored `chapter_pages` rows. The cached-or-live
+plugin path SHALL remain only for a title with no stored chapter rows. The prefetch worker's behavior
+SHALL NOT change: it SHALL fetch only page images that are absent from disk.
+
+#### Scenario: Prefetch on a stored title makes no metadata request
+- **WHEN** the reader posts a position for a chapter of a title that has stored chapters and page rows
+- **THEN** the returned window is composed from the store and no `chapters`/`pages` plugin call occurs
+
+#### Scenario: Prefetch still fills missing images
+- **WHEN** the window contains pages that are not on disk
+- **THEN** the worker fetches exactly those pages and leaves cached pages untouched
