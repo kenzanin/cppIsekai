@@ -14,43 +14,16 @@ namespace http::api {
 std::vector<reader::WindowPart> reader_window(Store& store, BS::thread_pool<>& db, BS::thread_pool<>& plugin_pool,
                                               plugin::Host& plugins, const std::string& plugin_id,
                                               const std::string& manga_id, const reader::Position& pos) {
-    crow::json::wvalue query;
-    query["id"] = manga_id;
-    const std::string chapters_query = query.dump();
-
-    const std::string envelope = on_pool(plugin_pool, [&] {
-        return call_cached(store, plugin_id, "chapters", chapters_query,
-                           [&] { return plugins.call(plugin_id, "chapters", chapters_query); }, &plugins);
-    });
-
+    // pages-local-first D4: the reader window is composed from the stored rows --
+    // chapters and page lists are permanent once a title has been opened, so a
+    // prefetch on a stored title costs no metadata request. The cached-or-live
+    // envelope stays the path for a title with no rows at all (first open).
     std::vector<reader::Chapter> chapters;
-    if (const auto data = envelope_data(envelope)) {
-        for (const auto& item : *data) {
-            if (!item.is_object()) {
-                continue;
-            }
-            const auto& entry = item.get_object();
-            const auto* const id = entry.find("id");
-            const auto* id_s = id == entry.end() ? nullptr : std::get_if<std::string>(&id->second.data);
-            if (id_s == nullptr) {
-                continue;
-            }
-            double number = 0; // fractional chapter numbers are a thing
-            if (const auto* const num = entry.find("number"); num != entry.end()) {
-                if (const auto* d = std::get_if<double>(&num->second.data)) {
-                    number = *d;
-                }
-            }
-            chapters.push_back(reader::Chapter{.id = *id_s, .number = number});
-        }
-    }
-    if (chapters.empty()) {
-        spdlog::warn("reader: no chapters for plugin='{}' manga='{}'", plugin_id, manga_id);
-        return {};
-    }
-
     reader::Skipped skip;
     on_pool(db, [&] {
+        for (const auto& s : store.chapters_list(plugin_id, manga_id)) {
+            chapters.push_back(reader::Chapter{.id = s.chapter_id, .number = s.number});
+        }
         // chapter-store 3.4: skip lives in the chapters.flags bitfield now
         // (bit1); the legacy host/skip keys ride in via chapters_upsert (D2).
         for (const auto& [ch_id, flags] : store.chapter_flags_list(plugin_id, manga_id)) {
@@ -59,7 +32,47 @@ std::vector<reader::WindowPart> reader_window(Store& store, BS::thread_pool<>& d
         return 0; // on_pool is value-based
     });
 
+    if (chapters.empty()) { // never opened: cached-or-live, same seam as before
+        crow::json::wvalue query;
+        query["id"] = manga_id;
+        const std::string chapters_query = query.dump();
+        const std::string envelope = on_pool(plugin_pool, [&] {
+            return call_cached(store, plugin_id, "chapters", chapters_query,
+                               [&] { return plugins.call(plugin_id, "chapters", chapters_query); }, &plugins);
+        });
+        if (const auto data = envelope_data(envelope)) {
+            for (const auto& item : *data) {
+                if (!item.is_object()) {
+                    continue;
+                }
+                const auto& entry = item.get_object();
+                const auto* const id = entry.find("id");
+                const auto* id_s = id == entry.end() ? nullptr : std::get_if<std::string>(&id->second.data);
+                if (id_s == nullptr) {
+                    continue;
+                }
+                double number = 0; // fractional chapter numbers are a thing
+                if (const auto* const num = entry.find("number"); num != entry.end()) {
+                    if (const auto* d = std::get_if<double>(&num->second.data)) {
+                        number = *d;
+                    }
+                }
+                chapters.push_back(reader::Chapter{.id = *id_s, .number = number});
+            }
+        }
+    }
+    if (chapters.empty()) {
+        spdlog::warn("reader: no chapters for plugin='{}' manga='{}'", plugin_id, manga_id);
+        return {};
+    }
+
     const auto pages_of = [&](const std::string& chapter_id) {
+        // D4: stored page rows first -- a page list the reader already resolved
+        // needs no plugin call for prefetch either.
+        auto stored = on_pool(db, [&] { return store.chapter_pages_urls(plugin_id, manga_id, chapter_id); });
+        if (!stored.empty()) {
+            return stored;
+        }
         crow::json::wvalue q;
         q["id"] = chapter_id;
         const std::string pages_query = q.dump();

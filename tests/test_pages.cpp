@@ -54,6 +54,19 @@ TEST_CASE("pages: offline envelopes rebuilt from stored rows keep a cached chapt
     CHECK_FALSE(build_pages_response(stored_chs, R"({"ok":false,"error":"offline"})", {"m", "s", 2}));
 }
 
+TEST_CASE("pages: stored rows and a parse render the same response") {
+    // pages-local-first D1: the route answers from chapter_pages rows instead of
+    // a plugin parse, so both envelopes must compose into one identical body.
+    const auto stored_chs = chapters_envelope_from_rows({{24, "c24a"}, {24, "c24b"}});
+    const std::vector<std::string> urls{"https://cdn/x/1.jpg", "https://cdn/x/2.jpg?a=b"};
+    const std::string parsed = R"({"ok":true,"data":["https://cdn/x/1.jpg","https://cdn/x/2.jpg?a=b"]})";
+    const auto from_rows = build_pages_response(stored_chs, pages_envelope_from_urls(urls), {"m", "s", 24, "c24b"});
+    const auto from_parse = build_pages_response(stored_chs, parsed, {"m", "s", 24, "c24b"});
+    REQUIRE(from_rows);
+    REQUIRE(from_parse);
+    CHECK(*from_rows == *from_parse);
+}
+
 TEST_CASE("pages: descending plugin order still yields nearest neighbors") {
     // mangafreak emits newest-first; walking the array used to make 36/1 win for every chapter.
     const std::string desc = R"({"ok":true,"data":[)"
