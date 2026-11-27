@@ -4,6 +4,7 @@
 #include "export_cbz.hpp"
 #include "img.hpp"
 #include "pages_api.hpp"
+#include "pages_source.hpp"
 
 #include <filesystem>
 #include <mutex>
@@ -91,58 +92,40 @@ void register_content(Ctx& c) {
                                                [&] { return plugins.call(plugin, "chapters", chs_params); }, &plugins);
             }
             // `ch_id` wins when it matches an entry; otherwise the first number
-            // match is the target (design D1/D2).
-            const std::string chapter_id = resolve_chapter_id(chapter_list_env, want_id, chd);
-            if (chapter_id.empty()) {
+            // match is the target (design D1/D2). The walk then prefers stored
+            // rows over a parse, and falls back across same-number siblings when
+            // a release's own parse yields nothing (per-entry upstream flakes,
+            // comico 502s -- see pages_source).
+            const PagesSource src = pick_pages_source(
+                chapter_list_env, chd, want_id,
+                [&](const std::string& id) { return store.chapter_pages_urls(plugin, slug, id); },
+                [&](const std::string& id) {
+                    crow::json::wvalue pages_q;
+                    pages_q["id"] = id;
+                    const std::string pages_params = pages_q.dump();
+                    std::string env = call_cached(store, plugin, "pages", pages_params,
+                                                  [&] { return plugins.call(plugin, "pages", pages_params); }, &plugins);
+                    if (std::string e = envelope_error(env); !e.empty()) {
+                        pages_error = std::move(e); // keep the real upstream reason for the 404 body
+                    }
+                    return env;
+                });
+            if (src.id.empty()) {
                 return std::string{};
             }
-            // Walk the primary id then same-number siblings; the first release
-            // with stored pages wins, else the first whose parse yields pages
-            // (per-entry upstream flakes, comico 502s).
-            std::vector<std::string> candidates = sibling_ids(chapter_list_env, chd, chapter_id);
-            candidates.insert(candidates.begin(), chapter_id);
-            std::string pages_id = chapter_id;
-            std::string pages_env;
-            for (const auto& cand : candidates) {
-                // pages-local-first D1/D2: a release that was ever opened answers
-                // from its rows -- no plugin call, and no 100%-on-disk gate (the
-                // page cache is keyed by layout path, never by URL).
-                const auto stored = store.chapter_pages_urls(plugin, slug, cand);
-                if (!stored.empty()) {
-                    pages_env = pages_envelope_from_urls(stored);
-                    pages_id = cand;
-                    served_id = cand;
-                    served_pages = static_cast<int>(stored.size());
-                    break;
-                }
-                crow::json::wvalue pages_q;
-                pages_q["id"] = cand;
-                const std::string pages_params = pages_q.dump();
-                pages_env = call_cached(store, plugin, "pages", pages_params,
-                                        [&] { return plugins.call(plugin, "pages", pages_params); }, &plugins);
-                if (const auto pages = envelope_data(pages_env); pages && !pages->empty()) {
-                    pages_id = cand;
-                    // chapter-store 2.2: page-url rows ride every parse (D4
-                    // replace-all); the reader-visible list stays the same shape.
-                    std::vector<std::string> urls;
-                    urls.reserve(pages->size());
-                    for (const auto& el : *pages) {
-                        if (const auto* s = std::get_if<std::string>(&el.data)) {
-                            urls.emplace_back(*s);
-                        }
-                    }
-                    store.chapter_pages_replace(plugin, slug, pages_id, urls);
-                    break;
-                }
-                if (std::string e = envelope_error(pages_env); !e.empty()) {
-                    pages_error = std::move(e); // keep the real upstream reason for the 404 body
-                }
+            if (src.from_rows) {
+                served_id = src.id;
+                served_pages = static_cast<int>(pages_urls(src.envelope).size());
+            } else {
+                // chapter-store 2.2: page-url rows ride every parse (D4
+                // replace-all); the reader-visible list stays the same shape.
+                store.chapter_pages_replace(plugin, slug, src.id, pages_urls(src.envelope));
             }
-            return build_pages_response(chapter_list_env, pages_env,
+            return build_pages_response(chapter_list_env, src.envelope,
                                         PagesCtx{.plugin = plugin,
                                                  .slug = slug,
                                                  .ch = chd,
-                                                 .ch_id = pages_id,
+                                                 .ch_id = src.id,
                                                  .hidden = hidden})
                 .value_or(std::string{});
         });
