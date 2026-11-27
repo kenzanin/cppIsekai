@@ -173,6 +173,12 @@ std::vector<ChapterSeed> Store::chapters_list(const std::string& plugin, const s
         if (auto* e = ephem_find(plugin, slug); e != nullptr) {
             out.reserve(e->chapters.size());
             for (const auto& [id, c] : e->chapters) {
+                // A page-list write mints a bare identity (chapter_pages_replace);
+                // it is not a parsed row, and listing it would hide the real
+                // chapters and make prev/next resolve to nothing.
+                if (c.number == 0 && c.title.empty() && c.url.empty() && c.release_at.empty()) {
+                    continue;
+                }
                 out.push_back(ChapterSeed{.chapter_id = id,
                                           .number = c.number,
                                           .title = c.title,

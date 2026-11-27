@@ -958,6 +958,26 @@ TEST_CASE("Store: chapter flags bitfield (chapter-state 1.3-1.6)") {
     }
 }
 
+TEST_CASE("Store: a page-list write never mints a listed chapter row") {
+    Store store("test_store.db");
+    const auto run = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+    const std::string plugin = "md", slug = "pp-" + run;
+    const std::vector<std::string> urls{"https://x/1.jpg"};
+
+    // Unsaved pair, pages written before any parse: the bare identity is not a
+    // chapter row, so the list stays empty and the plugin's parse still serves.
+    store.chapter_pages_replace(plugin, slug, "c1", urls);
+    CHECK(store.chapters_list(plugin, slug).empty());
+    CHECK(store.chapter_pages_urls(plugin, slug, "c1") == urls);
+
+    // Once parsed, the same write keeps the full list (number asc) and urls.
+    store.chapters_upsert(plugin, slug, {ChapterSeed{"c1", 1, "Ch.1", ""}, ChapterSeed{"c2", 2, "Ch.2", ""}});
+    const auto rows = store.chapters_list(plugin, slug);
+    REQUIRE(rows.size() == 2);
+    CHECK(rows[0].chapter_id == "c1");
+    CHECK(store.chapter_pages_urls(plugin, slug, "c1") == urls);
+}
+
 TEST_CASE("Store: read_max master progress + bump threshold (library-promote-on-save 4.4)") {
     Store store("test_store.db");
     const auto run = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
