@@ -20,3 +20,8 @@ docs/api/
 
 # generated in-memory asset archive (xmake pack-assets)
 assets.zip
+
+# kit/anam machine-local state
+.kit/anam_window
+anam-adapter.log
+.kit.yml.bak-*
