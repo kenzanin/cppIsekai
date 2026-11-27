@@ -45,7 +45,7 @@
       <div class="rounded overflow-hidden border" :class="it.exact ? 'border-emerald-700' : 'border-zinc-800'">
         <a :href="'/plugin/'+encodeURIComponent(it.plugin)" target="_blank" rel="noopener">
           <img :src="'/cache/img?url='+encodeURIComponent(it.cover||'')+'&cover=1&plugin='+encodeURIComponent(it.plugin)"
-               class="w-full aspect-[2/3] object-cover bg-zinc-900" loading="lazy" alt="">
+               class="w-full aspect-[2/3] object-contain bg-zinc-900" loading="lazy" alt="">
         </a>
         <div class="p-2">
           <div class="text-xs text-zinc-300 truncate" x-text="it.pluginName"></div>
