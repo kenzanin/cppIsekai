@@ -54,10 +54,12 @@ return function(params)
         local secs = epoch_ms_to_secs(ms)
         local num = chapter_number(label)
         -- comik returns one row per scanlation group: the same chapter number
-        -- arrives 5-10x with different ids. Merge on the number (number 0 =
-        -- unknown label stays per-id); the first row keeps the identity and
+        -- arrives 5-10x with different ids. Merge on the number; a row whose
+        -- label yields no number merges on its title instead ("Chapter 0" and
+        -- "Vol.66 Ch.0" stay separate). The first row keeps the identity and
         -- only the earliest release_at survives.
-        local prev = num ~= 0 and bynum[num] or nil
+        local key = num ~= 0 and num or ("t:" .. (label or ""))
+        local prev = bynum[key]
         if prev then
           if secs and (not prev.release_at or secs < prev.release_at) then
             prev.release_at = secs
@@ -71,9 +73,7 @@ return function(params)
             release_at = secs or 0,
             pages = 0,
           }
-          if num ~= 0 then
-            bynum[num] = item
-          end
+          bynum[key] = item
           out[#out + 1] = item
         end
       end
