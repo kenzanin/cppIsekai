@@ -43,8 +43,11 @@ Result rendered_fetch(const Request& req) {
         cmd += "obscura --stealth --storage-dir data/obscura fetch " + sh_quote(req.url) +
                " --dump html --wait-until networkidle2 --timeout " + std::to_string(req.timeout_ms / 1000);
     } else {
-        // 8s: enough for the challenge JS; more just burns the budget.
-        cmd += "lightpanda fetch " + sh_quote(req.url) + " --dump html --wait-ms 8000";
+        // Challenge JS budget: 8s solved it in Nov 2026 testing, but the page
+        // now regularly needs 15-25s before DOMContentLoaded -- 20s keeps the
+        // coreutils headroom (timeout_ms/1000+15) honest without hanging.
+        // ponytail: per-call wait knob if a second renderer plugin lands.
+        cmd += "lightpanda fetch " + sh_quote(req.url) + " --dump html --wait-ms 20000";
     }
     FILE* p = popen(cmd.c_str(), "r");
     if (!p) {

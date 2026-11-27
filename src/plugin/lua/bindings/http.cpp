@@ -22,6 +22,12 @@ struct HttpOpts {
     std::string accept;
     std::string user_agent;
     bool cookie = false; // per-plugin cookie jar
+    // ponytail: plain TLS path (stock curl via dlnext) segfaults today -- system
+    // easy_perform's internal curl_multi_* resolve to the linked impersonate
+    // lib's copy (unversioned symbols, global scope) and mixed-state crashes
+    // (0x6400000018 in multi_poll). Fix = isolate the pair (unique soname
+    // copy or both built in-process); until then keep plain unused.
+    bool plain = false;
     std::vector<std::pair<std::string, std::string>> headers;
 };
 
@@ -54,6 +60,9 @@ HttpOpts parse_http_opts(const sol::optional<sol::table>& opts, long timeout_ms,
         if (sol::object v = (*opts)["cookie"]; v.get_type() == sol::type::boolean) {
             o.cookie = v.as<bool>();
         }
+        if (sol::object v = (*opts)["plain"]; v.get_type() == sol::type::boolean) {
+            o.plain = v.as<bool>();
+        }
         if (sol::object v = (*opts)["headers"]; v.get_type() == sol::type::table) {
             v.as<sol::table>().for_each([&](const sol::object& k, const sol::object& val) {
                 if (k.get_type() == sol::type::string && val.get_type() == sol::type::string) {
@@ -76,7 +85,7 @@ std::pair<sol::object, std::optional<std::string>> json_fetch(const std::string&
     const std::string profile = checked_profile(std::move(o.profile), o.live_default);
     const std::string cookie_jar = o.cookie ? cookie_jar_path(id) : std::string{};
     const FetchResult fr =
-        fetch_sync(url, o.ms, profile, o.method, o.body, o.accept, o.user_agent, o.headers, proxy, cookie_jar);
+        fetch_sync(url, o.ms, profile, o.method, o.body, o.accept, o.user_agent, o.headers, proxy, cookie_jar, o.plain);
     if (!fr.error.empty()) {
         spdlog::warn("[plugin:{}] json_fetch {} failed: {}", id, url, fr.error);
         return {sol::make_object(ts, sol::lua_nil), std::optional(fr.error)};
@@ -116,7 +125,7 @@ void bind_http(lua_State* L, const HostCtx& ctx) {
         const std::string cookie_jar = o.cookie ? cookie_jar_path(id) : std::string{};
         // The shared sync path (http_client): one option block, retry, impersonation.
         const FetchResult fr =
-            fetch_sync(url, o.ms, profile, o.method, o.body, o.accept, o.user_agent, o.headers, proxy, cookie_jar);
+            fetch_sync(url, o.ms, profile, o.method, o.body, o.accept, o.user_agent, o.headers, proxy, cookie_jar, o.plain);
         if (!fr.error.empty()) {
             return fail(fr.error);
         }
@@ -144,7 +153,7 @@ void bind_http(lua_State* L, const HostCtx& ctx) {
         const std::string profile = checked_profile(std::move(o.profile), o.live_default);
         const std::string cookie_jar = o.cookie ? cookie_jar_path(id) : std::string{};
         const FetchResult fr =
-            fetch_sync(url, o.ms, profile, o.method, o.body, o.accept, o.user_agent, o.headers, proxy, cookie_jar);
+            fetch_sync(url, o.ms, profile, o.method, o.body, o.accept, o.user_agent, o.headers, proxy, cookie_jar, o.plain);
         if (!fr.error.empty()) {
             spdlog::warn("[plugin:{}] fetch_body {} failed: {}", id, url, fr.error);
             return {sol::make_object(ts, sol::lua_nil), std::optional(fr.error)};
@@ -211,3 +220,4 @@ void bind_http(lua_State* L, const HostCtx& ctx) {
 }
 
 } // namespace plugin::lua
+

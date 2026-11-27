@@ -5,7 +5,7 @@ namespace plugin {
 FetchResult fetch_sync(const std::string& url, long timeout_ms, const std::string& profile, const std::string& method,
                        const std::string& body, const std::string& accept_header, const std::string& ua_header,
                        const std::vector<std::pair<std::string, std::string>>& extra_headers, const std::string& proxy,
-                       const std::string& cookie_jar) {
+                       const std::string& cookie_jar, bool plain) {
     fetch::Request req;
     req.url = url;
     req.timeout_ms = timeout_ms;
@@ -16,6 +16,7 @@ FetchResult fetch_sync(const std::string& url, long timeout_ms, const std::strin
     req.ua_header = ua_header;
     req.headers = extra_headers;
     req.cookie_jar = cookie_jar;
+    req.plain = plain;
     return fetch::sync(req, proxy);
 }
 

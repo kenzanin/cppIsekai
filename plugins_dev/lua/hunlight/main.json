@@ -1,0 +1,9 @@
+{
+  "name": "HunlightComics",
+  "version": "1.0.0",
+  "runtime": "lua",
+  "api": 1,
+  "entry": "main.lua",
+  "website": "https://hunlightcomics.com",
+  "site_url": "https://hunlightcomics.com"
+}

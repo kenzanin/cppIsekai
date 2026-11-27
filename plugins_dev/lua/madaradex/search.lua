@@ -10,6 +10,28 @@ local abs_url = c.abs_url
 local manga_url = c.manga_url
 local img_src = c.img_src
 local genre_map = c.genre_map
+
+-- mdx_search: the only machine search endpoint the reader theme exposes
+-- (search.js); empty q answers {success,items={}} like an empty result.
+local function ajax_search(q)
+  local body, err = http_req(AJAX .. "?action=mdx_search&q=" .. host.url_encode(q))
+  if err ~= nil then
+    return { ok = false, error = err }
+  end
+  local ok, data = pcall(json.decode, body)
+  local payload = ok and type(data) == "table" and (data.data or data) or nil
+  if type(payload) ~= "table" or type(payload.items) ~= "table" then
+    return { ok = true, data = { items = {}, total = 0 } }
+  end
+  local items = {}
+  for _, r in ipairs(payload.items) do
+    local slug = type(r.url) == "string" and r.url:match("/title/([^/]+)/?$") or nil
+    if slug then
+      items[#items + 1] = { id = slug, name = host.text.unescape(r.title or ""), cover = r.cover or "" }
+    end
+  end
+  return { ok = true, data = { items = items, total = #items } }
+end
 return function(params)
   local q = host.text.trim(tostring(params.title or params.query or params.q or ""))
   local page = math.max(1, tonumber(params.page) or 1)
@@ -31,9 +53,9 @@ return function(params)
       url = url .. "page/" .. tostring(page) .. "/"
     end
   else
-    -- plain WordPress GET search; this theme's admin-ajax loader answers
-    -- "no-posts" for query strings
-    url = BASE .. "/?s=" .. host.url_encode(q) .. "&post_type=wp-manga"
+    -- the reader theme answers search over admin-ajax (action=mdx_search, JSON
+    -- {items=[{title,url,cover,...}]}); the page HTML renders no result cards.
+    return ajax_search(q)
   end
 
   local body, err = http_req(url)

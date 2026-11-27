@@ -43,7 +43,8 @@ local function get_json(path)
     return nil, ferr
   end
   if body:sub(1, 1) == "<" then
-    body = body:match("<pre>(.*)</pre>") or body
+    -- renderer dumps: <pre>-wrapped (plain) or a full html doc wrapping the json
+    body = body:match("<pre>(.*)</pre>") or body:match("<body>(.*)</body>") or body
   end -- renderer wraps json in <pre>
   local ok, data = pcall(json.decode, body)
   if not ok or type(data) ~= "table" then
