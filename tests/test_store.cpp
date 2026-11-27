@@ -885,9 +885,19 @@ TEST_CASE("Store: chapter flags bitfield (chapter-state 1.3-1.6)") {
         store.chapter_flags_apply(plugin, slug, {"a1"}, false, 1, 0);
         store.chapters_upsert(plugin, slug, {seed("a1", 1), seed("c3", 3)}); // re-parse
         CHECK(store.chapter_flags_get(plugin, slug, "a1") == 1); // bit survived
-        CHECK(store.chapter_flags_get(plugin, slug, "b2") == 0);
+        CHECK(store.chapter_flags_get(plugin, slug, "b2") == 0); // kept: number 2 is past the parsed range
         CHECK(store.chapter_flags_get(plugin, slug, "c3") == 0);
         CHECK_FALSE(store.chapter_flags_get(plugin, "nope", "a1").has_value());
+    }
+
+    SUBCASE("re-parse prunes folded duplicates but keeps a truncated tail") {
+        store.chapters_upsert(plugin, slug, {seed("a1", 1), seed("b2", 1), seed("c3", 40)});
+        // same number, new id = folded duplicate -> gone
+        store.chapters_upsert(plugin, slug, {seed("a1", 1), seed("c3", 40)});
+        CHECK_FALSE(store.chapter_flags_get(plugin, slug, "b2").has_value());
+        // truncated listing (stops at 1) must not delete the tail
+        store.chapters_upsert(plugin, slug, {seed("a1", 1)});
+        CHECK(store.chapter_flags_get(plugin, slug, "c3") == 0);
     }
 
     SUBCASE("RMW set/clear/all via one call; map echoes new values") {

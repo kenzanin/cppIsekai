@@ -1,4 +1,6 @@
 ## 2026-11-27
+* **Update** [2026-11-27T07:13:49Z]: Updated concept `references/comik-chapter-dedup-backlog.md`. — Rewrote the resume checklist as a done-note: root causes, conservative prune rule, live verification numbers.
+* **Update** [2026-11-27T07:13:44Z]: Updated concept `references/comik-chapter-dedup-backlog.md`. — Implemented + verified live: 306 stale rows -> 86 merged chapters, numbers from Ch./Chapter (not the volume digit), folded dup ids pruned conservatively (truncated listings keep their tail).
 * **Relate** [2026-11-27T02:30:42Z]: Linked `references/comik-chapter-dedup-backlog.md` to `findings/comik-search-pagination-2026-11-25.md` (Same plugin (comik), follow-up work after the search pagination fix.). — Linked the comik WIP backlog to the earlier comik search finding.
 * **Creation** [2026-11-27T02:30:39Z]: Documented concept `references/comik-chapter-dedup-backlog.md` (comik chapter dedupe by number + prune of vanished chapter ids (uncommitted WIP, resume here)). — Recorded the in-flight comik chapter dedupe / store prune work as a resume checklist.
 

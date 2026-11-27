@@ -8,6 +8,7 @@
 #include <ctime>
 #include <map>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 using namespace sqlite_orm;
@@ -58,10 +59,14 @@ int Store::chapters_upsert(const std::string& plugin, const std::string& slug,
             return 0;
         }
         auto& e = ephem_create(plugin, slug);
+        std::unordered_set<std::string> keep_ids;
+        std::unordered_set<double> keep_numbers;
         for (const auto& r : rows) {
             if (r.chapter_id.empty()) {
                 continue;
             }
+            keep_ids.insert(r.chapter_id);
+            keep_numbers.insert(r.number);
             auto& c = e.chapters[r.chapter_id];
             const bool fresh = c.title.empty() && c.pages.empty() && c.flags == 0;
             (void)fresh;
@@ -72,6 +77,12 @@ int Store::chapters_upsert(const std::string& plugin, const std::string& slug,
             c.release_at = r.release_at;
             c.updated_at = now;
         }
+        // folded duplicates only: an id the parse dropped whose NUMBER it still
+        // lists (comik merges groups). Numbers past the parse's end stay -- a
+        // truncated listing must not delete real rows.
+        std::erase_if(e.chapters, [&](const auto& kv) {
+            return !keep_ids.contains(kv.first) && keep_numbers.contains(kv.second.number);
+        });
         pair_chapters_fp_set(plugin, slug, fp);
         return static_cast<int>(rows.size());
     }
@@ -130,6 +141,22 @@ int Store::chapters_upsert(const std::string& plugin, const std::string& slug,
     for (auto& e : writes) {
         // composite-PK upsert for new rows; insert() misbinds NOT NULL cols here
         known.contains(e.chapter_id) ? st.update(e) : st.replace(e);
+    }
+    // same contract on the persistent path: drop ids the parse replaced at an
+    // unchanged NUMBER (folded duplicates); rows beyond the parsed range stay.
+    std::unordered_set<double> keep_numbers;
+    std::unordered_set<std::string> keep_ids;
+    for (const auto& e : writes) {
+        keep_ids.insert(e.chapter_id);
+        keep_numbers.insert(e.number);
+    }
+    for (const auto& [id, e] : known) {
+        if (keep_ids.contains(id) || !keep_numbers.contains(e.number)) {
+            continue;
+        }
+        st.remove_all<store_detail::ChapterEntity>(where(
+            c(&store_detail::ChapterEntity::plugin) == plugin && c(&store_detail::ChapterEntity::slug) == slug &&
+            c(&store_detail::ChapterEntity::chapter_id) == id));
     }
     tx.commit();
     pair_chapters_fp_set(plugin, slug, fp); // master column, post-commit (idempotent)
