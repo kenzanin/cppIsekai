@@ -1,4 +1,21 @@
 ## 2026-11-27
+* **Relate** [2026-11-27T15:27:40Z]: Linked `decisions/run-script-singleton.md` to `findings/render-scan-2026-11-27.md` (wedge incident that motivated the guard).
+* **Creation** [2026-11-27T15:27:40Z]: Documented concept `decisions/run-script-singleton.md` (run-cppIsekai.sh: flags --close/--restart only, bare run is singleton-guarded). — Collapse positional/flag duplication to one flag set after user pushback.
+* **Update** [2026-11-27T15:25:23Z]: Updated concept `findings/render-scan-2026-11-27.md`. — Resolution: valirscans removed from live (search dead for impersonated clients; SPA 307). Source kept in plugins_dev; library data survives as orphans by design.
+* **Relate** [2026-11-27T14:12:17Z]: Linked `findings/render-scan-2026-11-27.md` to `findings/plugin-liveness-2026-11-19.md` (same probe shape, earlier liveness pass).
+* **Relate** [2026-11-27T14:12:08Z]: Linked `findings/render-scan-2026-11-27.md` to `architecture/4ucomics-plugin.md` (scan outcome).
+* **Relate** [2026-11-27T14:12:07Z]: Linked `findings/render-scan-2026-11-27.md` to `decisions/renderer-fetch-engines.md` (scan outcome).
+* **Creation** [2026-11-27T14:12:07Z]: Documented concept `findings/render-scan-2026-11-27.md` (Plugin fleet scan 2026-11-27: 3 real breaks, 1 upstream outage, plain-TLS landmine). — Scan found+fixed madaradex/4ucomics, parked valirscans plain-TLS.
+* **Update** [2026-11-27T13:19:23Z]: Updated concept `decisions/chapters-parse-is-whole-list.md`. — de-link the lambda snippet (markdown swallowed it as a link)
+* **Relate** [2026-11-27T13:19:15Z]: Linked `decisions/chapters-parse-is-whole-list.md` to `findings/comik-search-pagination-2026-11-25.md` (related).
+* **Relate** [2026-11-27T13:19:15Z]: Linked `decisions/chapters-parse-is-whole-list.md` to `architecture/chapter-state-flags.md` (related).
+* **Relate** [2026-11-27T13:19:15Z]: Linked `findings/ephem-page-stub-shadows-chapters.md` to `architecture/hunlight-plugin.md` (related).
+* **Relate** [2026-11-27T13:19:15Z]: Linked `findings/ephem-page-stub-shadows-chapters.md` to `architecture/chapter-state-flags.md` (related).
+* **Relate** [2026-11-27T13:19:15Z]: Linked `architecture/hunlight-plugin.md` to `constraints/plugin-chapter-number-placeholders.md` (related).
+* **Relate** [2026-11-27T13:19:14Z]: Linked `architecture/hunlight-plugin.md` to `architecture/plugin-system.md` (related).
+* **Creation** [2026-11-27T13:19:12Z]: Documented concept `decisions/chapters-parse-is-whole-list.md` (A chapters parse is the whole list: upsert prunes upstream-gone identities). — Prune semantics shipped with the comik chapter fold.
+* **Creation** [2026-11-27T13:19:12Z]: Documented concept `findings/ephem-page-stub-shadows-chapters.md` (Unsaved pair: a page-list write minted a bare chapter row that then hid the whole list). — Found via the hunlight live smoke; store fix + regression test.
+* **Creation** [2026-11-27T13:19:03Z]: Documented concept `architecture/hunlight-plugin.md` (hunlight plugin: Madara /m/ permalinks, no genre archives, one-page search). — New hunlight plugin: site shape, limitations, chapter-id scheme.
 * **Update** [2026-11-27T07:13:49Z]: Updated concept `references/comik-chapter-dedup-backlog.md`. — Rewrote the resume checklist as a done-note: root causes, conservative prune rule, live verification numbers.
 * **Update** [2026-11-27T07:13:44Z]: Updated concept `references/comik-chapter-dedup-backlog.md`. — Implemented + verified live: 306 stale rows -> 86 merged chapters, numbers from Ch./Chapter (not the volume digit), folded dup ids pruned conservatively (truncated listings keep their tail).
 * **Relate** [2026-11-27T02:30:42Z]: Linked `references/comik-chapter-dedup-backlog.md` to `findings/comik-search-pagination-2026-11-25.md` (Same plugin (comik), follow-up work after the search pagination fix.). — Linked the comik WIP backlog to the earlier comik search finding.
