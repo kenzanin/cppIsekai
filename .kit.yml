@@ -3,7 +3,7 @@
 # NOTE: project config REPLACES (not merges) map sections of ~/.kit.yml, so the
 # 9router model catalog is mirrored here -- otherwise the /model picker in this
 # repo is empty. Keys come from env (OMNIROUTE_API_KEY), never committed.
-model: openai/free
+model: custom/fixer
 
 providers:
   9router:
@@ -30,7 +30,7 @@ customModels:
     baseUrl: "http://localhost:20128/v1"
     temperature: true
     cost: {input: 0.0, output: 0.0}
-    limit: {context: 262144, output: 8192}
+    limit: {context: 262144, output: 4096}
   librarian:
     name: "9router librarian"
     baseUrl: "http://localhost:20128/v1"
@@ -63,6 +63,9 @@ customModels:
     limit: {context: 262144, output: 8192}
 
 mcpServers:
+  anam:
+    type: local
+    command: ["/home/kenzanin/bin/anam", "mcp"]
   codebase-memory-mcp:
     type: local
     command: ["codebase-memory-mcp"]
