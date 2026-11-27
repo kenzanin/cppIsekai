@@ -1,3 +1,7 @@
+## 2026-11-27
+* **Relate** [2026-11-27T02:30:42Z]: Linked `references/comik-chapter-dedup-backlog.md` to `findings/comik-search-pagination-2026-11-25.md` (Same plugin (comik), follow-up work after the search pagination fix.). — Linked the comik WIP backlog to the earlier comik search finding.
+* **Creation** [2026-11-27T02:30:39Z]: Documented concept `references/comik-chapter-dedup-backlog.md` (comik chapter dedupe by number + prune of vanished chapter ids (uncommitted WIP, resume here)). — Recorded the in-flight comik chapter dedupe / store prune work as a resume checklist.
+
 ## 2026-11-26
 * **Update** [2026-11-26T11:51:34Z]: Updated concept `findings/harimanga-cf-challenge-2026-11-26.md`. — seed-jar is in-band (script eksternal dihapus); cookie_jar_path jadi satu pemilik; image_fetch accessor tunggal; restart form
 * **Relate** [2026-11-26T07:10:48Z]: Linked `decisions/titlestate-split.md` to `decisions/store-raw-handle-reuse.md` (consumer of the moved refresh_title driver).
